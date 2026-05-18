@@ -18,6 +18,10 @@ import {
   type GatewayPolicyDriftCheck,
 } from "./gateway-check";
 import {
+  evaluateRequiredProtectedPathPosture,
+  loadCurrentPostureForContract,
+} from "./protected-path-postures";
+import {
   PROTOCOL_VERSION,
   ReceiptSchema,
   GatewayCheckAttemptSchema,
@@ -26,6 +30,7 @@ import {
   type IsolationState,
   type JsonValue,
   type PolicyDecision,
+  type ProtectedPathPosture,
   type Receipt,
   type GatewayCheckAttempt,
   type GatewayRegistryEntry,
@@ -34,7 +39,7 @@ import {
   loadGatewayCheckSequenceDependencyStates,
   gatewayCheckSequenceDependencyRefusalReason,
 } from "./sequence-dependencies";
-import type { ProtocolStore } from "../storage/store";
+import type { ProtocolStore, StoredProtocolRecord } from "../storage/store";
 import { scopeIdsForContract, scopeIdsForGreenlight } from "../storage/store";
 import { guardGatewayCheckAuthority, type TransitionGuardResult } from "./transitions";
 
@@ -59,12 +64,22 @@ export async function gatewayCheck(
 
   const now = nowIso();
   const gatewayPolicyDrift = await currentGatewayPolicyDrift(store, contract.payload, greenlight.payload);
-  const observedParamsDigest = await digestCanonical(input.observedParameters);
+  const observedParamsDigest = await digestCanonical({
+    parameters: input.observedParameters,
+    secretRefs: contract.payload.secretRefs,
+  });
   const greenlightDigestSeen = await digestCanonical(greenlight.payload as unknown as JsonValue);
   const isolationStates = await store.listIsolationStates([
     ...scopeIdsForContract(contract.payload),
     ...scopeIdsForGreenlight(greenlight.payload),
   ]);
+  const protectedPathPosture = await loadCurrentPostureForContract(store, contract.payload);
+  const protectedPathEvaluation = evaluateRequiredProtectedPathPosture({
+    contract: contract.payload,
+    gateway: contract.payload,
+    posture: protectedPathPosture,
+    now,
+  });
   const sequenceDependencyStates = await loadGatewayCheckSequenceDependencyStates(store, contract.payload);
   const sequenceDependencyReasonCode = gatewayCheckSequenceDependencyRefusalReason(sequenceDependencyStates);
   const gateAttemptId = createId("gat");
@@ -75,6 +90,7 @@ export async function gatewayCheck(
     isolationStates,
     now,
     gatewayPolicyDrift.reasonCode,
+    protectedPathEvaluation.ok ? null : protectedPathEvaluation.reasonCode,
     sequenceDependencyReasonCode,
   );
   const artifacts = buildGateArtifacts({
@@ -88,6 +104,7 @@ export async function gatewayCheck(
     greenlightDigestSeen,
     isolationStates,
     gatewayPolicyDrift,
+    protectedPathPosture,
   });
   const streamRefs = actionLifecycleStreamRefs(contract.payload);
   const events = gateEventDescriptors(artifacts, streamRefs);
@@ -117,6 +134,7 @@ export async function gatewayCheck(
           greenlightDigestSeen,
           isolationStates,
           gatewayPolicyDrift,
+          protectedPathPosture,
         },
         finalizedResult,
       ).map((record) => recorder.buildRecord(record)),
@@ -128,6 +146,7 @@ export async function gatewayCheck(
         observedParamsDigest,
         isolationStates,
         gatewayPolicyDrift,
+        protectedPathPosture,
       });
     }
   }
@@ -159,6 +178,7 @@ async function commitReplayRefusal(
     observedParamsDigest: `sha256:${string}`;
     isolationStates: IsolationState[];
     gatewayPolicyDrift: GatewayPolicyDriftCheck;
+    protectedPathPosture?: StoredProtocolRecord<ProtectedPathPosture> | null;
   },
 ): Promise<GatewayCheckResult> {
   const now = nowIso();
@@ -200,6 +220,7 @@ function buildReplayGateAttempt(
     observedParamsDigest: `sha256:${string}`;
     isolationStates: IsolationState[];
     gatewayPolicyDrift: GatewayPolicyDriftCheck;
+    protectedPathPosture?: StoredProtocolRecord<ProtectedPathPosture> | null;
   },
   greenlightDigestSeen: `sha256:${string}`,
   now: string,
@@ -223,6 +244,9 @@ function buildReplayGateAttempt(
     paramsDigestSeen: context.observedParamsDigest,
     idempotencyKeySeen: contract.idempotencyKey,
     isolationSnapshotRef: isolationSnapshotRef(context.isolationStates),
+    protectedPathPostureIdSeen: context.protectedPathPosture?.payload.protectedPathPostureId ?? null,
+    protectedPathPostureDigestSeen: context.protectedPathPosture?.payload.postureDigest ?? null,
+    protectedPathPostureStateSeen: context.protectedPathPosture?.payload.postureState ?? null,
     gateDecision: "refused",
     gateDecisionReasonCode: "already_consumed",
     consumedGreenlight: false,

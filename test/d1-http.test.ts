@@ -18,8 +18,8 @@ import { verifiedGatewayCheckFromResult } from "../src/protocol/gateway-check-ar
 import { HandshakeClient } from "../src/sdk/client";
 import { proposePackageInstallActionContract } from "../src/runtime/package-install/tool-wrapper";
 import { D1ProtocolStore } from "../src/storage/d1";
-import { futureIso, makeKernelFixture } from "./fixtures";
-import { createD1HttpHarness, type D1HttpHarness } from "./support/d1-http-harness";
+import { futureIso, makeKernelFixture, makePackageInstallCandidate, proposalInputForCompilation } from "./fixtures";
+import { createD1HttpHarness, D1_HARNESS_TRANSITION_TOKEN, type D1HttpHarness } from "./support/d1-http-harness";
 import {
   createPackageManifestSurface,
   packageInstallRuntimeConfig,
@@ -58,6 +58,12 @@ type StreamEventTailRow = {
   offset: number;
   event_digest: string;
 };
+type ProtectedPathPostureCurrentRow = {
+  posture_scope_key: string;
+  protected_path_posture_id: string;
+  tenant_id: string;
+  organization_id: string;
+};
 
 describe("D1-backed Hono protocol surface", () => {
   it("preserves same object ids across different protocol object types", async () => {
@@ -87,6 +93,52 @@ describe("D1-backed Hono protocol surface", () => {
     }
   });
 
+  it("commits protected-path posture record, stream event, and current pointer together", async () => {
+    const harness = await createD1HttpHarness();
+    try {
+      const posture = await harness.post<{ protectedPathPostureId: string; postureScopeKey: string }>("/v0.2/protected-path-postures", {
+        tenantId: "tenant_demo",
+        organizationId: "org_demo",
+        runtimeAdapterId: "runtime_codex",
+        gatewayId: "gateway_preview_deploy_local",
+        actionClass: "preview_deploy.create",
+        resourceRef: "preview:local:demo-web:feature/handshake",
+        protectedSurfaceKind: "preview_deploy",
+        postureState: "gateway_checked",
+        credentialCustodyStatus: "fixture_gateway_held",
+        rawSiblingToolStatus: "blocked",
+        sourceAuthority: "conformance_fixture",
+        reasonCodes: ["local_preview_fixture_only"],
+        evidenceRefs: ["evidence:posture:d1"],
+        expiresAt: futureIso(),
+      });
+
+      const currentRows = await harness.query<ProtectedPathPostureCurrentRow>(
+        `SELECT posture_scope_key, protected_path_posture_id, tenant_id, organization_id
+         FROM protected_path_posture_current
+         WHERE posture_scope_key = ?`,
+        posture.postureScopeKey,
+      );
+      expect(currentRows).toEqual([
+        {
+          posture_scope_key: posture.postureScopeKey,
+          protected_path_posture_id: posture.protectedPathPostureId,
+          tenant_id: "tenant_demo",
+          organization_id: "org_demo",
+        },
+      ]);
+
+      const events = await harness.query<{ event_type: string; payload_json: string }>(
+        "SELECT event_type, payload_json FROM stream_events WHERE event_type = ?",
+        "protected_path_posture_recorded",
+      );
+      expect(events).toHaveLength(1);
+      expect(JSON.parse(events[0]?.payload_json ?? "{}").objectRefs).toContain(posture.protectedPathPostureId);
+    } finally {
+      await harness.dispose();
+    }
+  });
+
   it("persists a contiguous contract stream through pending mutation reconciliation", async () => {
     const harness = await createD1HttpHarness();
     try {
@@ -111,38 +163,13 @@ describe("D1-backed Hono protocol surface", () => {
         generatedCodeOrSpecRefs: ["code:d1-http-generated-plan"],
         declaredAssumptions: ["package name is explicit"],
         requiredEvidenceRefs: ["evidence:package-lock-diff"],
-        candidate: {
-          toolCapabilityId: fixture.tool.toolCapabilityId,
-          actionTypeId: fixture.actionType.actionTypeId,
-          gatewayRegistryEntryId: fixture.gateway.gatewayRegistryEntryId,
-          actionClass: "package.install",
-          gatewayId: fixture.gateway.gatewayId,
-          resourceRef: "npm:hono",
-        },
+        candidate: makePackageInstallCandidate(fixture),
       });
 
       const contract = await harness.post<ActionContractResponse>("/v0.2/action-contracts", {
-        tenantId: "tenant_demo",
-        organizationId: "org_demo",
         intentCompilationId: compilation.intentCompilationId,
-        envelopeId: fixture.envelope.envelopeId,
-        gatewayRegistryEntryId: fixture.gateway.gatewayRegistryEntryId,
-        gatewayId: fixture.gateway.gatewayId,
-        principalId: "principal_demo",
-        agentId: "agent_demo",
-        runId: "run_demo",
-        sequenceNumber: 1,
-        actionClass: "package.install",
-        resourceRef: "npm:hono",
-        parameters: { package: "hono", versionRange: "^4.12.19" },
-        nonSecretParamsSummary: { package: "hono", versionRange: "^4.12.19" },
-        purposeCode: "dependency_add",
-        expectedSideEffectCodes: ["package_json_change", "lockfile_change"],
-        evidenceRefs: ["evidence:package-lock-diff"],
-        bounds: { maxPackages: 1 },
-        idempotencyKey: "idem_d1_http_hono",
-        rollbackHint: "remove package and restore lockfile",
-        expiresAt: futureIso(),
+        candidateActionId: compilation.candidateAction.candidateActionId,
+        candidateDigest: compilation.candidateAction.candidateDigest,
         signingSecret: "test-secret",
       });
 
@@ -157,7 +184,6 @@ describe("D1-backed Hono protocol surface", () => {
         actionContractId: contract.actionContractId,
         greenlightId: policy.greenlight.greenlightId,
         observedParameters: { package: "hono", versionRange: "^4.12.19" },
-        downstreamMode: "pending",
         surfaceOperationRef: "surface-op:d1-pending-install",
       });
       if (!gate.mutationAttempt) throw new Error("expected gateway check to record a mutation attempt");
@@ -420,7 +446,6 @@ describe("D1-backed Hono protocol surface", () => {
         actionContractId: actionContract.actionContractId,
         greenlightId: greenlight.greenlightId,
         observedParameters: { package: "hono", versionRange: "^4.12.19" },
-        downstreamMode: "succeed",
         surfaceOperationRef: "surface-op:d1-receipt-export-install",
       });
       const receiptExport = await client.createReceiptExport({
@@ -466,11 +491,9 @@ describe("D1-backed Hono protocol surface", () => {
         actionContractId: actionContract.actionContractId,
         greenlightId: greenlight.greenlightId,
         observedParameters: { package: "hono", versionRange: "^4.12.19" },
-        downstreamMode: "unknown",
         surfaceOperationRef: "surface-op:d1-recovery-unknown",
       });
-      const proofGapId = gate.proofGap?.proofGapId;
-      if (!proofGapId) throw new Error("expected proof gap before recovery recommendation");
+      const proofGapId = await recordUnknownProofGapThroughClient(client, actionContract, gate);
 
       const recommendation = await client.createRecoveryRecommendation({
         sourceReceiptId: gate.receipt.receiptId,
@@ -505,40 +528,17 @@ describe("D1-backed Hono protocol surface", () => {
         generatedCodeOrSpecRefs: ["code:d1-recovery-follow-up"],
         declaredAssumptions: ["follow-up is narrowed by recovery recommendation"],
         requiredEvidenceRefs: ["gateway_finality_evidence"],
-        candidate: {
-          toolCapabilityId: fixture.tool.toolCapabilityId,
-          actionTypeId: fixture.actionType.actionTypeId,
-          gatewayRegistryEntryId: fixture.gateway.gatewayRegistryEntryId,
-          actionClass: actionContract.actionClass,
-          gatewayId: actionContract.gatewayId,
-          resourceRef: actionContract.resourceRef,
-        },
+        candidate: makePackageInstallCandidate(fixture, {
+          sequenceNumber: actionContract.sequenceNumber + 1,
+          recoveryRecommendationId: recommendation.recoveryRecommendationId,
+          purposeCode: "dependency_add_recovery",
+          evidenceRefs: ["gateway_finality_evidence"],
+          idempotencyKey: "idem_d1_recovery_followup",
+        }),
       });
-      const followUp = await client.proposeActionContract({
-        tenantId: actionContract.tenantId,
-        organizationId: actionContract.organizationId,
-        intentCompilationId: followUpCompilation.intentCompilationId,
-        envelopeId: fixture.envelope.envelopeId,
-        gatewayRegistryEntryId: fixture.gateway.gatewayRegistryEntryId,
-        gatewayId: actionContract.gatewayId,
-        principalId: actionContract.principalId,
-        agentId: actionContract.agentId,
-        runId: actionContract.runId,
-        sequenceNumber: actionContract.sequenceNumber + 1,
-        recoveryRecommendationId: recommendation.recoveryRecommendationId,
-        actionClass: actionContract.actionClass,
-        resourceRef: actionContract.resourceRef,
-        parameters: { package: "hono", versionRange: "^4.12.19" },
-        nonSecretParamsSummary: { package: "hono", versionRange: "^4.12.19" },
-        purposeCode: "dependency_add_recovery",
-        expectedSideEffectCodes: ["package_json_change", "lockfile_change"],
-        evidenceRefs: ["gateway_finality_evidence"],
-        bounds: { maxPackages: 1 },
-        idempotencyKey: "idem_d1_recovery_followup",
-        rollbackHint: "remove package and restore lockfile",
-        expiresAt: futureIso(),
-        signingSecret: "test-secret",
-      });
+      const followUp = await client.proposeActionContract(
+        proposalInputForCompilation(followUpCompilation, "test-secret"),
+      );
 
       expect(followUp.recoveryRecommendationId).toBe(recommendation.recoveryRecommendationId);
       expect(followUp.recoverySourceReceiptId).toBe(gate.receipt.receiptId);
@@ -602,11 +602,9 @@ describe("D1-backed Hono protocol surface", () => {
         actionContractId: actionContract.actionContractId,
         greenlightId: greenlight.greenlightId,
         observedParameters: { package: "hono", versionRange: "^4.12.19" },
-        downstreamMode: "unknown",
         surfaceOperationRef: "surface-op:d1-recovery-expire-unknown",
       });
-      const proofGapId = gate.proofGap?.proofGapId;
-      if (!proofGapId) throw new Error("expected proof gap before recovery expiration");
+      const proofGapId = await recordUnknownProofGapThroughClient(client, actionContract, gate);
 
       const recommendation = await client.createRecoveryRecommendation({
         sourceReceiptId: gate.receipt.receiptId,
@@ -654,11 +652,9 @@ describe("D1-backed Hono protocol surface", () => {
         actionContractId: actionContract.actionContractId,
         greenlightId: greenlight.greenlightId,
         observedParameters: { package: "hono", versionRange: "^4.12.19" },
-        downstreamMode: "unknown",
         surfaceOperationRef: "surface-op:d1-recovery-terminal-race",
       });
-      const proofGapId = gate.proofGap?.proofGapId;
-      if (!proofGapId) throw new Error("expected proof gap before recovery terminal race");
+      const proofGapId = await recordUnknownProofGapThroughClient(client, actionContract, gate);
 
       const recommendation = await client.createRecoveryRecommendation({
         sourceReceiptId: gate.receipt.receiptId,
@@ -733,11 +729,9 @@ describe("D1-backed Hono protocol surface", () => {
         actionContractId: actionContract.actionContractId,
         greenlightId: greenlight.greenlightId,
         observedParameters: { package: "hono", versionRange: "^4.12.19" },
-        downstreamMode: "unknown",
         surfaceOperationRef: "surface-op:d1-recovery-terminal-resolution",
       });
-      const proofGapId = gate.proofGap?.proofGapId;
-      if (!proofGapId) throw new Error("expected proof gap before recovery terminal resolution");
+      const proofGapId = await recordUnknownProofGapThroughClient(client, actionContract, gate);
 
       const recommendation = await client.createRecoveryRecommendation({
         sourceReceiptId: gate.receipt.receiptId,
@@ -885,7 +879,6 @@ describe("D1-backed Hono protocol surface", () => {
         actionContractId: actionContract.actionContractId,
         greenlightId: greenlight.greenlightId,
         observedParameters: { package: "hono", versionRange: "^4.12.19" },
-        downstreamMode: "succeed",
       });
 
       expect(breaker.isolationState.sourceDecisionRef).toBe(breaker.breakerDecision.breakerDecisionId);
@@ -928,7 +921,6 @@ describe("D1-backed Hono protocol surface", () => {
         greenlightId: greenlight.greenlightId,
         observedParameters: { package: "hono", versionRange: "^4.12.19" },
         surfaceOperationRef: "surface-op:d1-http-package-install-proof-gap",
-        downstreamMode: "pending",
       });
       const verifiedGate = verifiedGatewayCheckFromResult(gatewayCheck);
       if (!verifiedGate) throw new Error("expected passed gateway check");
@@ -1013,7 +1005,9 @@ async function createHttpPackageInstallContract(
   harness: D1HttpHarness,
   generatedCodeOrSpecRef: string,
 ) {
-  const client = new HandshakeClient("http://handshake.test", harness.fetch);
+  const client = new HandshakeClient("http://handshake.test", harness.fetch, {
+    transitionToken: D1_HARNESS_TRANSITION_TOKEN,
+  });
   const fixture = makeKernelFixture();
   await registerFixtureObjectsWithClient(client, fixture);
   const surface = await createPackageManifestSurface("handshake-package-d1-e2e-");
@@ -1041,4 +1035,23 @@ async function createHttpPackageInstallContract(
     policyDecision: policy.decision,
     surface,
   };
+}
+
+async function recordUnknownProofGapThroughClient(
+  client: HandshakeClient,
+  actionContract: ActionContract,
+  gate: { mutationAttempt: MutationAttempt | null },
+): Promise<string> {
+  if (!gate.mutationAttempt) throw new Error("expected mutation attempt before recovery proof gap");
+  const reconciliation = await client.reconcileSurfaceOperation({
+    mutationAttemptId: gate.mutationAttempt.mutationAttemptId,
+    idempotencyKey: actionContract.idempotencyKey,
+    observedSurfaceOperationRef: gate.mutationAttempt.surfaceOperationRef,
+    observedDownstreamStatus: "unknown",
+    evidenceRefs: [],
+    resolvedProofGapIds: [],
+  });
+  const proofGapId = reconciliation.createdProofGap?.proofGapId;
+  if (!proofGapId) throw new Error("expected reconciliation-created proof gap");
+  return proofGapId;
 }

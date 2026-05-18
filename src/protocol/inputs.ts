@@ -1,12 +1,83 @@
 import { z } from "zod";
 import {
   BreakerIsolationDecisionSchema,
+  CredentialCustodyStatusSchema,
   IsolationStateSchema,
   JsonValueSchema,
+  PostureSourceAuthoritySchema,
+  ProtectedPathStateSchema,
+  RawSiblingToolStatusSchema,
   RecoveryRecommendationTerminalStatusSchema,
   RecoveryRecommendedPathSchema,
+  RuntimeAccessPostureSchema,
+  RuntimeExecutionShapeSchema,
+  RuntimePostureSchema,
   StreamWatermarkSchema,
 } from "./schemas";
+
+const DigestInputSchema = z.string().regex(/^sha256:[a-f0-9]{64}$/);
+
+export const CreateRuntimeExecutionInputSchema = z.strictObject({
+  tenantId: z.string().min(1),
+  organizationId: z.string().min(1),
+  principalIntentRef: z.string().min(1),
+  principalId: z.string().min(1),
+  agentId: z.string().min(1),
+  runId: z.string().min(1),
+  runtimeAdapterId: z.string().min(1),
+  executionShape: RuntimeExecutionShapeSchema,
+  runtimePosture: RuntimePostureSchema,
+  executionBlockRef: z.string().min(1),
+  executionBlockDigest: DigestInputSchema,
+  generatedCodeOrSpecRefs: z.array(z.string().min(1)).default([]),
+  allowedToolCapabilityIds: z.array(z.string().min(1)).default([]),
+  observedToolCallRefs: z.array(z.string().min(1)).default([]),
+  observedConsequentialCallCount: z.number().int().nonnegative().default(0),
+  loopDetected: z.boolean().default(false),
+  retryDetected: z.boolean().default(false),
+  branchDetected: z.boolean().default(false),
+  dynamicToolConstructionDetected: z.boolean().default(false),
+  unobservedRegionRefs: z.array(z.string().min(1)).default([]),
+  accessPosture: RuntimeAccessPostureSchema,
+  uncertaintyMarkers: z.array(z.string().min(1)).default([]),
+  refusalReasonCodes: z.array(z.string().min(2)).default([]),
+  evidenceRefs: z.array(z.string().min(1)).default([]),
+});
+export type CreateRuntimeExecutionInput = z.input<typeof CreateRuntimeExecutionInputSchema>;
+
+export const CreateProtectedPathPostureInputSchema = z.strictObject({
+  tenantId: z.string().min(1),
+  organizationId: z.string().min(1),
+  runtimeAdapterId: z.string().min(1),
+  gatewayId: z.string().min(1),
+  actionClass: z.string().min(1),
+  resourceRef: z.string().min(1),
+  protectedSurfaceKind: z.string().min(1),
+  postureState: ProtectedPathStateSchema,
+  credentialCustodyStatus: CredentialCustodyStatusSchema,
+  rawSiblingToolStatus: RawSiblingToolStatusSchema,
+  sourceAuthority: PostureSourceAuthoritySchema,
+  reasonCodes: z.array(z.string().min(2)).default([]),
+  evidenceRefs: z.array(z.string().min(1)).default([]),
+  observedAt: z.string().datetime({ offset: true }).optional(),
+  expiresAt: z.string().datetime({ offset: true }),
+});
+export type CreateProtectedPathPostureInput = z.input<typeof CreateProtectedPathPostureInputSchema>;
+
+export const CreateReviewArtifactInputSchema = z.strictObject({
+  actionContractId: z.string().min(1),
+  policyDecisionId: z.string().min(1),
+  reviewArtifactRef: z.string().min(1),
+  reviewRenderSchemaVersion: z.string().min(1),
+  rendererRef: z.string().min(1),
+  renderedContractDigest: DigestInputSchema,
+  renderedPolicyInputDigest: DigestInputSchema,
+  renderedUncertaintyDigest: DigestInputSchema,
+  renderedArtifactDigest: DigestInputSchema,
+  uncertaintyMarkers: z.array(z.string().min(1)).default([]),
+  evidenceRefs: z.array(z.string().min(1)).default([]),
+});
+export type CreateReviewArtifactInput = z.input<typeof CreateReviewArtifactInputSchema>;
 
 export const CompileIntentInputSchema = z.strictObject({
   tenantId: z.string().min(1),
@@ -20,6 +91,7 @@ export const CompileIntentInputSchema = z.strictObject({
   toolCatalogRef: z.string().min(1),
   actionCatalogRef: z.string().min(1),
   gatewayRegistryRef: z.string().min(1),
+  runtimeExecutionId: z.string().min(1).nullable().default(null),
   generatedCodeOrSpecRefs: z.array(z.string()).default([]),
   declaredAssumptions: z.array(z.string()).default([]),
   requiredEvidenceRefs: z.array(z.string()).default([]),
@@ -30,35 +102,28 @@ export const CompileIntentInputSchema = z.strictObject({
     actionClass: z.string().min(1),
     gatewayId: z.string().min(1),
     resourceRef: z.string().min(1),
+    sequenceNumber: z.number().int().nonnegative(),
+    requiredPriorActionContractIds: z.array(z.string().min(1)).default([]),
+    recoveryRecommendationId: z.string().min(1).nullable().default(null),
+    parameters: z.record(z.string(), JsonValueSchema),
+    nonSecretParamsSummary: z.record(z.string(), JsonValueSchema),
+    secretRefs: z.record(z.string(), z.string().min(1)).default({}),
+    purposeCode: z.string().min(1),
+    expectedSideEffectCodes: z.array(z.string().min(1)),
+    evidenceRefs: z.array(z.string()).default([]),
+    bounds: z.record(z.string(), JsonValueSchema).default({}),
+    idempotencyKey: z.string().min(1),
+    rollbackHint: z.string().max(500).nullable().default(null),
+    expiresAt: z.string().datetime({ offset: true }),
   }),
   compilerVersion: z.string().min(1).default("handshake-compiler-0.2"),
 });
 export type CompileIntentInput = z.input<typeof CompileIntentInputSchema>;
 
 export const ProposeActionContractInputSchema = z.strictObject({
-  tenantId: z.string().min(1),
-  organizationId: z.string().min(1),
   intentCompilationId: z.string().min(1),
-  envelopeId: z.string().min(1),
-  gatewayRegistryEntryId: z.string().min(1),
-  gatewayId: z.string().min(1),
-  principalId: z.string().min(1),
-  agentId: z.string().min(1),
-  runId: z.string().min(1),
-  sequenceNumber: z.number().int().nonnegative(),
-  requiredPriorActionContractIds: z.array(z.string().min(1)).default([]),
-  recoveryRecommendationId: z.string().min(1).nullable().default(null),
-  actionClass: z.string().min(1),
-  resourceRef: z.string().min(1),
-  parameters: z.record(z.string(), JsonValueSchema),
-  nonSecretParamsSummary: z.record(z.string(), JsonValueSchema),
-  purposeCode: z.string().min(1),
-  expectedSideEffectCodes: z.array(z.string().min(1)),
-  evidenceRefs: z.array(z.string()).default([]),
-  bounds: z.record(z.string(), JsonValueSchema).default({}),
-  idempotencyKey: z.string().min(1),
-  rollbackHint: z.string().max(500).nullable().default(null),
-  expiresAt: z.string().datetime({ offset: true }),
+  candidateActionId: z.string().min(1),
+  candidateDigest: z.string().regex(/^sha256:[a-f0-9]{64}$/),
   signingSecret: z.string().min(1).optional(),
 });
 export type ProposeActionContractInput = z.input<typeof ProposeActionContractInputSchema>;
@@ -75,9 +140,9 @@ export type EvaluatePolicyInput = z.input<typeof EvaluatePolicyInputSchema>;
 export const CreateReviewDecisionInputSchema = z.strictObject({
   actionContractId: z.string().min(1),
   policyDecisionId: z.string().min(1),
+  reviewArtifactId: z.string().min(1),
+  reviewArtifactDigest: DigestInputSchema,
   reviewerPrincipalId: z.string().min(1),
-  reviewArtifactRef: z.string().min(1),
-  reviewRenderSchemaVersion: z.string().min(1),
   decision: z.enum(["approve", "reject", "needs_changes"]),
   decisionReasonCode: z.string().min(2),
   decisionExpiresAt: z.string().datetime({ offset: true }),
@@ -89,7 +154,6 @@ export const GatewayCheckInputSchema = z.strictObject({
   actionContractId: z.string().min(1),
   greenlightId: z.string().min(1),
   observedParameters: z.record(z.string(), JsonValueSchema),
-  downstreamMode: z.enum(["succeed", "pending", "refuse", "fail", "unknown"]).default("succeed"),
   surfaceOperationRef: z.string().min(1).optional(),
 });
 export type GatewayCheckInput = z.input<typeof GatewayCheckInputSchema>;

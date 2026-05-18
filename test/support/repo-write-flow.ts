@@ -2,6 +2,7 @@ import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { nowIso } from "../../src/protocol/ids";
+import { PROTOCOL_VERSION } from "../../src/protocol/schemas";
 import type {
   ActionType,
   OperatingEnvelope,
@@ -32,7 +33,7 @@ export function makeRepoWriteFixtureObjects(
   const createdAt = nowIso();
   const resourceRef = repoWriteResourceRef(repositoryRef, filePath);
   const tool: ToolCapability = {
-    schemaVersion: "0.2.1",
+    schemaVersion: PROTOCOL_VERSION,
     tenantId: "tenant_demo",
     organizationId: "org_demo",
     createdAt,
@@ -53,7 +54,7 @@ export function makeRepoWriteFixtureObjects(
     supersededAt: null,
   };
   const actionType: ActionType = {
-    schemaVersion: "0.2.1",
+    schemaVersion: PROTOCOL_VERSION,
     tenantId: "tenant_demo",
     organizationId: "org_demo",
     createdAt,
@@ -72,7 +73,7 @@ export function makeRepoWriteFixtureObjects(
     supersededAt: null,
   };
   const gateway: GatewayRegistryEntry = {
-    schemaVersion: "0.2.1",
+    schemaVersion: PROTOCOL_VERSION,
     tenantId: "tenant_demo",
     organizationId: "org_demo",
     createdAt,
@@ -92,10 +93,14 @@ export function makeRepoWriteFixtureObjects(
     canonicalizerVersion: "handshake-jcs-lite-0.2",
     receiptCapabilityStatus: "available",
     isolationCheckCapabilityStatus: "available",
+    credentialCustodyStatus: "gateway_held",
+    enforcementMode: "customer_gateway_adapter",
+    mutationCredentialHolderRef: "secretref:repo-write-token",
+    gatewayAuthorityHolderRef: "gateway-authority:repo-write",
     supersededAt: null,
   };
   const envelope: OperatingEnvelope = {
-    schemaVersion: "0.2.1",
+    schemaVersion: PROTOCOL_VERSION,
     tenantId: "tenant_demo",
     organizationId: "org_demo",
     createdAt,
@@ -106,6 +111,7 @@ export function makeRepoWriteFixtureObjects(
     allowedActionClasses: ["repo.write"],
     allowedGateways: ["gateway_repo_write"],
     allowedResources: [resourceRef],
+    requiredProtectedPathState: "not_required",
     evidenceRequirements: ["repo_file_diff"],
     policyPackRef: "policy:demo",
     policyPackVersion: "v1",

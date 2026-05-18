@@ -1,4 +1,4 @@
-import type { ContractStreamEvent, IsolationState, ProtocolObjectType } from "../protocol/schemas";
+import type { ContractStreamEvent, IsolationState, ProtectedPathPosture, ProtocolObjectType } from "../protocol/schemas";
 import type {
   GreenlightConsumption,
   GreenlightIssuanceClaim,
@@ -6,6 +6,7 @@ import type {
   ProtocolCommitResult,
   ProtocolStore,
   RecoveryTerminalClaim,
+  ProtectedPathPostureIndexEntry,
   GatewayCheckCommit,
   GatewayCheckCommitResult,
   StoredProtocolRecord,
@@ -18,9 +19,21 @@ export class InMemoryProtocolStore implements ProtocolStore {
   private consumptions = new Map<string, GreenlightConsumption>();
   private greenlightIssuanceClaims = new Map<string, GreenlightIssuanceClaim>();
   private recoveryTerminalClaims = new Map<string, RecoveryTerminalClaim>();
+  private currentProtectedPathPostures = new Map<string, ProtectedPathPostureIndexEntry>();
 
   async putRecord(record: StoredProtocolRecord): Promise<void> {
     this.records.set(recordKey(record.objectType, record.objectId), structuredClone(record));
+  }
+
+  async putRecordIfAbsentOrSame(record: StoredProtocolRecord): Promise<"inserted" | "unchanged" | "conflict"> {
+    const key = recordKey(record.objectType, record.objectId);
+    const existing = this.records.get(key);
+    if (!existing) {
+      this.records.set(key, structuredClone(record));
+      return "inserted";
+    }
+    if (existing.canonicalDigest === record.canonicalDigest) return "unchanged";
+    return "conflict";
   }
 
   async getRecord<T>(objectType: ProtocolObjectType, objectId: string): Promise<StoredProtocolRecord<T> | null> {
@@ -57,6 +70,12 @@ export class InMemoryProtocolStore implements ProtocolStore {
         candidate.offset === offset,
     );
     return event ? structuredClone(event) : null;
+  }
+
+  async getCurrentProtectedPathPosture(postureScopeKey: string): Promise<StoredProtocolRecord<ProtectedPathPosture> | null> {
+    const entry = this.currentProtectedPathPostures.get(postureScopeKey);
+    if (!entry) return null;
+    return this.getRecord<ProtectedPathPosture>("protected_path_posture", entry.protectedPathPostureId);
   }
 
   async appendEvent(event: ContractStreamEvent): Promise<void> {
@@ -106,17 +125,22 @@ export class InMemoryProtocolStore implements ProtocolStore {
     const nextEvents = [...this.events];
     const nextGreenlightIssuanceClaims = new Map(this.greenlightIssuanceClaims);
     const nextRecoveryTerminalClaims = new Map(this.recoveryTerminalClaims);
+    const nextCurrentProtectedPathPostures = new Map(this.currentProtectedPathPostures);
     for (const claim of commit.greenlightIssuanceClaims ?? []) {
       nextGreenlightIssuanceClaims.set(claim.actionContractId, structuredClone(claim));
     }
     for (const claim of commit.recoveryTerminalClaims ?? []) {
       nextRecoveryTerminalClaims.set(claim.recoveryRecommendationId, structuredClone(claim));
     }
+    for (const entry of commit.protectedPathPostureIndexEntries ?? []) {
+      nextCurrentProtectedPathPostures.set(entry.postureScopeKey, structuredClone(entry));
+    }
     this.stageRecordsAndEvents(nextRecords, nextEvents, commit.records, commit.events);
     this.records = nextRecords;
     this.events = nextEvents;
     this.greenlightIssuanceClaims = nextGreenlightIssuanceClaims;
     this.recoveryTerminalClaims = nextRecoveryTerminalClaims;
+    this.currentProtectedPathPostures = nextCurrentProtectedPathPostures;
     return "committed";
   }
 

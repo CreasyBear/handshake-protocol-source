@@ -4,6 +4,7 @@ import { HandshakeProtocolError } from "./errors";
 import type { ContractStreamEvent, JsonValue, ProtocolObjectType, ProtocolRecord } from "./schemas";
 import type {
   GreenlightIssuanceClaim,
+  ProtectedPathPostureIndexEntry,
   ProtocolStore,
   RecoveryTerminalClaim,
   StoredProtocolRecord,
@@ -15,6 +16,7 @@ const MAX_STREAM_COMMIT_RETRIES = 3;
 export type CommitRecordsOptions = {
   greenlightIssuanceClaims?: GreenlightIssuanceClaim[];
   recoveryTerminalClaims?: RecoveryTerminalClaim[];
+  protectedPathPostureIndexEntries?: ProtectedPathPostureIndexEntry[];
 };
 
 export class ProtocolRecorder {
@@ -32,6 +34,10 @@ export class ProtocolRecorder {
 
   async persistRecord(record: ProtocolRecord): Promise<void> {
     await this.store.putRecord(await this.buildRecord(record));
+  }
+
+  async persistRecordIfAbsentOrSame(record: ProtocolRecord): Promise<"inserted" | "unchanged" | "conflict"> {
+    return this.store.putRecordIfAbsentOrSame(await this.buildRecord(record));
   }
 
   async buildRecord(record: ProtocolRecord): Promise<StoredProtocolRecord> {

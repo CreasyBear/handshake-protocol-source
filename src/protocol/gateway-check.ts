@@ -1,7 +1,7 @@
 import { createId } from "./ids";
 import type { ActionContract, GateDecision, Greenlight, IsolationState, GatewayRegistryEntry } from "./schemas";
 
-export type DownstreamMode = "succeed" | "pending" | "refuse" | "fail" | "unknown";
+export type DownstreamMode = "pending";
 
 export type GatewayPolicyDriftCheck = {
   status: "same_version" | "compatible_stricter" | "incompatible" | "unknown";
@@ -16,6 +16,7 @@ export function gateRefusalReason(
   isolationStates: IsolationState[],
   now: string,
   gatewayPolicyDriftReasonCode: string | null,
+  protectedPathReasonCode: string | null,
   sequenceDependencyReasonCode: string | null,
 ): string | null {
   if (greenlight.actionContractId !== contract.actionContractId) return "contract_mismatch";
@@ -27,10 +28,12 @@ export function gateRefusalReason(
   if (greenlight.resourceRef !== contract.resourceRef) return "resource_mismatch";
   if (greenlight.paramsDigest !== observedParamsDigest) return "params_mismatch";
   if (greenlight.contractDigest !== contract.actionContractDigest) return "contract_digest_mismatch";
+  if (greenlight.requiredProtectedPathState !== contract.requiredProtectedPathState) return "protected_path_requirement_mismatch";
   if (Date.parse(greenlight.notBefore) > Date.parse(now)) return "greenlight_not_active";
   if (Date.parse(greenlight.expiresAt) <= Date.parse(now)) return "greenlight_expired";
   if (greenlight.consumedAt !== null) return "already_consumed";
   if (gatewayPolicyDriftReasonCode) return gatewayPolicyDriftReasonCode;
+  if (protectedPathReasonCode) return protectedPathReasonCode;
   const blockingIsolation = isolationStates.find((state) =>
     ["review_only", "quarantined", "halted", "revoked", "state_suspect"].includes(state.state),
   );
@@ -50,11 +53,15 @@ export function checkGatewayPolicyDrift(
 
   if (
     currentGateway.gatewayId !== contract.gatewayId ||
-    currentGateway.protectedSurfaceKind.length === 0 ||
+    currentGateway.protectedSurfaceKind !== contract.protectedSurfaceKind ||
     currentGateway.gatewayPolicyContractId !== contract.gatewayPolicyContractId ||
     currentGateway.canonicalizerVersion !== contract.canonicalizerVersion ||
     currentGateway.receiptCapabilityStatus !== "available" ||
-    currentGateway.isolationCheckCapabilityStatus !== "available"
+    currentGateway.isolationCheckCapabilityStatus !== "available" ||
+    currentGateway.credentialCustodyStatus !== contract.credentialCustodyStatus ||
+    currentGateway.enforcementMode !== contract.enforcementMode ||
+    currentGateway.mutationCredentialHolderRef !== contract.mutationCredentialHolderRef ||
+    currentGateway.gatewayAuthorityHolderRef !== contract.gatewayAuthorityHolderRef
   ) {
     return {
       status: "incompatible",
@@ -97,36 +104,24 @@ export function checkGatewayPolicyDrift(
   };
 }
 
-export function mutationOutcomeFor(mode: DownstreamMode) {
-  if (mode === "succeed") return "succeeded";
-  if (mode === "pending") return "submitted";
-  if (mode === "refuse") return "downstream_refused";
-  if (mode === "fail") return "failed";
-  return "unknown";
+export function mutationOutcomeFor() {
+  return "submitted";
 }
 
-export function surfaceOperationRefFor(mode: DownstreamMode, providedRef: string | undefined): string | null {
+export function surfaceOperationRefFor(providedRef: string | undefined): string | null {
   if (providedRef) return providedRef;
-  if (mode === "succeed" || mode === "pending") return createId("sop");
-  return null;
+  return createId("sop");
 }
 
-export function downstreamStatusFor(mode: DownstreamMode, gateDecision: GateDecision) {
+export function downstreamStatusFor(gateDecision: GateDecision) {
   if (gateDecision === "refused") return "not_started";
-  if (mode === "succeed") return "succeeded";
-  if (mode === "pending") return "pending";
-  if (mode === "refuse") return "refused";
-  if (mode === "fail") return "failed";
-  return "unknown";
+  return "pending";
 }
 
-export function receiptFinalityFor(mode: DownstreamMode, gateDecision: GateDecision, hasProofGap: boolean) {
+export function receiptFinalityFor(gateDecision: GateDecision, hasProofGap: boolean) {
   if (hasProofGap || gateDecision === "proof_gap") return "unknown";
   if (gateDecision === "refused") return "suspect";
-  if (mode === "succeed") return "final";
-  if (mode === "pending") return "pending";
-  if (mode === "unknown") return "unknown";
-  return "suspect";
+  return "pending";
 }
 
 export function reconciliationStatusFor(status: "pending" | "succeeded" | "refused" | "failed" | "unknown") {

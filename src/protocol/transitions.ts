@@ -30,6 +30,16 @@ export const PROTOCOL_TRANSITIONS = {
     to: "intent_compilation_recorded",
     guard: "Compilation records uncertainty instead of minting authority.",
   },
+  createRuntimeExecution: {
+    from: "generated_runtime_execution_block",
+    to: "runtime_execution_recorded",
+    guard: "Runtime evidence records orchestration shape only; it cannot mint policy, greenlight, gate, or mutation authority.",
+  },
+  createProtectedPathPosture: {
+    from: "runtime_gateway_surface_probe",
+    to: "protected_path_posture_recorded",
+    guard: "Protected path posture must be append-only and atomically update the current posture pointer.",
+  },
   proposeActionContract: {
     from: "clean_intent_compilation",
     to: "action_proposed",
@@ -48,7 +58,12 @@ export const PROTOCOL_TRANSITIONS = {
   createReviewDecision: {
     from: "review_required",
     to: "review_decision_recorded",
-    guard: "Review may bind only to a policy decision that required review for the exact action contract.",
+    guard: "Review may bind only through a review artifact whose digests match the exact contract, policy input, gateway policy, and uncertainty rendering.",
+  },
+  createReviewArtifact: {
+    from: "review_required",
+    to: "review_artifact_recorded",
+    guard: "Rendered review artifacts must bind to the exact contract digest and policy input digest.",
   },
   createBreakerDecision: {
     from: "observed_contract_stream_window",

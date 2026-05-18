@@ -15,10 +15,14 @@ import {
   ActionContractSchema,
   PROTOCOL_VERSION,
   type ActionContract,
+  type ActionType,
+  type CandidateAction,
   type IntentCompilationRecord,
   type JsonValue,
   type OperatingEnvelope,
+  type RuntimeExecutionRecord,
   type GatewayRegistryEntry,
+  type ToolCapability,
 } from "./schemas";
 import { guardActionProposal, type TransitionGuardResult } from "./transitions";
 
@@ -27,32 +31,61 @@ export async function proposeActionContract(
   inputValue: ProposeActionContractInput,
 ): Promise<ActionContract> {
   const input = ProposeActionContractInputSchema.parse(inputValue);
-  const [compilation, envelopeRecord, gatewayRecord] = await Promise.all([
-    recorder.requiredRecord<IntentCompilationRecord>(
-      "intent_compilation",
-      input.intentCompilationId,
-      "intent_compilation_missing",
-    ),
-    recorder.requiredRecord<OperatingEnvelope>("operating_envelope", input.envelopeId, "envelope_missing"),
+  const compilation = await recorder.requiredRecord<IntentCompilationRecord>(
+    "intent_compilation",
+    input.intentCompilationId,
+    "intent_compilation_missing",
+  );
+  const candidate = compilation.payload.candidateAction;
+  assertCandidateMatchesProposal(candidate, input.candidateActionId, input.candidateDigest);
+  const [envelopeRecord, gatewayRecord, toolRecord, actionTypeRecord, runtimeExecutionRecord] = await Promise.all([
+    recorder.requiredRecord<OperatingEnvelope>("operating_envelope", candidate.operatingEnvelopeId, "envelope_missing"),
     recorder.requiredRecord<GatewayRegistryEntry>(
       "gateway_registry_entry",
-      input.gatewayRegistryEntryId,
+      candidate.gatewayRegistryEntryId,
       "gateway_registry_entry_missing",
     ),
+    recorder.requiredRecord<ToolCapability>("tool_capability", candidate.toolCapabilityId, "tool_capability_missing"),
+    recorder.requiredRecord<ActionType>("action_type", candidate.actionTypeId, "action_type_missing"),
+    candidate.runtimeExecutionId
+      ? recorder.requiredRecord<RuntimeExecutionRecord>(
+          "runtime_execution",
+          candidate.runtimeExecutionId,
+          "runtime_execution_missing",
+        )
+      : Promise.resolve(null),
   ]);
+  assertPinnedDigest("operating_envelope", envelopeRecord.canonicalDigest, candidate.operatingEnvelopeDigest);
+  assertPinnedDigest("gateway_registry_entry", gatewayRecord.canonicalDigest, candidate.gatewayRegistryDigest);
+  assertPinnedDigest("tool_capability", toolRecord.canonicalDigest, candidate.toolCapabilityDigest);
+  assertPinnedDigest("action_type", actionTypeRecord.canonicalDigest, candidate.actionTypeDigest);
+  if (runtimeExecutionRecord) {
+    assertPinnedDigest("runtime_execution", runtimeExecutionRecord.payload.runtimeExecutionDigest, candidate.runtimeExecutionDigest);
+  }
+  const recomputedParamsDigest = await digestCanonical({
+    parameters: candidate.parameters,
+    secretRefs: candidate.secretRefs,
+  });
+  if (recomputedParamsDigest !== candidate.paramsDigest) {
+    throw new HandshakeProtocolError(
+      "candidate_params_digest_mismatch",
+      "Candidate params digest no longer matches stored candidate parameter material.",
+      409,
+    );
+  }
   const envelope = envelopeRecord.payload;
   const gateway = gatewayRecord.payload;
-  const recoveryLinkage = await loadRecoveryActionLinkage(recorder, input.recoveryRecommendationId);
+  const recoveryLinkage = await loadRecoveryActionLinkage(recorder, candidate.recoveryRecommendationId);
 
   assertTransition(
     guardActionProposal({
-      tenantId: input.tenantId,
-      organizationId: input.organizationId,
-      principalId: input.principalId,
-      agentId: input.agentId,
-      runId: input.runId,
-      envelopeId: input.envelopeId,
-      gatewayId: input.gatewayId,
+      tenantId: compilation.payload.tenantId,
+      organizationId: compilation.payload.organizationId,
+      principalId: compilation.payload.principalId,
+      agentId: compilation.payload.agentId,
+      runId: compilation.payload.runId,
+      envelopeId: candidate.operatingEnvelopeId,
+      gatewayId: candidate.gatewayId,
       compilation: compilation.payload,
       envelope,
       gateway,
@@ -60,36 +93,67 @@ export async function proposeActionContract(
   );
 
   const createdAt = nowIso();
-  assertRecoveryActionLinkage(input, recoveryLinkage, createdAt);
-  const paramsDigest = await digestCanonical(input.parameters);
+  assertRecoveryActionLinkage(
+    {
+      tenantId: compilation.payload.tenantId,
+      organizationId: compilation.payload.organizationId,
+      principalId: compilation.payload.principalId,
+      agentId: compilation.payload.agentId,
+      runId: compilation.payload.runId,
+      sequenceNumber: candidate.sequenceNumber,
+      actionClass: candidate.actionClass,
+      gatewayId: candidate.gatewayId,
+      resourceRef: candidate.resourceRef,
+      evidenceRefs: candidate.evidenceRefs,
+    },
+    recoveryLinkage,
+    createdAt,
+  );
   const contractBinding = {
-    tenantId: input.tenantId,
-    organizationId: input.organizationId,
+    tenantId: compilation.payload.tenantId,
+    organizationId: compilation.payload.organizationId,
     intentCompilationId: input.intentCompilationId,
+    candidateActionId: candidate.candidateActionId,
+    candidateDigest: input.candidateDigest,
     envelopeId: envelope.envelopeId,
-    agentId: input.agentId,
-    principalId: input.principalId,
-    runId: input.runId,
-    sequenceNumber: input.sequenceNumber,
-    requiredPriorActionContractIds: input.requiredPriorActionContractIds,
+    operatingEnvelopeDigest: candidate.operatingEnvelopeDigest,
+    agentId: compilation.payload.agentId,
+    principalId: compilation.payload.principalId,
+    runId: compilation.payload.runId,
+    runtimeAdapterId: compilation.payload.runtimeAdapterId,
+    sequenceNumber: candidate.sequenceNumber,
+    requiredPriorActionContractIds: candidate.requiredPriorActionContractIds,
     recoveryRecommendationId: recoveryLinkage?.recommendation.recoveryRecommendationId ?? null,
     recoverySourceReceiptId: recoveryLinkage?.recommendation.sourceReceiptId ?? null,
     recoveryRecommendationDigest: recoveryLinkage?.recommendation.recommendationDigest ?? null,
     issuedAt: createdAt,
-    expiresAt: input.expiresAt,
+    expiresAt: candidate.expiresAt,
     gatewayRegistryEntryId: gateway.gatewayRegistryEntryId,
+    gatewayRegistryDigest: candidate.gatewayRegistryDigest,
     gatewayRegistryVersion: gateway.gatewayRegistryVersion,
     gatewayId: gateway.gatewayId,
     gatewayPolicyContractId: gateway.gatewayPolicyContractId,
     gatewayPolicyVersion: gateway.gatewayPolicyVersion,
-    actionClass: input.actionClass,
-    resourceRef: input.resourceRef,
-    paramsDigest,
-    purposeCode: input.purposeCode,
-    expectedSideEffectCodes: input.expectedSideEffectCodes,
-    evidenceRefs: input.evidenceRefs,
-    bounds: input.bounds,
-    idempotencyKey: input.idempotencyKey,
+    credentialCustodyStatus: gateway.credentialCustodyStatus,
+    enforcementMode: gateway.enforcementMode,
+    mutationCredentialHolderRef: gateway.mutationCredentialHolderRef,
+    gatewayAuthorityHolderRef: gateway.gatewayAuthorityHolderRef,
+    toolCapabilityId: candidate.toolCapabilityId,
+    toolCapabilityDigest: candidate.toolCapabilityDigest,
+    actionTypeId: candidate.actionTypeId,
+    actionTypeDigest: candidate.actionTypeDigest,
+    actionClass: candidate.actionClass,
+    protectedSurfaceKind: actionTypeRecord.payload.protectedSurfaceKind,
+    resourceRef: candidate.resourceRef,
+    requiredProtectedPathState: envelope.requiredProtectedPathState,
+    runtimeExecutionId: candidate.runtimeExecutionId,
+    runtimeExecutionDigest: candidate.runtimeExecutionDigest,
+    paramsDigest: candidate.paramsDigest,
+    purposeCode: candidate.purposeCode,
+    expectedSideEffectCodes: candidate.expectedSideEffectCodes,
+    evidenceRefs: candidate.evidenceRefs,
+    bounds: candidate.bounds,
+    idempotencyKey: candidate.idempotencyKey,
     canonicalizerVersion: CANONICALIZER_VERSION,
   } satisfies JsonValue;
 
@@ -100,9 +164,10 @@ export async function proposeActionContract(
     schemaVersion: PROTOCOL_VERSION,
     createdAt,
     actionContractId: createId("act"),
-    parameters: input.parameters,
-    nonSecretParamsSummary: input.nonSecretParamsSummary,
-    rollbackHint: input.rollbackHint,
+    parameters: candidate.parameters,
+    nonSecretParamsSummary: candidate.nonSecretParamsSummary,
+    secretRefs: candidate.secretRefs,
+    rollbackHint: candidate.rollbackHint,
     actionContractDigest,
     contractSignature,
   });
@@ -162,6 +227,47 @@ export async function proposeActionContract(
     throw error;
   }
   return contract;
+}
+
+function assertCandidateMatchesProposal(candidate: CandidateAction, candidateActionId: string, candidateDigest: string): void {
+  if (candidate.candidateActionId !== candidateActionId) {
+    throw new HandshakeProtocolError(
+      "candidate_action_mismatch",
+      "Proposal candidateActionId must match the candidate embedded in the intent compilation record.",
+      409,
+    );
+  }
+  if (candidate.candidateStatus !== "contractable") {
+    throw new HandshakeProtocolError(
+      "intent_compilation_not_contractable",
+      "Candidate is rejected; no action contract may be emitted.",
+      409,
+    );
+  }
+  if (!candidate.candidateDigest || candidate.candidateDigest !== candidateDigest) {
+    throw new HandshakeProtocolError(
+      "candidate_digest_mismatch",
+      "Proposal candidateDigest must match the candidate embedded in the intent compilation record.",
+      409,
+    );
+  }
+}
+
+function assertPinnedDigest(objectType: string, currentDigest: string, candidateDigest: string | null): void {
+  if (!candidateDigest) {
+    throw new HandshakeProtocolError(
+      "candidate_digest_missing",
+      `Candidate is missing the pinned ${objectType} digest.`,
+      409,
+    );
+  }
+  if (currentDigest !== candidateDigest) {
+    throw new HandshakeProtocolError(
+      "candidate_catalog_digest_drift",
+      `Candidate pinned ${objectType} digest does not match the durable record now loaded for proposal.`,
+      409,
+    );
+  }
 }
 
 function assertTransition(result: TransitionGuardResult): void {

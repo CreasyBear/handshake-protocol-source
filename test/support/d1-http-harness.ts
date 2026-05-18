@@ -2,9 +2,19 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { Database, type SQLQueryBindings } from "bun:sqlite";
 import { createApp, type WorkerBindings } from "../../src/http/app";
+import type { CallerAuthTokens } from "../../src/http/caller-auth";
 import type { HandshakeFetch } from "../../src/sdk/client";
 
 type QueryBinding = string | number | boolean | null;
+
+export const D1_HARNESS_TRANSITION_TOKEN = "test_d1_transition_token";
+
+export const D1_HARNESS_CALLER_AUTH_TOKENS = {
+  control_plane: D1_HARNESS_TRANSITION_TOKEN,
+  runtime_evidence: D1_HARNESS_TRANSITION_TOKEN,
+  gateway_custody: D1_HARNESS_TRANSITION_TOKEN,
+  review_custody: D1_HARNESS_TRANSITION_TOKEN,
+} as const satisfies CallerAuthTokens;
 
 export type D1HttpHarness = {
   db: D1Database;
@@ -21,7 +31,13 @@ export async function createD1HttpHarness(): Promise<D1HttpHarness> {
   const migrationSql = await readFile(join(process.cwd(), "migrations", "0001_protocol_kernel.sql"), "utf8");
   await db.exec(migrationSql);
   const app = createApp();
-  const env = { DB: db } satisfies WorkerBindings;
+  const env = {
+    DB: db,
+    HANDSHAKE_CONTROL_PLANE_TOKEN: D1_HARNESS_CALLER_AUTH_TOKENS.control_plane,
+    HANDSHAKE_RUNTIME_EVIDENCE_TOKEN: D1_HARNESS_CALLER_AUTH_TOKENS.runtime_evidence,
+    HANDSHAKE_GATEWAY_CUSTODY_TOKEN: D1_HARNESS_CALLER_AUTH_TOKENS.gateway_custody,
+    HANDSHAKE_REVIEW_CUSTODY_TOKEN: D1_HARNESS_CALLER_AUTH_TOKENS.review_custody,
+  } satisfies WorkerBindings;
 
   return {
     db,
@@ -131,7 +147,10 @@ class LocalD1PreparedStatement {
 function jsonRequest(body: unknown): RequestInit {
   return {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: {
+      "content-type": "application/json",
+      authorization: `Bearer ${D1_HARNESS_TRANSITION_TOKEN}`,
+    },
     body: JSON.stringify(body),
   };
 }

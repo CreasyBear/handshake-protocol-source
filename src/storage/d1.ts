@@ -1,4 +1,4 @@
-import type { ContractStreamEvent, IsolationState, ProtocolObjectType } from "../protocol/schemas";
+import type { ContractStreamEvent, IsolationState, ProtectedPathPosture, ProtocolObjectType } from "../protocol/schemas";
 import type {
   GreenlightConsumption,
   GreenlightIssuanceClaim,
@@ -6,6 +6,7 @@ import type {
   ProtocolCommitResult,
   ProtocolStore,
   RecoveryTerminalClaim,
+  ProtectedPathPostureIndexEntry,
   GatewayCheckCommit,
   GatewayCheckCommitResult,
   StoredProtocolRecord,
@@ -34,6 +35,32 @@ export class D1ProtocolStore implements ProtocolStore {
         record.sourceEventId,
       )
       .run();
+  }
+
+  async putRecordIfAbsentOrSame(record: StoredProtocolRecord): Promise<"inserted" | "unchanged" | "conflict"> {
+    await this.db
+      .prepare(
+        `INSERT OR IGNORE INTO protocol_records
+          (object_id, object_type, tenant_id, organization_id, schema_version, canonical_digest, payload_json, created_at, source_event_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .bind(
+        record.objectId,
+        record.objectType,
+        record.tenantId,
+        record.organizationId,
+        record.schemaVersion,
+        record.canonicalDigest,
+        JSON.stringify(record.payload),
+        record.createdAt,
+        record.sourceEventId,
+      )
+      .run();
+
+    const existing = await this.getRecord(record.objectType, record.objectId);
+    if (!existing) return "conflict";
+    if (existing.canonicalDigest === record.canonicalDigest) return "unchanged";
+    return "conflict";
   }
 
   async getRecord<T>(objectType: ProtocolObjectType, objectId: string): Promise<StoredProtocolRecord<T> | null> {
@@ -121,6 +148,20 @@ export class D1ProtocolStore implements ProtocolStore {
     return row ? (JSON.parse(row.payload_json) as ContractStreamEvent) : null;
   }
 
+  async getCurrentProtectedPathPosture(postureScopeKey: string): Promise<StoredProtocolRecord<ProtectedPathPosture> | null> {
+    const row = await this.db
+      .prepare(
+        `SELECT protected_path_posture_id
+         FROM protected_path_posture_current
+         WHERE posture_scope_key = ?
+         LIMIT 1`,
+      )
+      .bind(postureScopeKey)
+      .first<{ protected_path_posture_id: string }>();
+    if (!row) return null;
+    return this.getRecord<ProtectedPathPosture>("protected_path_posture", row.protected_path_posture_id);
+  }
+
   async listIsolationStates(scopeIds: string[]): Promise<IsolationState[]> {
     if (scopeIds.length === 0) return [];
     const placeholders = scopeIds.map(() => "?").join(",");
@@ -201,7 +242,10 @@ export class D1ProtocolStore implements ProtocolStore {
   private protocolCommitStatements(
     records: StoredProtocolRecord[],
     events: ContractStreamEvent[],
-    options: Pick<ProtocolCommit, "greenlightIssuanceClaims" | "recoveryTerminalClaims"> = {},
+    options: Pick<
+      ProtocolCommit,
+      "greenlightIssuanceClaims" | "recoveryTerminalClaims" | "protectedPathPostureIndexEntries"
+    > = {},
   ): D1PreparedStatement[] {
     const statements: D1PreparedStatement[] = [];
     for (const claim of options.greenlightIssuanceClaims ?? []) {
@@ -209,6 +253,9 @@ export class D1ProtocolStore implements ProtocolStore {
     }
     for (const claim of options.recoveryTerminalClaims ?? []) {
       statements.push(this.recoveryTerminalClaimStatement(claim));
+    }
+    for (const entry of options.protectedPathPostureIndexEntries ?? []) {
+      statements.push(this.protectedPathPostureIndexStatement(entry));
     }
     for (const record of records) {
       statements.push(this.recordStatement(record));
@@ -319,6 +366,22 @@ export class D1ProtocolStore implements ProtocolStore {
         claim.statusTransitionId,
         claim.nextStatus,
         claim.claimedAt,
+      );
+  }
+
+  private protectedPathPostureIndexStatement(entry: ProtectedPathPostureIndexEntry): D1PreparedStatement {
+    return this.db
+      .prepare(
+        `INSERT OR REPLACE INTO protected_path_posture_current
+          (posture_scope_key, protected_path_posture_id, tenant_id, organization_id, updated_at)
+         VALUES (?, ?, ?, ?, ?)`,
+      )
+      .bind(
+        entry.postureScopeKey,
+        entry.protectedPathPostureId,
+        entry.tenantId,
+        entry.organizationId,
+        entry.updatedAt,
       );
   }
 

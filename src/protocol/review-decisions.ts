@@ -8,6 +8,7 @@ import {
   ReviewDecisionSchema,
   type ActionContract,
   type PolicyDecision,
+  type ReviewArtifactRecord,
   type ReviewDecision,
 } from "./schemas";
 import { guardReviewDecision, type TransitionGuardResult } from "./transitions";
@@ -17,11 +18,13 @@ export async function createReviewDecision(
   inputValue: CreateReviewDecisionInput,
 ): Promise<ReviewDecision> {
   const input = CreateReviewDecisionInputSchema.parse(inputValue);
-  const [contract, policyDecision] = await Promise.all([
+  const [contract, policyDecision, reviewArtifact] = await Promise.all([
     recorder.requiredRecord<ActionContract>("action_contract", input.actionContractId, "contract_missing"),
     recorder.requiredRecord<PolicyDecision>("policy_decision", input.policyDecisionId, "policy_decision_missing"),
+    recorder.requiredRecord<ReviewArtifactRecord>("review_artifact", input.reviewArtifactId, "review_artifact_missing"),
   ]);
   assertTransition(guardReviewDecision(contract.payload, policyDecision.payload));
+  assertReviewArtifactBinding(reviewArtifact.payload, contract.payload, policyDecision.payload, input.reviewArtifactDigest);
 
   const reviewDecision = ReviewDecisionSchema.parse({
     schemaVersion: PROTOCOL_VERSION,
@@ -29,8 +32,10 @@ export async function createReviewDecision(
     organizationId: contract.payload.organizationId,
     createdAt: nowIso(),
     reviewDecisionId: createId("rev"),
-    reviewArtifactRef: input.reviewArtifactRef,
-    reviewRenderSchemaVersion: input.reviewRenderSchemaVersion,
+    reviewArtifactId: reviewArtifact.payload.reviewArtifactId,
+    reviewArtifactRef: reviewArtifact.payload.reviewArtifactRef,
+    reviewArtifactDigest: reviewArtifact.payload.reviewArtifactDigest,
+    reviewRenderSchemaVersion: reviewArtifact.payload.reviewRenderSchemaVersion,
     reviewerPrincipalId: input.reviewerPrincipalId,
     actionContractId: contract.payload.actionContractId,
     actionContractDigest: contract.payload.actionContractDigest,
@@ -43,18 +48,67 @@ export async function createReviewDecision(
   });
 
   await recorder.commitRecordsWithEvents([{ objectType: "review_decision", payload: reviewDecision }], [
-      {
-        source: reviewDecision,
-        eventType: "review_decision_recorded",
-        objectRefs: [reviewDecision.reviewDecisionId, reviewDecision.actionContractId, reviewDecision.policyInputDigest],
-        streamRefs: actionLifecycleStreamRefs(contract.payload),
-        payload: {
+    {
+      source: reviewDecision,
+      eventType: "review_decision_recorded",
+      objectRefs: [
+        reviewDecision.reviewDecisionId,
+        reviewDecision.reviewArtifactId,
+        reviewDecision.actionContractId,
+        reviewDecision.policyInputDigest,
+      ],
+      streamRefs: actionLifecycleStreamRefs(contract.payload),
+      payload: {
         decision: reviewDecision.decision,
         decisionReasonCode: reviewDecision.decisionReasonCode,
       },
     },
   ]);
   return reviewDecision;
+}
+
+function assertReviewArtifactBinding(
+  reviewArtifact: ReviewArtifactRecord,
+  contract: ActionContract,
+  policyDecision: PolicyDecision,
+  suppliedDigest: string,
+): void {
+  if (reviewArtifact.reviewArtifactDigest !== suppliedDigest) {
+    throw new HandshakeProtocolError(
+      "review_artifact_digest_mismatch",
+      "Review decision must supply the exact review artifact digest.",
+      409,
+    );
+  }
+  if (
+    reviewArtifact.actionContractId !== contract.actionContractId ||
+    reviewArtifact.actionContractDigest !== contract.actionContractDigest ||
+    reviewArtifact.renderedContractDigest !== contract.actionContractDigest
+  ) {
+    throw new HandshakeProtocolError(
+      "review_artifact_contract_mismatch",
+      "Review artifact does not bind to the exact action contract digest.",
+      409,
+    );
+  }
+  if (
+    reviewArtifact.policyDecisionId !== policyDecision.policyDecisionId ||
+    reviewArtifact.policyInputDigest !== policyDecision.policyInputDigest ||
+    reviewArtifact.renderedPolicyInputDigest !== policyDecision.policyInputDigest
+  ) {
+    throw new HandshakeProtocolError(
+      "review_artifact_policy_input_mismatch",
+      "Review artifact does not bind to the exact policy input digest.",
+      409,
+    );
+  }
+  if (reviewArtifact.gatewayPolicyVersion !== contract.gatewayPolicyVersion) {
+    throw new HandshakeProtocolError(
+      "review_artifact_gateway_policy_mismatch",
+      "Review artifact gateway policy version does not match the exact action contract.",
+      409,
+    );
+  }
 }
 
 function assertTransition(result: TransitionGuardResult): void {

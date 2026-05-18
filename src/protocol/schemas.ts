@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const PROTOCOL_VERSION = "0.2.1";
+export const PROTOCOL_VERSION = "0.2.3";
 
 export type JsonValue =
   | null
@@ -27,6 +27,82 @@ export const IdSchema = z.string().min(3).max(160);
 export const IsoDateSchema = z.string().datetime({ offset: true });
 export const ReasonCodeSchema = z.string().min(2).max(120);
 export const ResourceRefSchema = z.string().min(1).max(500);
+
+export const RuntimeExecutionShapeSchema = z.enum([
+  "single_tool_call",
+  "generated_mcp_tool_chain",
+  "codemode_block",
+  "shell_exec_block",
+  "browser_action",
+  "scheduled_job",
+  "gateway_only",
+  "unknown",
+]);
+export type RuntimeExecutionShape = z.infer<typeof RuntimeExecutionShapeSchema>;
+
+export const RuntimePostureSchema = z.enum([
+  "prompt_guidance",
+  "hook_assisted",
+  "protected_capability",
+  "bounded_generation",
+  "gateway_enforced_only",
+  "hosted_control_plane",
+  "unknown",
+]);
+export type RuntimePosture = z.infer<typeof RuntimePostureSchema>;
+
+export const RuntimeAccessPostureSchema = z.enum([
+  "isolated",
+  "controlled_outbound",
+  "filesystem_available",
+  "network_available",
+  "secrets_available",
+  "unknown",
+]);
+export type RuntimeAccessPosture = z.infer<typeof RuntimeAccessPostureSchema>;
+
+export const ProtectedPathStateSchema = z.enum([
+  "gateway_checked",
+  "advisory",
+  "bypass_risk",
+  "blind",
+  "fixture_only",
+]);
+export type ProtectedPathState = z.infer<typeof ProtectedPathStateSchema>;
+
+export const RequiredProtectedPathStateSchema = z.enum(["not_required", "gateway_checked"]);
+export type RequiredProtectedPathState = z.infer<typeof RequiredProtectedPathStateSchema>;
+
+export const CredentialCustodyStatusSchema = z.enum([
+  "gateway_held",
+  "fixture_gateway_held",
+  "agent_has_raw_credential",
+  "shared_or_unknown",
+  "no_mutation_credential",
+]);
+export type CredentialCustodyStatus = z.infer<typeof CredentialCustodyStatusSchema>;
+
+export const RawSiblingToolStatusSchema = z.enum(["absent", "blocked", "present", "unknown"]);
+export type RawSiblingToolStatus = z.infer<typeof RawSiblingToolStatusSchema>;
+
+export const PostureSourceAuthoritySchema = z.enum([
+  "runtime_probe",
+  "gateway_probe",
+  "operator_attestation",
+  "conformance_fixture",
+  "hosted_monitor",
+  "unknown",
+]);
+export type PostureSourceAuthority = z.infer<typeof PostureSourceAuthoritySchema>;
+
+export const GatewayEnforcementModeSchema = z.enum([
+  "reference_fixture",
+  "customer_gateway_adapter",
+  "provider_gateway",
+  "hosted_control_plane_only",
+  "unknown",
+]);
+export type GatewayEnforcementMode = z.infer<typeof GatewayEnforcementModeSchema>;
 
 export const ProtocolBaseSchema = z.strictObject({
   schemaVersion: z.literal(PROTOCOL_VERSION),
@@ -88,6 +164,10 @@ export const GatewayRegistryEntrySchema = ProtocolBaseSchema.extend({
   canonicalizerVersion: z.string().min(1),
   receiptCapabilityStatus: z.enum(["available", "unavailable", "unknown"]),
   isolationCheckCapabilityStatus: z.enum(["available", "unavailable", "unknown"]),
+  credentialCustodyStatus: CredentialCustodyStatusSchema,
+  enforcementMode: GatewayEnforcementModeSchema,
+  mutationCredentialHolderRef: z.string().min(1),
+  gatewayAuthorityHolderRef: z.string().min(1),
   supersededAt: IsoDateSchema.nullable(),
 });
 export type GatewayRegistryEntry = z.infer<typeof GatewayRegistryEntrySchema>;
@@ -100,6 +180,7 @@ export const OperatingEnvelopeSchema = ProtocolBaseSchema.extend({
   allowedActionClasses: z.array(z.string().min(1)),
   allowedGateways: z.array(IdSchema),
   allowedResources: z.array(ResourceRefSchema),
+  requiredProtectedPathState: RequiredProtectedPathStateSchema.default("not_required"),
   evidenceRequirements: z.array(z.string()).default([]),
   policyPackRef: z.string().min(1),
   policyPackVersion: z.string().min(1),
@@ -108,6 +189,96 @@ export const OperatingEnvelopeSchema = ProtocolBaseSchema.extend({
   revokedAt: IsoDateSchema.nullable(),
 });
 export type OperatingEnvelope = z.infer<typeof OperatingEnvelopeSchema>;
+
+export const RuntimeExecutionRecordSchema = ProtocolBaseSchema.extend({
+  runtimeExecutionId: IdSchema,
+  principalIntentRef: z.string().min(1),
+  principalId: IdSchema,
+  agentId: IdSchema,
+  runId: IdSchema,
+  runtimeAdapterId: IdSchema,
+  executionShape: RuntimeExecutionShapeSchema,
+  runtimePosture: RuntimePostureSchema,
+  executionBlockRef: z.string().min(1),
+  executionBlockDigest: DigestSchema,
+  generatedCodeOrSpecRefs: z.array(z.string()).default([]),
+  allowedToolCapabilityIds: z.array(IdSchema).default([]),
+  observedToolCallRefs: z.array(z.string().min(1)).default([]),
+  observedConsequentialCallCount: z.number().int().nonnegative(),
+  loopDetected: z.boolean(),
+  retryDetected: z.boolean(),
+  branchDetected: z.boolean(),
+  dynamicToolConstructionDetected: z.boolean(),
+  unobservedRegionRefs: z.array(z.string().min(1)).default([]),
+  accessPosture: RuntimeAccessPostureSchema,
+  uncertaintyMarkers: z.array(z.string().min(1)).default([]),
+  refusalReasonCodes: z.array(ReasonCodeSchema).default([]),
+  evidenceRefs: z.array(z.string().min(1)).default([]),
+  runtimeExecutionDigest: DigestSchema,
+});
+export type RuntimeExecutionRecord = z.infer<typeof RuntimeExecutionRecordSchema>;
+
+export const ProtectedPathPostureSchema = ProtocolBaseSchema.extend({
+  protectedPathPostureId: IdSchema,
+  postureScopeKey: z.string().min(1),
+  runtimeAdapterId: IdSchema,
+  gatewayId: IdSchema,
+  actionClass: z.string().min(1),
+  resourceRef: ResourceRefSchema,
+  protectedSurfaceKind: z.string().min(1),
+  postureState: ProtectedPathStateSchema,
+  credentialCustodyStatus: CredentialCustodyStatusSchema,
+  rawSiblingToolStatus: RawSiblingToolStatusSchema,
+  sourceAuthority: PostureSourceAuthoritySchema,
+  reasonCodes: z.array(ReasonCodeSchema).default([]),
+  evidenceRefs: z.array(z.string().min(1)).default([]),
+  observedAt: IsoDateSchema,
+  expiresAt: IsoDateSchema,
+  postureDigest: DigestSchema,
+});
+export type ProtectedPathPosture = z.infer<typeof ProtectedPathPostureSchema>;
+
+export const CandidateActionStatusSchema = z.enum(["contractable", "rejected"]);
+export type CandidateActionStatus = z.infer<typeof CandidateActionStatusSchema>;
+
+export const CandidateActionSchema = z.strictObject({
+  candidateActionId: IdSchema,
+  candidateStatus: CandidateActionStatusSchema,
+  candidateDigest: DigestSchema.nullable(),
+  refusalReasonCodes: z.array(ReasonCodeSchema).default([]),
+  toolCapabilityId: IdSchema,
+  toolCapabilityDigest: DigestSchema.nullable(),
+  toolCatalogVersion: z.string().min(1).nullable(),
+  actionTypeId: IdSchema,
+  actionTypeDigest: DigestSchema.nullable(),
+  actionCatalogVersion: z.string().min(1).nullable(),
+  gatewayRegistryEntryId: IdSchema,
+  gatewayRegistryDigest: DigestSchema.nullable(),
+  gatewayRegistryVersion: z.string().min(1).nullable(),
+  operatingEnvelopeId: IdSchema,
+  operatingEnvelopeDigest: DigestSchema.nullable(),
+  actionClass: z.string().min(1),
+  gatewayId: IdSchema,
+  resourceRef: ResourceRefSchema,
+  sequenceNumber: z.number().int().nonnegative(),
+  requiredPriorActionContractIds: z.array(IdSchema).default([]),
+  recoveryRecommendationId: IdSchema.nullable(),
+  parameters: z.record(z.string(), JsonValueSchema),
+  paramsDigest: DigestSchema,
+  nonSecretParamsSummary: z.record(z.string(), JsonValueSchema),
+  secretRefs: z.record(z.string(), z.string().min(1)).default({}),
+  purposeCode: z.string().min(1),
+  expectedSideEffectCodes: z.array(z.string().min(1)),
+  evidenceRefs: z.array(z.string()).default([]),
+  bounds: z.record(z.string(), JsonValueSchema).default({}),
+  idempotencyKey: IdSchema,
+  rollbackHint: z.string().max(500).nullable(),
+  expiresAt: IsoDateSchema,
+  generatedCodeOrSpecRefs: z.array(z.string()).default([]),
+  runtimeExecutionId: IdSchema.nullable().default(null),
+  runtimeExecutionDigest: DigestSchema.nullable().default(null),
+});
+export type CandidateAction = z.infer<typeof CandidateActionSchema>;
 
 export const IntentCompilationRecordSchema = ProtocolBaseSchema.extend({
   intentCompilationId: IdSchema,
@@ -120,9 +291,12 @@ export const IntentCompilationRecordSchema = ProtocolBaseSchema.extend({
   toolCatalogRef: z.string().min(1),
   actionCatalogRef: z.string().min(1),
   gatewayRegistryRef: z.string().min(1),
+  runtimeExecutionId: IdSchema.nullable().default(null),
+  runtimeExecutionDigest: DigestSchema.nullable().default(null),
   generatedCodeOrSpecRefs: z.array(z.string()).default([]),
   declaredAssumptions: z.array(z.string()).default([]),
   uncertaintyMarkers: z.array(z.string()).default([]),
+  candidateAction: CandidateActionSchema,
   candidateActionContractRefs: z.array(IdSchema).default([]),
   rejectedCandidateRefs: z.array(IdSchema).default([]),
   overreachReasonCodes: z.array(ReasonCodeSchema).default([]),
@@ -134,10 +308,14 @@ export type IntentCompilationRecord = z.infer<typeof IntentCompilationRecordSche
 export const ActionContractSchema = ProtocolBaseSchema.extend({
   actionContractId: IdSchema,
   intentCompilationId: IdSchema,
+  candidateActionId: IdSchema,
+  candidateDigest: DigestSchema,
   envelopeId: IdSchema,
+  operatingEnvelopeDigest: DigestSchema,
   agentId: IdSchema,
   principalId: IdSchema,
   runId: IdSchema,
+  runtimeAdapterId: IdSchema,
   sequenceNumber: z.number().int().nonnegative(),
   requiredPriorActionContractIds: z.array(IdSchema).default([]),
   recoveryRecommendationId: IdSchema.nullable(),
@@ -146,15 +324,29 @@ export const ActionContractSchema = ProtocolBaseSchema.extend({
   issuedAt: IsoDateSchema,
   expiresAt: IsoDateSchema,
   gatewayRegistryEntryId: IdSchema,
+  gatewayRegistryDigest: DigestSchema,
   gatewayRegistryVersion: z.string().min(1),
   gatewayId: IdSchema,
   gatewayPolicyContractId: IdSchema,
   gatewayPolicyVersion: z.string().min(1),
+  credentialCustodyStatus: CredentialCustodyStatusSchema,
+  enforcementMode: GatewayEnforcementModeSchema,
+  mutationCredentialHolderRef: z.string().min(1),
+  gatewayAuthorityHolderRef: z.string().min(1),
+  toolCapabilityId: IdSchema,
+  toolCapabilityDigest: DigestSchema,
+  actionTypeId: IdSchema,
+  actionTypeDigest: DigestSchema,
   actionClass: z.string().min(1),
+  protectedSurfaceKind: z.string().min(1),
   resourceRef: ResourceRefSchema,
+  requiredProtectedPathState: RequiredProtectedPathStateSchema,
+  runtimeExecutionId: IdSchema.nullable(),
+  runtimeExecutionDigest: DigestSchema.nullable(),
   parameters: z.record(z.string(), JsonValueSchema),
   paramsDigest: DigestSchema,
   nonSecretParamsSummary: z.record(z.string(), JsonValueSchema),
+  secretRefs: z.record(z.string(), z.string().min(1)).default({}),
   purposeCode: z.string().min(1),
   expectedSideEffectCodes: z.array(z.string().min(1)),
   evidenceRefs: z.array(z.string()).default([]),
@@ -199,6 +391,9 @@ export const GreenlightSchema = ProtocolBaseSchema.extend({
   gatewayPolicyVersion: z.string().min(1),
   actionClass: z.string().min(1),
   resourceRef: ResourceRefSchema,
+  requiredProtectedPathState: RequiredProtectedPathStateSchema,
+  protectedPathPostureId: IdSchema.nullable(),
+  protectedPathPostureDigest: DigestSchema.nullable(),
   paramsDigest: DigestSchema,
   contractDigest: DigestSchema,
   maxUses: z.literal(1),
@@ -213,9 +408,31 @@ export const GreenlightSchema = ProtocolBaseSchema.extend({
 });
 export type Greenlight = z.infer<typeof GreenlightSchema>;
 
+export const ReviewArtifactRecordSchema = ProtocolBaseSchema.extend({
+  reviewArtifactId: IdSchema,
+  reviewArtifactRef: z.string().min(1),
+  reviewRenderSchemaVersion: z.string().min(1),
+  rendererRef: z.string().min(1),
+  actionContractId: IdSchema,
+  actionContractDigest: DigestSchema,
+  policyDecisionId: IdSchema,
+  policyInputDigest: DigestSchema,
+  gatewayPolicyVersion: z.string().min(1),
+  renderedContractDigest: DigestSchema,
+  renderedPolicyInputDigest: DigestSchema,
+  renderedUncertaintyDigest: DigestSchema,
+  renderedArtifactDigest: DigestSchema,
+  uncertaintyMarkers: z.array(z.string().min(1)).default([]),
+  evidenceRefs: z.array(z.string().min(1)).default([]),
+  reviewArtifactDigest: DigestSchema,
+});
+export type ReviewArtifactRecord = z.infer<typeof ReviewArtifactRecordSchema>;
+
 export const ReviewDecisionSchema = ProtocolBaseSchema.extend({
   reviewDecisionId: IdSchema,
+  reviewArtifactId: IdSchema,
   reviewArtifactRef: z.string().min(1),
+  reviewArtifactDigest: DigestSchema,
   reviewRenderSchemaVersion: z.string().min(1),
   reviewerPrincipalId: IdSchema,
   actionContractId: IdSchema,
@@ -315,6 +532,9 @@ export const GatewayCheckAttemptSchema = ProtocolBaseSchema.extend({
   paramsDigestSeen: DigestSchema,
   idempotencyKeySeen: IdSchema,
   isolationSnapshotRef: z.string().min(1),
+  protectedPathPostureIdSeen: IdSchema.nullable(),
+  protectedPathPostureDigestSeen: DigestSchema.nullable(),
+  protectedPathPostureStateSeen: ProtectedPathStateSchema.nullable(),
   gateDecision: GateDecisionSchema,
   gateDecisionReasonCode: ReasonCodeSchema,
   consumedGreenlight: z.boolean(),
@@ -543,11 +763,14 @@ export const ContractStreamEventSchema = ProtocolBaseSchema.extend({
   partitionKey: z.string().min(1),
   eventType: z.enum([
     "intent_compiled",
+    "runtime_execution_recorded",
+    "protected_path_posture_recorded",
     "action_proposed",
     "policy_decision_recorded",
     "action_greenlit",
     "action_refused",
     "review_required",
+    "review_artifact_recorded",
     "gateway_checked",
     "mutation_attempted",
     "surface_operation_reconciled",
@@ -576,10 +799,13 @@ export const ProtocolRecordSchema = z.discriminatedUnion("objectType", [
   z.strictObject({ objectType: z.literal("action_type"), payload: ActionTypeSchema }),
   z.strictObject({ objectType: z.literal("gateway_registry_entry"), payload: GatewayRegistryEntrySchema }),
   z.strictObject({ objectType: z.literal("operating_envelope"), payload: OperatingEnvelopeSchema }),
+  z.strictObject({ objectType: z.literal("runtime_execution"), payload: RuntimeExecutionRecordSchema }),
+  z.strictObject({ objectType: z.literal("protected_path_posture"), payload: ProtectedPathPostureSchema }),
   z.strictObject({ objectType: z.literal("intent_compilation"), payload: IntentCompilationRecordSchema }),
   z.strictObject({ objectType: z.literal("action_contract"), payload: ActionContractSchema }),
   z.strictObject({ objectType: z.literal("policy_decision"), payload: PolicyDecisionSchema }),
   z.strictObject({ objectType: z.literal("greenlight"), payload: GreenlightSchema }),
+  z.strictObject({ objectType: z.literal("review_artifact"), payload: ReviewArtifactRecordSchema }),
   z.strictObject({ objectType: z.literal("review_decision"), payload: ReviewDecisionSchema }),
   z.strictObject({ objectType: z.literal("breaker_decision"), payload: BreakerDecisionSchema }),
   z.strictObject({ objectType: z.literal("isolation_state"), payload: IsolationStateSchema }),

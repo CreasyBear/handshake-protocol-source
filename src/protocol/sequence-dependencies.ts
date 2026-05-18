@@ -4,6 +4,7 @@ import type {
   Greenlight,
   PolicyDecision,
   Receipt,
+  SurfaceOperationReconciliation,
 } from "./schemas";
 import type { ProtocolStore } from "../storage/store";
 
@@ -98,7 +99,7 @@ export async function loadGatewayCheckSequenceDependencyStates(
   contract: ActionContract,
 ): Promise<GatewayCheckSequenceDependencyState[]> {
   if (contract.requiredPriorActionContractIds.length === 0) return [];
-  const [policyDecisionRecords, greenlightRecords, receiptRecords] = await Promise.all([
+  const [policyDecisionRecords, greenlightRecords, receiptRecords, reconciliationRecords] = await Promise.all([
     store.listRecordsByType<PolicyDecision>("policy_decision", {
       tenantId: contract.tenantId,
       organizationId: contract.organizationId,
@@ -108,6 +109,10 @@ export async function loadGatewayCheckSequenceDependencyStates(
       organizationId: contract.organizationId,
     }),
     store.listRecordsByType<Receipt>("receipt", {
+      tenantId: contract.tenantId,
+      organizationId: contract.organizationId,
+    }),
+    store.listRecordsByType<SurfaceOperationReconciliation>("surface_operation_reconciliation", {
       tenantId: contract.tenantId,
       organizationId: contract.organizationId,
     }),
@@ -144,7 +149,16 @@ export async function loadGatewayCheckSequenceDependencyStates(
       .map((record) => record.payload)
       .filter((receipt) => receipt.actionContractId === requiredPriorActionContractId);
     const finalPassedReceipt = receipts.find(
-      (receipt) => receipt.gatewayCheckStatus === "passed" && receipt.finalityStatus === "final",
+      (receipt) =>
+        receipt.gatewayCheckStatus === "passed" &&
+        (receipt.finalityStatus === "final" ||
+          reconciliationRecords
+            .map((record) => record.payload)
+            .some(
+              (reconciliation) =>
+                reconciliation.mutationAttemptId === receipt.mutationAttemptId &&
+                reconciliation.finalityStatus === "final",
+            )),
     );
     if (finalPassedReceipt) {
       states.push(
@@ -160,6 +174,12 @@ export async function loadGatewayCheckSequenceDependencyStates(
     }
 
     const latestReceipt = receipts.at(-1) ?? null;
+    const latestReconciliation = latestReceipt?.mutationAttemptId
+      ? reconciliationRecords
+          .map((record) => record.payload)
+          .filter((reconciliation) => reconciliation.mutationAttemptId === latestReceipt.mutationAttemptId)
+          .at(-1) ?? null
+      : null;
     states.push(
       gatewayCheckSequenceState(
         requiredPriorActionContractId,
@@ -171,6 +191,7 @@ export async function loadGatewayCheckSequenceDependencyStates(
         policyDecision ?? null,
         greenlight,
         latestReceipt,
+        latestReconciliation,
       ),
     );
   }
@@ -191,6 +212,7 @@ function gatewayCheckSequenceState(
   policyDecision: PolicyDecision | null = null,
   greenlight: Greenlight | null = null,
   receipt: Receipt | null = null,
+  reconciliation: SurfaceOperationReconciliation | null = null,
 ): GatewayCheckSequenceDependencyState {
   return {
     requiredPriorActionContractId,
@@ -200,7 +222,7 @@ function gatewayCheckSequenceState(
     greenlightId: greenlight?.greenlightId ?? null,
     receiptId: receipt?.receiptId ?? null,
     gatewayCheckStatus: receipt?.gatewayCheckStatus ?? null,
-    finalityStatus: receipt?.finalityStatus ?? null,
+    finalityStatus: reconciliation?.finalityStatus ?? receipt?.finalityStatus ?? null,
   };
 }
 

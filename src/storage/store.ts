@@ -3,6 +3,7 @@ import type {
   ContractStreamEvent,
   Greenlight,
   IsolationState,
+  ProtectedPathPosture,
   ProtocolObjectType,
   ProtocolRecord,
 } from "../protocol/schemas";
@@ -43,6 +44,14 @@ export type RecoveryTerminalClaim = {
   claimedAt: string;
 };
 
+export type ProtectedPathPostureIndexEntry = {
+  postureScopeKey: string;
+  protectedPathPostureId: string;
+  tenantId: string;
+  organizationId: string;
+  updatedAt: string;
+};
+
 export type GatewayCheckCommit = {
   consumption: GreenlightConsumption | null;
   records: StoredProtocolRecord[];
@@ -52,6 +61,7 @@ export type GatewayCheckCommit = {
 export type ProtocolCommit = {
   greenlightIssuanceClaims?: GreenlightIssuanceClaim[];
   recoveryTerminalClaims?: RecoveryTerminalClaim[];
+  protectedPathPostureIndexEntries?: ProtectedPathPostureIndexEntry[];
   records: StoredProtocolRecord[];
   events: ContractStreamEvent[];
 };
@@ -70,10 +80,12 @@ export type StreamTail = {
 
 export interface ProtocolStore {
   putRecord(record: StoredProtocolRecord): Promise<void>;
+  putRecordIfAbsentOrSame(record: StoredProtocolRecord): Promise<"inserted" | "unchanged" | "conflict">;
   getRecord<T>(objectType: ProtocolObjectType, objectId: string): Promise<StoredProtocolRecord<T> | null>;
   listRecordsByType<T>(objectType: ProtocolObjectType, scope?: { tenantId?: string; organizationId?: string }): Promise<StoredProtocolRecord<T>[]>;
   getStreamTail(streamId: string, partitionKey: string): Promise<StreamTail>;
   getStreamEvent(streamId: string, partitionKey: string, offset: number): Promise<ContractStreamEvent | null>;
+  getCurrentProtectedPathPosture(postureScopeKey: string): Promise<StoredProtocolRecord<ProtectedPathPosture> | null>;
   listIsolationStates(scopeIds: string[]): Promise<IsolationState[]>;
   consumeGreenlight(consumption: GreenlightConsumption): Promise<"consumed" | "already_consumed">;
   commitProtocolRecords(commit: ProtocolCommit): Promise<ProtocolCommitResult>;
@@ -90,6 +102,10 @@ export function getObjectId(record: ProtocolRecord): string {
       return record.payload.gatewayRegistryEntryId;
     case "operating_envelope":
       return record.payload.envelopeId;
+    case "runtime_execution":
+      return record.payload.runtimeExecutionId;
+    case "protected_path_posture":
+      return record.payload.protectedPathPostureId;
     case "intent_compilation":
       return record.payload.intentCompilationId;
     case "action_contract":
@@ -98,6 +114,8 @@ export function getObjectId(record: ProtocolRecord): string {
       return record.payload.policyDecisionId;
     case "greenlight":
       return record.payload.greenlightId;
+    case "review_artifact":
+      return record.payload.reviewArtifactId;
     case "review_decision":
       return record.payload.reviewDecisionId;
     case "breaker_decision":

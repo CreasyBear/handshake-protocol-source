@@ -1,10 +1,24 @@
 import { describe, expect, it } from "bun:test";
 import { createApp } from "../src/http/app";
+import type { CallerAuthTokens, TransitionCallerRole } from "../src/http/caller-auth";
 import { HandshakeKernel } from "../src/protocol/kernel";
 import type { ProofGap, RecoveryRecommendationStatusTransition } from "../src/protocol/schemas";
 import { InMemoryProtocolStore } from "../src/storage/memory";
 import type { ProtocolCommit, ProtocolCommitResult } from "../src/storage/store";
-import { createGreenlitContract, makeKernelFixture } from "./fixtures";
+import {
+  createGreenlitContract,
+  makeKernelFixture,
+  makePackageInstallCandidate,
+  proposalInputForCompilation,
+  recordUnknownDownstreamProofGap,
+} from "./fixtures";
+
+const TEST_CALLER_AUTH_TOKENS = {
+  control_plane: "test_control_plane_token",
+  runtime_evidence: "test_runtime_evidence_token",
+  gateway_custody: "test_gateway_custody_token",
+  review_custody: "test_review_custody_token",
+} as const satisfies CallerAuthTokens;
 
 describe("Hono protocol surface", () => {
   it("serves health and OpenAPI metadata", async () => {
@@ -16,16 +30,28 @@ describe("Hono protocol surface", () => {
 
     const openapi = await app.request("/openapi.json");
     expect(openapi.status).toBe(200);
-    expect(await openapi.json()).toMatchObject({ openapi: "3.1.0" });
+    const openapiDocument = (await openapi.json()) as {
+      components: { securitySchemes: Record<string, { type: string; scheme: string }> };
+      openapi: string;
+      paths: Record<string, { post: { security: Array<Record<string, string[]>> } }>;
+    };
+    expect(openapiDocument).toMatchObject({ openapi: "3.1.0" });
+    expect(openapiDocument.components.securitySchemes.handshakeGatewayCustodyBearer).toMatchObject({
+      type: "http",
+      scheme: "bearer",
+    });
+    const gatewayCheckPath = openapiDocument.paths["/v0.2/gateway-check-attempts"];
+    expect(gatewayCheckPath).toBeDefined();
+    expect(gatewayCheckPath?.post.security).toEqual([{ handshakeGatewayCustodyBearer: [] }]);
   });
 
   it("fails closed for state-changing endpoints without durable storage", async () => {
     const fixture = makeKernelFixture();
-    const app = createApp();
+    const app = createApp({ callerAuthTokens: TEST_CALLER_AUTH_TOKENS });
 
     const response = await app.request("/v0.2/catalog/tool-capabilities", {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: jsonHeaders("control_plane"),
       body: JSON.stringify(fixture.tool),
     });
 
@@ -35,13 +61,113 @@ describe("Hono protocol surface", () => {
     });
   });
 
-  it("returns structured gate receipts through HTTP", async () => {
-    const fixture = await createGreenlitContract();
-    const app = createApp({ store: fixture.store });
+  it("requires transition caller auth before parsing state-changing request bodies", async () => {
+    const app = createApp({
+      store: new InMemoryProtocolStore(),
+      callerAuthTokens: TEST_CALLER_AUTH_TOKENS,
+    });
+
+    const response = await app.request("/v0.2/runtime-executions", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ invalid: true }),
+    });
+
+    expect(response.status).toBe(401);
+    expect(await response.json()).toMatchObject({
+      error: { code: "caller_auth_required" },
+    });
+  });
+
+  it("fails closed when transition caller auth is not configured", async () => {
+    const app = createApp({ store: new InMemoryProtocolStore() });
+
+    const response = await app.request("/v0.2/runtime-executions", {
+      method: "POST",
+      headers: jsonHeaders("runtime_evidence"),
+      body: JSON.stringify({ invalid: true }),
+    });
+
+    expect(response.status).toBe(503);
+    expect(await response.json()).toMatchObject({
+      error: { code: "caller_auth_not_configured" },
+    });
+  });
+
+  it("refuses a caller token from the wrong custody role", async () => {
+    const app = createApp({
+      store: new InMemoryProtocolStore(),
+      callerAuthTokens: TEST_CALLER_AUTH_TOKENS,
+    });
 
     const response = await app.request("/v0.2/gateway-check-attempts", {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: jsonHeaders("control_plane"),
+      body: JSON.stringify({ invalid: true }),
+    });
+
+    expect(response.status).toBe(403);
+    expect(await response.json()).toMatchObject({
+      error: { code: "caller_auth_forbidden" },
+    });
+  });
+
+  it("requires control-plane custody for internal record reads", async () => {
+    const app = createApp({
+      store: new InMemoryProtocolStore(),
+      callerAuthTokens: TEST_CALLER_AUTH_TOKENS,
+    });
+
+    const missingAuth = await app.request("/v0.2/records/action_contract/ac_missing");
+    expect(missingAuth.status).toBe(401);
+    expect(await missingAuth.json()).toMatchObject({
+      error: { code: "caller_auth_required" },
+    });
+
+    const wrongRole = await app.request("/v0.2/records/action_contract/ac_missing", {
+      headers: jsonHeaders("runtime_evidence"),
+    });
+    expect(wrongRole.status).toBe(403);
+    expect(await wrongRole.json()).toMatchObject({
+      error: { code: "caller_auth_forbidden" },
+    });
+
+    const controlPlane = await app.request("/v0.2/records/action_contract/ac_missing", {
+      headers: jsonHeaders("control_plane"),
+    });
+    expect(controlPlane.status).toBe(404);
+    expect(await controlPlane.json()).toMatchObject({
+      error: { code: "record_not_found" },
+    });
+  });
+
+  it("returns structured gate receipts through HTTP", async () => {
+    const fixture = await createGreenlitContract();
+    const app = createApp({ store: fixture.store, callerAuthTokens: TEST_CALLER_AUTH_TOKENS });
+
+    const response = await app.request("/v0.2/gateway-check-attempts", {
+      method: "POST",
+      headers: jsonHeaders("gateway_custody"),
+      body: JSON.stringify({
+        actionContractId: fixture.contract.actionContractId,
+        greenlightId: fixture.greenlight.greenlightId,
+        observedParameters: { package: "hono", versionRange: "^4.12.19" },
+      }),
+    });
+
+    expect(response.status).toBe(201);
+    const body = (await response.json()) as { gateAttempt: { gateDecision: string }; receipt: { finalityStatus: string } };
+    expect(body.gateAttempt.gateDecision).toBe("passed");
+    expect(body.receipt.finalityStatus).toBe("pending");
+  });
+
+  it("rejects caller-declared downstream outcomes at the gateway-check route", async () => {
+    const fixture = await createGreenlitContract();
+    const app = createApp({ store: fixture.store, callerAuthTokens: TEST_CALLER_AUTH_TOKENS });
+
+    const response = await app.request("/v0.2/gateway-check-attempts", {
+      method: "POST",
+      headers: jsonHeaders("gateway_custody"),
       body: JSON.stringify({
         actionContractId: fixture.contract.actionContractId,
         greenlightId: fixture.greenlight.greenlightId,
@@ -50,19 +176,17 @@ describe("Hono protocol surface", () => {
       }),
     });
 
-    expect(response.status).toBe(201);
-    const body = (await response.json()) as { gateAttempt: { gateDecision: string }; receipt: { finalityStatus: string } };
-    expect(body.gateAttempt.gateDecision).toBe("passed");
-    expect(body.receipt.finalityStatus).toBe("final");
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({ error: { code: "invalid_request" } });
   });
 
   it("resolves recovery terminal conflict proof gaps through HTTP", async () => {
     const state = await createRecoveryTerminalConflictState();
-    const app = createApp({ store: state.fixture.store });
+    const app = createApp({ store: state.fixture.store, callerAuthTokens: TEST_CALLER_AUTH_TOKENS });
 
     const response = await app.request("/v0.2/recovery-terminal-conflict-resolutions", {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: jsonHeaders("control_plane"),
       body: JSON.stringify({
         proofGapId: state.terminalConflictGap.proofGapId,
         recoveryRecommendationStatusTransitionId:
@@ -86,6 +210,13 @@ describe("Hono protocol surface", () => {
   });
 });
 
+function jsonHeaders(role: TransitionCallerRole): Record<string, string> {
+  return {
+    "content-type": "application/json",
+    authorization: `Bearer ${TEST_CALLER_AUTH_TOKENS[role]}`,
+  };
+}
+
 async function createRecoveryTerminalConflictState() {
   const base = makeKernelFixture();
   const store = new RecoveryTerminalConflictOnceStore();
@@ -94,10 +225,8 @@ async function createRecoveryTerminalConflictState() {
     actionContractId: fixture.contract.actionContractId,
     greenlightId: fixture.greenlight.greenlightId,
     observedParameters: { package: "hono", versionRange: "^4.12.19" },
-    downstreamMode: "unknown",
   });
-  const sourceProofGapId = gate.proofGap?.proofGapId;
-  if (!sourceProofGapId) throw new Error("expected source proof gap");
+  const sourceProofGapId = (await recordUnknownDownstreamProofGap(fixture, gate)).proofGapId;
   const recommendation = await fixture.kernel.createRecoveryRecommendation({
     sourceReceiptId: gate.receipt.receiptId,
     sourceRefusalOrGapRef: sourceProofGapId,
@@ -120,39 +249,15 @@ async function createRecoveryTerminalConflictState() {
     toolCatalogRef: "tool_catalog_demo@v1",
     actionCatalogRef: "action_catalog_demo@v1",
     gatewayRegistryRef: "gateway_registry@v1",
-    candidate: {
-      toolCapabilityId: fixture.tool.toolCapabilityId,
-      actionTypeId: fixture.actionType.actionTypeId,
-      gatewayRegistryEntryId: fixture.gateway.gatewayRegistryEntryId,
-      actionClass: fixture.contract.actionClass,
-      gatewayId: fixture.contract.gatewayId,
-      resourceRef: fixture.contract.resourceRef,
-    },
+    candidate: makePackageInstallCandidate(fixture, {
+      sequenceNumber: fixture.contract.sequenceNumber + 1,
+      recoveryRecommendationId: recommendation.recoveryRecommendationId,
+      purposeCode: "dependency_add_recovery",
+      evidenceRefs: ["gateway_finality_evidence"],
+      idempotencyKey: "idem_http_recovery_terminal",
+    }),
   });
-  const followUpInput = {
-    tenantId: "tenant_demo",
-    organizationId: "org_demo",
-    intentCompilationId: compilation.intentCompilationId,
-    envelopeId: fixture.envelope.envelopeId,
-    gatewayRegistryEntryId: fixture.gateway.gatewayRegistryEntryId,
-    gatewayId: fixture.gateway.gatewayId,
-    principalId: "principal_demo",
-    agentId: "agent_demo",
-    runId: "run_demo",
-    sequenceNumber: fixture.contract.sequenceNumber + 1,
-    recoveryRecommendationId: recommendation.recoveryRecommendationId,
-    actionClass: fixture.contract.actionClass,
-    resourceRef: fixture.contract.resourceRef,
-    parameters: { package: "hono", versionRange: "^4.12.19" },
-    nonSecretParamsSummary: { package: "hono", versionRange: "^4.12.19" },
-    purposeCode: "dependency_add_recovery",
-    expectedSideEffectCodes: ["package_json_change", "lockfile_change"],
-    evidenceRefs: ["gateway_finality_evidence"],
-    bounds: { maxPackages: 1 },
-    idempotencyKey: "idem_http_recovery_terminal_loser",
-    rollbackHint: "remove package and restore lockfile",
-    expiresAt: new Date(Date.now() + 60_000).toISOString(),
-  };
+  const followUpInput = proposalInputForCompilation(compilation);
 
   await expect(fixture.kernel.proposeActionContract(followUpInput)).rejects.toThrow(
     "already has a terminal status transition",
@@ -162,10 +267,7 @@ async function createRecoveryTerminalConflictState() {
     .find((proofGap) => proofGap.reasonCode === "recovery_terminal_conflict");
   if (!terminalConflictGap) throw new Error("expected terminal conflict proof gap");
 
-  await fixture.kernel.proposeActionContract({
-    ...followUpInput,
-    idempotencyKey: "idem_http_recovery_terminal_winner",
-  });
+  await fixture.kernel.proposeActionContract(followUpInput);
   const transitions = await fixture.store.listRecordsByType<RecoveryRecommendationStatusTransition>(
     "recovery_recommendation_status_transition",
   );

@@ -24,10 +24,12 @@ import {
   type JsonValue,
   type MutationAttempt,
   type ProofGap,
+  type ProtectedPathPosture,
   type ProtocolRecord,
   type Receipt,
   type GatewayCheckAttempt,
 } from "./schemas";
+import type { StoredProtocolRecord } from "../storage/store";
 
 export type GatewayCheckResult = {
   gateAttempt: GatewayCheckAttempt;
@@ -60,6 +62,7 @@ export type GatewayCheckArtifactInput = {
   greenlightDigestSeen: `sha256:${string}`;
   isolationStates: IsolationState[];
   gatewayPolicyDrift: GatewayPolicyDriftCheck;
+  protectedPathPosture: StoredProtocolRecord<ProtectedPathPosture> | null;
 };
 
 export function verifiedGatewayCheckFromResult(result: GatewayCheckResult): VerifiedGatewayCheck | null {
@@ -171,11 +174,11 @@ function buildMutationAttempt(input: GatewayCheckArtifactInput): MutationAttempt
     actionClass: input.contract.actionClass,
     resourceRef: input.contract.resourceRef,
     idempotencyKey: input.contract.idempotencyKey,
-    outcome: mutationOutcomeFor(input.input.downstreamMode),
-    outcomeReasonCode: input.input.downstreamMode,
-    surfaceOperationRef: surfaceOperationRefFor(input.input.downstreamMode, input.input.surfaceOperationRef),
+    outcome: mutationOutcomeFor(),
+    outcomeReasonCode: "pending",
+    surfaceOperationRef: surfaceOperationRefFor(input.input.surfaceOperationRef),
     startedAt: input.now,
-    finishedAt: input.input.downstreamMode === "pending" ? null : input.now,
+    finishedAt: null,
   });
 }
 
@@ -217,6 +220,9 @@ function buildGateAttempt(
     paramsDigestSeen: input.observedParamsDigest,
     idempotencyKeySeen: input.contract.idempotencyKey,
     isolationSnapshotRef: isolationSnapshotRef(input.isolationStates),
+    protectedPathPostureIdSeen: input.protectedPathPosture?.payload.protectedPathPostureId ?? null,
+    protectedPathPostureDigestSeen: input.protectedPathPosture?.payload.postureDigest ?? null,
+    protectedPathPostureStateSeen: input.protectedPathPosture?.payload.postureState ?? null,
     gateDecision,
     gateDecisionReasonCode: reasonCode,
     consumedGreenlight: !input.refusal,
@@ -247,14 +253,14 @@ function buildReceipt(
     gatewayCheckStatus: gateAttempt.gateDecision,
     greenlightConsumptionStatus: !input.refusal ? "consumed" : input.refusal === "already_consumed" ? "replayed" : "not_consumed",
     mutationAttemptStatus: mutationAttempt?.outcome ?? "not_attempted",
-    downstreamExecutionStatus: downstreamStatusFor(input.input.downstreamMode, gateAttempt.gateDecision),
+    downstreamExecutionStatus: downstreamStatusFor(gateAttempt.gateDecision),
     proofGapIds: proofGap ? [proofGap.proofGapId] : [],
     evidenceRefs: input.contract.evidenceRefs,
     streamEventIds: [],
     streamOffsets: [],
     receiptDigest: null,
     auditChainDigest: null,
-    finalityStatus: receiptFinalityFor(input.input.downstreamMode, gateAttempt.gateDecision, proofGap !== null),
+    finalityStatus: receiptFinalityFor(gateAttempt.gateDecision, proofGap !== null),
     emittedAt: input.now,
   });
 }

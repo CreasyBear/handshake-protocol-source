@@ -47,6 +47,7 @@ describe("package install runtime wrapper", () => {
       "unknown_tool_capability",
       "unknown_action_type",
       "unknown_gateway_registry_entry",
+      "unknown_operating_envelope",
     ]);
     expect(fixture.store.countRecordsOfType("intent_compilation")).toBe(1);
     expect(fixture.store.countRecordsOfType("action_contract")).toBe(0);

@@ -61,6 +61,7 @@ export async function proposePackageInstallActionContract(
   toolCallValue: PackageInstallToolCall,
 ): Promise<PackageInstallRuntimeResult> {
   const toolCall = PackageInstallToolCallSchema.parse(toolCallValue);
+  const parameters = { package: toolCall.package, versionRange: toolCall.versionRange };
   const intentCompilation = await protocol.compileIntent({
     tenantId: config.tenantId,
     organizationId: config.organizationId,
@@ -83,6 +84,19 @@ export async function proposePackageInstallActionContract(
       actionClass: "package.install",
       gatewayId: config.gatewayId,
       resourceRef: `npm:${toolCall.package}`,
+      sequenceNumber: toolCall.sequenceNumber,
+      requiredPriorActionContractIds: toolCall.requiredPriorActionContractIds,
+      recoveryRecommendationId: null,
+      parameters,
+      nonSecretParamsSummary: parameters,
+      secretRefs: {},
+      purposeCode: "dependency_add",
+      expectedSideEffectCodes: ["package_json_change", "lockfile_change"],
+      evidenceRefs: ["evidence:package-manifest-diff"],
+      bounds: { maxPackages: 1 },
+      idempotencyKey: `package-install:${config.runId}:${toolCall.sequenceNumber}:${toolCall.package}`,
+      rollbackHint: "remove package and restore manifest from receipt evidence",
+      expiresAt: config.contractExpiresAt,
     },
   });
 
@@ -95,29 +109,15 @@ export async function proposePackageInstallActionContract(
   }
 
   const actionContract = await protocol.proposeActionContract({
-    tenantId: config.tenantId,
-    organizationId: config.organizationId,
     intentCompilationId: intentCompilation.intentCompilationId,
-    envelopeId: config.operatingEnvelopeId,
-    gatewayRegistryEntryId: config.gatewayRegistryEntryId,
-    gatewayId: config.gatewayId,
-    principalId: config.principalId,
-    agentId: config.agentId,
-    runId: config.runId,
-    sequenceNumber: toolCall.sequenceNumber,
-    requiredPriorActionContractIds: toolCall.requiredPriorActionContractIds,
-    actionClass: "package.install",
-    resourceRef: `npm:${toolCall.package}`,
-    parameters: { package: toolCall.package, versionRange: toolCall.versionRange },
-    nonSecretParamsSummary: { package: toolCall.package, versionRange: toolCall.versionRange },
-    purposeCode: "dependency_add",
-    expectedSideEffectCodes: ["package_json_change", "lockfile_change"],
-    evidenceRefs: ["evidence:package-manifest-diff"],
-    bounds: { maxPackages: 1 },
-    idempotencyKey: `package-install:${config.runId}:${toolCall.sequenceNumber}:${toolCall.package}`,
-    rollbackHint: "remove package and restore manifest from receipt evidence",
-    expiresAt: config.contractExpiresAt,
+    candidateActionId: intentCompilation.candidateAction.candidateActionId,
+    candidateDigest: requireCandidateDigest(intentCompilation.candidateAction.candidateDigest),
     signingSecret: config.signingSecret,
   });
   return { outcome: "action_contract_proposed", intentCompilation, actionContract };
+}
+
+function requireCandidateDigest(candidateDigest: string | null): string {
+  if (!candidateDigest) throw new Error("Contractable candidate is missing candidateDigest.");
+  return candidateDigest;
 }

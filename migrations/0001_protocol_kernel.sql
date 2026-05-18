@@ -51,6 +51,17 @@ CREATE TABLE IF NOT EXISTS recovery_terminal_claims (
 CREATE INDEX IF NOT EXISTS idx_recovery_terminal_claims_status
   ON recovery_terminal_claims (next_status, claimed_at);
 
+CREATE TABLE IF NOT EXISTS protected_path_posture_current (
+  posture_scope_key TEXT PRIMARY KEY,
+  protected_path_posture_id TEXT NOT NULL,
+  tenant_id TEXT NOT NULL,
+  organization_id TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_protected_path_posture_current_scope
+  ON protected_path_posture_current (tenant_id, organization_id, posture_scope_key);
+
 CREATE TABLE IF NOT EXISTS stream_events (
   stream_event_id TEXT PRIMARY KEY,
   tenant_id TEXT NOT NULL,

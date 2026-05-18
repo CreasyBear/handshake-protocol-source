@@ -10,13 +10,23 @@ describe("reference repo write gateway adapter", () => {
       actionContractId: fixture.contract.actionContractId,
       greenlightId: fixture.greenlight.greenlightId,
       observedParameters: { package: "hono", versionRange: "^4.12.19" },
-      downstreamMode: "unknown",
     });
+    const nonAuthoritativeGate = {
+      ...proofGapGate,
+      gateAttempt: {
+        ...proofGapGate.gateAttempt,
+        gateDecision: "proof_gap" as const,
+        gateDecisionReasonCode: "gateway_receipt_unavailable",
+        consumedGreenlight: false,
+        mutationAttemptId: null,
+      },
+      mutationAttempt: null,
+    };
     const surface = await createRepoWriteSurface("handshake-repo-write-proof-gap-");
 
     const result = await runRepoWriteGateway({
       protocol: {
-        gatewayCheck: async () => proofGapGate,
+        gatewayCheck: async () => nonAuthoritativeGate,
         reconcileSurfaceOperation: async () => {
           throw new Error("proof-gap gate must not reconcile through the adapter");
         },

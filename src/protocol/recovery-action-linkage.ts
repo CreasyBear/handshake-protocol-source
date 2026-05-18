@@ -1,5 +1,4 @@
 import { HandshakeProtocolError } from "./errors";
-import type { ProposeActionContractInputSchema } from "./inputs";
 import type { ProtocolRecorder } from "./records";
 import type {
   ActionContract,
@@ -7,7 +6,18 @@ import type {
   RecoveryRecommendedPath,
 } from "./schemas";
 
-type ParsedActionContractInput = ReturnType<typeof ProposeActionContractInputSchema.parse>;
+type RecoveryFollowupCandidate = {
+  tenantId: string;
+  organizationId: string;
+  principalId: string;
+  agentId: string;
+  runId: string;
+  sequenceNumber: number;
+  actionClass: string;
+  gatewayId: string;
+  resourceRef: string;
+  evidenceRefs: string[];
+};
 
 export type RecoveryActionLinkage = {
   recommendation: RecoveryRecommendation;
@@ -36,7 +46,7 @@ export async function loadRecoveryActionLinkage(
 }
 
 export function assertRecoveryActionLinkage(
-  input: ParsedActionContractInput,
+  input: RecoveryFollowupCandidate,
   linkage: RecoveryActionLinkage | null,
   now: string,
 ): void {

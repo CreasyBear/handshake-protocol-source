@@ -1,9 +1,12 @@
 import { describe, expect, it } from "bun:test";
 import { HandshakeProtocolError } from "../src/protocol/errors";
 import { HandshakeKernel } from "../src/protocol/kernel";
+import { protectedPathPostureScopeKeyForContract } from "../src/protocol/protected-path-postures";
+import { ProtocolRecorder } from "../src/protocol/records";
 import { digestCanonical } from "../src/protocol/canonical";
 import type {
   ContractStreamEvent,
+  GatewayRegistryEntry,
   ProofGap,
   ProtocolObjectType,
   RecoveryRecommendationStatusTransition,
@@ -16,7 +19,15 @@ import type {
   GatewayCheckCommitResult,
   StoredProtocolRecord,
 } from "../src/storage/store";
-import { createGreenlitContract, makeKernelFixture, registerFixtureObjects } from "./fixtures";
+import {
+  createGreenlitContract,
+  futureIso,
+  makeKernelFixture,
+  makePackageInstallCandidate,
+  proposalInputForCompilation,
+  recordUnknownDownstreamProofGap,
+  registerFixtureObjects,
+} from "./fixtures";
 
 describe("Handshake kernel invariants", () => {
   it("records compiler uncertainty when catalog and gateway records are not durable", async () => {
@@ -34,21 +45,155 @@ describe("Handshake kernel invariants", () => {
       toolCatalogRef: "tool_catalog_demo@v1",
       actionCatalogRef: "action_catalog_demo@v1",
       gatewayRegistryRef: "gateway_registry@v1",
-      candidate: {
+      candidate: makePackageInstallCandidate(fixture, {
         toolCapabilityId: "tool_not_registered",
         actionTypeId: "atype_not_registered",
         gatewayRegistryEntryId: "gateway_not_registered",
-        actionClass: "package.install",
-        gatewayId: "gateway_package_manager",
-        resourceRef: "npm:hono",
-      },
+      }),
     });
 
     expect(compilation.uncertaintyMarkers).toEqual([
       "unknown_tool_capability",
       "unknown_action_type",
       "unknown_gateway_registry_entry",
+      "unknown_operating_envelope",
     ]);
+  });
+
+  it("records runtime execution evidence without minting authority", async () => {
+    const fixture = makeKernelFixture();
+    const executionBlockDigest = await digestCanonical({ code: "await tools.package.install({ package: 'hono' })" });
+
+    const runtimeExecution = await fixture.kernel.createRuntimeExecution({
+      tenantId: "tenant_demo",
+      organizationId: "org_demo",
+      principalIntentRef: "intent:install hono",
+      principalId: "principal_demo",
+      agentId: "agent_demo",
+      runId: "run_demo",
+      runtimeAdapterId: "runtime_codex",
+      executionShape: "codemode_block",
+      runtimePosture: "bounded_generation",
+      executionBlockRef: "codemode:block:1",
+      executionBlockDigest,
+      generatedCodeOrSpecRefs: ["code:codemode-block"],
+      allowedToolCapabilityIds: [fixture.tool.toolCapabilityId],
+      observedToolCallRefs: ["tool-call:package-install"],
+      observedConsequentialCallCount: 1,
+      loopDetected: false,
+      retryDetected: false,
+      branchDetected: true,
+      dynamicToolConstructionDetected: false,
+      unobservedRegionRefs: [],
+      accessPosture: "controlled_outbound",
+      uncertaintyMarkers: ["branch_condition_observed"],
+      refusalReasonCodes: [],
+      evidenceRefs: ["trace:codemode-block"],
+    });
+
+    expect(runtimeExecution.executionShape).toBe("codemode_block");
+    expect(runtimeExecution.runtimeExecutionDigest).toMatch(/^sha256:/);
+    expect(fixture.store.countRecordsOfType("runtime_execution")).toBe(1);
+    expect(fixture.store.countRecordsOfType("policy_decision")).toBe(0);
+    expect(fixture.store.countRecordsOfType("greenlight")).toBe(0);
+    expect(fixture.store.countRecordsOfType("gateway_check_attempt")).toBe(0);
+  });
+
+  it("links multiple compilations to one runtime block and refuses dynamic tool construction", async () => {
+    const fixture = makeKernelFixture();
+    await registerFixtureObjects(fixture);
+    const runtimeExecution = await fixture.kernel.createRuntimeExecution({
+      tenantId: "tenant_demo",
+      organizationId: "org_demo",
+      principalIntentRef: "intent:install hono",
+      principalId: "principal_demo",
+      agentId: "agent_demo",
+      runId: "run_demo",
+      runtimeAdapterId: "runtime_codex",
+      executionShape: "codemode_block",
+      runtimePosture: "bounded_generation",
+      executionBlockRef: "codemode:block:multi",
+      executionBlockDigest: await digestCanonical({ code: "for (const p of packages) await tools[p.tool](p)" }),
+      generatedCodeOrSpecRefs: ["code:codemode-multi"],
+      allowedToolCapabilityIds: [fixture.tool.toolCapabilityId],
+      observedToolCallRefs: ["tool-call:package-install:1", "tool-call:package-install:2"],
+      observedConsequentialCallCount: 2,
+      loopDetected: true,
+      retryDetected: false,
+      branchDetected: false,
+      dynamicToolConstructionDetected: false,
+      unobservedRegionRefs: [],
+      accessPosture: "controlled_outbound",
+    });
+
+    const first = await fixture.kernel.compileIntent({
+      tenantId: "tenant_demo",
+      organizationId: "org_demo",
+      principalIntentRef: "intent:install hono",
+      principalId: "principal_demo",
+      agentId: "agent_demo",
+      runId: "run_demo",
+      runtimeAdapterId: "runtime_codex",
+      operatingEnvelopeId: fixture.envelope.envelopeId,
+      toolCatalogRef: "tool_catalog_demo@v1",
+      actionCatalogRef: "action_catalog_demo@v1",
+      gatewayRegistryRef: "gateway_registry@v1",
+      runtimeExecutionId: runtimeExecution.runtimeExecutionId,
+      candidate: makePackageInstallCandidate(fixture, { idempotencyKey: "idem_runtime_one" }),
+    });
+    const second = await fixture.kernel.compileIntent({
+      tenantId: "tenant_demo",
+      organizationId: "org_demo",
+      principalIntentRef: "intent:install hono",
+      principalId: "principal_demo",
+      agentId: "agent_demo",
+      runId: "run_demo",
+      runtimeAdapterId: "runtime_codex",
+      operatingEnvelopeId: fixture.envelope.envelopeId,
+      toolCatalogRef: "tool_catalog_demo@v1",
+      actionCatalogRef: "action_catalog_demo@v1",
+      gatewayRegistryRef: "gateway_registry@v1",
+      runtimeExecutionId: runtimeExecution.runtimeExecutionId,
+      candidate: makePackageInstallCandidate(fixture, { idempotencyKey: "idem_runtime_two", sequenceNumber: 2 }),
+    });
+
+    expect(first.runtimeExecutionId).toBe(runtimeExecution.runtimeExecutionId);
+    expect(second.runtimeExecutionDigest).toBe(runtimeExecution.runtimeExecutionDigest);
+
+    const dynamicRuntime = await fixture.kernel.createRuntimeExecution({
+      tenantId: "tenant_demo",
+      organizationId: "org_demo",
+      principalIntentRef: "intent:dynamic tool",
+      principalId: "principal_demo",
+      agentId: "agent_demo",
+      runId: "run_demo",
+      runtimeAdapterId: "runtime_codex",
+      executionShape: "codemode_block",
+      runtimePosture: "bounded_generation",
+      executionBlockRef: "codemode:block:dynamic",
+      executionBlockDigest: await digestCanonical({ code: "await tools[name](args)" }),
+      observedConsequentialCallCount: 1,
+      dynamicToolConstructionDetected: true,
+      accessPosture: "controlled_outbound",
+    });
+    const rejected = await fixture.kernel.compileIntent({
+      tenantId: "tenant_demo",
+      organizationId: "org_demo",
+      principalIntentRef: "intent:dynamic tool",
+      principalId: "principal_demo",
+      agentId: "agent_demo",
+      runId: "run_demo",
+      runtimeAdapterId: "runtime_codex",
+      operatingEnvelopeId: fixture.envelope.envelopeId,
+      toolCatalogRef: "tool_catalog_demo@v1",
+      actionCatalogRef: "action_catalog_demo@v1",
+      gatewayRegistryRef: "gateway_registry@v1",
+      runtimeExecutionId: dynamicRuntime.runtimeExecutionId,
+      candidate: makePackageInstallCandidate(fixture, { idempotencyKey: "idem_dynamic_tool" }),
+    });
+
+    expect(rejected.candidateAction.candidateStatus).toBe("rejected");
+    expect(rejected.overreachReasonCodes).toContain("runtime_dynamic_tool_construction_detected");
   });
 
   it("does not emit an action contract when compilation has an unwrapped consequential tool", async () => {
@@ -68,36 +213,16 @@ describe("Handshake kernel invariants", () => {
       toolCatalogRef: "tool_catalog_demo@v1",
       actionCatalogRef: "action_catalog_demo@v1",
       gatewayRegistryRef: "gateway_registry@v1",
-      candidate: {
+      candidate: makePackageInstallCandidate({ ...fixture, tool: unsafeTool }, {
         toolCapabilityId: unsafeTool.toolCapabilityId,
-        actionTypeId: fixture.actionType.actionTypeId,
-        gatewayRegistryEntryId: fixture.gateway.gatewayRegistryEntryId,
-        actionClass: "package.install",
-        gatewayId: fixture.gateway.gatewayId,
-        resourceRef: "npm:hono",
-      },
+      }),
     });
 
     await expect(
       fixture.kernel.proposeActionContract({
-        tenantId: "tenant_demo",
-        organizationId: "org_demo",
         intentCompilationId: compilation.intentCompilationId,
-        envelopeId: fixture.envelope.envelopeId,
-        gatewayRegistryEntryId: fixture.gateway.gatewayRegistryEntryId,
-        gatewayId: fixture.gateway.gatewayId,
-        principalId: "principal_demo",
-        agentId: "agent_demo",
-        runId: "run_demo",
-        sequenceNumber: 1,
-        actionClass: "package.install",
-        resourceRef: "npm:hono",
-        parameters: { package: "hono" },
-        nonSecretParamsSummary: { package: "hono" },
-        purposeCode: "dependency_add",
-        expectedSideEffectCodes: ["package_json_change"],
-        idempotencyKey: "idem_unsafe",
-        expiresAt: new Date(Date.now() + 60_000).toISOString(),
+        candidateActionId: compilation.candidateAction.candidateActionId,
+        candidateDigest: "sha256:0000000000000000000000000000000000000000000000000000000000000000",
         signingSecret: "test-secret",
       }),
     ).rejects.toThrow(HandshakeProtocolError);
@@ -118,39 +243,154 @@ describe("Handshake kernel invariants", () => {
       toolCatalogRef: "tool_catalog_demo@v1",
       actionCatalogRef: "action_catalog_demo@v1",
       gatewayRegistryRef: "gateway_registry@v1",
-      candidate: {
-        toolCapabilityId: fixture.tool.toolCapabilityId,
-        actionTypeId: fixture.actionType.actionTypeId,
-        gatewayRegistryEntryId: fixture.gateway.gatewayRegistryEntryId,
-        actionClass: "package.install",
-        gatewayId: fixture.gateway.gatewayId,
-        resourceRef: "npm:hono",
-      },
+      candidate: makePackageInstallCandidate(fixture, { gatewayId: "gateway_forged" }),
     });
 
     await expect(
       fixture.kernel.proposeActionContract({
+        intentCompilationId: compilation.intentCompilationId,
+        candidateActionId: compilation.candidateAction.candidateActionId,
+        candidateDigest: "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+        signingSecret: "test-secret",
+      }),
+    ).rejects.toThrow("Candidate is rejected");
+  });
+
+  it("refuses proposal when the caller supplies a mismatched candidate digest", async () => {
+    const fixture = makeKernelFixture();
+    await registerFixtureObjects(fixture);
+    const compilation = await fixture.kernel.compileIntent({
+      tenantId: "tenant_demo",
+      organizationId: "org_demo",
+      principalIntentRef: "intent:install hono",
+      principalId: "principal_demo",
+      agentId: "agent_demo",
+      runId: "run_demo",
+      runtimeAdapterId: "runtime_codex",
+      operatingEnvelopeId: fixture.envelope.envelopeId,
+      toolCatalogRef: "tool_catalog_demo@v1",
+      actionCatalogRef: "action_catalog_demo@v1",
+      gatewayRegistryRef: "gateway_registry@v1",
+      candidate: makePackageInstallCandidate(fixture),
+    });
+
+    await expect(
+      fixture.kernel.proposeActionContract({
+        intentCompilationId: compilation.intentCompilationId,
+        candidateActionId: compilation.candidateAction.candidateActionId,
+        candidateDigest: "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      }),
+    ).rejects.toThrow("candidateDigest must match");
+  });
+
+  it("derives authority-bearing action contract fields from the compiled candidate", async () => {
+    const fixture = makeKernelFixture();
+    await registerFixtureObjects(fixture);
+    const compilation = await fixture.kernel.compileIntent({
+      tenantId: "tenant_demo",
+      organizationId: "org_demo",
+      principalIntentRef: "intent:install hono",
+      principalId: "principal_demo",
+      agentId: "agent_demo",
+      runId: "run_demo",
+      runtimeAdapterId: "runtime_codex",
+      operatingEnvelopeId: fixture.envelope.envelopeId,
+      toolCatalogRef: "tool_catalog_demo@v1",
+      actionCatalogRef: "action_catalog_demo@v1",
+      gatewayRegistryRef: "gateway_registry@v1",
+      candidate: makePackageInstallCandidate(fixture, {
+        parameters: { package: "hono", versionRange: "^4.12.19", installMode: "dev" },
+        nonSecretParamsSummary: { package: "hono", versionRange: "^4.12.19", installMode: "dev" },
+        bounds: { maxPackages: 1, devDependency: true },
+      }),
+    });
+
+    const contract = await fixture.kernel.proposeActionContract(proposalInputForCompilation(compilation));
+    const candidateDigest = compilation.candidateAction.candidateDigest;
+    if (!candidateDigest) throw new Error("expected contractable candidate digest");
+
+    expect(contract.candidateActionId).toBe(compilation.candidateAction.candidateActionId);
+    expect(contract.candidateDigest).toBe(candidateDigest);
+    expect(contract.gatewayId).toBe(compilation.candidateAction.gatewayId);
+    expect(contract.resourceRef).toBe(compilation.candidateAction.resourceRef);
+    expect(contract.parameters).toEqual(compilation.candidateAction.parameters);
+    expect(contract.paramsDigest).toBe(compilation.candidateAction.paramsDigest);
+  });
+
+  it("keeps bootstrap catalog and envelope registration idempotent for same digest and rejects same-id replacement", async () => {
+    const fixture = makeKernelFixture();
+
+    await fixture.kernel.putCatalogObject({ objectType: "tool_capability", payload: fixture.tool });
+    await fixture.kernel.putCatalogObject({ objectType: "tool_capability", payload: fixture.tool });
+    expect(fixture.store.countRecordsOfType("tool_capability")).toBe(1);
+
+    await expect(
+      fixture.kernel.putCatalogObject({
+        objectType: "tool_capability",
+        payload: { ...fixture.tool, toolCatalogVersion: "v2" },
+      }),
+    ).rejects.toThrow("immutable by object id");
+  });
+
+  it("rejects secret-bearing top-level parameters and stores only secret refs plus non-secret params", async () => {
+    const fixture = makeKernelFixture();
+    const secretAwareTool = { ...fixture.tool, secretBearingFields: ["authToken"] };
+    await registerFixtureObjects({ ...fixture, tool: secretAwareTool });
+
+    await expect(
+      fixture.kernel.compileIntent({
         tenantId: "tenant_demo",
         organizationId: "org_demo",
-        intentCompilationId: compilation.intentCompilationId,
-        envelopeId: fixture.envelope.envelopeId,
-        gatewayRegistryEntryId: fixture.gateway.gatewayRegistryEntryId,
-        gatewayId: "gateway_forged",
+        principalIntentRef: "intent:install hono with token",
         principalId: "principal_demo",
         agentId: "agent_demo",
         runId: "run_demo",
-        sequenceNumber: 1,
-        actionClass: "package.install",
-        resourceRef: "npm:hono",
-        parameters: { package: "hono" },
-        nonSecretParamsSummary: { package: "hono" },
-        purposeCode: "dependency_add",
-        expectedSideEffectCodes: ["package_json_change"],
-        idempotencyKey: "idem_forged_gateway",
-        expiresAt: new Date(Date.now() + 60_000).toISOString(),
-        signingSecret: "test-secret",
+        runtimeAdapterId: "runtime_codex",
+        operatingEnvelopeId: fixture.envelope.envelopeId,
+        toolCatalogRef: "tool_catalog_demo@v1",
+        actionCatalogRef: "action_catalog_demo@v1",
+        gatewayRegistryRef: "gateway_registry@v1",
+        candidate: makePackageInstallCandidate({ ...fixture, tool: secretAwareTool }, {
+          parameters: { package: "hono", versionRange: "^4.12.19", authToken: "raw-token-value" },
+          nonSecretParamsSummary: { package: "hono", versionRange: "^4.12.19" },
+          secretRefs: { authToken: "secretref:package-manager-token" },
+        }),
       }),
-    ).rejects.toThrow("gateway");
+    ).rejects.toThrow("Secret-bearing parameter authToken");
+
+    const compilation = await fixture.kernel.compileIntent({
+      tenantId: "tenant_demo",
+      organizationId: "org_demo",
+      principalIntentRef: "intent:install hono with token ref",
+      principalId: "principal_demo",
+      agentId: "agent_demo",
+      runId: "run_demo",
+      runtimeAdapterId: "runtime_codex",
+      operatingEnvelopeId: fixture.envelope.envelopeId,
+      toolCatalogRef: "tool_catalog_demo@v1",
+      actionCatalogRef: "action_catalog_demo@v1",
+      gatewayRegistryRef: "gateway_registry@v1",
+      candidate: makePackageInstallCandidate({ ...fixture, tool: secretAwareTool }, {
+        secretRefs: { authToken: "secretref:package-manager-token" },
+      }),
+    });
+    const contract = await fixture.kernel.proposeActionContract(proposalInputForCompilation(compilation));
+    const policy = await fixture.kernel.evaluatePolicy({
+      actionContractId: contract.actionContractId,
+      envelopeId: fixture.envelope.envelopeId,
+    });
+    if (!policy.greenlight) throw new Error("expected greenlight for secret-ref candidate");
+    const gate = await fixture.kernel.gatewayCheck({
+      actionContractId: contract.actionContractId,
+      greenlightId: policy.greenlight.greenlightId,
+      observedParameters: contract.parameters,
+    });
+
+    const storedActionContract = await fixture.store.getRecord("action_contract", contract.actionContractId);
+    const storedReceipt = await fixture.store.getRecord("receipt", gate.receipt.receiptId);
+    expect(contract.secretRefs).toEqual({ authToken: "secretref:package-manager-token" });
+    expect(gate.gateAttempt.gateDecision).toBe("passed");
+    expect(JSON.stringify([compilation, storedActionContract, storedReceipt])).not.toContain("raw-token-value");
   });
 
   it("rejects direct writes for lifecycle-owned protocol objects", async () => {
@@ -206,6 +446,122 @@ describe("Handshake kernel invariants", () => {
     expect(store.countRecordsOfType("greenlight")).toBe(1);
   });
 
+  it("requires fresh gateway_checked protected-path posture before policy can greenlight", async () => {
+    const fixture = await createContractRequiringGatewayCheckedPosture();
+
+    const missingPosture = await fixture.kernel.evaluatePolicy({
+      actionContractId: fixture.contract.actionContractId,
+      envelopeId: fixture.envelope.envelopeId,
+    });
+    expect(missingPosture.decision.decision).toBe("refuse");
+    expect(missingPosture.decision.decisionReasonCode).toBe("protected_path_posture_missing");
+    expect(missingPosture.greenlight).toBeNull();
+
+    await fixture.kernel.createProtectedPathPosture({
+      tenantId: "tenant_demo",
+      organizationId: "org_demo",
+      runtimeAdapterId: "runtime_codex",
+      gatewayId: fixture.gateway.gatewayId,
+      actionClass: "package.install",
+      resourceRef: fixture.contract.resourceRef,
+      protectedSurfaceKind: "package_manager",
+      postureState: "gateway_checked",
+      credentialCustodyStatus: "gateway_held",
+      rawSiblingToolStatus: "blocked",
+      sourceAuthority: "runtime_probe",
+      reasonCodes: ["runtime_observed_wrapper"],
+      evidenceRefs: ["evidence:posture:runtime-probe"],
+      expiresAt: futureIso(),
+    });
+    const weakSource = await fixture.kernel.evaluatePolicy({
+      actionContractId: fixture.contract.actionContractId,
+      envelopeId: fixture.envelope.envelopeId,
+    });
+    expect(weakSource.decision.decision).toBe("refuse");
+    expect(weakSource.decision.decisionReasonCode).toBe("protected_path_source_authority_weak");
+    expect(weakSource.greenlight).toBeNull();
+
+    const posture = await fixture.kernel.createProtectedPathPosture({
+      tenantId: "tenant_demo",
+      organizationId: "org_demo",
+      runtimeAdapterId: "runtime_codex",
+      gatewayId: fixture.gateway.gatewayId,
+      actionClass: "package.install",
+      resourceRef: fixture.contract.resourceRef,
+      protectedSurfaceKind: "package_manager",
+      postureState: "gateway_checked",
+      credentialCustodyStatus: "gateway_held",
+      rawSiblingToolStatus: "blocked",
+      sourceAuthority: "conformance_fixture",
+      reasonCodes: ["local_fixture_gateway_checked"],
+      evidenceRefs: ["evidence:posture:local-fixture"],
+      expiresAt: futureIso(),
+    });
+    const currentPosture = await fixture.store.getCurrentProtectedPathPosture(
+      protectedPathPostureScopeKeyForContract(fixture.contract),
+    );
+    expect(currentPosture?.payload.protectedPathPostureId).toBe(posture.protectedPathPostureId);
+
+    const greenlit = await fixture.kernel.evaluatePolicy({
+      actionContractId: fixture.contract.actionContractId,
+      envelopeId: fixture.envelope.envelopeId,
+    });
+    expect(greenlit.decision.decision).toBe("greenlight");
+    expect(greenlit.greenlight?.protectedPathPostureId).toBe(posture.protectedPathPostureId);
+    expect(greenlit.greenlight?.protectedPathPostureDigest).toBe(posture.postureDigest);
+  });
+
+  it("refuses at the gateway when protected-path posture drifts unsafe after greenlight", async () => {
+    const fixture = await createContractRequiringGatewayCheckedPosture("idem_posture_drift");
+    await fixture.kernel.createProtectedPathPosture({
+      tenantId: "tenant_demo",
+      organizationId: "org_demo",
+      runtimeAdapterId: "runtime_codex",
+      gatewayId: fixture.gateway.gatewayId,
+      actionClass: "package.install",
+      resourceRef: fixture.contract.resourceRef,
+      protectedSurfaceKind: "package_manager",
+      postureState: "gateway_checked",
+      credentialCustodyStatus: "gateway_held",
+      rawSiblingToolStatus: "blocked",
+      sourceAuthority: "conformance_fixture",
+      expiresAt: futureIso(),
+    });
+    const policy = await fixture.kernel.evaluatePolicy({
+      actionContractId: fixture.contract.actionContractId,
+      envelopeId: fixture.envelope.envelopeId,
+    });
+    if (!policy.greenlight) throw new Error("expected greenlight with safe posture");
+
+    await fixture.kernel.createProtectedPathPosture({
+      tenantId: "tenant_demo",
+      organizationId: "org_demo",
+      runtimeAdapterId: "runtime_codex",
+      gatewayId: fixture.gateway.gatewayId,
+      actionClass: "package.install",
+      resourceRef: fixture.contract.resourceRef,
+      protectedSurfaceKind: "package_manager",
+      postureState: "advisory",
+      credentialCustodyStatus: "agent_has_raw_credential",
+      rawSiblingToolStatus: "present",
+      sourceAuthority: "runtime_probe",
+      reasonCodes: ["raw_package_manager_available"],
+      evidenceRefs: ["evidence:posture:raw-tool-present"],
+      expiresAt: futureIso(),
+    });
+
+    const gate = await fixture.kernel.gatewayCheck({
+      actionContractId: fixture.contract.actionContractId,
+      greenlightId: policy.greenlight.greenlightId,
+      observedParameters: { package: "hono", versionRange: "^4.12.19" },
+    });
+
+    expect(gate.gateAttempt.gateDecision).toBe("refused");
+    expect(gate.gateAttempt.gateDecisionReasonCode).toBe("protected_path_posture_not_gateway_checked");
+    expect(gate.gateAttempt.protectedPathPostureStateSeen).toBe("advisory");
+    expect(gate.mutationAttempt).toBeNull();
+  });
+
   it("passes the gateway check once and refuses replay", async () => {
     const fixture = await createGreenlitContract();
 
@@ -215,18 +571,16 @@ describe("Handshake kernel invariants", () => {
       actionContractId: fixture.contract.actionContractId,
       greenlightId: fixture.greenlight.greenlightId,
       observedParameters: { package: "hono", versionRange: "^4.12.19" },
-      downstreamMode: "succeed",
     });
 
     expect(first.gateAttempt.gateDecision).toBe("passed");
-    expect(first.receipt.finalityStatus).toBe("final");
-    expect(first.mutationAttempt?.outcome).toBe("succeeded");
+    expect(first.receipt.finalityStatus).toBe("pending");
+    expect(first.mutationAttempt?.outcome).toBe("submitted");
 
     const replay = await fixture.kernel.gatewayCheck({
       actionContractId: fixture.contract.actionContractId,
       greenlightId: fixture.greenlight.greenlightId,
       observedParameters: { package: "hono", versionRange: "^4.12.19" },
-      downstreamMode: "succeed",
     });
 
     expect(replay.gateAttempt.gateDecision).toBe("refused");
@@ -255,7 +609,6 @@ describe("Handshake kernel invariants", () => {
       actionContractId: fixture.contract.actionContractId,
       greenlightId: fixture.greenlight.greenlightId,
       observedParameters: { package: "hono", versionRange: "^4.12.19" },
-      downstreamMode: "succeed",
     });
 
     const afterGate = fixture.store.listEventsForPartition(streamId, partitionKey);
@@ -341,7 +694,6 @@ describe("Handshake kernel invariants", () => {
       actionContractId: fixture.contract.actionContractId,
       greenlightId: fixture.greenlight.greenlightId,
       observedParameters: { package: "hono", versionRange: "^4.12.19" },
-      downstreamMode: "succeed",
     });
 
     const exportRecord = await fixture.kernel.createReceiptExport({
@@ -358,7 +710,7 @@ describe("Handshake kernel invariants", () => {
     expect(exportRecord.receiptDigest).toBe(gate.receipt.receiptDigest);
     expect(exportRecord.auditChainDigest).toBe(gate.receipt.auditChainDigest);
     expect(exportRecord.streamOffsets).toEqual(gate.receipt.streamOffsets);
-    expect(exportRecord.finalityStatus).toBe("final");
+    expect(exportRecord.finalityStatus).toBe("pending");
     expect(exportRecord.exportDigest).toMatch(/^sha256:/);
     expect(fixture.store.countRecordsOfType("mutation_attempt")).toBe(1);
     expect(fixture.store.countRecordsOfType("greenlight")).toBe(1);
@@ -372,7 +724,7 @@ describe("Handshake kernel invariants", () => {
     expect(exportEvents[0]?.payload).toEqual({
       receiptId: gate.receipt.receiptId,
       exportDigest: exportRecord.exportDigest,
-      finalityStatus: "final",
+      finalityStatus: "pending",
     });
   });
 
@@ -382,7 +734,6 @@ describe("Handshake kernel invariants", () => {
       actionContractId: fixture.contract.actionContractId,
       greenlightId: fixture.greenlight.greenlightId,
       observedParameters: { package: "hono", versionRange: "^4.12.19" },
-      downstreamMode: "succeed",
     });
     const receiptRecord = await fixture.store.getRecord("receipt", gate.receipt.receiptId);
     if (!receiptRecord) throw new Error("expected receipt record");
@@ -409,10 +760,10 @@ describe("Handshake kernel invariants", () => {
       actionContractId: fixture.contract.actionContractId,
       greenlightId: fixture.greenlight.greenlightId,
       observedParameters: { package: "hono", versionRange: "^4.12.19" },
-      downstreamMode: "unknown",
     });
-    const proofGapId = gate.proofGap?.proofGapId;
-    if (!proofGapId || !gate.receipt.receiptDigest || !gate.receipt.auditChainDigest) {
+    const proofGap = await recordUnknownDownstreamProofGap(fixture, gate);
+    const proofGapId = proofGap.proofGapId;
+    if (!gate.receipt.receiptDigest || !gate.receipt.auditChainDigest) {
       throw new Error("expected proof-gap receipt with digest material");
     }
 
@@ -466,7 +817,6 @@ describe("Handshake kernel invariants", () => {
       actionContractId: fixture.contract.actionContractId,
       greenlightId: fixture.greenlight.greenlightId,
       observedParameters: { package: "hono", versionRange: "^4.12.19" },
-      downstreamMode: "succeed",
     });
 
     await expect(
@@ -488,10 +838,8 @@ describe("Handshake kernel invariants", () => {
       actionContractId: fixture.contract.actionContractId,
       greenlightId: fixture.greenlight.greenlightId,
       observedParameters: { package: "hono", versionRange: "^4.12.19" },
-      downstreamMode: "unknown",
     });
-    const proofGapId = gate.proofGap?.proofGapId;
-    if (!proofGapId) throw new Error("expected proof gap before recovery follow-up");
+    const proofGapId = (await recordUnknownDownstreamProofGap(fixture, gate)).proofGapId;
     const recommendation = await fixture.kernel.createRecoveryRecommendation({
       sourceReceiptId: gate.receipt.receiptId,
       sourceRefusalOrGapRef: proofGapId,
@@ -517,41 +865,18 @@ describe("Handshake kernel invariants", () => {
       generatedCodeOrSpecRefs: ["code:recovery-follow-up"],
       declaredAssumptions: ["follow-up is narrowed by recovery recommendation"],
       requiredEvidenceRefs: ["gateway_finality_evidence"],
-      candidate: {
-        toolCapabilityId: fixture.tool.toolCapabilityId,
-        actionTypeId: fixture.actionType.actionTypeId,
-        gatewayRegistryEntryId: fixture.gateway.gatewayRegistryEntryId,
-        actionClass: fixture.contract.actionClass,
-        gatewayId: fixture.contract.gatewayId,
-        resourceRef: fixture.contract.resourceRef,
-      },
+      candidate: makePackageInstallCandidate(fixture, {
+        sequenceNumber: fixture.contract.sequenceNumber + 1,
+        recoveryRecommendationId: recommendation.recoveryRecommendationId,
+        purposeCode: "dependency_add_recovery",
+        evidenceRefs: ["gateway_finality_evidence"],
+        idempotencyKey: "idem_package_hono_recovery_followup",
+      }),
     });
 
-    const followUp = await fixture.kernel.proposeActionContract({
-      tenantId: "tenant_demo",
-      organizationId: "org_demo",
-      intentCompilationId: followUpCompilation.intentCompilationId,
-      envelopeId: fixture.envelope.envelopeId,
-      gatewayRegistryEntryId: fixture.gateway.gatewayRegistryEntryId,
-      gatewayId: fixture.gateway.gatewayId,
-      principalId: "principal_demo",
-      agentId: "agent_demo",
-      runId: "run_demo",
-      sequenceNumber: fixture.contract.sequenceNumber + 1,
-      recoveryRecommendationId: recommendation.recoveryRecommendationId,
-      actionClass: fixture.contract.actionClass,
-      resourceRef: fixture.contract.resourceRef,
-      parameters: { package: "hono", versionRange: "^4.12.19" },
-      nonSecretParamsSummary: { package: "hono", versionRange: "^4.12.19" },
-      purposeCode: "dependency_add_recovery",
-      expectedSideEffectCodes: ["package_json_change", "lockfile_change"],
-      evidenceRefs: ["gateway_finality_evidence"],
-      bounds: { maxPackages: 1 },
-      idempotencyKey: "idem_package_hono_recovery_followup",
-      rollbackHint: "remove package and restore lockfile",
-      expiresAt: new Date(Date.now() + 60_000).toISOString(),
-      signingSecret: "test-secret",
-    });
+    const followUp = await fixture.kernel.proposeActionContract(
+      proposalInputForCompilation(followUpCompilation, "test-secret"),
+    );
 
     expect(followUp.recoveryRecommendationId).toBe(recommendation.recoveryRecommendationId);
     expect(followUp.recoverySourceReceiptId).toBe(gate.receipt.receiptId);
@@ -589,30 +914,7 @@ describe("Handshake kernel invariants", () => {
     });
 
     await expect(
-      fixture.kernel.proposeActionContract({
-        tenantId: "tenant_demo",
-        organizationId: "org_demo",
-        intentCompilationId: followUpCompilation.intentCompilationId,
-        envelopeId: fixture.envelope.envelopeId,
-        gatewayRegistryEntryId: fixture.gateway.gatewayRegistryEntryId,
-        gatewayId: fixture.gateway.gatewayId,
-        principalId: "principal_demo",
-        agentId: "agent_demo",
-        runId: "run_demo",
-        sequenceNumber: fixture.contract.sequenceNumber + 2,
-        recoveryRecommendationId: recommendation.recoveryRecommendationId,
-        actionClass: fixture.contract.actionClass,
-        resourceRef: fixture.contract.resourceRef,
-        parameters: { package: "hono", versionRange: "^4.12.19" },
-        nonSecretParamsSummary: { package: "hono", versionRange: "^4.12.19" },
-        purposeCode: "dependency_add_recovery_again",
-        expectedSideEffectCodes: ["package_json_change", "lockfile_change"],
-        evidenceRefs: ["gateway_finality_evidence"],
-        bounds: { maxPackages: 1 },
-        idempotencyKey: "idem_package_hono_recovery_followup_reuse",
-        rollbackHint: "remove package and restore lockfile",
-        expiresAt: new Date(Date.now() + 60_000).toISOString(),
-      }),
+      fixture.kernel.proposeActionContract(proposalInputForCompilation(followUpCompilation)),
     ).rejects.toThrow("only to an open recovery recommendation");
     expect(fixture.store.countRecordsOfType("action_contract")).toBe(2);
 
@@ -632,10 +934,8 @@ describe("Handshake kernel invariants", () => {
       actionContractId: fixture.contract.actionContractId,
       greenlightId: fixture.greenlight.greenlightId,
       observedParameters: { package: "hono", versionRange: "^4.12.19" },
-      downstreamMode: "unknown",
     });
-    const proofGapId = gate.proofGap?.proofGapId;
-    if (!proofGapId) throw new Error("expected proof gap before recovery expiry");
+    const proofGapId = (await recordUnknownDownstreamProofGap(fixture, gate)).proofGapId;
     const recommendation = await fixture.kernel.createRecoveryRecommendation({
       sourceReceiptId: gate.receipt.receiptId,
       sourceRefusalOrGapRef: proofGapId,
@@ -682,10 +982,8 @@ describe("Handshake kernel invariants", () => {
       actionContractId: fixture.contract.actionContractId,
       greenlightId: fixture.greenlight.greenlightId,
       observedParameters: { package: "hono", versionRange: "^4.12.19" },
-      downstreamMode: "unknown",
     });
-    const proofGapId = gate.proofGap?.proofGapId;
-    if (!proofGapId) throw new Error("expected proof gap before recovery follow-up");
+    const proofGapId = (await recordUnknownDownstreamProofGap(fixture, gate)).proofGapId;
     const recommendation = await fixture.kernel.createRecoveryRecommendation({
       sourceReceiptId: gate.receipt.receiptId,
       sourceRefusalOrGapRef: proofGapId,
@@ -708,41 +1006,17 @@ describe("Handshake kernel invariants", () => {
       toolCatalogRef: "tool_catalog_demo@v1",
       actionCatalogRef: "action_catalog_demo@v1",
       gatewayRegistryRef: "gateway_registry@v1",
-      candidate: {
-        toolCapabilityId: fixture.tool.toolCapabilityId,
-        actionTypeId: fixture.actionType.actionTypeId,
-        gatewayRegistryEntryId: fixture.gateway.gatewayRegistryEntryId,
-        actionClass: fixture.contract.actionClass,
-        gatewayId: fixture.contract.gatewayId,
-        resourceRef: fixture.contract.resourceRef,
-      },
+      candidate: makePackageInstallCandidate(fixture, {
+        sequenceNumber: fixture.contract.sequenceNumber + 1,
+        recoveryRecommendationId: recommendation.recoveryRecommendationId,
+        purposeCode: "dependency_add_recovery",
+        evidenceRefs: ["gateway_finality_evidence"],
+        idempotencyKey: "idem_package_hono_recovery_terminal_race",
+      }),
     });
 
     await expect(
-      fixture.kernel.proposeActionContract({
-        tenantId: "tenant_demo",
-        organizationId: "org_demo",
-        intentCompilationId: followUpCompilation.intentCompilationId,
-        envelopeId: fixture.envelope.envelopeId,
-        gatewayRegistryEntryId: fixture.gateway.gatewayRegistryEntryId,
-        gatewayId: fixture.gateway.gatewayId,
-        principalId: "principal_demo",
-        agentId: "agent_demo",
-        runId: "run_demo",
-        sequenceNumber: fixture.contract.sequenceNumber + 1,
-        recoveryRecommendationId: recommendation.recoveryRecommendationId,
-        actionClass: fixture.contract.actionClass,
-        resourceRef: fixture.contract.resourceRef,
-        parameters: { package: "hono", versionRange: "^4.12.19" },
-        nonSecretParamsSummary: { package: "hono", versionRange: "^4.12.19" },
-        purposeCode: "dependency_add_recovery",
-        expectedSideEffectCodes: ["package_json_change", "lockfile_change"],
-        evidenceRefs: ["gateway_finality_evidence"],
-        bounds: { maxPackages: 1 },
-        idempotencyKey: "idem_package_hono_recovery_terminal_race",
-        rollbackHint: "remove package and restore lockfile",
-        expiresAt: new Date(Date.now() + 60_000).toISOString(),
-      }),
+      fixture.kernel.proposeActionContract(proposalInputForCompilation(followUpCompilation)),
     ).rejects.toThrow("already has a terminal status transition");
 
     const storedRecommendation = await fixture.store.getRecord(
@@ -781,10 +1055,8 @@ describe("Handshake kernel invariants", () => {
       actionContractId: fixture.contract.actionContractId,
       greenlightId: fixture.greenlight.greenlightId,
       observedParameters: { package: "hono", versionRange: "^4.12.19" },
-      downstreamMode: "unknown",
     });
-    const proofGapId = gate.proofGap?.proofGapId;
-    if (!proofGapId) throw new Error("expected proof gap before recovery follow-up");
+    const proofGapId = (await recordUnknownDownstreamProofGap(fixture, gate)).proofGapId;
     const recommendation = await fixture.kernel.createRecoveryRecommendation({
       sourceReceiptId: gate.receipt.receiptId,
       sourceRefusalOrGapRef: proofGapId,
@@ -807,39 +1079,15 @@ describe("Handshake kernel invariants", () => {
       toolCatalogRef: "tool_catalog_demo@v1",
       actionCatalogRef: "action_catalog_demo@v1",
       gatewayRegistryRef: "gateway_registry@v1",
-      candidate: {
-        toolCapabilityId: fixture.tool.toolCapabilityId,
-        actionTypeId: fixture.actionType.actionTypeId,
-        gatewayRegistryEntryId: fixture.gateway.gatewayRegistryEntryId,
-        actionClass: fixture.contract.actionClass,
-        gatewayId: fixture.contract.gatewayId,
-        resourceRef: fixture.contract.resourceRef,
-      },
+      candidate: makePackageInstallCandidate(fixture, {
+        sequenceNumber: fixture.contract.sequenceNumber + 1,
+        recoveryRecommendationId: recommendation.recoveryRecommendationId,
+        purposeCode: "dependency_add_recovery",
+        evidenceRefs: ["gateway_finality_evidence"],
+        idempotencyKey: "idem_package_hono_recovery_terminal_resolution",
+      }),
     });
-    const followUpInput = {
-      tenantId: "tenant_demo",
-      organizationId: "org_demo",
-      intentCompilationId: followUpCompilation.intentCompilationId,
-      envelopeId: fixture.envelope.envelopeId,
-      gatewayRegistryEntryId: fixture.gateway.gatewayRegistryEntryId,
-      gatewayId: fixture.gateway.gatewayId,
-      principalId: "principal_demo",
-      agentId: "agent_demo",
-      runId: "run_demo",
-      sequenceNumber: fixture.contract.sequenceNumber + 1,
-      recoveryRecommendationId: recommendation.recoveryRecommendationId,
-      actionClass: fixture.contract.actionClass,
-      resourceRef: fixture.contract.resourceRef,
-      parameters: { package: "hono", versionRange: "^4.12.19" },
-      nonSecretParamsSummary: { package: "hono", versionRange: "^4.12.19" },
-      purposeCode: "dependency_add_recovery",
-      expectedSideEffectCodes: ["package_json_change", "lockfile_change"],
-      evidenceRefs: ["gateway_finality_evidence"],
-      bounds: { maxPackages: 1 },
-      idempotencyKey: "idem_package_hono_recovery_terminal_resolution_loser",
-      rollbackHint: "remove package and restore lockfile",
-      expiresAt: new Date(Date.now() + 60_000).toISOString(),
-    };
+    const followUpInput = proposalInputForCompilation(followUpCompilation);
 
     await expect(fixture.kernel.proposeActionContract(followUpInput)).rejects.toThrow(
       "already has a terminal status transition",
@@ -850,10 +1098,7 @@ describe("Handshake kernel invariants", () => {
     if (!terminalConflictGap) throw new Error("expected recovery terminal conflict proof gap");
     const losingActionContractRef = terminalConflictGap.affectedObjectRefs[3];
 
-    const winningContract = await fixture.kernel.proposeActionContract({
-      ...followUpInput,
-      idempotencyKey: "idem_package_hono_recovery_terminal_resolution_winner",
-    });
+    const winningContract = await fixture.kernel.proposeActionContract(followUpInput);
     const statusTransitions = await fixture.store.listRecordsByType<RecoveryRecommendationStatusTransition>(
       "recovery_recommendation_status_transition",
     );
@@ -899,10 +1144,8 @@ describe("Handshake kernel invariants", () => {
       actionContractId: fixture.contract.actionContractId,
       greenlightId: fixture.greenlight.greenlightId,
       observedParameters: { package: "hono", versionRange: "^4.12.19" },
-      downstreamMode: "unknown",
     });
-    const proofGapId = gate.proofGap?.proofGapId;
-    if (!proofGapId) throw new Error("expected proof gap before recovery follow-up");
+    const proofGapId = (await recordUnknownDownstreamProofGap(fixture, gate)).proofGapId;
     const recommendation = await fixture.kernel.createRecoveryRecommendation({
       sourceReceiptId: gate.receipt.receiptId,
       sourceRefusalOrGapRef: proofGapId,
@@ -925,41 +1168,17 @@ describe("Handshake kernel invariants", () => {
       toolCatalogRef: "tool_catalog_demo@v1",
       actionCatalogRef: "action_catalog_demo@v1",
       gatewayRegistryRef: "gateway_registry@v1",
-      candidate: {
-        toolCapabilityId: fixture.tool.toolCapabilityId,
-        actionTypeId: fixture.actionType.actionTypeId,
-        gatewayRegistryEntryId: fixture.gateway.gatewayRegistryEntryId,
-        actionClass: fixture.contract.actionClass,
-        gatewayId: fixture.contract.gatewayId,
-        resourceRef: fixture.contract.resourceRef,
-      },
+      candidate: makePackageInstallCandidate(fixture, {
+        sequenceNumber: fixture.contract.sequenceNumber + 1,
+        recoveryRecommendationId: recommendation.recoveryRecommendationId,
+        purposeCode: "dependency_add_recovery",
+        evidenceRefs: [],
+        idempotencyKey: "idem_package_hono_recovery_missing_evidence",
+      }),
     });
 
     await expect(
-      fixture.kernel.proposeActionContract({
-        tenantId: "tenant_demo",
-        organizationId: "org_demo",
-        intentCompilationId: followUpCompilation.intentCompilationId,
-        envelopeId: fixture.envelope.envelopeId,
-        gatewayRegistryEntryId: fixture.gateway.gatewayRegistryEntryId,
-        gatewayId: fixture.gateway.gatewayId,
-        principalId: "principal_demo",
-        agentId: "agent_demo",
-        runId: "run_demo",
-        sequenceNumber: fixture.contract.sequenceNumber + 1,
-        recoveryRecommendationId: recommendation.recoveryRecommendationId,
-        actionClass: fixture.contract.actionClass,
-        resourceRef: fixture.contract.resourceRef,
-        parameters: { package: "hono", versionRange: "^4.12.19" },
-        nonSecretParamsSummary: { package: "hono", versionRange: "^4.12.19" },
-        purposeCode: "dependency_add_recovery",
-        expectedSideEffectCodes: ["package_json_change", "lockfile_change"],
-        evidenceRefs: [],
-        bounds: { maxPackages: 1 },
-        idempotencyKey: "idem_package_hono_recovery_missing_evidence",
-        rollbackHint: "remove package and restore lockfile",
-        expiresAt: new Date(Date.now() + 60_000).toISOString(),
-      }),
+      fixture.kernel.proposeActionContract(proposalInputForCompilation(followUpCompilation)),
     ).rejects.toThrow("missing required new evidence");
     expect(fixture.store.countRecordsOfType("action_contract")).toBe(1);
   });
@@ -975,7 +1194,6 @@ describe("Handshake kernel invariants", () => {
       actionContractId: fixture.contract.actionContractId,
       greenlightId: fixture.greenlight.greenlightId,
       observedParameters: { package: "hono", versionRange: "^4.12.19" },
-      downstreamMode: "succeed",
     });
 
     const gateEvent = store
@@ -983,7 +1201,7 @@ describe("Handshake kernel invariants", () => {
       .find((event) => event.objectRefs.includes(result.gateAttempt.gateAttemptId));
 
     expect(result.gateAttempt.gateDecision).toBe("passed");
-    expect(result.mutationAttempt?.outcome).toBe("succeeded");
+    expect(result.mutationAttempt?.outcome).toBe("submitted");
     expect(gateEvent?.offset).toBe(4);
     expect(gateEvent?.previousEventDigest).toBe(
       store.listEventsForPartition(streamId, partitionKey).find((event) => event.offset === 3)?.eventDigest,
@@ -1043,7 +1261,6 @@ describe("Handshake kernel invariants", () => {
       actionContractId: fixture.contract.actionContractId,
       greenlightId: fixture.greenlight.greenlightId,
       observedParameters: { package: "hono", versionRange: "^4.12.19" },
-      downstreamMode: "succeed",
     });
 
     const greenlightRecord = await fixture.store.getRecord("greenlight", fixture.greenlight.greenlightId);
@@ -1063,7 +1280,6 @@ describe("Handshake kernel invariants", () => {
       actionContractId: fixture.contract.actionContractId,
       greenlightId: fixture.greenlight.greenlightId,
       observedParameters: { package: "other", versionRange: "^4.12.19" },
-      downstreamMode: "succeed",
     });
 
     expect(result.gateAttempt.gateDecision).toBe("refused");
@@ -1104,7 +1320,6 @@ describe("Handshake kernel invariants", () => {
       actionContractId: fixture.contract.actionContractId,
       greenlightId: fixture.greenlight.greenlightId,
       observedParameters: { package: "hono", versionRange: "^4.12.19" },
-      downstreamMode: "succeed",
     });
 
     expect(result.gateAttempt.gateDecision).toBe("refused");
@@ -1194,7 +1409,6 @@ describe("Handshake kernel invariants", () => {
       actionContractId: fixture.contract.actionContractId,
       greenlightId: fixture.greenlight.greenlightId,
       observedParameters: { package: "hono", versionRange: "^4.12.19" },
-      downstreamMode: "succeed",
     });
     expect(gate.gateAttempt.gateDecision).toBe("refused");
     expect(gate.gateAttempt.gateDecisionReasonCode).toBe("current_isolation_quarantined");
@@ -1238,20 +1452,16 @@ describe("Handshake kernel invariants", () => {
 
   it("refuses incompatible gateway policy drift before mutation", async () => {
     const fixture = await createGreenlitContract();
-    await fixture.kernel.putCatalogObject({
-      objectType: "gateway_registry_entry",
-      payload: {
-        ...fixture.gateway,
-        gatewayRegistryVersion: "v2",
-        gatewayPolicyVersion: "v2",
-      },
+    await replaceGatewayRecordOutOfBand(fixture, {
+      ...fixture.gateway,
+      gatewayRegistryVersion: "v2",
+      gatewayPolicyVersion: "v2",
     });
 
     const result = await fixture.kernel.gatewayCheck({
       actionContractId: fixture.contract.actionContractId,
       greenlightId: fixture.greenlight.greenlightId,
       observedParameters: { package: "hono", versionRange: "^4.12.19" },
-      downstreamMode: "succeed",
     });
 
     expect(result.gateAttempt.gateDecision).toBe("refused");
@@ -1264,29 +1474,25 @@ describe("Handshake kernel invariants", () => {
 
   it("records compatible stricter gateway policy drift at the gate", async () => {
     const fixture = await createGreenlitContract();
-    await fixture.kernel.putCatalogObject({
-      objectType: "gateway_registry_entry",
-      payload: {
-        ...fixture.gateway,
-        gatewayRegistryVersion: "v2",
-        gatewayPolicyVersion: "v2",
-        gatewayPolicyDriftMode: "allow_compatible_stricter",
-        compatiblePreviousGatewayPolicyVersions: ["v1"],
-      },
+    await replaceGatewayRecordOutOfBand(fixture, {
+      ...fixture.gateway,
+      gatewayRegistryVersion: "v2",
+      gatewayPolicyVersion: "v2",
+      gatewayPolicyDriftMode: "allow_compatible_stricter",
+      compatiblePreviousGatewayPolicyVersions: ["v1"],
     });
 
     const result = await fixture.kernel.gatewayCheck({
       actionContractId: fixture.contract.actionContractId,
       greenlightId: fixture.greenlight.greenlightId,
       observedParameters: { package: "hono", versionRange: "^4.12.19" },
-      downstreamMode: "succeed",
     });
 
     expect(result.gateAttempt.gateDecision).toBe("passed");
     expect(result.gateAttempt.gatewayPolicyDriftStatus).toBe("compatible_stricter");
     expect(result.gateAttempt.pinnedGatewayPolicyVersion).toBe("v1");
     expect(result.gateAttempt.currentGatewayPolicyVersion).toBe("v2");
-    expect(result.mutationAttempt?.outcome).toBe("succeeded");
+    expect(result.mutationAttempt?.outcome).toBe("submitted");
   });
 
   it("only turns review_required into greenlight when review binds exact contract and policy input", async () => {
@@ -1304,39 +1510,9 @@ describe("Handshake kernel invariants", () => {
       toolCatalogRef: "tool_catalog_demo@v1",
       actionCatalogRef: "action_catalog_demo@v1",
       gatewayRegistryRef: "gateway_registry@v1",
-      candidate: {
-        toolCapabilityId: fixture.tool.toolCapabilityId,
-        actionTypeId: fixture.actionType.actionTypeId,
-        gatewayRegistryEntryId: fixture.gateway.gatewayRegistryEntryId,
-        actionClass: "package.install",
-        gatewayId: fixture.gateway.gatewayId,
-        resourceRef: "npm:hono",
-      },
+      candidate: makePackageInstallCandidate(fixture, { idempotencyKey: "idem_review_hono" }),
     });
-    const contract = await fixture.kernel.proposeActionContract({
-      tenantId: "tenant_demo",
-      organizationId: "org_demo",
-      intentCompilationId: compilation.intentCompilationId,
-      envelopeId: fixture.envelope.envelopeId,
-      gatewayRegistryEntryId: fixture.gateway.gatewayRegistryEntryId,
-      gatewayId: fixture.gateway.gatewayId,
-      principalId: "principal_demo",
-      agentId: "agent_demo",
-      runId: "run_demo",
-      sequenceNumber: 1,
-      actionClass: "package.install",
-      resourceRef: "npm:hono",
-      parameters: { package: "hono", versionRange: "^4.12.19" },
-      nonSecretParamsSummary: { package: "hono", versionRange: "^4.12.19" },
-      purposeCode: "dependency_add",
-      expectedSideEffectCodes: ["package_json_change", "lockfile_change"],
-      evidenceRefs: ["evidence:package-lock-diff"],
-      bounds: { maxPackages: 1 },
-      idempotencyKey: "idem_review_hono",
-      rollbackHint: "remove package and restore lockfile",
-      expiresAt: new Date(Date.now() + 60_000).toISOString(),
-      signingSecret: "test-secret",
-    });
+    const contract = await fixture.kernel.proposeActionContract(proposalInputForCompilation(compilation, "test-secret"));
     await fixture.kernel.createIsolationState({
       tenantId: "tenant_demo",
       organizationId: "org_demo",
@@ -1354,12 +1530,25 @@ describe("Handshake kernel invariants", () => {
     expect(reviewRequired.decision.decision).toBe("review_required");
     expect(reviewRequired.greenlight).toBeNull();
 
+    const reviewArtifact = await fixture.kernel.createReviewArtifact({
+      actionContractId: contract.actionContractId,
+      policyDecisionId: reviewRequired.decision.policyDecisionId,
+      reviewArtifactRef: "review:exact-contract",
+      reviewRenderSchemaVersion: "review-render-v1",
+      rendererRef: "renderer:test-review",
+      renderedContractDigest: contract.actionContractDigest,
+      renderedPolicyInputDigest: reviewRequired.decision.policyInputDigest,
+      renderedUncertaintyDigest: await digestCanonical({ uncertaintyMarkers: [] }),
+      renderedArtifactDigest: await digestCanonical({ artifact: "review:exact-contract" }),
+      uncertaintyMarkers: [],
+      evidenceRefs: ["review:evidence:test"],
+    });
     const review = await fixture.kernel.createReviewDecision({
       actionContractId: contract.actionContractId,
       policyDecisionId: reviewRequired.decision.policyDecisionId,
+      reviewArtifactId: reviewArtifact.reviewArtifactId,
+      reviewArtifactDigest: reviewArtifact.reviewArtifactDigest,
       reviewerPrincipalId: "principal_reviewer",
-      reviewArtifactRef: "review:exact-contract",
-      reviewRenderSchemaVersion: "review-render-v1",
       decision: "approve",
       decisionReasonCode: "human_verified_exact_contract",
       decisionExpiresAt: new Date(Date.now() + 60_000).toISOString(),
@@ -1377,23 +1566,20 @@ describe("Handshake kernel invariants", () => {
     expect(approved.greenlight?.actionContractId).toBe(contract.actionContractId);
   });
 
-  it("records a proof gap when downstream finality is unknown", async () => {
+  it("keeps a passed gateway check pending until reconciliation records downstream finality", async () => {
     const fixture = await createGreenlitContract();
 
     const result = await fixture.kernel.gatewayCheck({
       actionContractId: fixture.contract.actionContractId,
       greenlightId: fixture.greenlight.greenlightId,
       observedParameters: { package: "hono", versionRange: "^4.12.19" },
-      downstreamMode: "unknown",
     });
 
-    expect(result.gateAttempt.gateDecision).toBe("proof_gap");
-    expect(result.proofGap).not.toBeNull();
-    const proofGapId = result.proofGap?.proofGapId;
-    if (!proofGapId) throw new Error("expected proof gap id");
-    expect(result.proofGap?.reasonCode).toBe("downstream_status_unknown");
-    expect(result.receipt.proofGapIds).toEqual([proofGapId]);
-    expect(result.receipt.finalityStatus).toBe("unknown");
+    expect(result.gateAttempt.gateDecision).toBe("passed");
+    expect(result.mutationAttempt?.outcome).toBe("submitted");
+    expect(result.proofGap).toBeNull();
+    expect(result.receipt.proofGapIds).toEqual([]);
+    expect(result.receipt.finalityStatus).toBe("pending");
   });
 
   it("reconciles a pending surface operation without a second mutation attempt", async () => {
@@ -1402,7 +1588,6 @@ describe("Handshake kernel invariants", () => {
       actionContractId: fixture.contract.actionContractId,
       greenlightId: fixture.greenlight.greenlightId,
       observedParameters: { package: "hono", versionRange: "^4.12.19" },
-      downstreamMode: "pending",
       surfaceOperationRef: "surface-op:pending-install",
     });
     if (!gate.mutationAttempt) throw new Error("expected mutation attempt");
@@ -1429,7 +1614,6 @@ describe("Handshake kernel invariants", () => {
       actionContractId: fixture.contract.actionContractId,
       greenlightId: fixture.greenlight.greenlightId,
       observedParameters: { package: "hono", versionRange: "^4.12.19" },
-      downstreamMode: "pending",
       surfaceOperationRef: "surface-op:pending-install",
     });
     if (!gate.mutationAttempt) throw new Error("expected mutation attempt");
@@ -1456,11 +1640,19 @@ describe("Handshake kernel invariants", () => {
       actionContractId: fixture.contract.actionContractId,
       greenlightId: fixture.greenlight.greenlightId,
       observedParameters: { package: "hono", versionRange: "^4.12.19" },
-      downstreamMode: "unknown",
     });
-    const proofGapId = gate.proofGap?.proofGapId;
     const mutationAttemptId = gate.mutationAttempt?.mutationAttemptId;
-    if (!proofGapId || !mutationAttemptId) throw new Error("expected mutation attempt and proof gap");
+    if (!mutationAttemptId) throw new Error("expected mutation attempt");
+    const unknown = await fixture.kernel.reconcileSurfaceOperation({
+      mutationAttemptId,
+      idempotencyKey: fixture.contract.idempotencyKey,
+      observedDownstreamStatus: "unknown",
+      observedSurfaceOperationRef: gate.mutationAttempt?.surfaceOperationRef ?? null,
+      evidenceRefs: [],
+      resolvedProofGapIds: [],
+    });
+    const proofGapId = unknown.createdProofGap?.proofGapId;
+    if (!proofGapId) throw new Error("expected downstream unknown proof gap");
 
     const result = await fixture.kernel.reconcileSurfaceOperation({
       mutationAttemptId,
@@ -1486,7 +1678,6 @@ describe("Handshake kernel invariants", () => {
       actionContractId: fixture.contract.actionContractId,
       greenlightId: fixture.greenlight.greenlightId,
       observedParameters: { package: "hono", versionRange: "^4.12.19" },
-      downstreamMode: "pending",
       surfaceOperationRef: "surface-op:pending-install",
     });
     if (!gate.mutationAttempt) throw new Error("expected mutation attempt");
@@ -1554,6 +1745,41 @@ class GreenlightListBlindStore extends InMemoryProtocolStore {
     if (objectType === "greenlight") return [];
     return super.listRecordsByType<T>(objectType, scope);
   }
+}
+
+async function replaceGatewayRecordOutOfBand(
+  fixture: Awaited<ReturnType<typeof createGreenlitContract>>,
+  gateway: GatewayRegistryEntry,
+): Promise<void> {
+  const recorder = new ProtocolRecorder(fixture.store);
+  await fixture.store.putRecord(await recorder.buildRecord({ objectType: "gateway_registry_entry", payload: gateway }));
+}
+
+async function createContractRequiringGatewayCheckedPosture(idempotencyKey = "idem_posture_required") {
+  const fixture = makeKernelFixture();
+  fixture.envelope = {
+    ...fixture.envelope,
+    envelopeId: "env_posture_required",
+    objectiveRef: "intent:install-with-enforcing-gateway",
+    requiredProtectedPathState: "gateway_checked",
+  };
+  await registerFixtureObjects(fixture);
+  const compilation = await fixture.kernel.compileIntent({
+    tenantId: "tenant_demo",
+    organizationId: "org_demo",
+    principalIntentRef: "intent:install hono with gateway posture",
+    principalId: "principal_demo",
+    agentId: "agent_demo",
+    runId: "run_demo",
+    runtimeAdapterId: "runtime_codex",
+    operatingEnvelopeId: fixture.envelope.envelopeId,
+    toolCatalogRef: "tool_catalog_demo@v1",
+    actionCatalogRef: "action_catalog_demo@v1",
+    gatewayRegistryRef: "gateway_registry@v1",
+    candidate: makePackageInstallCandidate(fixture, { idempotencyKey }),
+  });
+  const contract = await fixture.kernel.proposeActionContract(proposalInputForCompilation(compilation, "test-secret"));
+  return { ...fixture, compilation, contract };
 }
 
 async function buildCompetingStreamEvent(event: ContractStreamEvent): Promise<ContractStreamEvent> {

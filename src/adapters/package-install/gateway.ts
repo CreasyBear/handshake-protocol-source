@@ -83,7 +83,6 @@ export async function runPackageInstallGateway(
     actionContractId: input.actionContractId,
     greenlightId: input.greenlightId,
     observedParameters,
-    downstreamMode: "pending",
     surfaceOperationRef,
   });
 

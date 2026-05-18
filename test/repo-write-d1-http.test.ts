@@ -3,7 +3,7 @@ import { runRepoWriteGateway } from "../src/adapters/repo-write/gateway";
 import { digestUtf8Content, utf8ByteLength } from "../src/protocol/content-digests";
 import { HandshakeClient } from "../src/sdk/client";
 import { proposeRepoWriteActionContract } from "../src/runtime/repo-write/tool-wrapper";
-import { createD1HttpHarness, type D1HttpHarness } from "./support/d1-http-harness";
+import { createD1HttpHarness, D1_HARNESS_TRANSITION_TOKEN, type D1HttpHarness } from "./support/d1-http-harness";
 import {
   createRepoWriteSurface,
   makeRepoWriteFixtureObjects,
@@ -123,7 +123,9 @@ describe("repo write Hono/D1 reference gateway", () => {
 });
 
 async function createRepoWriteContract(harness: D1HttpHarness, content: string) {
-  const client = new HandshakeClient("http://handshake.test", harness.fetch);
+  const client = new HandshakeClient("http://handshake.test", harness.fetch, {
+    transitionToken: D1_HARNESS_TRANSITION_TOKEN,
+  });
   const fixture = makeRepoWriteFixtureObjects();
   await registerRepoWriteFixtureObjectsWithClient(client, fixture);
   const surface = await createRepoWriteSurface("handshake-repo-write-d1-");

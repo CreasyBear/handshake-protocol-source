@@ -4,16 +4,20 @@ import {
   ActionTypeSchema,
   OperatingEnvelopeSchema,
   GatewayRegistryEntrySchema,
+  PROTOCOL_VERSION,
   ToolCapabilitySchema,
   type ProtocolObjectType,
 } from "../protocol/schemas";
 import {
   CompileIntentInputSchema,
   CreateBreakerDecisionInputSchema,
+  CreateProtectedPathPostureInputSchema,
   CreateReviewDecisionInputSchema,
+  CreateReviewArtifactInputSchema,
   CreateIsolationInputSchema,
   CreateRecoveryRecommendationInputSchema,
   CreateReceiptExportInputSchema,
+  CreateRuntimeExecutionInputSchema,
   EvaluatePolicyInputSchema,
   ProposeActionContractInputSchema,
   ReconcileSurfaceOperationInputSchema,
@@ -26,9 +30,15 @@ import { HandshakeKernel } from "../protocol/kernel";
 import { D1ProtocolStore } from "../storage/d1";
 import { InMemoryProtocolStore } from "../storage/memory";
 import type { ProtocolStore } from "../storage/store";
+import {
+  authorizeTransitionCaller,
+  type CallerAuthTokens,
+  type CallerAuthWorkerBindings,
+  type TransitionCallerRole,
+} from "./caller-auth";
 import { openApiDocument } from "./openapi";
 
-export type WorkerBindings = {
+export type WorkerBindings = CallerAuthWorkerBindings & {
   DB?: D1Database;
   CACHE?: KVNamespace;
 };
@@ -36,6 +46,7 @@ export type WorkerBindings = {
 type AppOptions = {
   store?: ProtocolStore;
   allowEphemeralStore?: boolean;
+  callerAuthTokens?: CallerAuthTokens;
 };
 
 export function createApp(options: AppOptions = {}) {
@@ -52,106 +63,164 @@ export function createApp(options: AppOptions = {}) {
     return c.json({ error: { code: "internal_error", message: "Unexpected protocol error." } }, 500);
   });
 
-  app.get("/health", (c) => c.json({ ok: true, protocol: "handshake", version: "0.2.1" }));
+  app.get("/health", (c) => c.json({ ok: true, protocol: "handshake", version: PROTOCOL_VERSION }));
   app.get("/openapi.json", (c) => c.json(openApiDocument));
 
   app.post("/v0.2/catalog/tool-capabilities", async (c) => {
+    const authFailure = authorize(c, options.callerAuthTokens, "control_plane");
+    if (authFailure) return authFailure;
     const body = await parseBody(c, ToolCapabilitySchema);
     await kernelFor(c, fallbackStore).putCatalogObject({ objectType: "tool_capability", payload: body });
     return c.json(body, 201);
   });
 
   app.post("/v0.2/catalog/action-types", async (c) => {
+    const authFailure = authorize(c, options.callerAuthTokens, "control_plane");
+    if (authFailure) return authFailure;
     const body = await parseBody(c, ActionTypeSchema);
     await kernelFor(c, fallbackStore).putCatalogObject({ objectType: "action_type", payload: body });
     return c.json(body, 201);
   });
 
   app.post("/v0.2/catalog/gateways", async (c) => {
+    const authFailure = authorize(c, options.callerAuthTokens, "control_plane");
+    if (authFailure) return authFailure;
     const body = await parseBody(c, GatewayRegistryEntrySchema);
     await kernelFor(c, fallbackStore).putCatalogObject({ objectType: "gateway_registry_entry", payload: body });
     return c.json(body, 201);
   });
 
   app.post("/v0.2/envelopes", async (c) => {
+    const authFailure = authorize(c, options.callerAuthTokens, "control_plane");
+    if (authFailure) return authFailure;
     const body = await parseBody(c, OperatingEnvelopeSchema);
     await kernelFor(c, fallbackStore).putCatalogObject({ objectType: "operating_envelope", payload: body });
     return c.json(body, 201);
   });
 
   app.post("/v0.2/intent-compilations", async (c) => {
+    const authFailure = authorize(c, options.callerAuthTokens, "runtime_evidence");
+    if (authFailure) return authFailure;
     const body = await parseBody(c, CompileIntentInputSchema);
     const result = await kernelFor(c, fallbackStore).compileIntent(body);
     return c.json(result, 201);
   });
 
+  app.post("/v0.2/runtime-executions", async (c) => {
+    const authFailure = authorize(c, options.callerAuthTokens, "runtime_evidence");
+    if (authFailure) return authFailure;
+    const body = await parseBody(c, CreateRuntimeExecutionInputSchema);
+    const result = await kernelFor(c, fallbackStore).createRuntimeExecution(body);
+    return c.json(result, 201);
+  });
+
+  app.post("/v0.2/protected-path-postures", async (c) => {
+    const authFailure = authorize(c, options.callerAuthTokens, "gateway_custody");
+    if (authFailure) return authFailure;
+    const body = await parseBody(c, CreateProtectedPathPostureInputSchema);
+    const result = await kernelFor(c, fallbackStore).createProtectedPathPosture(body);
+    return c.json(result, 201);
+  });
+
   app.post("/v0.2/action-contracts", async (c) => {
+    const authFailure = authorize(c, options.callerAuthTokens, "control_plane");
+    if (authFailure) return authFailure;
     const body = await parseBody(c, ProposeActionContractInputSchema);
     const result = await kernelFor(c, fallbackStore).proposeActionContract(body);
     return c.json(result, 201);
   });
 
   app.post("/v0.2/policy-decisions", async (c) => {
+    const authFailure = authorize(c, options.callerAuthTokens, "control_plane");
+    if (authFailure) return authFailure;
     const body = await parseBody(c, EvaluatePolicyInputSchema);
     const result = await kernelFor(c, fallbackStore).evaluatePolicy(body);
     return c.json(result, 201);
   });
 
   app.post("/v0.2/review-decisions", async (c) => {
+    const authFailure = authorize(c, options.callerAuthTokens, "review_custody");
+    if (authFailure) return authFailure;
     const body = await parseBody(c, CreateReviewDecisionInputSchema);
     const result = await kernelFor(c, fallbackStore).createReviewDecision(body);
     return c.json(result, 201);
   });
 
+  app.post("/v0.2/review-artifacts", async (c) => {
+    const authFailure = authorize(c, options.callerAuthTokens, "review_custody");
+    if (authFailure) return authFailure;
+    const body = await parseBody(c, CreateReviewArtifactInputSchema);
+    const result = await kernelFor(c, fallbackStore).createReviewArtifact(body);
+    return c.json(result, 201);
+  });
+
   app.post("/v0.2/gateway-check-attempts", async (c) => {
+    const authFailure = authorize(c, options.callerAuthTokens, "gateway_custody");
+    if (authFailure) return authFailure;
     const body = await parseBody(c, GatewayCheckInputSchema);
     const result = await kernelFor(c, fallbackStore).gatewayCheck(body);
     return c.json(result, 201);
   });
 
   app.post("/v0.2/surface-operation-reconciliations", async (c) => {
+    const authFailure = authorize(c, options.callerAuthTokens, "gateway_custody");
+    if (authFailure) return authFailure;
     const body = await parseBody(c, ReconcileSurfaceOperationInputSchema);
     const result = await kernelFor(c, fallbackStore).reconcileSurfaceOperation(body);
     return c.json(result, 201);
   });
 
   app.post("/v0.2/isolation-states", async (c) => {
+    const authFailure = authorize(c, options.callerAuthTokens, "control_plane");
+    if (authFailure) return authFailure;
     const body = await parseBody(c, CreateIsolationInputSchema);
     const result = await kernelFor(c, fallbackStore).createIsolationState(body);
     return c.json(result, 201);
   });
 
   app.post("/v0.2/breaker-decisions", async (c) => {
+    const authFailure = authorize(c, options.callerAuthTokens, "control_plane");
+    if (authFailure) return authFailure;
     const body = await parseBody(c, CreateBreakerDecisionInputSchema);
     const result = await kernelFor(c, fallbackStore).createBreakerDecision(body);
     return c.json(result, 201);
   });
 
   app.post("/v0.2/receipt-exports", async (c) => {
+    const authFailure = authorize(c, options.callerAuthTokens, "control_plane");
+    if (authFailure) return authFailure;
     const body = await parseBody(c, CreateReceiptExportInputSchema);
     const result = await kernelFor(c, fallbackStore).createReceiptExport(body);
     return c.json(result, 201);
   });
 
   app.post("/v0.2/recovery-recommendations", async (c) => {
+    const authFailure = authorize(c, options.callerAuthTokens, "control_plane");
+    if (authFailure) return authFailure;
     const body = await parseBody(c, CreateRecoveryRecommendationInputSchema);
     const result = await kernelFor(c, fallbackStore).createRecoveryRecommendation(body);
     return c.json(result, 201);
   });
 
   app.post("/v0.2/recovery-recommendation-status-transitions", async (c) => {
+    const authFailure = authorize(c, options.callerAuthTokens, "control_plane");
+    if (authFailure) return authFailure;
     const body = await parseBody(c, TransitionRecoveryRecommendationStatusInputSchema);
     const result = await kernelFor(c, fallbackStore).transitionRecoveryRecommendationStatus(body);
     return c.json(result, 201);
   });
 
   app.post("/v0.2/recovery-terminal-conflict-resolutions", async (c) => {
+    const authFailure = authorize(c, options.callerAuthTokens, "control_plane");
+    if (authFailure) return authFailure;
     const body = await parseBody(c, ResolveRecoveryTerminalConflictInputSchema);
     const result = await kernelFor(c, fallbackStore).resolveRecoveryTerminalConflictProofGap(body);
     return c.json(result, 201);
   });
 
   app.get("/v0.2/records/:objectType/:objectId", async (c) => {
+    const authFailure = authorize(c, options.callerAuthTokens, "control_plane");
+    if (authFailure) return authFailure;
     const objectType = c.req.param("objectType") as ProtocolObjectType;
     const objectId = c.req.param("objectId");
     const record = await storeFor(c, fallbackStore).getRecord(objectType, objectId);
@@ -165,6 +234,14 @@ export function createApp(options: AppOptions = {}) {
 async function parseBody<T>(c: Context, schema: ZodType<T>): Promise<T> {
   const json = await c.req.json();
   return schema.parse(json);
+}
+
+function authorize(
+  c: Context<{ Bindings: WorkerBindings }>,
+  configuredTokens: CallerAuthTokens | undefined,
+  role: TransitionCallerRole,
+): Response | null {
+  return authorizeTransitionCaller(c, configuredTokens, role);
 }
 
 function kernelFor(c: Context<{ Bindings: WorkerBindings }>, fallbackStore: ProtocolStore | null): HandshakeKernel {

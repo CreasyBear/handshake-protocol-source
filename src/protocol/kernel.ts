@@ -7,9 +7,12 @@ import type {
   CompileIntentInput,
   CreateBreakerDecisionInput,
   CreateIsolationInput,
+  CreateProtectedPathPostureInput,
   CreateRecoveryRecommendationInput,
   CreateReceiptExportInput,
+  CreateReviewArtifactInput,
   CreateReviewDecisionInput,
+  CreateRuntimeExecutionInput,
   EvaluatePolicyInput,
   ProposeActionContractInput,
   ReconcileSurfaceOperationInput,
@@ -18,12 +21,15 @@ import type {
   TransitionRecoveryRecommendationStatusInput,
 } from "./inputs";
 import { evaluatePolicy as evaluatePolicyTransition } from "./policy-decisions";
+import { createProtectedPathPosture as createProtectedPathPostureTransition } from "./protected-path-postures";
 import { createReceiptExport as createReceiptExportTransition } from "./receipt-exports";
 import {
   transitionRecoveryRecommendationStatus as transitionRecoveryRecommendationStatusTransition,
   type RecoveryRecommendationStatusChange,
 } from "./recovery-recommendation-status";
 import { createRecoveryRecommendation as createRecoveryRecommendationTransition } from "./recovery-recommendations";
+import { createReviewArtifact as createReviewArtifactTransition } from "./review-artifacts";
+import { createRuntimeExecution as createRuntimeExecutionTransition } from "./runtime-executions";
 import {
   resolveRecoveryTerminalConflictProofGap as resolveRecoveryTerminalConflictProofGapTransition,
   type RecoveryTerminalConflictResolution,
@@ -42,9 +48,12 @@ import type {
   IsolationState,
   PolicyDecision,
   ProtocolRecord,
+  ProtectedPathPosture,
   ReceiptExport,
   RecoveryRecommendation,
+  ReviewArtifactRecord,
   ReviewDecision,
+  RuntimeExecutionRecord,
 } from "./schemas";
 import { guardCatalogRegistration, type TransitionGuardResult } from "./transitions";
 import type { ProtocolStore } from "../storage/store";
@@ -58,7 +67,22 @@ export class HandshakeKernel {
 
   async putCatalogObject(record: ProtocolRecord): Promise<void> {
     this.assertTransition(guardCatalogRegistration(record));
-    await this.recorder.persistRecord(record);
+    const result = await this.recorder.persistRecordIfAbsentOrSame(record);
+    if (result === "conflict") {
+      throw new HandshakeProtocolError(
+        "bootstrap_record_digest_conflict",
+        "Bootstrap catalog and envelope records are immutable by object id; same-id replacement must have the same canonical digest.",
+        409,
+      );
+    }
+  }
+
+  createRuntimeExecution(input: CreateRuntimeExecutionInput): Promise<RuntimeExecutionRecord> {
+    return createRuntimeExecutionTransition(this.recorder, input);
+  }
+
+  createProtectedPathPosture(input: CreateProtectedPathPostureInput): Promise<ProtectedPathPosture> {
+    return createProtectedPathPostureTransition(this.recorder, input);
   }
 
   compileIntent(input: CompileIntentInput): Promise<IntentCompilationRecord> {
@@ -79,6 +103,10 @@ export class HandshakeKernel {
 
   createReviewDecision(input: CreateReviewDecisionInput): Promise<ReviewDecision> {
     return createReviewDecisionTransition(this.recorder, input);
+  }
+
+  createReviewArtifact(input: CreateReviewArtifactInput): Promise<ReviewArtifactRecord> {
+    return createReviewArtifactTransition(this.recorder, input);
   }
 
   reconcileSurfaceOperation(input: ReconcileSurfaceOperationInput): Promise<SurfaceOperationReconciliationResult> {

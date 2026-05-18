@@ -27,18 +27,18 @@ export async function createRecoveryRecommendation(
   const input = CreateRecoveryRecommendationInputSchema.parse(inputValue);
   const receiptRecord = await recorder.requiredRecord<Receipt>("receipt", input.sourceReceiptId, "receipt_missing");
   const receipt = receiptRecord.payload;
-  assertRecoverableReceipt(receipt);
   assertReceiptDigestMaterial(receipt);
   await assertReceiptDigests(receipt);
+  const proofGaps = await loadProofGaps(recorder, receipt, input.sourceRefusalOrGapRef);
+  assertRecoverableReceipt(receipt, proofGaps);
 
   const contractRecord = await recorder.requiredRecord<ActionContract>(
     "action_contract",
     receipt.actionContractId,
     "contract_missing",
   );
-  const proofGaps = await loadProofGaps(recorder, receipt.proofGapIds);
-  const sourceRefusalOrGapRef = input.sourceRefusalOrGapRef ?? defaultSourceRefusalOrGapRef(receipt);
-  assertSourceRefBelongsToReceipt(receipt, sourceRefusalOrGapRef);
+  const sourceRefusalOrGapRef = input.sourceRefusalOrGapRef ?? defaultSourceRefusalOrGapRef(receipt, proofGaps);
+  assertSourceRefBelongsToReceipt(receipt, proofGaps, sourceRefusalOrGapRef);
   assertRecommendationScope(input.recommendedPath, input.allowedNextActionClasses);
 
   const now = nowIso();
@@ -93,7 +93,7 @@ export async function createRecoveryRecommendation(
     resourceRef: contract.resourceRef,
     actionClass: contract.actionClass,
     failureReceiptRef: receipt.receiptId,
-    proofGapIds: receipt.proofGapIds,
+    proofGapIds: proofGaps.map((proofGap) => proofGap.proofGapId),
     missingEvidenceRefs: proofGaps.map((proofGap) => proofGap.missingOrInvalidEvidenceRef),
     reviewDecisionRef: input.reviewDecisionRef,
     policyChangeRef: input.policyChangeRef,
@@ -146,9 +146,9 @@ export async function createRecoveryRecommendation(
   return recommendation;
 }
 
-function assertRecoverableReceipt(receipt: Receipt): void {
+function assertRecoverableReceipt(receipt: Receipt, proofGaps: ProofGap[]): void {
   const hasRecoverableStatus =
-    receipt.proofGapIds.length > 0 ||
+    proofGaps.length > 0 ||
     receipt.gatewayCheckStatus === "refused" ||
     receipt.gatewayCheckStatus === "proof_gap" ||
     receipt.mutationAttemptStatus === "downstream_refused" ||
@@ -214,19 +214,23 @@ async function assertReceiptDigests(receipt: DigestedReceipt): Promise<void> {
   }
 }
 
-function defaultSourceRefusalOrGapRef(receipt: Receipt): string {
-  if (receipt.proofGapIds[0]) return receipt.proofGapIds[0];
+function defaultSourceRefusalOrGapRef(receipt: Receipt, proofGaps: ProofGap[]): string {
+  if (proofGaps[0]) return proofGaps[0].proofGapId;
   if (receipt.gatewayCheckStatus === "refused") return receipt.gateAttemptId ?? receipt.receiptId;
   if (receipt.mutationAttemptStatus !== "not_attempted") return receipt.mutationAttemptId ?? receipt.gateAttemptId ?? receipt.receiptId;
   return receipt.gateAttemptId ?? receipt.receiptId;
 }
 
-function assertSourceRefBelongsToReceipt(receipt: Receipt, sourceRefusalOrGapRef: string): void {
+function assertSourceRefBelongsToReceipt(
+  receipt: Receipt,
+  proofGaps: ProofGap[],
+  sourceRefusalOrGapRef: string,
+): void {
   const allowedRefs = new Set([
     receipt.receiptId,
     receipt.gateAttemptId,
     receipt.mutationAttemptId,
-    ...receipt.proofGapIds,
+    ...proofGaps.map((proofGap) => proofGap.proofGapId),
   ].filter((ref): ref is string => ref !== null));
   if (!allowedRefs.has(sourceRefusalOrGapRef)) {
     throw new HandshakeProtocolError(
@@ -284,11 +288,39 @@ function agentInstructionUpdateCandidate(reasonCode: string): boolean {
   return reasonCode.includes("agent") || reasonCode.includes("compiler") || reasonCode.includes("overreach");
 }
 
-async function loadProofGaps(recorder: ProtocolRecorder, proofGapIds: string[]): Promise<ProofGap[]> {
+async function loadProofGaps(
+  recorder: ProtocolRecorder,
+  receipt: Receipt,
+  sourceRefusalOrGapRef: string | null | undefined,
+): Promise<ProofGap[]> {
+  const proofGapIds = new Set(receipt.proofGapIds);
+  if (sourceRefusalOrGapRef?.startsWith("gap_")) proofGapIds.add(sourceRefusalOrGapRef);
   const proofGaps: ProofGap[] = [];
-  for (const proofGapId of proofGapIds) {
+  for (const proofGapId of [...proofGapIds]) {
     const proofGap = await recorder.requiredRecord<ProofGap>("proof_gap", proofGapId, "proof_gap_missing");
+    assertProofGapBelongsToReceipt(receipt, proofGap.payload);
     proofGaps.push(proofGap.payload);
   }
   return proofGaps;
+}
+
+function assertProofGapBelongsToReceipt(receipt: Receipt, proofGap: ProofGap): void {
+  const refs = new Set([
+    proofGap.receiptId,
+    proofGap.gateAttemptId,
+    proofGap.mutationAttemptId,
+    ...proofGap.affectedObjectRefs,
+  ].filter((ref): ref is string => ref !== null));
+  if (
+    refs.has(receipt.receiptId) ||
+    (receipt.gateAttemptId !== null && refs.has(receipt.gateAttemptId)) ||
+    (receipt.mutationAttemptId !== null && refs.has(receipt.mutationAttemptId))
+  ) {
+    return;
+  }
+  throw new HandshakeProtocolError(
+    "recovery_source_ref_mismatch",
+    "Proof gap used for recovery must reference the source receipt, gate attempt, or mutation attempt.",
+    409,
+  );
 }

@@ -1,6 +1,7 @@
 export * from "./adapters/package-install/gateway";
 export * from "./adapters/repo-write/gateway";
 export * from "./http/app";
+export * from "./http/caller-auth";
 export * from "./protocol/action-contracts";
 export * from "./protocol/breaker-decisions";
 export * from "./protocol/canonical";

@@ -4,7 +4,6 @@ import {
   type GatewayCheckResult,
   type VerifiedGatewayCheck,
 } from "../../protocol/gateway-check-artifacts";
-import { digestUtf8Content, utf8ByteLength } from "../../protocol/content-digests";
 import type {
   GatewayCheckInput,
   ReconcileSurfaceOperationInput,
@@ -12,87 +11,80 @@ import type {
 import type { SurfaceOperationReconciliationResult } from "../../protocol/surface-operation-reconciliations";
 import type { SurfaceOperationReconciliation } from "../../protocol/schemas";
 
-export const RepoWriteParametersSchema = z.strictObject({
-  repositoryRef: z.string().min(1),
-  filePath: z.string().min(1),
-  contentDigest: z.string().regex(/^sha256:[a-f0-9]{64}$/),
-  contentByteLength: z.number().int().nonnegative(),
+export const PreviewDeployParametersSchema = z.strictObject({
+  provider: z.string().min(1),
+  projectRef: z.string().min(1),
+  branchRef: z.string().min(1),
+  commitRef: z.string().min(1),
+  previewUrlHint: z.string().min(1).nullable(),
 });
-export type RepoWriteParameters = z.infer<typeof RepoWriteParametersSchema>;
+export type PreviewDeployParameters = z.infer<typeof PreviewDeployParametersSchema>;
 
-export type RepoWriteMutationCommand = {
+export type PreviewDeployCommand = {
   verifiedGate: VerifiedGatewayCheck;
-  repositoryRef: string;
-  filePath: string;
-  content: string;
-  contentDigest: `sha256:${string}`;
-  contentByteLength: number;
+  provider: string;
+  projectRef: string;
+  branchRef: string;
+  commitRef: string;
+  previewUrlHint: string | null;
 };
 
-export type RepoWriteMutationEvidence = {
+export type PreviewDeployEvidence = {
   evidenceRef: string;
   surfaceOperationRef: string;
-  repositoryRef: string;
-  filePath: string;
-  contentDigest: `sha256:${string}`;
-  contentByteLength: number;
+  previewUrl: string;
+  provider: string;
+  projectRef: string;
+  branchRef: string;
+  commitRef: string;
 };
 
-export interface RepoWriteMutationSurface {
-  applyRepoWrite(command: RepoWriteMutationCommand): Promise<RepoWriteMutationEvidence>;
+export interface PreviewDeploySurface {
+  createPreviewDeploy(command: PreviewDeployCommand): Promise<PreviewDeployEvidence>;
 }
 
-export type RepoWriteProtocol = {
+export type PreviewDeployProtocol = {
   gatewayCheck(input: GatewayCheckInput): Promise<GatewayCheckResult>;
   reconcileSurfaceOperation(input: ReconcileSurfaceOperationInput): Promise<SurfaceOperationReconciliationResult>;
 };
 
-export type RepoWriteGatewayInput = {
-  protocol: RepoWriteProtocol;
-  surface: RepoWriteMutationSurface;
+export type PreviewDeployGatewayInput = {
+  protocol: PreviewDeployProtocol;
+  surface: PreviewDeploySurface;
   actionContractId: string;
   greenlightId: string;
-  repositoryRef: string;
-  filePath: string;
-  content: string;
+  observedParameters: PreviewDeployParameters;
   surfaceOperationRef?: string;
 };
 
-export type RepoWriteGatewayResult =
+export type PreviewDeployGatewayResult =
   | {
       outcome: "gateway_check_refused";
       gatewayCheck: GatewayCheckResult;
       reconciliation: null;
-      mutationEvidence: null;
+      previewEvidence: null;
     }
   | {
       outcome: "gateway_check_not_authoritative";
       gatewayCheck: GatewayCheckResult;
       reconciliation: null;
-      mutationEvidence: null;
+      previewEvidence: null;
     }
   | {
-      outcome: "mutation_reconciled";
+      outcome: "preview_created";
       gatewayCheck: GatewayCheckResult;
       reconciliation: SurfaceOperationReconciliation;
-      mutationEvidence: RepoWriteMutationEvidence;
+      previewEvidence: PreviewDeployEvidence;
     }
   | {
-      outcome: "mutation_failed";
+      outcome: "preview_failed";
       gatewayCheck: GatewayCheckResult;
       reconciliation: SurfaceOperationReconciliation;
-      mutationEvidence: null;
+      previewEvidence: null;
     };
 
-export async function runRepoWriteGateway(input: RepoWriteGatewayInput): Promise<RepoWriteGatewayResult> {
-  const contentDigest = await digestUtf8Content(input.content);
-  const contentByteLength = utf8ByteLength(input.content);
-  const observedParameters = RepoWriteParametersSchema.parse({
-    repositoryRef: input.repositoryRef,
-    filePath: input.filePath,
-    contentDigest,
-    contentByteLength,
-  });
+export async function runPreviewDeployGateway(input: PreviewDeployGatewayInput): Promise<PreviewDeployGatewayResult> {
+  const observedParameters = PreviewDeployParametersSchema.parse(input.observedParameters);
   const surfaceOperationRef = input.surfaceOperationRef ?? `surface-op:${input.actionContractId}`;
   const gatewayCheck = await input.protocol.gatewayCheck({
     actionContractId: input.actionContractId,
@@ -105,36 +97,36 @@ export async function runRepoWriteGateway(input: RepoWriteGatewayInput): Promise
   if (!verifiedGate) {
     const outcome =
       gatewayCheck.gateAttempt.gateDecision === "refused" ? "gateway_check_refused" : "gateway_check_not_authoritative";
-    return { outcome, gatewayCheck, reconciliation: null, mutationEvidence: null };
+    return { outcome, gatewayCheck, reconciliation: null, previewEvidence: null };
   }
 
   try {
-    const mutationEvidence = await input.surface.applyRepoWrite({
+    const previewEvidence = await input.surface.createPreviewDeploy({
       verifiedGate,
-      repositoryRef: input.repositoryRef,
-      filePath: input.filePath,
-      content: input.content,
-      contentDigest,
-      contentByteLength,
+      provider: observedParameters.provider,
+      projectRef: observedParameters.projectRef,
+      branchRef: observedParameters.branchRef,
+      commitRef: observedParameters.commitRef,
+      previewUrlHint: observedParameters.previewUrlHint,
     });
     const { reconciliation } = await input.protocol.reconcileSurfaceOperation({
       mutationAttemptId: verifiedGate.mutationAttemptId,
       idempotencyKey: verifiedGate.idempotencyKey,
-      observedSurfaceOperationRef: mutationEvidence.surfaceOperationRef,
+      observedSurfaceOperationRef: previewEvidence.surfaceOperationRef,
       observedDownstreamStatus: "succeeded",
-      evidenceRefs: [mutationEvidence.evidenceRef],
+      evidenceRefs: [previewEvidence.evidenceRef],
       resolvedProofGapIds: [],
     });
-    return { outcome: "mutation_reconciled", gatewayCheck, reconciliation, mutationEvidence };
+    return { outcome: "preview_created", gatewayCheck, reconciliation, previewEvidence };
   } catch {
     const { reconciliation } = await input.protocol.reconcileSurfaceOperation({
       mutationAttemptId: verifiedGate.mutationAttemptId,
       idempotencyKey: verifiedGate.idempotencyKey,
       observedSurfaceOperationRef: surfaceOperationRef,
       observedDownstreamStatus: "failed",
-      evidenceRefs: [`evidence:repo-write-failed:${surfaceOperationRef}`],
+      evidenceRefs: [`evidence:preview-deploy-failed:${surfaceOperationRef}`],
       resolvedProofGapIds: [],
     });
-    return { outcome: "mutation_failed", gatewayCheck, reconciliation, mutationEvidence: null };
+    return { outcome: "preview_failed", gatewayCheck, reconciliation, previewEvidence: null };
   }
 }

@@ -3,7 +3,7 @@ import { HandshakeClient } from "../src/sdk/client";
 import { proposeCodemodeActionContracts } from "../src/runtime/codemode-multi-action/wrapper";
 import { proposePackageInstallActionContract } from "../src/runtime/package-install/tool-wrapper";
 import { proposeRepoWriteActionContract } from "../src/runtime/repo-write/tool-wrapper";
-import { createD1HttpHarness } from "./support/d1-http-harness";
+import { createD1HttpHarness, D1_HARNESS_TRANSITION_TOKEN } from "./support/d1-http-harness";
 import {
   codemodeMultiActionRuntimeConfig,
   makeCodemodeMultiActionFixtureObjects,
@@ -18,7 +18,9 @@ describe("codemode multi-action runtime wrapper", () => {
   it("emits ordered package-install and repo-write action contracts without policy or gateway authority", async () => {
     const harness = await createD1HttpHarness();
     try {
-      const client = new HandshakeClient("http://handshake.test", harness.fetch);
+      const client = new HandshakeClient("http://handshake.test", harness.fetch, {
+        transitionToken: D1_HARNESS_TRANSITION_TOKEN,
+      });
       const fixture = makeCodemodeMultiActionFixtureObjects();
       await registerCodemodeMultiActionFixtureObjectsWithClient(client, fixture);
 
@@ -65,7 +67,9 @@ describe("codemode multi-action runtime wrapper", () => {
   it("records candidate refusal without granting authority to the rest of the generated program", async () => {
     const harness = await createD1HttpHarness();
     try {
-      const client = new HandshakeClient("http://handshake.test", harness.fetch);
+      const client = new HandshakeClient("http://handshake.test", harness.fetch, {
+        transitionToken: D1_HARNESS_TRANSITION_TOKEN,
+      });
       const fixture = makeCodemodeMultiActionFixtureObjects();
       fixture.repoWrite.tool = { ...fixture.repoWrite.tool, wrapperStatus: "unwrapped" };
       await registerCodemodeMultiActionFixtureObjectsWithClient(client, fixture);
@@ -104,7 +108,9 @@ describe("codemode multi-action runtime wrapper", () => {
   it("refuses later contract policy until its declared prior contract is greenlit", async () => {
     const harness = await createD1HttpHarness();
     try {
-      const client = new HandshakeClient("http://handshake.test", harness.fetch);
+      const client = new HandshakeClient("http://handshake.test", harness.fetch, {
+        transitionToken: D1_HARNESS_TRANSITION_TOKEN,
+      });
       const fixture = makeCodemodeMultiActionFixtureObjects();
       await registerCodemodeMultiActionFixtureObjectsWithClient(client, fixture);
 
@@ -160,7 +166,9 @@ describe("codemode multi-action runtime wrapper", () => {
   it("refuses later gateway check until its declared prior contract has a final receipt", async () => {
     const harness = await createD1HttpHarness();
     try {
-      const client = new HandshakeClient("http://handshake.test", harness.fetch);
+      const client = new HandshakeClient("http://handshake.test", harness.fetch, {
+        transitionToken: D1_HARNESS_TRANSITION_TOKEN,
+      });
       const fixture = makeCodemodeMultiActionFixtureObjects();
       await registerCodemodeMultiActionFixtureObjectsWithClient(client, fixture);
 
@@ -197,7 +205,6 @@ describe("codemode multi-action runtime wrapper", () => {
         actionContractId: second.actionContractId,
         greenlightId: secondPolicy.greenlight.greenlightId,
         observedParameters: second.parameters,
-        downstreamMode: "succeed",
       });
       expect(earlySecondGate.gateAttempt.gateDecision).toBe("refused");
       expect(earlySecondGate.gateAttempt.gateDecisionReasonCode).toBe("prior_action_not_receipted");
@@ -208,15 +215,22 @@ describe("codemode multi-action runtime wrapper", () => {
         actionContractId: first.actionContractId,
         greenlightId: firstPolicy.greenlight.greenlightId,
         observedParameters: first.parameters,
-        downstreamMode: "succeed",
       });
       expect(firstGate.gateAttempt.gateDecision).toBe("passed");
+      if (!firstGate.mutationAttempt) throw new Error("expected first mutation attempt");
+      await client.reconcileSurfaceOperation({
+        mutationAttemptId: firstGate.mutationAttempt.mutationAttemptId,
+        idempotencyKey: first.idempotencyKey,
+        observedSurfaceOperationRef: firstGate.mutationAttempt.surfaceOperationRef,
+        observedDownstreamStatus: "succeeded",
+        evidenceRefs: ["evidence:first-action-complete"],
+        resolvedProofGapIds: [],
+      });
 
       const laterSecondGate = await client.gatewayCheck({
         actionContractId: second.actionContractId,
         greenlightId: secondPolicy.greenlight.greenlightId,
         observedParameters: second.parameters,
-        downstreamMode: "succeed",
       });
       expect(laterSecondGate.gateAttempt.gateDecision).toBe("passed");
       expect(await recordCount(harness, "gateway_check_attempt")).toBe(3);
@@ -229,7 +243,9 @@ describe("codemode multi-action runtime wrapper", () => {
   it("refuses policy when a declared prior contract is missing", async () => {
     const harness = await createD1HttpHarness();
     try {
-      const client = new HandshakeClient("http://handshake.test", harness.fetch);
+      const client = new HandshakeClient("http://handshake.test", harness.fetch, {
+        transitionToken: D1_HARNESS_TRANSITION_TOKEN,
+      });
       const fixture = makeCodemodeMultiActionFixtureObjects();
       await registerCodemodeMultiActionFixtureObjectsWithClient(client, fixture);
       const config = codemodeMultiActionRuntimeConfig(fixture);
@@ -260,15 +276,20 @@ describe("codemode multi-action runtime wrapper", () => {
   it("refuses policy when a declared prior contract was refused", async () => {
     const harness = await createD1HttpHarness();
     try {
-      const client = new HandshakeClient("http://handshake.test", harness.fetch);
+      const client = new HandshakeClient("http://handshake.test", harness.fetch, {
+        transitionToken: D1_HARNESS_TRANSITION_TOKEN,
+      });
       const fixture = makeCodemodeMultiActionFixtureObjects();
       await registerCodemodeMultiActionFixtureObjectsWithClient(client, fixture);
       const config = codemodeMultiActionRuntimeConfig(fixture);
-      const refusedPrior = await proposePackageInstallActionContract(client, config.packageInstall, {
+      const refusedPrior = await proposePackageInstallActionContract(client, {
+        ...config.packageInstall,
+        contractExpiresAt: new Date(Date.now() - 60_000).toISOString(),
+      }, {
         principalIntentRef: "intent:install unapproved package then write file",
         generatedCodeOrSpecRef: "code:package-install-refused-prior",
-        package: "left-pad",
-        versionRange: "^1.3.0",
+        package: "hono",
+        versionRange: "^4.12.19",
       });
       if (refusedPrior.outcome !== "action_contract_proposed") throw new Error("expected prior action contract");
       const refusedPriorPolicy = await client.evaluatePolicy({
@@ -277,7 +298,7 @@ describe("codemode multi-action runtime wrapper", () => {
         signingSecret: "test-secret",
       });
       expect(refusedPriorPolicy.decision.decision).toBe("refuse");
-      expect(refusedPriorPolicy.decision.decisionReasonCode).toBe("resource_outside_envelope");
+      expect(refusedPriorPolicy.decision.decisionReasonCode).toBe("contract_expired");
 
       const proposed = await proposeRepoWriteActionContract(client, config.repoWrite, {
         principalIntentRef: "intent:write file after refused prior",
