@@ -487,6 +487,41 @@ Remaining foundation gap:
   tests seeded from the executable transition matrix so invalid transition
   sequences cannot mint mutation authority.
 
+### Slice 5: Model-Based Invariant Tests
+
+Status: implemented 2026-05-19.
+
+Evidence:
+
+- Added `test/model-based-invariants.test.ts` with a deterministic command
+  model seeded from the transition matrix route vocabulary.
+- The model executes valid and invalid transition sequences and re-reads the
+  store after every command.
+- Covered sequences include rejected compilation before catalog registration,
+  runtime evidence without authority, missing contract/policy/gateway attempts,
+  the canonical contract -> policy -> greenlight -> gate chain, greenlight
+  replay, unknown downstream finality proof-gap recovery evidence, isolation
+  before policy, isolation after greenlight, and receipt export.
+- The invariant check fails if a mutation exists without an ActionContract,
+  PolicyDecision, Greenlight, and passed GatewayCheckAttempt; if one greenlight
+  maps to multiple mutation attempts; if refused receipts imply mutation; if
+  non-final receipts imply downstream success; or if proof-gap/recovery/export
+  evidence creates retry authority.
+
+Verification:
+
+```text
+bun test test/model-based-invariants.test.ts
+npm run typecheck -- --pretty false
+```
+
+Remaining foundation gap:
+
+- Plan 05 foundation gates are now implemented. The next work item in the
+  active repo goal is Plan 03 generated-execution graph coverage, using the
+  transition matrix, fault harness, budget recorder, typed errors, and
+  model-based invariant test as foundation gates.
+
 ## NOT In Scope
 
 - new product UI, CLI, MCP server, or dashboard;
@@ -501,13 +536,13 @@ Remaining foundation gap:
 
 | Lens | Applies? | Target | Hard Stops | Evidence Required | Closeout |
 |---|---:|---:|---|---|---|
-| Product / CEO | yes | Foundation only | Plan implies Tier 2, hosted, or provider-side enforcement. | Non-claims in plan and docs. | open |
-| Engineering | yes | hard gate | Matrix or fault harness misses a committed transition. | Completeness tests and focused fault-injection tests. | open |
-| Security / CSO | yes | hard gate | Failure simulation can produce mutation authority. | Fault-injection refusal/proof-gap tests. | open |
+| Product / CEO | yes | Foundation only | Plan implies Tier 2, hosted, or provider-side enforcement. | Non-claims in plan and docs. | closed |
+| Engineering | yes | hard gate | Matrix or fault harness misses a committed transition. | Completeness tests and focused fault-injection tests. | closed |
+| Security / CSO | yes | hard gate | Failure simulation can produce mutation authority. | Fault-injection refusal/proof-gap tests. | closed |
 | DevEx | yes | 8/10 | SDK errors remain generic or unactionable. | Typed error tests. | slice 4 closed |
 | Design | no | n/a | No UI or review surface changes in this plan. | n/a | not applicable |
-| Architecture | yes | 8/10 | Harness becomes another protocol owner. | Import posture, module ownership docs, and `test/support` containment. | open |
-| Domain Invariant | yes | hard gate | Any path bypasses contract -> policy -> greenlight -> gate. | Model-based invariants and no-mutation fault tests. | open |
+| Architecture | yes | 8/10 | Harness becomes another protocol owner. | Import posture, module ownership docs, and `test/support` containment. | closed |
+| Domain Invariant | yes | hard gate | Any path bypasses contract -> policy -> greenlight -> gate. | Model-based invariants and no-mutation fault tests. | closed |
 
 ## Completion Summary Template
 
