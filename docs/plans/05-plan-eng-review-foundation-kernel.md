@@ -1,7 +1,7 @@
 # Plan 05: Foundation Kernel Operating Practice
 
-Status: proposed foundation gate
-Last reviewed: 2026-05-18
+Status: implemented foundation gate
+Last reviewed: 2026-05-19
 Owner: protocol kernel
 Governing docs:
 
@@ -515,12 +515,14 @@ bun test test/model-based-invariants.test.ts
 npm run typecheck -- --pretty false
 ```
 
-Remaining foundation gap:
+Foundation closeout:
 
-- Plan 05 foundation gates are now implemented. The next work item in the
-  active repo goal is Plan 03 generated-execution graph coverage, using the
-  transition matrix, fault harness, budget recorder, typed errors, and
-  model-based invariant test as foundation gates.
+- Plan 05 foundation gates are implemented and now act as the operating
+  practice for later work.
+- Plan 03 generated-execution graph coverage has also landed locally on top of
+  these gates.
+- The next non-hosted mechanism is the first Tier 2 protected-action plan. Plan
+  04 remains gated to hosted or multi-tenant claims.
 
 ## NOT In Scope
 
@@ -543,6 +545,18 @@ Remaining foundation gap:
 | Design | no | n/a | No UI or review surface changes in this plan. | n/a | not applicable |
 | Architecture | yes | 8/10 | Harness becomes another protocol owner. | Import posture, module ownership docs, and `test/support` containment. | closed |
 | Domain Invariant | yes | hard gate | Any path bypasses contract -> policy -> greenlight -> gate. | Model-based invariants and no-mutation fault tests. | closed |
+
+## Quality Closeout
+
+| Lens | Planned Target | Actual Result | Evidence | Delta | Status |
+|---|---:|---:|---|---|---|
+| Product / CEO | Foundation only | The plan remains foundation-only and does not claim Tier 2, hosted operation, or provider enforcement. | `docs/plans/README.md`, `docs/index.md`, `docs/product/non-claims-and-theatre.md`, Plan 05 NOT in scope. | First Tier 2 protected path remains future work. | pass |
+| Engineering | hard gate | Every public route and public kernel transition is represented in the executable matrix, with focused drift tests. | `test/support/transition-matrix.ts`, `test/transition-matrix.test.ts`. | None for the foundation gate. | pass |
+| Security / CSO | hard gate | Fault injection covers conflict, replay, stale, missing, and ambiguous states without minting mutation authority. | `test/support/fault-injecting-protocol-store.ts`, `test/fault-injecting-protocol-store.test.ts`, kernel/Hono fault tests. | Hosted caller identity remains Plan 04 only. | pass |
+| DevEx | 8/10 | HTTP and SDK callers receive typed transition error envelopes with retryability, commit state, custody role, request identity, and proof/refusal references. | `src/http/transition-error-envelope.ts`, `src/sdk/client.ts`, `test/http.test.ts`. | No new public graph helper. | pass |
+| Design | n/a | No UI, review renderer, or human decision surface was added. | No changed UI surface. | Future review surfaces must bind exact contract/policy/graph digests. | pass |
+| Architecture | 8/10 | Foundation harnesses stay in `test/support`; protocol meaning remains in area-owned modules behind the kernel facade. | `test/import-posture.test.ts`, `test/root-exports.test.ts`, `QUALITY.md`. | None for the foundation gate. | pass |
+| Domain Invariant | hard gate | Model-based tests fail if mutation appears without contract, policy, one-use greenlight, and passed gateway check, or if proof/recovery/export evidence becomes retry authority. | `test/model-based-invariants.test.ts`, `test/protected-mutation-adapter-conformance.test.ts`. | Future Tier 2 surfaces must reuse these gates. | pass |
 
 ## Completion Summary Template
 

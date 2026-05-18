@@ -1,17 +1,21 @@
 # Protocol Completion Audit v0.2
 
-Status: Passed for v0.2 protocol kernel
-Version: v0.2.1
+Status: Passed for v0.2.4 foundation kernel
+Version: v0.2.4
 Audience: Protocol implementers, runtime builders, gateway owners, platform engineering
 Implementation status: Backed by current TypeScript modules, Hono routes, D1 tests, gateway adapters, runtime wrappers, and invariant tests
 Canonical owner: Protocol owner
-Last reviewed: 2026-05-18
+Last reviewed: 2026-05-19
 
 ## Invariant At Stake
 
 No consequential autonomous action executes outside declared bounds, and divergent behavior must be haltable, isolatable, and reconstructable.
 
-This audit checks the current implementation against `01-plan-eng-review-primitive-fields-state.md` and `QUALITY.md`. It does not expand the object model. It asks whether the v0.2 kernel proves the first closed enforcement loop before product UI.
+This audit checks the current implementation against the local foundation
+sequence through Plan 05 and Plan 03, plus `QUALITY.md`. It does not expand the
+object model. It asks whether the v0.2 kernel proves the closed enforcement loop
+and the failure-simulation foundation before product UI, hosted operation, or
+public evidence APIs.
 
 ## Audit Verdict
 
@@ -46,6 +50,8 @@ This is not a claim that production gateway integrations, product UI, multi-tena
 | Minimal explicit SDK | Pass | `src/sdk/client.ts`, D1 tests using `HandshakeClient` |
 | Reference TypeScript runtime wrappers | Pass | `src/runtime/package-install/tool-wrapper.ts`, `src/runtime/repo-write/tool-wrapper.ts`, `src/runtime/codemode-multi-action/wrapper.ts` |
 | Gateway adapter proof | Pass | `src/adapters/package-install/gateway.ts`, `src/adapters/repo-write/gateway.ts`, gateway and D1 adapter tests |
+| Generated execution graph boundary | Pass | `src/protocol/generated-execution-graph/`, `test/generated-execution-graph.test.ts`, `test/codemode-multi-action-runtime.test.ts` |
+| Foundation failure-simulation practice | Pass | `test/support/transition-matrix.ts`, `test/support/fault-injecting-protocol-store.ts`, `test/support/transition-budget-recorder.ts`, `test/model-based-invariants.test.ts` |
 | Product UI not built first | Pass | No app/product UI package exists; docs keep product surfaces out of v0.2 kernel |
 
 ## Plan Obligations
@@ -78,18 +84,45 @@ The v0.2 state model is explicit enough for the first closed loop:
 - Replayable reconstruction is enforced through digest-linked `ContractStreamEvent` partitions.
 - Missing, unknown, stale, or conflicting evidence is represented as `ProofGap`, not receipt prose or mutation authority.
 
+## Foundation Practice Evidence
+
+Plan 05 is implemented as a test-facing operating practice, not a product
+surface:
+
+- `test/support/transition-matrix.ts` covers every public transition route and
+  public kernel transition method with caller custody, outcomes, records,
+  events, indexes, proof/refusal obligations, and illegal authority claims.
+- `test/support/fault-injecting-protocol-store.ts` makes stream conflicts,
+  greenlight replay, operation-claim conflicts, stale posture, stale gateway
+  policy, missing reads, delayed current indexes, and ambiguous commits
+  repeatable in tests.
+- `test/support/transition-budget-recorder.ts` records read/write, record,
+  event, partition, and method-count drift as pressure signals.
+- `src/http/transition-error-envelope.ts` and `src/sdk/client.ts` expose typed
+  transition failures so callers can distinguish retryable, terminal,
+  proof-linked, refusal-linked, and ambiguous commit states without receiving
+  raw internals.
+- `test/model-based-invariants.test.ts` checks generated valid and invalid
+  transition sequences after every step so evidence records, proof gaps,
+  recovery recommendations, and receipt exports cannot become mutation
+  authority.
+
 ## Runtime And Gateway Evidence
 
-The runtime seam has two concrete action shapes and one generated-program wrapper:
+The runtime seam has two concrete action shapes and one generated-program
+wrapper:
 
 - package install runtime proposal;
 - repository write runtime proposal with content digest binding;
-- codemode multi-action proposal with sequence dependencies.
+- codemode multi-action proposal with one `RuntimeExecutionRecord`, one
+  `GeneratedExecutionGraph`, graph-bound child compilations, and sequence
+  dependencies.
 
-The gateway seam has two concrete adapters:
+The gateway seam has three local reference adapters:
 
 - package manifest mutation after `VerifiedGatewayCheck`;
 - repository file write after content digest verification and gateway check.
+- local preview deploy fixture mutation after `VerifiedGatewayCheck`.
 
 This satisfies the architecture skill's real-seam test: the gateway seam has more than one adapter, and the runtime seam has more than one action shape.
 
@@ -104,7 +137,8 @@ bun test
 rg -n "z\\.unknown\\(\\)|mutationAttempt: unknown|proofGap: unknown|payload: any|metadata: any|approval|permission|executeWithoutGate|assumeSuccess|allowAll|skipVerification|trustedAgent|probably executed|best effort receipt" src test
 ```
 
-Expected result: typecheck/build/test pass; the authority-pattern scan returns no matches.
+Expected result: typecheck/build/test pass; the authority-pattern scan returns
+only intentional illegal-claim text in `test/support/transition-matrix.ts`.
 
 ## Non-Claims
 
@@ -126,4 +160,6 @@ Keep. The v0.2 kernel now proves the primitive without product theatre.
 
 Further object-model expansion should require an ADR or a new plan. The next practical wave should package the kernel for integration or choose one production gateway adapter, but that is outside this completion audit.
 
-Protocol next mechanism: cut a v0.2 protocol-kernel checkpoint, then require an ADR before changing the control object model. This is separate from the CLI/MCP product-surface shipment and its first gateway adapter.
+Protocol next mechanism: choose and plan the first Tier 2 protected-action path.
+Keep public graph APIs, hosted caller identity, provider enforcement, CLI/MCP,
+and UI surfaces cut until their governing plans prove the new failure modes.
