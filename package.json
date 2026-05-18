@@ -1,0 +1,22 @@
+{
+  "name": "handshake-protocol-kernel",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "typecheck": "tsc --noEmit",
+    "test": "bun test",
+    "build": "tsc --noEmit"
+  },
+  "dependencies": {
+    "hono": "^4.12.19",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20260517.1",
+    "@types/bun": "^1.3.14",
+    "typescript": "^6.0.3",
+    "wrangler": "^4.92.0"
+  }
+}

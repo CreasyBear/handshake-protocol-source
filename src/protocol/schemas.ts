@@ -1,0 +1,600 @@
+import { z } from "zod";
+
+export const PROTOCOL_VERSION = "0.2.0";
+
+export type JsonValue =
+  | null
+  | boolean
+  | number
+  | string
+  | JsonValue[]
+  | { [key: string]: JsonValue };
+
+export const JsonValueSchema: z.ZodType<JsonValue> = z.lazy(() =>
+  z.union([
+    z.null(),
+    z.boolean(),
+    z.number().finite(),
+    z.string(),
+    z.array(JsonValueSchema),
+    z.record(z.string(), JsonValueSchema),
+  ]),
+);
+
+export const DigestSchema = z.string().regex(/^sha256:[a-f0-9]{64}$/);
+export const SignatureSchema = z.string().regex(/^hmac-sha256:[a-f0-9]{64}$/);
+export const IdSchema = z.string().min(3).max(160);
+export const IsoDateSchema = z.string().datetime({ offset: true });
+export const ReasonCodeSchema = z.string().min(2).max(120);
+export const ResourceRefSchema = z.string().min(1).max(500);
+
+export const ProtocolBaseSchema = z.strictObject({
+  schemaVersion: z.literal(PROTOCOL_VERSION),
+  tenantId: IdSchema,
+  organizationId: IdSchema,
+  createdAt: IsoDateSchema,
+});
+
+export const ToolCapabilitySchema = ProtocolBaseSchema.extend({
+  toolCapabilityId: IdSchema,
+  toolCatalogId: IdSchema,
+  toolCatalogVersion: z.string().min(1),
+  runtimeAdapterId: IdSchema,
+  toolName: z.string().min(1),
+  toolNamespace: z.string().min(1),
+  capabilityClass: z.enum(["read", "write", "network", "filesystem", "deploy", "package", "database", "unknown"]),
+  readWriteClassification: z.enum(["read_only", "consequential", "ambiguous"]),
+  consequentialityDefault: z.enum(["non_consequential", "consequential", "requires_classification"]),
+  wrapperStatus: z.enum(["wrapped", "unwrapped", "unknown"]),
+  rawBypassPossible: z.boolean(),
+  inputSchemaRef: z.string().min(1),
+  outputSchemaRef: z.string().min(1),
+  secretBearingFields: z.array(z.string()).default([]),
+  supersededAt: IsoDateSchema.nullable(),
+});
+export type ToolCapability = z.infer<typeof ToolCapabilitySchema>;
+
+export const ActionTypeSchema = ProtocolBaseSchema.extend({
+  actionTypeId: IdSchema,
+  actionCatalogId: IdSchema,
+  actionCatalogVersion: z.string().min(1),
+  actionClass: z.string().min(1),
+  receiverKind: z.string().min(1),
+  requiredContractFields: z.array(z.string().min(1)),
+  canonicalParameterSchemaRef: z.string().min(1),
+  resourceRefSchemaRef: z.string().min(1),
+  requiredEvidenceTypes: z.array(z.string()).default([]),
+  allowedBoundsSchemaRef: z.string().min(1),
+  defaultReceiptRequirement: z.enum(["none", "gate", "mutation", "downstream_finality"]),
+  defaultIdempotencyRequirement: z.enum(["required", "optional", "forbidden"]),
+  supersededAt: IsoDateSchema.nullable(),
+});
+export type ActionType = z.infer<typeof ActionTypeSchema>;
+
+export const ReceiverRegistryEntrySchema = ProtocolBaseSchema.extend({
+  receiverRegistryEntryId: IdSchema,
+  receiverRegistryVersion: z.string().min(1),
+  receiverId: IdSchema,
+  receiverKind: z.string().min(1),
+  receiverAdapterId: IdSchema,
+  receiverAdapterVersion: z.string().min(1),
+  gateEndpointRef: z.string().min(1),
+  receiverPolicyContractId: IdSchema,
+  receiverPolicyVersion: z.string().min(1),
+  receiverPolicyDriftMode: z.enum(["refuse_on_drift", "allow_compatible_stricter"]),
+  compatiblePreviousReceiverPolicyVersions: z.array(z.string().min(1)).default([]),
+  acceptedActionCatalogVersions: z.array(z.string().min(1)),
+  resourceNamespaceRef: z.string().min(1),
+  canonicalizerVersion: z.string().min(1),
+  receiptCapabilityStatus: z.enum(["available", "unavailable", "unknown"]),
+  isolationCheckCapabilityStatus: z.enum(["available", "unavailable", "unknown"]),
+  supersededAt: IsoDateSchema.nullable(),
+});
+export type ReceiverRegistryEntry = z.infer<typeof ReceiverRegistryEntrySchema>;
+
+export const OperatingEnvelopeSchema = ProtocolBaseSchema.extend({
+  envelopeId: IdSchema,
+  principalId: IdSchema,
+  agentId: IdSchema,
+  objectiveRef: z.string().min(1),
+  allowedActionClasses: z.array(z.string().min(1)),
+  allowedReceivers: z.array(IdSchema),
+  allowedResources: z.array(ResourceRefSchema),
+  evidenceRequirements: z.array(z.string()).default([]),
+  policyPackRef: z.string().min(1),
+  policyPackVersion: z.string().min(1),
+  issuedAt: IsoDateSchema,
+  expiresAt: IsoDateSchema,
+  revokedAt: IsoDateSchema.nullable(),
+});
+export type OperatingEnvelope = z.infer<typeof OperatingEnvelopeSchema>;
+
+export const IntentCompilationRecordSchema = ProtocolBaseSchema.extend({
+  intentCompilationId: IdSchema,
+  principalIntentRef: z.string().min(1),
+  principalId: IdSchema,
+  agentId: IdSchema,
+  runId: IdSchema,
+  runtimeAdapterId: IdSchema,
+  operatingEnvelopeId: IdSchema,
+  toolCatalogRef: z.string().min(1),
+  actionCatalogRef: z.string().min(1),
+  receiverRegistryRef: z.string().min(1),
+  generatedCodeOrSpecRefs: z.array(z.string()).default([]),
+  declaredAssumptions: z.array(z.string()).default([]),
+  uncertaintyMarkers: z.array(z.string()).default([]),
+  candidateActionContractRefs: z.array(IdSchema).default([]),
+  rejectedCandidateRefs: z.array(IdSchema).default([]),
+  overreachReasonCodes: z.array(ReasonCodeSchema).default([]),
+  requiredEvidenceRefs: z.array(z.string()).default([]),
+  compilerVersion: z.string().min(1),
+});
+export type IntentCompilationRecord = z.infer<typeof IntentCompilationRecordSchema>;
+
+export const ActionContractSchema = ProtocolBaseSchema.extend({
+  actionContractId: IdSchema,
+  intentCompilationId: IdSchema,
+  envelopeId: IdSchema,
+  agentId: IdSchema,
+  principalId: IdSchema,
+  runId: IdSchema,
+  sequenceNumber: z.number().int().nonnegative(),
+  requiredPriorActionContractIds: z.array(IdSchema).default([]),
+  recoveryRecommendationId: IdSchema.nullable(),
+  recoverySourceReceiptId: IdSchema.nullable(),
+  recoveryRecommendationDigest: DigestSchema.nullable(),
+  issuedAt: IsoDateSchema,
+  expiresAt: IsoDateSchema,
+  receiverRegistryEntryId: IdSchema,
+  receiverRegistryVersion: z.string().min(1),
+  receiverId: IdSchema,
+  receiverPolicyContractId: IdSchema,
+  receiverPolicyVersion: z.string().min(1),
+  actionClass: z.string().min(1),
+  resourceRef: ResourceRefSchema,
+  parameters: z.record(z.string(), JsonValueSchema),
+  paramsDigest: DigestSchema,
+  nonSecretParamsSummary: z.record(z.string(), JsonValueSchema),
+  purposeCode: z.string().min(1),
+  expectedSideEffectCodes: z.array(z.string().min(1)),
+  evidenceRefs: z.array(z.string()).default([]),
+  bounds: z.record(z.string(), JsonValueSchema).default({}),
+  idempotencyKey: IdSchema,
+  rollbackHint: z.string().max(500).nullable(),
+  canonicalizerVersion: z.string().min(1),
+  actionContractDigest: DigestSchema,
+  contractSignature: SignatureSchema.nullable(),
+});
+export type ActionContract = z.infer<typeof ActionContractSchema>;
+
+export const PolicyDecisionValueSchema = z.enum(["greenlight", "refuse", "review_required", "halt", "quarantine"]);
+export type PolicyDecisionValue = z.infer<typeof PolicyDecisionValueSchema>;
+
+export const PolicyDecisionSchema = ProtocolBaseSchema.extend({
+  policyDecisionId: IdSchema,
+  actionContractId: IdSchema,
+  envelopeId: IdSchema,
+  policyPackRef: z.string().min(1),
+  policyPackVersion: z.string().min(1),
+  policyEvaluatorVersion: z.string().min(1),
+  policyInputDigest: DigestSchema,
+  decision: PolicyDecisionValueSchema,
+  decisionReasonCode: ReasonCodeSchema,
+  decisionReason: z.string().min(1).max(1000),
+  matchedRuleIds: z.array(z.string()).default([]),
+  requiredReceipt: z.enum(["none", "gate", "mutation", "downstream_finality"]),
+  isolationSnapshotRef: z.string().min(1),
+  expiresAt: IsoDateSchema,
+  decisionSignature: SignatureSchema.nullable(),
+});
+export type PolicyDecision = z.infer<typeof PolicyDecisionSchema>;
+
+export const GreenlightSchema = ProtocolBaseSchema.extend({
+  greenlightId: IdSchema,
+  actionContractId: IdSchema,
+  policyDecisionId: IdSchema,
+  receiverRegistryEntryId: IdSchema,
+  receiverRegistryVersion: z.string().min(1),
+  receiverId: IdSchema,
+  receiverPolicyVersion: z.string().min(1),
+  actionClass: z.string().min(1),
+  resourceRef: ResourceRefSchema,
+  paramsDigest: DigestSchema,
+  contractDigest: DigestSchema,
+  maxUses: z.literal(1),
+  issuedAt: IsoDateSchema,
+  notBefore: IsoDateSchema,
+  expiresAt: IsoDateSchema,
+  isolationSnapshotRef: z.string().min(1),
+  requiredReceipt: z.enum(["none", "gate", "mutation", "downstream_finality"]),
+  decisionSignature: SignatureSchema.nullable(),
+  consumedAt: IsoDateSchema.nullable(),
+  consumedByGateAttemptId: IdSchema.nullable(),
+});
+export type Greenlight = z.infer<typeof GreenlightSchema>;
+
+export const ReviewDecisionSchema = ProtocolBaseSchema.extend({
+  reviewDecisionId: IdSchema,
+  reviewArtifactRef: z.string().min(1),
+  reviewRenderSchemaVersion: z.string().min(1),
+  reviewerPrincipalId: IdSchema,
+  actionContractId: IdSchema,
+  actionContractDigest: DigestSchema,
+  policyInputDigest: DigestSchema,
+  receiverPolicyVersion: z.string().min(1),
+  decision: z.enum(["approve", "reject", "needs_changes"]),
+  decisionReasonCode: ReasonCodeSchema,
+  decisionExpiresAt: IsoDateSchema,
+  signatureOrAttestationRef: z.string().min(1),
+});
+export type ReviewDecision = z.infer<typeof ReviewDecisionSchema>;
+
+export const StreamWatermarkSchema = z.strictObject({
+  streamId: IdSchema,
+  partitionKey: z.string().min(1),
+  observedOffsetStart: z.number().int().nonnegative(),
+  observedOffsetEnd: z.number().int().nonnegative(),
+  observedEventDigest: DigestSchema.nullable(),
+}).refine((watermark) => watermark.observedOffsetStart <= watermark.observedOffsetEnd, {
+  message: "observedOffsetEnd must be greater than or equal to observedOffsetStart",
+  path: ["observedOffsetEnd"],
+});
+export type StreamWatermark = z.infer<typeof StreamWatermarkSchema>;
+
+export const BreakerIsolationDecisionSchema = z.enum([
+  "review_only",
+  "rate_limited",
+  "quarantined",
+  "halted",
+  "revoked",
+  "state_suspect",
+]);
+export type BreakerIsolationDecision = z.infer<typeof BreakerIsolationDecisionSchema>;
+
+export const BreakerDecisionSchema = ProtocolBaseSchema.extend({
+  breakerDecisionId: IdSchema,
+  listenerId: IdSchema,
+  listenerVersion: z.string().min(1),
+  rulePackRef: z.string().min(1),
+  rulePackVersion: z.string().min(1),
+  observedStreamOffsets: z.array(StreamWatermarkSchema).min(1),
+  observedWindowDigest: DigestSchema,
+  decision: BreakerIsolationDecisionSchema,
+  decisionReasonCode: ReasonCodeSchema,
+  decisionReason: z.string().min(1).max(1000),
+  targetScopeType: z.enum(["tenant", "organization", "agent", "run", "envelope", "action_class", "receiver", "resource"]),
+  targetScopeId: IdSchema,
+  createdIsolationStateId: IdSchema,
+  agentId: IdSchema.nullable(),
+  runId: IdSchema.nullable(),
+  receiverId: IdSchema.nullable(),
+  resourceRef: ResourceRefSchema.nullable(),
+  actionClass: z.string().min(1).nullable(),
+  sequenceRiskScore: z.number().min(0).max(1),
+  matchedBreakerRuleIds: z.array(z.string().min(1)).default([]),
+  supportingEventRefs: z.array(IdSchema).default([]),
+  missingEventRefs: z.array(z.string().min(1)).default([]),
+  proofGapRefs: z.array(IdSchema).default([]),
+  decisionEffectiveAt: IsoDateSchema,
+  decisionExpiresAt: IsoDateSchema.nullable(),
+  watermarkAtDecision: IsoDateSchema,
+});
+export type BreakerDecision = z.infer<typeof BreakerDecisionSchema>;
+
+export const IsolationStateSchema = ProtocolBaseSchema.extend({
+  isolationStateId: IdSchema,
+  scopeType: z.enum(["tenant", "organization", "agent", "run", "envelope", "action_class", "receiver", "resource"]),
+  scopeId: IdSchema,
+  state: z.enum(["active", "review_only", "rate_limited", "quarantined", "halted", "revoked", "state_suspect"]),
+  reasonCode: ReasonCodeSchema,
+  reasonSummary: z.string().min(1).max(1000),
+  sourceDecisionRef: z.string().min(1),
+  effectiveAt: IsoDateSchema,
+  expiresAt: IsoDateSchema.nullable(),
+  clearedAt: IsoDateSchema.nullable(),
+  observedStreamOffsets: z.array(StreamWatermarkSchema).default([]),
+  version: z.number().int().nonnegative(),
+});
+export type IsolationState = z.infer<typeof IsolationStateSchema>;
+
+export const GateDecisionSchema = z.enum(["passed", "refused", "proof_gap"]);
+export type GateDecision = z.infer<typeof GateDecisionSchema>;
+
+export const ReceiverGateAttemptSchema = ProtocolBaseSchema.extend({
+  gateAttemptId: IdSchema,
+  receiverId: IdSchema,
+  receiverPolicyContractId: IdSchema,
+  receiverPolicyVersion: z.string().min(1),
+  pinnedReceiverPolicyVersion: z.string().min(1),
+  currentReceiverPolicyVersion: z.string().min(1).nullable(),
+  receiverPolicyDriftStatus: z.enum(["same_version", "compatible_stricter", "incompatible", "unknown"]),
+  actionContractId: IdSchema,
+  greenlightId: IdSchema,
+  contractDigestSeen: DigestSchema,
+  greenlightDigestSeen: DigestSchema,
+  paramsDigestSeen: DigestSchema,
+  idempotencyKeySeen: IdSchema,
+  isolationSnapshotRef: z.string().min(1),
+  gateDecision: GateDecisionSchema,
+  gateDecisionReasonCode: ReasonCodeSchema,
+  consumedGreenlight: z.boolean(),
+  mutationAttemptId: IdSchema.nullable(),
+});
+export type ReceiverGateAttempt = z.infer<typeof ReceiverGateAttemptSchema>;
+
+export const MutationAttemptSchema = ProtocolBaseSchema.extend({
+  mutationAttemptId: IdSchema,
+  gateAttemptId: IdSchema,
+  actionContractId: IdSchema,
+  greenlightId: IdSchema,
+  receiverId: IdSchema,
+  actionClass: z.string().min(1),
+  resourceRef: ResourceRefSchema,
+  idempotencyKey: IdSchema,
+  outcome: z.enum(["not_attempted", "submitted", "succeeded", "downstream_refused", "failed", "unknown"]),
+  outcomeReasonCode: ReasonCodeSchema,
+  receiverOperationRef: z.string().min(1).nullable(),
+  startedAt: IsoDateSchema,
+  finishedAt: IsoDateSchema.nullable(),
+});
+export type MutationAttempt = z.infer<typeof MutationAttemptSchema>;
+
+export const ReceiverOperationReconciliationSchema = ProtocolBaseSchema.extend({
+  reconciliationId: IdSchema,
+  mutationAttemptId: IdSchema,
+  gateAttemptId: IdSchema,
+  actionContractId: IdSchema,
+  greenlightId: IdSchema,
+  receiverId: IdSchema,
+  idempotencyKey: IdSchema,
+  receiverOperationRef: z.string().min(1).nullable(),
+  previousMutationOutcome: MutationAttemptSchema.shape.outcome,
+  observedDownstreamStatus: z.enum(["pending", "succeeded", "refused", "failed", "unknown"]),
+  observedAt: IsoDateSchema,
+  evidenceRefs: z.array(z.string()).default([]),
+  resolvedProofGapIds: z.array(IdSchema).default([]),
+  reconciliationStatus: z.enum(["pending", "resolved", "still_unknown", "failed"]),
+  finalityStatus: z.enum(["final", "pending", "suspect", "unknown"]),
+});
+export type ReceiverOperationReconciliation = z.infer<typeof ReceiverOperationReconciliationSchema>;
+
+export const ProofGapSchema = ProtocolBaseSchema.extend({
+  proofGapId: IdSchema,
+  gapPhase: z.enum(["compilation", "policy", "gate", "mutation", "receipt", "stream", "recovery"]),
+  expectedEvidenceType: z.string().min(1),
+  missingOrInvalidEvidenceRef: z.string().min(1),
+  affectedObjectRefs: z.array(z.string().min(1)),
+  gateAttemptId: IdSchema.nullable(),
+  mutationAttemptId: IdSchema.nullable(),
+  receiptId: IdSchema.nullable(),
+  reasonCode: ReasonCodeSchema,
+  finalityImpact: z.enum(["none", "suspect", "unknown", "invalid"]),
+  recoveryRequirement: z.string().min(1),
+  resolvedAt: IsoDateSchema.nullable(),
+  resolvedByRef: z.string().min(1).nullable(),
+});
+export type ProofGap = z.infer<typeof ProofGapSchema>;
+
+export const ReceiptStreamReferenceSchema = z.strictObject({
+  streamId: IdSchema,
+  streamScope: z.enum(["tenant", "organization", "run", "receiver_resource"]),
+  partitionKey: z.string().min(1),
+  offsetStart: z.number().int().nonnegative(),
+  offsetEnd: z.number().int().nonnegative(),
+  terminalEventDigest: DigestSchema,
+}).refine((reference) => reference.offsetStart <= reference.offsetEnd, {
+  message: "offsetEnd must be greater than or equal to offsetStart",
+  path: ["offsetEnd"],
+});
+export type ReceiptStreamReference = z.infer<typeof ReceiptStreamReferenceSchema>;
+
+export const ReceiptSchema = ProtocolBaseSchema.extend({
+  receiptId: IdSchema,
+  actionContractId: IdSchema,
+  policyDecisionId: IdSchema,
+  greenlightId: IdSchema.nullable(),
+  gateAttemptId: IdSchema.nullable(),
+  mutationAttemptId: IdSchema.nullable(),
+  receiverId: IdSchema,
+  policyDecisionStatus: PolicyDecisionValueSchema,
+  receiverGateStatus: GateDecisionSchema.nullable(),
+  greenlightConsumptionStatus: z.enum(["not_applicable", "not_consumed", "consumed", "replayed"]),
+  mutationAttemptStatus: z.enum(["not_attempted", "submitted", "succeeded", "downstream_refused", "failed", "unknown"]),
+  downstreamExecutionStatus: z.enum(["not_started", "pending", "succeeded", "refused", "failed", "unknown"]),
+  proofGapIds: z.array(IdSchema).default([]),
+  evidenceRefs: z.array(z.string()).default([]),
+  streamEventIds: z.array(IdSchema).default([]),
+  streamOffsets: z.array(ReceiptStreamReferenceSchema).default([]),
+  receiptDigest: DigestSchema.nullable(),
+  auditChainDigest: DigestSchema.nullable(),
+  finalityStatus: z.enum(["final", "pending", "suspect", "unknown"]),
+  emittedAt: IsoDateSchema,
+});
+export type Receipt = z.infer<typeof ReceiptSchema>;
+
+export const ReceiptExportSchema = ProtocolBaseSchema.extend({
+  receiptExportId: IdSchema,
+  receiptId: IdSchema,
+  actionContractId: IdSchema,
+  policyDecisionId: IdSchema,
+  greenlightId: IdSchema.nullable(),
+  gateAttemptId: IdSchema.nullable(),
+  mutationAttemptId: IdSchema.nullable(),
+  receiverId: IdSchema,
+  principalId: IdSchema,
+  agentId: IdSchema,
+  runId: IdSchema,
+  receiverPolicyVersion: z.string().min(1),
+  policyDecisionStatus: PolicyDecisionValueSchema,
+  receiverGateCheckStatus: GateDecisionSchema.nullable(),
+  receiverGateCheckedAt: IsoDateSchema.nullable(),
+  greenlightConsumptionStatus: ReceiptSchema.shape.greenlightConsumptionStatus,
+  mutationAttemptStatus: ReceiptSchema.shape.mutationAttemptStatus,
+  downstreamExecutionStatus: ReceiptSchema.shape.downstreamExecutionStatus,
+  proofGapStatus: z.enum(["none", "present"]),
+  proofGapIds: z.array(IdSchema).default([]),
+  proofGapReasonCodes: z.array(ReasonCodeSchema).default([]),
+  finalityStatus: ReceiptSchema.shape.finalityStatus,
+  evidenceRefs: z.array(z.string()).default([]),
+  streamOffsets: z.array(ReceiptStreamReferenceSchema).default([]),
+  receiptDigest: DigestSchema,
+  auditChainDigest: DigestSchema,
+  exportFormat: z.enum(["json", "redacted_json"]),
+  redactionProfileRef: z.string().min(1),
+  exportPurposeCode: z.string().min(1),
+  requestedByRef: z.string().min(1),
+  evidenceRetentionUntil: IsoDateSchema.nullable(),
+  exportedAt: IsoDateSchema,
+  exportDigest: DigestSchema,
+});
+export type ReceiptExport = z.infer<typeof ReceiptExportSchema>;
+
+export const RecoveryRecommendedPathSchema = z.enum([
+  "narrower_action_contract_required",
+  "receiver_reconciliation_required",
+  "human_review_required",
+  "compensating_action_contract_required",
+  "halt_without_retry",
+]);
+export type RecoveryRecommendedPath = z.infer<typeof RecoveryRecommendedPathSchema>;
+
+export const RecoveryRecommendationStatusSchema = z.enum(["open", "expired", "superseded"]);
+export type RecoveryRecommendationStatus = z.infer<typeof RecoveryRecommendationStatusSchema>;
+
+export const RecoveryRecommendationTerminalStatusSchema = z.enum(["expired", "superseded"]);
+export type RecoveryRecommendationTerminalStatus = z.infer<typeof RecoveryRecommendationTerminalStatusSchema>;
+
+export const RecoveryRecommendationSchema = ProtocolBaseSchema.extend({
+  recoveryRecommendationId: IdSchema,
+  sourceReceiptId: IdSchema,
+  sourceActionContractId: IdSchema,
+  sourcePolicyDecisionId: IdSchema,
+  sourceGreenlightId: IdSchema.nullable(),
+  sourceGateAttemptId: IdSchema.nullable(),
+  sourceMutationAttemptId: IdSchema.nullable(),
+  sourceRefusalOrGapRef: z.string().min(1),
+  sourceFinalityStatus: ReceiptSchema.shape.finalityStatus,
+  sourceReceiverGateStatus: GateDecisionSchema.nullable(),
+  sourceMutationAttemptStatus: ReceiptSchema.shape.mutationAttemptStatus,
+  sourceDownstreamExecutionStatus: ReceiptSchema.shape.downstreamExecutionStatus,
+  recommendedPath: RecoveryRecommendedPathSchema,
+  allowedNextActionClasses: z.array(z.string().min(1)).default([]),
+  requiredNewEvidence: z.array(z.string().min(1)).default([]),
+  requiresHumanReview: z.boolean(),
+  safeRetryAvailable: z.boolean(),
+  scopeNarrowingRequired: z.boolean(),
+  policyUpdateCandidate: z.boolean(),
+  agentInstructionUpdateCandidate: z.boolean(),
+  principalId: IdSchema,
+  agentId: IdSchema,
+  runId: IdSchema,
+  receiverId: IdSchema,
+  resourceRef: ResourceRefSchema,
+  actionClass: z.string().min(1),
+  failureReceiptRef: IdSchema,
+  proofGapIds: z.array(IdSchema).default([]),
+  missingEvidenceRefs: z.array(z.string().min(1)).default([]),
+  reviewDecisionRef: z.string().min(1).nullable(),
+  policyChangeRef: z.string().min(1).nullable(),
+  sourceReceiptDigest: DigestSchema,
+  sourceAuditChainDigest: DigestSchema,
+  sourceStreamOffsets: z.array(ReceiptStreamReferenceSchema).default([]),
+  reasonCode: ReasonCodeSchema,
+  reasonSummary: z.string().min(1).max(1000),
+  recommendedAt: IsoDateSchema,
+  recoveryExpiresAt: IsoDateSchema.nullable(),
+  reviewDueAt: IsoDateSchema.nullable(),
+  retryNotBefore: IsoDateSchema.nullable(),
+  mustCreateNewActionContract: z.literal(true),
+  mayReuseGreenlight: z.literal(false),
+  mayMutateReceiver: z.literal(false),
+  recommendationStatus: RecoveryRecommendationStatusSchema,
+  statusChangedAt: IsoDateSchema.nullable(),
+  statusChangedByRef: z.string().min(1).nullable(),
+  statusReasonCode: ReasonCodeSchema.nullable(),
+  statusReasonSummary: z.string().min(1).max(1000).nullable(),
+  supersededByActionContractId: IdSchema.nullable(),
+  recommendationDigest: DigestSchema,
+});
+export type RecoveryRecommendation = z.infer<typeof RecoveryRecommendationSchema>;
+
+export const RecoveryRecommendationStatusTransitionSchema = ProtocolBaseSchema.extend({
+  recoveryRecommendationStatusTransitionId: IdSchema,
+  recoveryRecommendationId: IdSchema,
+  sourceReceiptId: IdSchema,
+  sourceActionContractId: IdSchema,
+  previousStatus: RecoveryRecommendationStatusSchema,
+  nextStatus: RecoveryRecommendationTerminalStatusSchema,
+  recommendationDigest: DigestSchema,
+  reasonCode: ReasonCodeSchema,
+  reasonSummary: z.string().min(1).max(1000),
+  changedByRef: z.string().min(1),
+  changedAt: IsoDateSchema,
+  supersededByActionContractId: IdSchema.nullable(),
+  transitionDigest: DigestSchema,
+});
+export type RecoveryRecommendationStatusTransition = z.infer<typeof RecoveryRecommendationStatusTransitionSchema>;
+
+export const ContractStreamEventSchema = ProtocolBaseSchema.extend({
+  streamEventId: IdSchema,
+  streamId: IdSchema,
+  streamScope: z.enum(["tenant", "organization", "run", "receiver_resource"]),
+  offset: z.number().int().nonnegative(),
+  partitionKey: z.string().min(1),
+  eventType: z.enum([
+    "intent_compiled",
+    "action_proposed",
+    "policy_decision_recorded",
+    "action_greenlit",
+    "action_refused",
+    "review_required",
+    "receiver_gate_checked",
+    "mutation_attempted",
+    "receiver_operation_reconciled",
+    "receiver_refused",
+    "review_decision_recorded",
+    "breaker_decision_recorded",
+    "receipt_emitted",
+    "receipt_exported",
+    "recovery_recommended",
+    "recovery_status_changed",
+    "proof_gap_recorded",
+    "proof_gap_resolved",
+    "isolation_changed",
+  ]),
+  eventTime: IsoDateSchema,
+  producerRef: z.string().min(1),
+  objectRefs: z.array(z.string().min(1)),
+  previousEventDigest: DigestSchema.nullable(),
+  eventDigest: DigestSchema,
+  payload: z.record(z.string(), JsonValueSchema),
+});
+export type ContractStreamEvent = z.infer<typeof ContractStreamEventSchema>;
+
+export const ProtocolRecordSchema = z.discriminatedUnion("objectType", [
+  z.strictObject({ objectType: z.literal("tool_capability"), payload: ToolCapabilitySchema }),
+  z.strictObject({ objectType: z.literal("action_type"), payload: ActionTypeSchema }),
+  z.strictObject({ objectType: z.literal("receiver_registry_entry"), payload: ReceiverRegistryEntrySchema }),
+  z.strictObject({ objectType: z.literal("operating_envelope"), payload: OperatingEnvelopeSchema }),
+  z.strictObject({ objectType: z.literal("intent_compilation"), payload: IntentCompilationRecordSchema }),
+  z.strictObject({ objectType: z.literal("action_contract"), payload: ActionContractSchema }),
+  z.strictObject({ objectType: z.literal("policy_decision"), payload: PolicyDecisionSchema }),
+  z.strictObject({ objectType: z.literal("greenlight"), payload: GreenlightSchema }),
+  z.strictObject({ objectType: z.literal("review_decision"), payload: ReviewDecisionSchema }),
+  z.strictObject({ objectType: z.literal("breaker_decision"), payload: BreakerDecisionSchema }),
+  z.strictObject({ objectType: z.literal("isolation_state"), payload: IsolationStateSchema }),
+  z.strictObject({ objectType: z.literal("receiver_gate_attempt"), payload: ReceiverGateAttemptSchema }),
+  z.strictObject({ objectType: z.literal("mutation_attempt"), payload: MutationAttemptSchema }),
+  z.strictObject({ objectType: z.literal("receiver_operation_reconciliation"), payload: ReceiverOperationReconciliationSchema }),
+  z.strictObject({ objectType: z.literal("proof_gap"), payload: ProofGapSchema }),
+  z.strictObject({ objectType: z.literal("receipt"), payload: ReceiptSchema }),
+  z.strictObject({ objectType: z.literal("receipt_export"), payload: ReceiptExportSchema }),
+  z.strictObject({ objectType: z.literal("recovery_recommendation"), payload: RecoveryRecommendationSchema }),
+  z.strictObject({
+    objectType: z.literal("recovery_recommendation_status_transition"),
+    payload: RecoveryRecommendationStatusTransitionSchema,
+  }),
+  z.strictObject({ objectType: z.literal("contract_stream_event"), payload: ContractStreamEventSchema }),
+]);
+export type ProtocolRecord = z.infer<typeof ProtocolRecordSchema>;
+export type ProtocolObjectType = ProtocolRecord["objectType"];

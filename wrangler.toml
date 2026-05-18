@@ -1,0 +1,12 @@
+name = "handshake-protocol-kernel"
+main = "src/worker.ts"
+compatibility_date = "2026-05-17"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "handshake_protocol"
+database_id = "00000000-0000-0000-0000-000000000000"
+
+[[kv_namespaces]]
+binding = "CACHE"
+id = "00000000000000000000000000000000"

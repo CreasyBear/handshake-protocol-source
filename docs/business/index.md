@@ -1,0 +1,73 @@
+# Handshake Business Spine
+
+Status: Canonical business alpha  
+Version: v0.2.0  
+Audience: Founder, product, GTM, design partners, platform/security buyers  
+Implementation status: Depends on `docs/plans/01-plan-eng-review-primitive-fields-state.md` and `docs/plans/02-plan-eng-review-agent-requirements.md`; not yet validated by paid pilots  
+Canonical owner: Product owner  
+Last reviewed: 2026-05-17
+
+## Customer And Moment Of Value
+
+Customer: engineering teams adopting coding agents near production-adjacent work.
+
+Moment of value: a coding agent attempts a consequential action, Handshake turns it into an exact action contract, policy greenlights or refuses it, the receiver gate enforces before mutation, and the receipt reconstructs the run.
+
+## Business Invariant
+
+Handshake is only commercially real if receiver-gated action control lets customers delegate more valuable work to agents.
+
+If the product only adds review work, logs, dashboards, or safety language without unlocking more bounded autonomous execution, the business is failing.
+
+## What We Sell First
+
+Sell:
+
+```text
+Handshake Agent Guardrails
+Receiver-gated action contracts and receipts for coding agents doing production-adjacent work.
+```
+
+Do not sell the protocol first. The protocol proves the product is real. The bought product is the workflow unlock:
+
+```text
+Let coding agents perform larger production-adjacent tasks under receiver-gated bounds instead of ambient authority.
+```
+
+## Canonical Business Docs
+
+Read these in order:
+
+1. [Canonical Product](./canonical-product.md)
+2. [Go-To-Market And Validation](./go-to-market-and-validation.md)
+3. [ICP And Buyer Map](./icp-and-buyer-map.md)
+4. [Protocol Vs Product](./protocol-vs-product.md)
+
+Protocol dependencies:
+
+- [Protocol Kernel](../protocol-kernel.md)
+- [First Contract Walkthrough](../first-contract-walkthrough.md)
+- [Agent Requirements Plan](../plans/02-plan-eng-review-agent-requirements.md)
+
+## Non-Canonical Research Inputs
+
+The old strategy and agentic circuit-breaker research folders are inputs, not business truth.
+
+Carry forward:
+
+- buyers pay when control unlocks more autonomous execution;
+- engineering agents are the cheapest first proof;
+- support/billing may be the stronger commercial challenger;
+- embedded agentic SaaS may become the distribution path;
+- horizontal market-access language is future category work, not first-sale language.
+
+Reject:
+
+- agent smart-contract branding;
+- circuit-breaker platform positioning;
+- broad agent governance;
+- dashboard-first product;
+- audit-only product;
+- marketplace before receiver enforcement.
+
+Smallest next product shipment: one design-partner-ready proof packet for a receiver-gated engineering-agent action.
