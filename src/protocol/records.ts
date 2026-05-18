@@ -1,15 +1,23 @@
 import { digestCanonical } from "./canonical";
+import type { ContractStreamEvent } from "./event-schemas";
 import { buildEventChain, type EventDescriptor } from "./events";
 import { HandshakeProtocolError } from "./errors";
-import type { ContractStreamEvent, JsonValue, ProtocolObjectType, ProtocolRecord } from "./schemas";
+import type { ProtocolObjectType, ProtocolRecord } from "./object-registry/schemas";
+import type { JsonValue } from "./schema-core";
+import {
+  buildTransitionRequestContext,
+  type TransitionRequestContextDraft,
+} from "./transition-request-contexts";
 import type {
   GreenlightIssuanceClaim,
+  ProtectedSurfaceOperationClaimIndexEntry,
   ProtectedPathPostureIndexEntry,
   ProtocolStore,
+  ReceiptMutationAttemptIndexEntry,
   RecoveryTerminalClaim,
   StoredProtocolRecord,
-} from "../storage/store";
-import { getObjectId } from "../storage/store";
+} from "./store-port";
+import { getObjectId } from "./object-registry";
 
 const MAX_STREAM_COMMIT_RETRIES = 3;
 
@@ -17,10 +25,16 @@ export type CommitRecordsOptions = {
   greenlightIssuanceClaims?: GreenlightIssuanceClaim[];
   recoveryTerminalClaims?: RecoveryTerminalClaim[];
   protectedPathPostureIndexEntries?: ProtectedPathPostureIndexEntry[];
+  protectedSurfaceOperationClaimIndexEntries?: ProtectedSurfaceOperationClaimIndexEntry[];
+  protectedSurfaceOperationClaimIndexReleases?: string[];
+  receiptMutationAttemptIndexEntries?: ReceiptMutationAttemptIndexEntry[];
 };
 
 export class ProtocolRecorder {
-  constructor(private readonly store: ProtocolStore) {}
+  constructor(
+    private readonly store: ProtocolStore,
+    private readonly transitionRequestContext?: TransitionRequestContextDraft,
+  ) {}
 
   async requiredRecord<T>(
     objectType: ProtocolObjectType,
@@ -34,10 +48,13 @@ export class ProtocolRecorder {
 
   async persistRecord(record: ProtocolRecord): Promise<void> {
     await this.store.putRecord(await this.buildRecord(record));
+    await this.persistTransitionRequestContextIfNeeded(record);
   }
 
   async persistRecordIfAbsentOrSame(record: ProtocolRecord): Promise<"inserted" | "unchanged" | "conflict"> {
-    return this.store.putRecordIfAbsentOrSame(await this.buildRecord(record));
+    const result = await this.store.putRecordIfAbsentOrSame(await this.buildRecord(record));
+    if (result !== "conflict") await this.persistTransitionRequestContextIfNeeded(record);
+    return result;
   }
 
   async buildRecord(record: ProtocolRecord): Promise<StoredProtocolRecord> {
@@ -59,9 +76,11 @@ export class ProtocolRecorder {
     eventDescriptors: EventDescriptor[],
     options: CommitRecordsOptions = {},
   ): Promise<ContractStreamEvent[]> {
-    const records = await Promise.all(protocolRecords.map((record) => this.buildRecord(record)));
+    const { records: protocolRecordsWithContext, eventDescriptors: eventDescriptorsWithContext } =
+      await this.withTransitionRequestContext(protocolRecords, eventDescriptors);
+    const records = await Promise.all(protocolRecordsWithContext.map((record) => this.buildRecord(record)));
     for (let attempt = 0; attempt <= MAX_STREAM_COMMIT_RETRIES; attempt += 1) {
-      const events = await buildEventChain(this.store, eventDescriptors);
+      const events = await buildEventChain(this.store, eventDescriptorsWithContext);
       const commitResult = await this.store.commitProtocolRecords({ records, events, ...options });
       if (commitResult === "committed") return events;
       if (commitResult === "greenlight_issuance_conflict") {
@@ -84,5 +103,61 @@ export class ProtocolRecorder {
       "Protocol lifecycle record could not commit a contiguous contract stream after retrying fresh stream tails.",
       409,
     );
+  }
+
+  private async persistTransitionRequestContextIfNeeded(record: ProtocolRecord): Promise<void> {
+    if (!this.transitionRequestContext || record.objectType === "transition_request_context") return;
+    const context = await buildTransitionRequestContext(this.transitionRequestContext, {
+      tenantId: record.payload.tenantId,
+      organizationId: record.payload.organizationId,
+    });
+    await this.store.putRecord(await this.buildRecord({ objectType: "transition_request_context", payload: context }));
+  }
+
+  async transitionRequestContextRecordFor(scope: {
+    tenantId: string;
+    organizationId: string;
+  }): Promise<ProtocolRecord | null> {
+    if (!this.transitionRequestContext) return null;
+    const context = await buildTransitionRequestContext(this.transitionRequestContext, scope);
+    return { objectType: "transition_request_context", payload: context };
+  }
+
+  withTransitionRequestContextEventDescriptors(
+    eventDescriptors: EventDescriptor[],
+    contextRecord: ProtocolRecord | null,
+  ): EventDescriptor[] {
+    if (!contextRecord || contextRecord.objectType !== "transition_request_context") return eventDescriptors;
+    const context = contextRecord.payload;
+    return eventDescriptors.map((descriptor) => ({
+      ...descriptor,
+      objectRefs: [context.transitionRequestContextId, ...descriptor.objectRefs],
+      payload: {
+        ...descriptor.payload,
+        transitionRequestContextId: context.transitionRequestContextId,
+        requestContextDigest: context.requestContextDigest,
+      },
+    }));
+  }
+
+  private async withTransitionRequestContext(
+    protocolRecords: ProtocolRecord[],
+    eventDescriptors: EventDescriptor[],
+  ): Promise<{ records: ProtocolRecord[]; eventDescriptors: EventDescriptor[] }> {
+    if (!this.transitionRequestContext || protocolRecords.length === 0) {
+      return { records: protocolRecords, eventDescriptors };
+    }
+    const scopeRecord = protocolRecords[0];
+    if (!scopeRecord) return { records: protocolRecords, eventDescriptors };
+    const scope = scopeRecord.payload;
+    const contextRecord = await this.transitionRequestContextRecordFor({
+      tenantId: scope.tenantId,
+      organizationId: scope.organizationId,
+    });
+    if (!contextRecord) return { records: protocolRecords, eventDescriptors };
+    return {
+      records: [contextRecord, ...protocolRecords],
+      eventDescriptors: this.withTransitionRequestContextEventDescriptors(eventDescriptors, contextRecord),
+    };
   }
 }

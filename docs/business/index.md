@@ -45,9 +45,9 @@ Read these in order:
 
 Protocol dependencies:
 
-- [Protocol Kernel](../protocol-kernel.md)
-- [First Contract Walkthrough](../first-contract-walkthrough.md)
-- [Protocol Completion Audit v0.2](../protocol-completion-audit-v0.2.md)
+- [Protocol Kernel](../protocol/protocol-kernel.md)
+- [First Contract Walkthrough](../protocol/first-contract-walkthrough.md)
+- [Protocol Completion Audit v0.2](../audits/protocol-completion-audit-v0.2.md)
 
 ## Non-Canonical Research Inputs
 
@@ -72,4 +72,7 @@ Reject:
 - marketplace before gateway enforcement.
 - payment rails, wallets, budgets, settlement, accounting, credit, fraud, or personalized financial-management scope.
 
-Active next product shipment: a design-partner pilot for Handshake Protected Actions through the CLI/MCP protected action surface. The bought product is the CLI/MCP integration, Contract Viewer, Receipt Timeline, install posture, and gateway-adapter path that lets a coding agent propose protected actions without ambient authority. The first adapter-backed workflow is protected repo-write-to-PR through a GitHub App-backed `repo_write_gateway`. Proof packets are sales/conformance evidence only.
+Active next product shipment is owned by
+[`canonical-product.md`](./canonical-product.md). This business index may point
+to the shipment owner, but it must not restate the current adapter proof or
+become a second source of product truth.

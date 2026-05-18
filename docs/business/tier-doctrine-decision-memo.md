@@ -314,6 +314,22 @@ This doctrine carries forward the r1-r10 exploration conclusions:
 - r9: Cloudflare is the product discipline model: open primitive, clear boundaries, many surfaces, hosted operation, no vague trust claims.
 - r10: AgentCash/x402/payment rails are future gateway/action adapters only when the enforcement boundary is honest.
 
+## Doctrine Change Boundary
+
+This memo changes only when Handshake's tier doctrine, monetization boundary,
+long-term claim limit, or product center changes.
+
+It does not own active shipment scope. Current bought product and current adapter
+proof are owned by [`canonical-product.md`](./canonical-product.md). If the
+active proof moves from repo-write to preview deploy, package install, CI, or
+another protected action family, update the canonical product doc first. Change
+this memo only if that movement changes what is open, self-hostable, hosted,
+paid, or future ecosystem.
+
+Preview deploy can remain the buyer-legible wedge doctrine while the canonical
+product doc names the current first adapter proof. Do not resolve that tension by
+duplicating active-shipment prose here.
+
 ## What This Memo Is Not
 
 This memo is not:
@@ -331,7 +347,8 @@ Product-build principles live in [`../specs/00-product-requirements-spine.md`](.
 
 ## Smallest Next Doctrine Step
 
-Write the canonical product docs and product surfaces so every Handshake tier answers:
+Before changing product scope, verify the canonical product docs and product
+surfaces still answer:
 
 ```text
 What is open?
@@ -342,4 +359,6 @@ What evidence remains?
 What must we not claim yet?
 ```
 
-Do not build new implementation from this memo until the canonical product story is updated and reviewed against gateway-checked enforcement claims.
+Do not build new implementation from this memo directly. Build from a spec or
+plan that cites this memo for tier doctrine, cites canonical product for active
+shipment scope, and is reviewed against gateway-checked enforcement claims.

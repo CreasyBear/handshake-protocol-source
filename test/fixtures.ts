@@ -1,6 +1,7 @@
 import { HandshakeKernel } from "../src/protocol/kernel";
 import { nowIso } from "../src/protocol/ids";
 import type { CompileIntentInput, ProposeActionContractInput } from "../src/protocol/inputs";
+import type { ProtocolStore } from "../src/protocol/store-port";
 import type {
   ActionType,
   OperatingEnvelope,
@@ -9,6 +10,15 @@ import type {
 } from "../src/protocol/schemas";
 import { PROTOCOL_VERSION } from "../src/protocol/schemas";
 import { InMemoryProtocolStore } from "../src/storage/memory";
+
+export type KernelFixture = {
+  store: ProtocolStore;
+  kernel: HandshakeKernel;
+  tool: ToolCapability;
+  actionType: ActionType;
+  gateway: GatewayRegistryEntry;
+  envelope: OperatingEnvelope;
+};
 
 export function futureIso(minutes = 10): string {
   return new Date(Date.now() + minutes * 60_000).toISOString();
@@ -113,7 +123,7 @@ export function makeKernelFixture() {
   return { store, kernel, tool, actionType, gateway, envelope };
 }
 
-export async function registerFixtureObjects(fixture: ReturnType<typeof makeKernelFixture>) {
+export async function registerFixtureObjects(fixture: Pick<KernelFixture, "kernel" | "tool" | "actionType" | "gateway" | "envelope">) {
   await fixture.kernel.putCatalogObject({ objectType: "tool_capability", payload: fixture.tool });
   await fixture.kernel.putCatalogObject({ objectType: "action_type", payload: fixture.actionType });
   await fixture.kernel.putCatalogObject({ objectType: "gateway_registry_entry", payload: fixture.gateway });
@@ -178,7 +188,9 @@ export async function recordUnknownDownstreamProofGap(
   return result.createdProofGap;
 }
 
-export async function createGreenlitContract(fixture = makeKernelFixture()) {
+export async function createGreenlitContract<T extends KernelFixture = ReturnType<typeof makeKernelFixture>>(
+  fixture: T = makeKernelFixture() as unknown as T,
+) {
   await registerFixtureObjects(fixture);
   const compilation = await fixture.kernel.compileIntent({
     tenantId: "tenant_demo",

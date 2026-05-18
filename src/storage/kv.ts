@@ -1,4 +1,4 @@
-import type { IsolationState } from "../protocol/schemas";
+import type { IsolationState } from "../protocol/store-port";
 
 export interface IsolationCache {
   get(scopeId: string): Promise<IsolationState | null>;

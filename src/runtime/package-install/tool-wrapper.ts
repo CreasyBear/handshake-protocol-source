@@ -1,12 +1,9 @@
 import { z } from "zod";
+import type { ActionContract, ProposeActionContractInput } from "../../protocol/action-contract";
 import type {
   CompileIntentInput,
-  ProposeActionContractInput,
-} from "../../protocol/inputs";
-import type {
-  ActionContract,
   IntentCompilationRecord,
-} from "../../protocol/schemas";
+} from "../../protocol/intent-compilation";
 
 export const PackageInstallToolCallSchema = z.strictObject({
   principalIntentRef: z.string().min(1),

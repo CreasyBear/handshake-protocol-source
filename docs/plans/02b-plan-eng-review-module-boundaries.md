@@ -1,13 +1,13 @@
 # Plan Eng Review 02b: Module Boundary Checkpoint
 
-Status: Integration-prep checkpoint
-Version: v0.2.3 boundary review after ADR 0001 closeout
+Status: Implemented boundary checkpoint
+Version: v0.2.4 boundary implementation checkpoint
 Audience: Protocol implementers, SDK authors, runtime builders, gateway owners, platform engineering, security engineering
-Implementation status: Docs review hardened for integration; code integration still pending
+Implementation status: Implemented for local alpha; record-read custody/objectType validation, transition route registry/OpenAPI parity, per-role SDK tokens, and root export curation are covered. ADR 0005 hosted caller identity and redacted public evidence reads remain deferred.
 Canonical owner: Protocol owner
 Follows: [`02-plan-eng-review-authority-hardening.md`](./02-plan-eng-review-authority-hardening.md)
-References: [`../adr/0001-kernel-evidence-boundaries.md`](../adr/0001-kernel-evidence-boundaries.md)
-Blocks: `03-plan-protected-mcp-cli-preview-deploy` until the integration checklist below is implemented and verified
+References: [`../adr/0001-kernel-evidence-boundaries.md`](../adr/0001-kernel-evidence-boundaries.md), [`../adr/0005-hosted-transition-caller-identity.md`](../adr/0005-hosted-transition-caller-identity.md)
+Blocks: no longer blocks local `03` planning; hosted/public `03` claims remain blocked on ADR 0005 hosted caller identity and redacted evidence APIs
 Last reviewed: 2026-05-18
 
 ## Invariant At Stake
@@ -38,7 +38,9 @@ ADR 0001 is now implemented. The old facts that blocked the tree are obsolete:
 - HTTP transition routes now require caller-custody bearer tokens before parsing POST bodies.
 - The tree is green on test, typecheck, build, and whitespace checks.
 
-The remaining `03` risk is no longer "partial 0.2.3 lifecycle." It is boundary hygiene:
+The stale false closure is removed: `02b` is not complete just because caller custody
+exists on POST transitions and the internal record-read route. The remaining `03`
+risk is boundary hygiene:
 
 ```text
 Do not let internal implementation modules, debug read routes, or static caller
@@ -48,15 +50,19 @@ tokens become accidental public API or hosted security claims.
 Integration decision:
 
 1. Keep `GET /v0.2/records/:objectType/:objectId` only as an `internal_debug`
-   route for local/control-plane inspection. It must require `control_plane`
-   caller custody and must stay out of public OpenAPI until a redacted public
-   receipt/evidence read API is designed.
-2. Treat the package root as a curated alpha API surface. Before `03`, add an
+   route for local/control-plane inspection. It already requires `control_plane`
+   caller custody. It must validate `objectType` before storage reads and stay
+   out of public OpenAPI until a redacted public receipt/evidence read API is
+   designed.
+2. Add a metadata-only transition route registry consumed by both Hono route
+   binding and OpenAPI security so route custody and published metadata cannot
+   drift independently.
+3. Treat the package root as a curated alpha API surface. Before `03`, add an
    explicit export posture table and a root export snapshot test. Transition
    internals, recorder internals, event builders, and storage internals must not
    remain accidentally public without an explicit `internal` or `experimental`
    decision.
-3. Add a route-role completeness test before any new transition route is added.
+4. Add a route-role completeness test before any new transition route is added.
    If a route can create records or touch authority-adjacent state, it must have
    a custody role and OpenAPI security posture from the same source of truth.
 
@@ -70,32 +76,47 @@ Integration decision:
 | Durable evidence | `ProtocolRecorder.commitRecordsWithEvents` and `ProtocolStore` | Reuse; evidence records must stay transition-created. |
 | Current posture | D1/memory current-posture index plus append-only posture records | Reuse; do not add a second mutable posture source. |
 | HTTP transport | Hono app + OpenAPI + SDK client | Reuse; only add route posture metadata or auth wrappers. |
-| Caller custody | `src/http/caller-auth.ts` and role-specific bearer tokens | Reuse for local/control-plane alpha; replace before hosted multi-tenant use. |
+| Caller custody | `src/http/caller-auth.ts` and role-specific bearer tokens | Reuse for local/control-plane alpha; replace with ADR 0005 `TransitionCallerIdentity` before hosted multi-tenant use. |
 | Gateway mutation | package-install, repo-write, and local preview-deploy adapters | Reuse as reference seams; do not move mutation into runtime wrappers. |
 | Verification | Hono/D1 tests, invariant tests, active vocabulary guard, authority scans | Reuse; add narrow tests for any boundary change. |
 
 ### Minimum Set Before `03`
 
-`03` can proceed after these hard-stop items are resolved:
+`03` can proceed only after the strict sequence is satisfied:
 
-1. Enforce `control_plane` custody on `GET /v0.2/records/:objectType/:objectId`
-   or remove the route.
+```text
+02b boundary hardening
+  -> 02c-A transition request context
+  -> 02c-B operation lifecycle, claims, orphan handling, adapter conformance
+  -> 03 adapter-backed generated execution claims
+```
+
+Hard-stop items for this slice:
+
+1. Keep `control_plane` custody on `GET /v0.2/records/:objectType/:objectId`
+   and validate `objectType` before raw record lookup.
 2. Keep that route out of public OpenAPI unless redaction and consumer semantics
    are explicitly designed.
-3. Curate or explicitly label the root package export surface.
-4. Add tests for per-role SDK token routing and route custody completeness.
+3. Curate the root package export surface now. Keep public SDK/app/schema/input/verified-gate surfaces; expose reference adapters only as explicitly experimental; remove storage, recorder, transition, kernel, and event internals from the root.
+4. Add tests for per-role SDK token routing, fallback token behavior, OpenAPI
+   security parity, route custody completeness, debug `objectType` validation,
+   and root public import smoke coverage.
 
-Static transition bearer tokens are acceptable only for the local alpha fixture boundary. Replacing them with org-scoped caller identity is required before hosted multi-tenant deployment, but it does not need to block local `03` fixture work if the plan states that limit.
+Static transition bearer tokens are acceptable only for the local alpha fixture
+boundary. ADR 0005's server-derived `TransitionCallerIdentity` is required
+before hosted multi-tenant deployment, but it does not need to block local `03`
+fixture work if the plan states that limit.
 
 ### Complexity Check
 
 The current implementation touches more than eight files because ADR 0001 was a full evidence-boundary expansion. That is already done and verified. For `02b`, the next changes should be deliberately small:
 
 ```text
-internal-debug record-read custody
-root export posture
-per-role SDK token test
-route custody completeness test
+metadata-only route registry
+internal-debug objectType validation
+root export curation
+per-role SDK token/fallback tests
+route custody/OpenAPI completeness tests
 ```
 
 If the next implementation touches broad protocol lifecycle modules again, it is probably scope creep.
@@ -123,8 +144,8 @@ bun test
 npm run typecheck -- --pretty false
 npm run build -- --pretty false
 git diff --check
-rg -n -i "best[- ]effort|advisory only|approval only|ambient authority|runtime permission|dashboard-first|provider-side enforcement|provider enforcement|route bearer token is .*authority|transition bearer token is .*authority" README.md docs/index.md docs/protocol-kernel.md docs/api-protocol.md docs/non-claims-and-theatre.md docs/adr src test
-rg -n -i "local preview-deploy fixture (proves|is|provides).*provider|preview deploy.*provider-side enforcement|provider-side enforcement.*preview deploy" README.md docs/index.md docs/protocol-kernel.md docs/api-protocol.md docs/non-claims-and-theatre.md docs/adr src test
+rg -n -i "best[- ]effort|advisory only|approval only|ambient authority|runtime permission|dashboard-first|provider-side enforcement|provider enforcement|route bearer token is .*authority|transition bearer token is .*authority" README.md docs/index.md docs/protocol/protocol-kernel.md docs/protocol/api-protocol.md docs/product/non-claims-and-theatre.md docs/adr src test
+rg -n -i "local preview-deploy fixture (proves|is|provides).*provider|preview deploy.*provider-side enforcement|provider-side enforcement.*preview deploy" README.md docs/index.md docs/protocol/protocol-kernel.md docs/protocol/api-protocol.md docs/product/non-claims-and-theatre.md docs/adr src test
 ```
 
 Observed result:
@@ -174,7 +195,9 @@ The fastest safe implementation is a docs-backed export map plus a root export s
 
 The new route guard is useful and correct for local alpha custody, but it is not organization-scoped authorization. ADR 0001 says this plainly.
 
-Decision: do not block local `03` fixture work on full auth, but make hosted deployment impossible to claim until static tokens are replaced with org-scoped caller identity and role claims.
+Decision: do not block local `03` fixture work on full auth, but make hosted
+deployment impossible to claim until static tokens are replaced with ADR 0005's
+server-derived `TransitionCallerIdentity`.
 
 Failure scenario: one leaked transition token allows every transition in that custody lane until rotated. That is entrypoint compromise, not a failure of the greenlight/gateway invariant, but it is still a hosted-product blocker.
 
@@ -250,23 +273,20 @@ Action authority path
 | POST route missing token fails before body parsing | yes | `test/http.test.ts` `caller_auth_required`. |
 | POST route configured with no token fails closed | yes | `test/http.test.ts` `caller_auth_not_configured`. |
 | POST route wrong custody token refuses | yes | `test/http.test.ts` `caller_auth_forbidden`. |
-| OpenAPI declares bearer security for gateway route | partial | Tests one route, not every POST route. |
+| OpenAPI declares bearer security for transition routes | yes | Route registry/OpenAPI security parity tests in `test/http.test.ts`. |
 | SDK forwards a token through D1/Hono flows | yes | D1 and codemode HTTP tests use `transitionToken`. |
-| SDK forwards per-role token map | no | Needs one focused unit test. |
-| Every POST route has explicit custody metadata | partial | Auth exists in code; no table-driven completeness test. |
-| GET record route has custody/redaction posture | partial | `test/http.test.ts` requires `control_plane` custody; redacted public evidence API remains undesigned. |
-| Root export posture is enforced | no | Needs export snapshot or API surface test. |
+| SDK forwards per-role token map | yes | Focused SDK header-routing test in `test/http.test.ts`. |
+| Every POST route has explicit custody metadata | yes | `transitionRouteDefinitions` drives Hono binding and OpenAPI. |
+| GET record route has custody/redaction posture | partial | `test/http.test.ts` requires `control_plane` custody and validates `objectType`; redacted public evidence API remains undesigned. |
+| Root export posture is enforced | yes | Root export snapshot and smoke tests in `test/root-exports.test.ts`. |
 
-### Critical Gaps
+### Deferred Hosted/Public Gaps
 
 1. `GET /v0.2/records/:objectType/:objectId` now has a caller-custody test. The
    remaining hosted-boundary gap is that this route is raw/internal only; a
    redacted public evidence API is still undesigned.
-2. Root package exports have no public/internal snapshot test. This is an
-   API-boundary gap, not a mutation-authority gap, and must be fixed by the
-   integration slice.
-3. `transitionTokens` has no per-role SDK test. This is not a hosted hard stop
-   by itself, but it is cheap to cover and should be included in the same slice.
+2. Static/local bearer tokens are acceptable for local alpha. Hosted deployment
+   still needs ADR 0005 hosted caller identity before multi-tenant use.
 
 ## Failure Modes
 
@@ -330,7 +350,8 @@ No current performance blocker.
 - New docs source of truth: ADR 0001 owns evidence boundaries; this `02b` owns
   pre-`03` module/API boundary gates.
 - New long-term maintenance burden: export snapshot upkeep, route metadata upkeep,
-  and explicit migration from static caller tokens before hosted deployment.
+  and explicit migration from static caller tokens to ADR 0005 caller identity
+  before hosted deployment.
 
 ### Monte Carlo Futures
 
@@ -350,7 +371,7 @@ No current performance blocker.
 |---|---|---|---:|
 | Product / CEO | Debug record reads can be mistaken for a product evidence API. | Keep route internal and non-OpenAPI. | yes |
 | Engineering | Route/auth/OpenAPI roles can drift if each route is hand-wired. | Add route metadata or completeness test. | no |
-| Security / CSO | Static bearer tokens are custody, not org authorization. | Block hosted claims until org-scoped caller identity exists. | yes for hosted |
+| Security / CSO | Static bearer tokens are custody, not org authorization. | Block hosted claims until ADR 0005 hosted caller identity exists. | yes for hosted |
 | Architecture | Root exports make implementation details look stable. | Add export posture and snapshot test. | no |
 | DevEx | Removing raw record reads hurts local debugging. | Keep internal debug with custody. | no |
 | Future Maintainer | Tests may bless route plumbing instead of boundaries. | Test route posture and export posture explicitly. | no |
@@ -388,7 +409,7 @@ No current performance blocker.
 
 | Shortcut | Pain Created | When It Hurts | Owner Or Trigger | Reversibility | Adjustment |
 |---|---|---|---|---|---|
-| Static bearer tokens | no org-scoped authorization | hosted or multi-tenant deployment | hosted deployment plan | moderate | block hosted claims until replaced |
+| Static bearer tokens | no ADR 0005 caller identity | hosted or multi-tenant deployment | hosted deployment plan | moderate | block hosted claims until replaced |
 | Raw record read route | accidental evidence API | public SDK/docs consumers appear | before `03` public docs | cheap now, expensive later | internal debug custody now |
 | Broad root exports | Hyrum's Law on internals | SDK users import internals | before `03` integration examples | cheap now | export snapshot now |
 | Hand-wired route roles | route/security drift | next transition route | any new route | moderate | metadata/completeness test now |
@@ -433,7 +454,7 @@ No current performance blocker.
 | Add root export posture and snapshot test. | Hyrum's Law on internals. | Public/experimental/internal table plus import/export test. | `02b` integration. | accepted |
 | Add per-role SDK token test. | SDK role fallback drift. | Hono test with distinct role tokens. | `02b` integration. | accepted |
 | Add route custody completeness test. | Future route drift. | Route metadata or OpenAPI/security completeness assertion. | Before any new POST route. | accepted |
-| Block hosted claims until org-scoped identity exists. | Static token auth theatre. | Non-claim and future hosted-auth gate. | Hosted deployment trigger. | accepted |
+| Block hosted claims until ADR 0005 caller identity exists. | Static token auth theatre. | Non-claim and future hosted-caller-identity gate. | Hosted deployment trigger. | accepted |
 
 ### Chairman Synthesis
 
@@ -459,18 +480,19 @@ slice around HTTP route posture, SDK token routing, and root package exports.
 ### Integration Sequence
 
 ```text
-1. Record-read route posture
-   -> require control_plane custody on GET /v0.2/records/:objectType/:objectId
-   -> add missing/wrong-token tests
+1. Transition route registry
+   -> bind POST transition route role/schema/response metadata from one source
+   -> consume the same registry from Hono and OpenAPI
+   -> assert all state-changing routes have custody and OpenAPI security
+
+2. Record-read route posture
+   -> keep control_plane custody on GET /v0.2/records/:objectType/:objectId
+   -> validate objectType before storage lookup
    -> assert route stays absent from public OpenAPI
 
-2. SDK token routing
+3. SDK token routing
    -> add distinct role-token test for transitionTokens
    -> prove fallback transitionToken still works for local fixtures
-
-3. Route custody completeness
-   -> add route metadata or test helper
-   -> assert every POST /v0.2/* route has custody/security posture
 
 4. Root export posture
    -> write export posture table in README or API docs
@@ -592,5 +614,5 @@ These should be decided before implementation. They are not silently appended to
 | Eng Review | `/plan-eng-review` | Architecture & tests (required) | 1 | integration_ready | 5 issues converted into integration work, 1 hosted-boundary gap assigned |
 | Design Review | `/plan-design-review` | UI/UX gaps | 0 | not applicable | no UI surface |
 
-- **UNRESOLVED:** none at plan level; implementation remains pending.
-- **VERDICT:** ENG REVIEW HARDENED. Proceed to the `02b` integration slice before `03`; do not claim hosted/public protocol surface until the acceptance criteria pass.
+- **UNRESOLVED:** none for local alpha boundary hardening; ADR 0005 hosted caller identity and a redacted evidence API remain deferred.
+- **VERDICT:** ENG REVIEW HARDENED AND IMPLEMENTED. Proceed to `02c`/`03` local integration; do not claim hosted/public protocol surface until the deferred hosted-boundary gaps are designed and verified.

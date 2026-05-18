@@ -1,0 +1,69 @@
+import { z } from "zod";
+import { DigestSchema, IdSchema, IsoDateSchema, JsonValueSchema, ProtocolBaseSchema, ReasonCodeSchema, ResourceRefSchema } from "../schema-core";
+
+export const CandidateActionStatusSchema = z.enum(["contractable", "rejected"]);
+export type CandidateActionStatus = z.infer<typeof CandidateActionStatusSchema>;
+
+export const CandidateActionSchema = z.strictObject({
+  candidateActionId: IdSchema,
+  candidateStatus: CandidateActionStatusSchema,
+  candidateDigest: DigestSchema.nullable(),
+  refusalReasonCodes: z.array(ReasonCodeSchema).default([]),
+  toolCapabilityId: IdSchema,
+  toolCapabilityDigest: DigestSchema.nullable(),
+  toolCatalogVersion: z.string().min(1).nullable(),
+  actionTypeId: IdSchema,
+  actionTypeDigest: DigestSchema.nullable(),
+  actionCatalogVersion: z.string().min(1).nullable(),
+  gatewayRegistryEntryId: IdSchema,
+  gatewayRegistryDigest: DigestSchema.nullable(),
+  gatewayRegistryVersion: z.string().min(1).nullable(),
+  operatingEnvelopeId: IdSchema,
+  operatingEnvelopeDigest: DigestSchema.nullable(),
+  actionClass: z.string().min(1),
+  gatewayId: IdSchema,
+  resourceRef: ResourceRefSchema,
+  sequenceNumber: z.number().int().nonnegative(),
+  requiredPriorActionContractIds: z.array(IdSchema).default([]),
+  recoveryRecommendationId: IdSchema.nullable(),
+  parameters: z.record(z.string(), JsonValueSchema),
+  paramsDigest: DigestSchema,
+  nonSecretParamsSummary: z.record(z.string(), JsonValueSchema),
+  secretRefs: z.record(z.string(), z.string().min(1)).default({}),
+  purposeCode: z.string().min(1),
+  expectedSideEffectCodes: z.array(z.string().min(1)),
+  evidenceRefs: z.array(z.string()).default([]),
+  bounds: z.record(z.string(), JsonValueSchema).default({}),
+  idempotencyKey: IdSchema,
+  rollbackHint: z.string().max(500).nullable(),
+  expiresAt: IsoDateSchema,
+  generatedCodeOrSpecRefs: z.array(z.string()).default([]),
+  runtimeExecutionId: IdSchema.nullable().default(null),
+  runtimeExecutionDigest: DigestSchema.nullable().default(null),
+});
+export type CandidateAction = z.infer<typeof CandidateActionSchema>;
+
+export const IntentCompilationRecordSchema = ProtocolBaseSchema.extend({
+  intentCompilationId: IdSchema,
+  principalIntentRef: z.string().min(1),
+  principalId: IdSchema,
+  agentId: IdSchema,
+  runId: IdSchema,
+  runtimeAdapterId: IdSchema,
+  operatingEnvelopeId: IdSchema,
+  toolCatalogRef: z.string().min(1),
+  actionCatalogRef: z.string().min(1),
+  gatewayRegistryRef: z.string().min(1),
+  runtimeExecutionId: IdSchema.nullable().default(null),
+  runtimeExecutionDigest: DigestSchema.nullable().default(null),
+  generatedCodeOrSpecRefs: z.array(z.string()).default([]),
+  declaredAssumptions: z.array(z.string()).default([]),
+  uncertaintyMarkers: z.array(z.string()).default([]),
+  candidateAction: CandidateActionSchema,
+  candidateActionContractRefs: z.array(IdSchema).default([]),
+  rejectedCandidateRefs: z.array(IdSchema).default([]),
+  overreachReasonCodes: z.array(ReasonCodeSchema).default([]),
+  requiredEvidenceRefs: z.array(z.string()).default([]),
+  compilerVersion: z.string().min(1),
+});
+export type IntentCompilationRecord = z.infer<typeof IntentCompilationRecordSchema>;

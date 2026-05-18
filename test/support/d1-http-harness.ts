@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { Database, type SQLQueryBindings } from "bun:sqlite";
 import { createApp, type WorkerBindings } from "../../src/http/app";
 import type { CallerAuthTokens } from "../../src/http/caller-auth";
+import { PROTOCOL_VERSION } from "../../src/protocol/schemas";
 import type { HandshakeFetch } from "../../src/sdk/client";
 
 type QueryBinding = string | number | boolean | null;
@@ -149,6 +150,8 @@ function jsonRequest(body: unknown): RequestInit {
     method: "POST",
     headers: {
       "content-type": "application/json",
+      "x-handshake-protocol-version": PROTOCOL_VERSION,
+      "x-handshake-request-identity": "test-d1-harness-request",
       authorization: `Bearer ${D1_HARNESS_TRANSITION_TOKEN}`,
     },
     body: JSON.stringify(body),

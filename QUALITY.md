@@ -103,91 +103,116 @@ await recordReceipt({
 
 ---
 
-## 3. Protocol boundaries
+## 3. Repo-wide module ownership
 
-Each package or module must have a clear protocol responsibility.
+Each module must have one reason to exist and one owner for the meaning it
+contains. Handshake should avoid monoliths, but it should also avoid shallow
+file sprawl. The target is deep modules: small interfaces that hide meaningful
+behavior and concentrate locality.
 
-Recommended repo layout:
-
-```text
-handshake/
-  packages/
-    protocol/
-      src/
-        schemas/
-        canonicalization/
-        hashes/
-        signatures/
-        ids/
-        errors/
-        state-machine/
-    server/
-      src/
-        routes/
-        middleware/
-        storage/
-        workers/
-    policy/
-      src/
-        evaluator/
-        decisions/
-        templates/
-    gateway/
-      src/
-        gate/
-        verification/
-        replay/
-        drift/
-    runtime/
-      src/
-        tool-wrapper/
-        codemode-wrapper/
-        contract-proposal/
-    adapters/
-      preview-deploy/
-      package-install/
-      repo-write/
-      ci-mutation/
-      cloud-config/
-      database-operation/
-    examples/
-      preview-deploy/
-      package-install-refusal/
-      codemode-multi-action/
-  apps/
-    playground/
-    docs/
-  tests/
-    invariant/
-    integration/
-    fixtures/
-  docs/
-    protocol/
-    gateway-check/
-    runtime-wrapper/
-    threat-model/
-```
-
-Package responsibilities:
+Current v0.2 layout:
 
 ```text
-protocol = what the system means
-server = how the protocol is served
-policy = how decisions are made
-gateway = how mutation is enforced
-runtime = how agents propose contracts
-adapters = concrete gateway/runtime integrations
-apps = product surfaces
+src/protocol/   = protocol meaning and transition invariants
+src/http/       = Hono transport adapter and hosted caller custody
+src/sdk/        = remote client over public HTTP transition routes
+src/runtime/    = runtime wrappers that compile generated tool calls into candidates
+src/adapters/   = reference mutation adapters that require VerifiedGatewayCheck
+src/storage/    = ProtocolStore implementations and atomic storage primitives
+test/           = invariant, conformance, posture, and integration evidence
+docs/           = product, protocol, plan, ADR, and reference truth owners
 ```
 
 Rules:
 
-- `@handshake/protocol` must not depend on Hono, D1, React, Workers, or app code.
-- `@handshake/policy` may evaluate exact contracts; it must not mutate receivers.
-- `@handshake/runtime` may propose contracts; it must not perform consequential mutations.
-- `@handshake/gateway` verifies gate checks; it must not invent policy semantics.
-- Adapters may mutate only after verified gateway-check checks.
-- Product UI must not redefine protocol semantics.
+- `src/protocol` owns Handshake meaning. It must not import Hono, SDK, runtime
+  wrappers, adapters, storage implementations, Workers, or product surfaces.
+- `src/protocol/kernel.ts` is the named transition facade. It delegates to
+  invariant-owned protocol areas; it must not grow primitive logic that belongs
+  to an area.
+- Protocol area modules are organized by invariant, not file type. A valid area
+  owns its local `schemas.ts`, `inputs.ts`, guards, transition function,
+  constructors, event descriptors, and tests.
+- Root `src/protocol/schemas.ts` and `src/protocol/inputs.ts` are public
+  compatibility aggregators only. Protocol internals, storage adapters,
+  reference adapters, and runtime wrappers must import from owning area indexes.
+- `src/http` is a transport adapter. It may parse requests, check caller
+  custody, build request context, invoke one kernel transition, map errors, and
+  describe OpenAPI. It must not decide policy, lifecycle, gateway, review,
+  proof-gap, recovery, or object meaning.
+- HTTP transition files have separate owners: `transition-route-registry.ts`
+  owns route metadata, `transition-invokers.ts` owns kernel dispatch, and
+  `transition-response-schemas.ts` owns transport response shape composition.
+  `openapi.ts` reads route metadata; `app.ts` owns Hono request flow.
+- `src/sdk` is a remote client. It may mirror public transition routes and
+  caller-custody headers. It must not reimplement policy or infer protocol
+  state from responses.
+- `src/runtime` may inspect runtime/tool input and call `compileIntent` /
+  `proposeActionContract`. It must not issue policy decisions, greenlights,
+  gateway checks, receipts, or mutations.
+- `src/adapters` may mutate only after a `VerifiedGatewayCheck`. Reference
+  adapters call protocol interfaces, not storage internals.
+- `src/storage` implements `ProtocolStore` and atomic index/commit behavior.
+  Storage must not decide what a policy result, lifecycle state, proof gap,
+  review artifact, recovery status, or gateway refusal means.
+- D1 storage keeps `d1.ts` as the `ProtocolStore` implementation and keeps SQL
+  mutation statement assembly in `d1-statements.ts`. Storage-private files may
+  express database mechanics; they must not define protocol primitives or
+  reinterpret protocol outcomes.
+- Tests should target module interfaces and protocol invariants. Import-posture
+  tests are architecture tests, not hygiene tests.
+
+Dependency direction:
+
+```text
+HTTP / SDK / runtime / adapters
+  -> public protocol surfaces
+  -> HandshakeKernel
+  -> area-owned protocol modules
+  -> ProtocolRecorder / ProtocolStore port
+  -> storage adapters
+```
+
+Forbidden direction:
+
+```text
+protocol -> http/sdk/runtime/adapters/storage implementation
+storage -> protocol primitive modules
+runtime/adapters -> root protocol schemas/inputs compatibility aggregators
+transport -> protocol area internals
+area module -> another area's private file
+```
+
+Use the deletion test before adding a module:
+
+```text
+If deleting the module would make its rules reappear across several callers, it
+is earning its keep. If deleting it only removes a pass-through wrapper, it is
+file sprawl.
+```
+
+Use the two-adapter test before inventing a seam:
+
+```text
+One adapter is a hypothesis. Two adapters make the seam real. Until then, prefer
+a narrow private helper inside the owning module.
+```
+
+When a file feels too large, split by owned step, not by convenience:
+
+```text
+Good: gateway commit assembly, replay refusal receipt builder, posture evaluator
+Bad: helpers, utils, common, misc, handler extras
+```
+
+Architecture acceptance gates:
+
+```text
+bun test test/import-posture.test.ts test/root-exports.test.ts
+bun test test/protected-mutation-adapter-conformance.test.ts
+npm run typecheck -- --pretty false
+git diff --check
+```
 
 ---
 
@@ -250,7 +275,7 @@ processDecision();
 checkGreenlight();
 ```
 
-`checkGreenlight()` sounds read-only. If the function consumes a one-time-use greenlight, name it `consumeGreenlightAfterReceiverCheck()` or split verification from consumption.
+`checkGreenlight()` sounds read-only. If the function consumes a one-time-use greenlight, name it `consumeGreenlightAfterGatewayCheck()` or split verification from consumption.
 
 ---
 
@@ -333,17 +358,17 @@ Preferred pattern:
 
 ```ts
 export const ActionContractSchema = z.object({
-  contractId: ActionContractIdSchema,
+  actionContractId: ActionContractIdSchema,
   principalId: PrincipalIdSchema,
   agentId: AgentIdSchema,
-  receiverId: ReceiverIdSchema,
-  actionFamily: ActionFamilySchema,
-  target: ActionTargetSchema,
-  parameters: JsonObjectSchema,
-  preconditions: z.array(PreconditionSchema),
+  runId: RunIdSchema,
+  gatewayId: GatewayIdSchema,
+  actionClass: ActionClassSchema,
+  resourceRef: ResourceRefSchema,
+  paramsDigest: DigestSchema,
   idempotencyKey: z.string(),
   expiresAt: IsoDateTimeSchema,
-  canonicalHash: z.string(),
+  actionContractDigest: DigestSchema,
 });
 
 export type ActionContract = z.infer<typeof ActionContractSchema>;
@@ -507,26 +532,25 @@ No function should mutate external systems unless it passes through a gateway-ch
 Allowed mutation functions should live only in gateway adapters:
 
 ```text
-packages/adapters/*/src/mutate*.ts
-packages/gateway/src/gate/*
+src/adapters/*/gateway.ts
 ```
 
-Runtime packages propose contracts, not mutations:
+Runtime wrappers propose contracts, not mutations:
 
 ```text
-packages/runtime/src/contract-proposal/*
+src/runtime/*/tool-wrapper.ts
 ```
 
-Policy packages decide, not mutate:
+Protocol policy areas decide, not mutate:
 
 ```text
-packages/policy/src/evaluator/*
+src/protocol/policy-greenlight/
 ```
 
-Protocol packages define and verify, not perform I/O:
+Protocol areas define meaning and transitions, not external mutation:
 
 ```text
-packages/protocol/src/*
+src/protocol/
 ```
 
 Required adapter signature pattern:
@@ -611,7 +635,7 @@ Good:
 const gateResult = await verifyGatewayCheck(input);
 
 if (gateResult.type !== "passed") {
-  await recordReceiverRefusalOrProofGap(gateResult);
+  await recordGatewayRefusalOrProofGap(gateResult);
   return gateResult;
 }
 
@@ -714,7 +738,7 @@ Something went wrong
 Good:
 
 ```text
-GREENLIGHT_RECEIVER_MISMATCH:
+GREENLIGHT_GATEWAY_MISMATCH:
 This greenlight was issued for gateway preview-deploy:vercel,
 but the gateway check was checked by gateway repo-write:github.
 A greenlight authorizes exactly one gateway-bound mutation attempt.
@@ -728,8 +752,8 @@ export const HandshakeErrorCode = {
   CONTRACT_HASH_MISMATCH: "CONTRACT_HASH_MISMATCH",
   GREENLIGHT_EXPIRED: "GREENLIGHT_EXPIRED",
   GREENLIGHT_ALREADY_USED: "GREENLIGHT_ALREADY_USED",
-  GREENLIGHT_RECEIVER_MISMATCH: "GREENLIGHT_RECEIVER_MISMATCH",
-  RECEIVER_GATE_REQUIRED: "RECEIVER_GATE_REQUIRED",
+  GREENLIGHT_GATEWAY_MISMATCH: "GREENLIGHT_GATEWAY_MISMATCH",
+  GATEWAY_CHECK_REQUIRED: "GATEWAY_CHECK_REQUIRED",
   ISOLATION_ACTIVE: "ISOLATION_ACTIVE",
   PROOF_GAP_RECORDED: "PROOF_GAP_RECORDED",
 } as const;
@@ -811,7 +835,11 @@ one route handler: ideally < 80 lines
 one test file: can be longer if organized by invariant
 ```
 
-When a file grows, split by protocol responsibility.
+These are pressure signals, not automatic refactor commands. A 300-line file
+with one clear owner can be safer than six shallow files that hide a state
+transition across imports.
+
+When a file grows, split by owned responsibility inside the same area first.
 
 Bad split:
 
@@ -824,12 +852,15 @@ more-utils.ts
 Good split:
 
 ```text
-parse-contract-request.ts
-validate-contract-schema.ts
-canonicalize-contract.ts
-persist-contract.ts
-emit-contract-proposed-transition.ts
+action-contract/load-proposal-records.ts
+action-contract/build-contract-binding.ts
+gateway-gate/build-gate-records.ts
+gateway-gate/commit-gateway-check.ts
+recovery/build-status-change.ts
 ```
+
+Do not create a new public module just because a private function got long. A
+new public module must pass the deletion test and name the invariant it owns.
 
 ---
 
@@ -986,10 +1017,10 @@ Adapters should not invent policy or protocol semantics.
 Good adapter responsibilities:
 
 ```text
-map gateway-specific request into ActionContract
-perform gateway check verification
+accept VerifiedGatewayCheck
+map verified contract parameters into one protected-surface mutation
 execute mutation only after verified gate
-return evidence for receipt
+return evidence for same-operation reconciliation
 ```
 
 Bad adapter responsibilities:
@@ -1064,7 +1095,7 @@ ALLOW_ALL_ACTIONS=true
 Better:
 
 ```text
-HANDSHAKE_DEV_MODE_ALLOW_FAKE_RECEIVER=true
+HANDSHAKE_DEV_MODE_ALLOW_REFERENCE_FIXTURE_GATEWAY=true
 ```
 
 Production defaults must be conservative.
@@ -1074,7 +1105,7 @@ Recommended environment naming:
 ```text
 HANDSHAKE_ENV=local | staging | production
 HANDSHAKE_RECEIPT_STORE=d1
-HANDSHAKE_ALLOW_UNVERIFIED_RECEIVER=false
+HANDSHAKE_ALLOW_UNVERIFIED_GATEWAY=false
 ```
 
 Dangerous config must be impossible or noisy outside local development.
@@ -1100,12 +1131,13 @@ Suggested dependency boundaries:
 
 ```text
 protocol: zod, minimal crypto/canonical JSON helpers
-server: hono, cloudflare worker types
+http: hono, cloudflare worker types
 storage: D1-specific code isolated behind interfaces
-apps: UI dependencies allowed
+runtime/adapters: concrete integration dependencies only when needed
 ```
 
-`@handshake/protocol` must not depend on Hono, D1, React, or Cloudflare-specific runtime APIs.
+`src/protocol` must not depend on Hono, D1, React, or Cloudflare-specific
+runtime APIs.
 
 ---
 
@@ -1116,12 +1148,13 @@ Every protocol object should have documentation close to its implementation.
 Example:
 
 ```text
-packages/protocol/src/action-contract/
-  action-contract.schema.ts
-  action-contract.types.ts
-  canonicalize-action-contract.ts
-  action-contract.md
-  action-contract.test.ts
+src/protocol/action-contract/
+  schemas.ts
+  inputs.ts
+  guards.ts
+  transitions.ts
+  index.ts
+test/kernel.test.ts
 ```
 
 `action-contract.md` should explain:
@@ -1188,8 +1221,9 @@ Recommended rules:
 no explicit any in protocol packages
 no default exports in protocol packages
 no circular dependencies
-no imports from server into protocol
-no imports from adapters into protocol
+no imports from http/sdk/runtime/adapters/storage implementation into protocol
+no imports from storage into protocol primitive modules
+no root protocol schema/input compatibility imports from protocol internals, storage, runtime, or adapters
 no mutation API calls outside adapters
 no unsafe* exports from production entrypoints
 consistent type imports

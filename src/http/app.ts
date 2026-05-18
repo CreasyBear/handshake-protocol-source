@@ -1,35 +1,15 @@
 import { Hono, type Context } from "hono";
-import { z, type ZodType } from "zod";
+import type { ZodType } from "zod";
 import {
-  ActionTypeSchema,
-  OperatingEnvelopeSchema,
-  GatewayRegistryEntrySchema,
   PROTOCOL_VERSION,
-  ToolCapabilitySchema,
-  type ProtocolObjectType,
+  ProtocolObjectTypeSchema,
 } from "../protocol/schemas";
-import {
-  CompileIntentInputSchema,
-  CreateBreakerDecisionInputSchema,
-  CreateProtectedPathPostureInputSchema,
-  CreateReviewDecisionInputSchema,
-  CreateReviewArtifactInputSchema,
-  CreateIsolationInputSchema,
-  CreateRecoveryRecommendationInputSchema,
-  CreateReceiptExportInputSchema,
-  CreateRuntimeExecutionInputSchema,
-  EvaluatePolicyInputSchema,
-  ProposeActionContractInputSchema,
-  ReconcileSurfaceOperationInputSchema,
-  ResolveRecoveryTerminalConflictInputSchema,
-  GatewayCheckInputSchema,
-  TransitionRecoveryRecommendationStatusInputSchema,
-} from "../protocol/inputs";
 import { HandshakeProtocolError } from "../protocol/errors";
 import { HandshakeKernel } from "../protocol/kernel";
+import type { TransitionRequestContextDraft } from "../protocol/transition-request-contexts";
 import { D1ProtocolStore } from "../storage/d1";
 import { InMemoryProtocolStore } from "../storage/memory";
-import type { ProtocolStore } from "../storage/store";
+import type { ProtocolStore } from "../protocol/store-port";
 import {
   authorizeTransitionCaller,
   type CallerAuthTokens,
@@ -37,6 +17,14 @@ import {
   type TransitionCallerRole,
 } from "./caller-auth";
 import { openApiDocument } from "./openapi";
+import {
+  HANDSHAKE_REQUEST_IDENTITY_HEADER,
+  transitionRequestContextDraftFor,
+  transitionRequestHeaderContextFor,
+} from "./transition-request-context";
+import { transitionErrorResult, type TransitionErrorContext } from "./transition-error-envelope";
+import { transitionInvokers } from "./transition-invokers";
+import { transitionRouteDefinitions, type TransitionRouteDefinition } from "./transition-route-registry";
 
 export type WorkerBindings = CallerAuthWorkerBindings & {
   DB?: D1Database;
@@ -54,177 +42,53 @@ export function createApp(options: AppOptions = {}) {
   const app = new Hono<{ Bindings: WorkerBindings }>();
 
   app.onError((error, c) => {
-    if (error instanceof HandshakeProtocolError) {
-      return c.json({ error: { code: error.code, message: error.message } }, error.status as 400);
-    }
-    if (error instanceof z.ZodError) {
-      return c.json({ error: { code: "invalid_request", issues: error.issues } }, 400);
-    }
-    return c.json({ error: { code: "internal_error", message: "Unexpected protocol error." } }, 500);
+    const result = transitionErrorResult(error);
+    return c.json(result.body, result.status as 400);
   });
 
   app.get("/health", (c) => c.json({ ok: true, protocol: "handshake", version: PROTOCOL_VERSION }));
   app.get("/openapi.json", (c) => c.json(openApiDocument));
 
-  app.post("/v0.2/catalog/tool-capabilities", async (c) => {
-    const authFailure = authorize(c, options.callerAuthTokens, "control_plane");
-    if (authFailure) return authFailure;
-    const body = await parseBody(c, ToolCapabilitySchema);
-    await kernelFor(c, fallbackStore).putCatalogObject({ objectType: "tool_capability", payload: body });
-    return c.json(body, 201);
-  });
-
-  app.post("/v0.2/catalog/action-types", async (c) => {
-    const authFailure = authorize(c, options.callerAuthTokens, "control_plane");
-    if (authFailure) return authFailure;
-    const body = await parseBody(c, ActionTypeSchema);
-    await kernelFor(c, fallbackStore).putCatalogObject({ objectType: "action_type", payload: body });
-    return c.json(body, 201);
-  });
-
-  app.post("/v0.2/catalog/gateways", async (c) => {
-    const authFailure = authorize(c, options.callerAuthTokens, "control_plane");
-    if (authFailure) return authFailure;
-    const body = await parseBody(c, GatewayRegistryEntrySchema);
-    await kernelFor(c, fallbackStore).putCatalogObject({ objectType: "gateway_registry_entry", payload: body });
-    return c.json(body, 201);
-  });
-
-  app.post("/v0.2/envelopes", async (c) => {
-    const authFailure = authorize(c, options.callerAuthTokens, "control_plane");
-    if (authFailure) return authFailure;
-    const body = await parseBody(c, OperatingEnvelopeSchema);
-    await kernelFor(c, fallbackStore).putCatalogObject({ objectType: "operating_envelope", payload: body });
-    return c.json(body, 201);
-  });
-
-  app.post("/v0.2/intent-compilations", async (c) => {
-    const authFailure = authorize(c, options.callerAuthTokens, "runtime_evidence");
-    if (authFailure) return authFailure;
-    const body = await parseBody(c, CompileIntentInputSchema);
-    const result = await kernelFor(c, fallbackStore).compileIntent(body);
-    return c.json(result, 201);
-  });
-
-  app.post("/v0.2/runtime-executions", async (c) => {
-    const authFailure = authorize(c, options.callerAuthTokens, "runtime_evidence");
-    if (authFailure) return authFailure;
-    const body = await parseBody(c, CreateRuntimeExecutionInputSchema);
-    const result = await kernelFor(c, fallbackStore).createRuntimeExecution(body);
-    return c.json(result, 201);
-  });
-
-  app.post("/v0.2/protected-path-postures", async (c) => {
-    const authFailure = authorize(c, options.callerAuthTokens, "gateway_custody");
-    if (authFailure) return authFailure;
-    const body = await parseBody(c, CreateProtectedPathPostureInputSchema);
-    const result = await kernelFor(c, fallbackStore).createProtectedPathPosture(body);
-    return c.json(result, 201);
-  });
-
-  app.post("/v0.2/action-contracts", async (c) => {
-    const authFailure = authorize(c, options.callerAuthTokens, "control_plane");
-    if (authFailure) return authFailure;
-    const body = await parseBody(c, ProposeActionContractInputSchema);
-    const result = await kernelFor(c, fallbackStore).proposeActionContract(body);
-    return c.json(result, 201);
-  });
-
-  app.post("/v0.2/policy-decisions", async (c) => {
-    const authFailure = authorize(c, options.callerAuthTokens, "control_plane");
-    if (authFailure) return authFailure;
-    const body = await parseBody(c, EvaluatePolicyInputSchema);
-    const result = await kernelFor(c, fallbackStore).evaluatePolicy(body);
-    return c.json(result, 201);
-  });
-
-  app.post("/v0.2/review-decisions", async (c) => {
-    const authFailure = authorize(c, options.callerAuthTokens, "review_custody");
-    if (authFailure) return authFailure;
-    const body = await parseBody(c, CreateReviewDecisionInputSchema);
-    const result = await kernelFor(c, fallbackStore).createReviewDecision(body);
-    return c.json(result, 201);
-  });
-
-  app.post("/v0.2/review-artifacts", async (c) => {
-    const authFailure = authorize(c, options.callerAuthTokens, "review_custody");
-    if (authFailure) return authFailure;
-    const body = await parseBody(c, CreateReviewArtifactInputSchema);
-    const result = await kernelFor(c, fallbackStore).createReviewArtifact(body);
-    return c.json(result, 201);
-  });
-
-  app.post("/v0.2/gateway-check-attempts", async (c) => {
-    const authFailure = authorize(c, options.callerAuthTokens, "gateway_custody");
-    if (authFailure) return authFailure;
-    const body = await parseBody(c, GatewayCheckInputSchema);
-    const result = await kernelFor(c, fallbackStore).gatewayCheck(body);
-    return c.json(result, 201);
-  });
-
-  app.post("/v0.2/surface-operation-reconciliations", async (c) => {
-    const authFailure = authorize(c, options.callerAuthTokens, "gateway_custody");
-    if (authFailure) return authFailure;
-    const body = await parseBody(c, ReconcileSurfaceOperationInputSchema);
-    const result = await kernelFor(c, fallbackStore).reconcileSurfaceOperation(body);
-    return c.json(result, 201);
-  });
-
-  app.post("/v0.2/isolation-states", async (c) => {
-    const authFailure = authorize(c, options.callerAuthTokens, "control_plane");
-    if (authFailure) return authFailure;
-    const body = await parseBody(c, CreateIsolationInputSchema);
-    const result = await kernelFor(c, fallbackStore).createIsolationState(body);
-    return c.json(result, 201);
-  });
-
-  app.post("/v0.2/breaker-decisions", async (c) => {
-    const authFailure = authorize(c, options.callerAuthTokens, "control_plane");
-    if (authFailure) return authFailure;
-    const body = await parseBody(c, CreateBreakerDecisionInputSchema);
-    const result = await kernelFor(c, fallbackStore).createBreakerDecision(body);
-    return c.json(result, 201);
-  });
-
-  app.post("/v0.2/receipt-exports", async (c) => {
-    const authFailure = authorize(c, options.callerAuthTokens, "control_plane");
-    if (authFailure) return authFailure;
-    const body = await parseBody(c, CreateReceiptExportInputSchema);
-    const result = await kernelFor(c, fallbackStore).createReceiptExport(body);
-    return c.json(result, 201);
-  });
-
-  app.post("/v0.2/recovery-recommendations", async (c) => {
-    const authFailure = authorize(c, options.callerAuthTokens, "control_plane");
-    if (authFailure) return authFailure;
-    const body = await parseBody(c, CreateRecoveryRecommendationInputSchema);
-    const result = await kernelFor(c, fallbackStore).createRecoveryRecommendation(body);
-    return c.json(result, 201);
-  });
-
-  app.post("/v0.2/recovery-recommendation-status-transitions", async (c) => {
-    const authFailure = authorize(c, options.callerAuthTokens, "control_plane");
-    if (authFailure) return authFailure;
-    const body = await parseBody(c, TransitionRecoveryRecommendationStatusInputSchema);
-    const result = await kernelFor(c, fallbackStore).transitionRecoveryRecommendationStatus(body);
-    return c.json(result, 201);
-  });
-
-  app.post("/v0.2/recovery-terminal-conflict-resolutions", async (c) => {
-    const authFailure = authorize(c, options.callerAuthTokens, "control_plane");
-    if (authFailure) return authFailure;
-    const body = await parseBody(c, ResolveRecoveryTerminalConflictInputSchema);
-    const result = await kernelFor(c, fallbackStore).resolveRecoveryTerminalConflictProofGap(body);
-    return c.json(result, 201);
-  });
+  for (const route of transitionRouteDefinitions) {
+    app.post(route.path, (c) => handleTransition(c, options.callerAuthTokens, fallbackStore, route));
+  }
 
   app.get("/v0.2/records/:objectType/:objectId", async (c) => {
-    const authFailure = authorize(c, options.callerAuthTokens, "control_plane");
+    const errorContext: TransitionErrorContext = {
+      transitionName: "readProtocolRecord",
+      callerCustodyRole: "control_plane",
+      requestIdentity: null,
+    };
+    const authFailure = authorize(c, options.callerAuthTokens, "control_plane", errorContext);
     if (authFailure) return authFailure;
-    const objectType = c.req.param("objectType") as ProtocolObjectType;
+    const objectTypeResult = ProtocolObjectTypeSchema.safeParse(c.req.param("objectType"));
+    if (!objectTypeResult.success) {
+      const result = transitionErrorResult(
+        new HandshakeProtocolError(
+          "invalid_protocol_object_type",
+          "Record read objectType is not a protocol object type.",
+          400,
+          { retryability: "terminal", commitState: "not_started" },
+        ),
+        errorContext,
+      );
+      return c.json(result.body, result.status as 400);
+    }
+    const objectType = objectTypeResult.data;
     const objectId = c.req.param("objectId");
     const record = await storeFor(c, fallbackStore).getRecord(objectType, objectId);
-    if (!record) return c.json({ error: { code: "record_not_found" } }, 404);
+    if (!record) {
+      const result = transitionErrorResult(
+        new HandshakeProtocolError(
+          "record_not_found",
+          "Protocol record was not found.",
+          404,
+          { retryability: "terminal", commitState: "not_applicable" },
+        ),
+        errorContext,
+      );
+      return c.json(result.body, result.status as 404);
+    }
     return c.json(record);
   });
 
@@ -236,16 +100,57 @@ async function parseBody<T>(c: Context, schema: ZodType<T>): Promise<T> {
   return schema.parse(json);
 }
 
+async function handleTransition(
+  c: Context<{ Bindings: WorkerBindings }>,
+  configuredTokens: CallerAuthTokens | undefined,
+  fallbackStore: ProtocolStore | null,
+  route: TransitionRouteDefinition,
+): Promise<Response> {
+  const errorContext: TransitionErrorContext = {
+    transitionName: route.routeId,
+    callerCustodyRole: route.role,
+    requestIdentity: null,
+  };
+  const authFailure = authorize(c, configuredTokens, route.role, errorContext);
+  if (authFailure) return authFailure;
+  try {
+    const headerContext = await transitionRequestHeaderContextFor(c, {
+      callerCustodyRole: route.role,
+      transitionName: route.routeId,
+      routePattern: route.path,
+    });
+    errorContext.requestIdentity = headerContext.requestIdentity;
+    const body = await parseBody(c, route.requestSchema);
+    const requestContext = await transitionRequestContextDraftFor(headerContext, body);
+    const result = await transitionInvokers[route.routeId](kernelFor(c, fallbackStore, requestContext), body);
+    c.header("X-Handshake-Request-Identity", requestContext.requestIdentity);
+    c.header(HANDSHAKE_REQUEST_IDENTITY_HEADER, requestContext.requestIdentity);
+    return c.json(result, 201);
+  } catch (error) {
+    const result = transitionErrorResult(error, errorContext);
+    if (errorContext.requestIdentity) {
+      c.header("X-Handshake-Request-Identity", errorContext.requestIdentity);
+      c.header(HANDSHAKE_REQUEST_IDENTITY_HEADER, errorContext.requestIdentity);
+    }
+    return c.json(result.body, result.status as 400);
+  }
+}
+
 function authorize(
   c: Context<{ Bindings: WorkerBindings }>,
   configuredTokens: CallerAuthTokens | undefined,
   role: TransitionCallerRole,
+  context: TransitionErrorContext,
 ): Response | null {
-  return authorizeTransitionCaller(c, configuredTokens, role);
+  return authorizeTransitionCaller(c, configuredTokens, role, context);
 }
 
-function kernelFor(c: Context<{ Bindings: WorkerBindings }>, fallbackStore: ProtocolStore | null): HandshakeKernel {
-  return new HandshakeKernel(storeFor(c, fallbackStore));
+function kernelFor(
+  c: Context<{ Bindings: WorkerBindings }>,
+  fallbackStore: ProtocolStore | null,
+  requestContext?: TransitionRequestContextDraft,
+): HandshakeKernel {
+  return new HandshakeKernel(storeFor(c, fallbackStore), requestContext);
 }
 
 function storeFor(c: Context<{ Bindings: WorkerBindings }>, fallbackStore: ProtocolStore | null): ProtocolStore {

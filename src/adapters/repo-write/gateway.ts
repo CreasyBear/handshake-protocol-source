@@ -1,16 +1,16 @@
 import { z } from "zod";
 import {
   verifiedGatewayCheckFromResult,
+  type GatewayCheckInput,
   type GatewayCheckResult,
   type VerifiedGatewayCheck,
-} from "../../protocol/gateway-check-artifacts";
+} from "../../protocol/gateway-gate";
 import { digestUtf8Content, utf8ByteLength } from "../../protocol/content-digests";
 import type {
-  GatewayCheckInput,
   ReconcileSurfaceOperationInput,
-} from "../../protocol/inputs";
-import type { SurfaceOperationReconciliationResult } from "../../protocol/surface-operation-reconciliations";
-import type { SurfaceOperationReconciliation } from "../../protocol/schemas";
+  SurfaceOperationReconciliation,
+  SurfaceOperationReconciliationResult,
+} from "../../protocol/operation-lifecycle";
 
 export const RepoWriteParametersSchema = z.strictObject({
   repositoryRef: z.string().min(1),

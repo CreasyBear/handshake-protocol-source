@@ -79,6 +79,12 @@ If a plan starts with a dashboard, role, or public route before it identifies th
 
 This section is non-canonical research input. The local doctrine and protocol documents remain the source of truth.
 
+Agent-Native is the strongest outside signal for surface fan-out: UI, agent chat,
+actions, shared state, workspace memory, extensions, MCP, and A2A-style remote
+work all become peers in one application model. Handshake should adopt the
+surface-plural lesson without adopting ambient authority. The governing design
+concept is [Agent-Native Surface Binding](../product/agent-native-surface-binding.md).
+
 Cloudflare Agentic Inbox is a useful agent-first example: the application organizes around durable agent state, explicit email tools, inbound email triggers, MCP access, and agent-visible tool calls. It also exposes the gap Handshake exists to close: the README states that any user passing the shared Cloudflare Access policy can operate on any mailbox through `/mcp` by passing `mailboxId`, with no per-mailbox authorization. See [cloudflare/agentic-inbox](https://github.com/cloudflare/agentic-inbox).
 
 Cloudflare's MCP Code Mode is the sharper signal. Their Cloudflare API MCP server exposes thousands of API endpoints through `search` and `execute`, where the model writes generated JavaScript against a typed API surface. That means the product unit is often not a single tool call. It is generated code that can select, branch, and invoke many consequential operations. See [Cloudflare MCP servers](https://developers.cloudflare.com/agents/model-context-protocol/mcp-servers-for-cloudflare/).
@@ -102,7 +108,7 @@ but must not let any of them masquerade as mutation authority.
 - The tier doctrine is the top-level product direction.
 - `03` must be chosen as one agentic execution shape plus one protected action path.
 - Tier 2 activation is the next strategic milestone because it proves the open/self-hosted loop before hosted monetization.
-- Preview deploy remains the likely first wedge, but this spine does not permit preview deploy to become the category.
+- Preview deploy remains a buyer-legible wedge candidate, but this spine does not permit preview deploy to become the category or override the active shipment named in canonical product docs.
 
 ## Product-Build Principles
 
@@ -151,11 +157,29 @@ docs/business/
   canonical-product.md                current product direction
   protocol-vs-product.md              protocol/product/cloud split
 
+docs/product/
+  agentic-economy-protocol.md         north-star product doctrine
+  cli-mcp-surface.md                  current developer product surface
+  non-claims-and-theatre.md           product claim guardrails
+
+docs/protocol/
+  protocol-kernel.md                  current protocol semantics
+  api-protocol.md                     transition API reference
+  runtime/gateway/receipt docs        integration and reconstruction references
+
+docs/audits/
+  protocol-completion-audit-v0.2.md   point-in-time completion evidence
+
+docs/reference/
+  legacy-context-map.md               provenance map for old repo context
+  planning-technical-data-store.md    local planning memory reference
+
 docs/specs/
   00-product-requirements-spine.md    this governing agent-native requirements spine
   future specs                        concrete execution jobs and acceptance criteria
 
 docs/plans/
+  README.md                           cross-plan architecture spine and tier decision map
   01-plan-eng-review-...              primitive/state reference
   01a-plan-eng-review-...             vocabulary migration checkpoint
   02-plan-eng-review-...              authority hardening gate
@@ -164,6 +188,30 @@ docs/plans/
 ```
 
 Specs define what must be true and why. Plans define how. Code implements only accepted plan slices.
+
+## Document Promotion Rules
+
+This spine is a planning gate, not an idea catalog.
+
+Use it to reject plans that cannot name the agentic execution shape, protected
+action path, gateway authority holder, bypass posture, acceptance evidence, and
+non-claim. Do not add a new section here just because a new adapter, runtime,
+surface, customer story, or source study exists.
+
+Promotion rules:
+
+- Put research, source studies, rejected ideas, and historical framing in
+  provenance docs or archives.
+- Put one concrete future execution job in a candidate spec.
+- Put implementation order, task breakdown, and verification commands in a plan.
+- Put durable architecture decisions and non-claims in an ADR.
+- Put active bought-product and shipment changes in
+  [`../business/canonical-product.md`](../business/canonical-product.md).
+- Put tier, monetization, and long-term claim changes in
+  [`../business/tier-doctrine-decision-memo.md`](../business/tier-doctrine-decision-memo.md).
+
+Deletion test: if removing a proposed spine section would not lose a reusable
+planning gate, it belongs in a spec, plan, ADR, or provenance note instead.
 
 ## Requirement Entry Style
 
@@ -614,7 +662,7 @@ Done means:
 
 ## Open Questions
 
-- Is `02` Phase 0/1 complete enough for `03`, or must the protected MCP/CLI preview-deploy plan include those tasks as hard blockers before agent-runtime work?
+- Is `02` Phase 0/1 complete enough for `03`, or must the next protected MCP/CLI plan include those tasks as hard blockers before agent-runtime work?
 - Should the hook-assisted shell guard be a conformance fixture, a docs example, or a later runtime adapter?
 - Which raw credential posture can the first Tier 2 quickstart actually prove without lying?
 - What customer evidence is needed before broadening from engineering-agent protected actions to support, billing, commerce, or data-plane surfaces?
@@ -633,6 +681,11 @@ one agentic execution shape
 + one receipt/proof-gap reconstruction loop
 ```
 
-The most coherent first `03` is a protected MCP/CLI preview-deploy path after `02` Phase 0 and Phase 1 are complete. If that hardening is not complete, `03` must list it as a blocker before any agent-runtime work.
+The current active shipment is owned by
+[`../business/canonical-product.md`](../business/canonical-product.md). Use that
+doc to choose the current protected action family; use this spine to test whether
+the resulting plan is ready to build. If protocol hardening is incomplete, the
+plan must list it as a blocker before any agent-runtime work.
 
-Smallest next mechanism: complete `02` Phase 0/1, then write the `03` spec by filling the planning gate for protected MCP/CLI preview deploy.
+Smallest next mechanism: write the next executable spec by filling the planning
+gate for the active protected action path named in the canonical product doc.

@@ -1,14 +1,10 @@
 import { digestCanonical } from "./canonical";
+import type { ActionContract } from "./action-contract";
+import { ContractStreamEventSchema, type ContractStreamEvent } from "./event-schemas";
 import { createId, nowIso } from "./ids";
-import {
-  ContractStreamEventSchema,
-  PROTOCOL_VERSION,
-  type ActionContract,
-  type ContractStreamEvent,
-  type JsonValue,
-  type ReceiptStreamReference,
-} from "./schemas";
-import type { ProtocolStore } from "../storage/store";
+import type { ReceiptStreamReference } from "./receipt-export";
+import { PROTOCOL_VERSION, type JsonValue } from "./schema-core";
+import type { ProtocolStore } from "./store-port";
 
 export type ActionLifecycleStreamRefs = {
   actionContractId: string;

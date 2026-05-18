@@ -3,7 +3,7 @@
 Status: Archived historical planning extension; not executable
 Version: v0.2.1
 Audience: Agent-runtime builders, gateway endpoint owners, platform engineering, security engineering, protocol implementers
-Implementation status: Historical agent-requirements input; current runtime wrappers, gateway adapters, and codemode proof are documented in `../../runtime-integration.md`, `../../gateway-integration.md`, and `../../protocol-completion-audit-v0.2.md`
+Implementation status: Historical agent-requirements input; current runtime wrappers, gateway adapters, and codemode proof are documented in `../../protocol/runtime-integration.md`, `../../protocol/gateway-integration.md`, and `../../audits/protocol-completion-audit-v0.2.md`
 Canonical owner: Product owner
 Extends: [`../01-plan-eng-review-primitive-fields-state.md`](../01-plan-eng-review-primitive-fields-state.md)
 Archived by: [`../02-plan-eng-review-authority-hardening.md`](../02-plan-eng-review-authority-hardening.md)

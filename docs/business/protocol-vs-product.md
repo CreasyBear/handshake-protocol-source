@@ -508,30 +508,25 @@ So the agent can move fast, but it never gets ambient authority.
 
 Show the demo. Do not start with the protocol unless the buyer asks how it works.
 
-## Active Next Product Shipment
+## Active Shipment Pointer
 
-Build one installable Handshake CLI/MCP pilot with GitHub App as the first gateway adapter:
+Active shipment scope is owned by
+[`canonical-product.md`](./canonical-product.md). This document owns the
+Protocol / Protected Actions / Cloud split, not the current adapter proof.
+
+When the canonical product doc names a first protected action path, this document
+should explain which layer owns each part of the path:
 
 ```text
-Title:
-Let coding agents use protected Handshake tools without ambient gateway authority.
+Protocol = exact contracts, policy decisions, one-use greenlights, gateway checks,
+receipts, refusals, proof gaps, and isolation.
 
-Demo:
-1. Agent receives a repo-change task.
-2. Runtime connects to the Handshake MCP server instead of raw gateway tools.
-3. Agent calls a protected proposal tool such as `handshake.repo.propose_write_to_pr`.
-4. Handshake creates an exact action contract with principal intent and generated code/spec refs.
-5. Policy greenlights only the generated branch + exact content + pull request shape.
-6. The GitHub App-backed gateway adapter checks the exact greenlight before using its installation token.
-7. The adapter creates the generated branch, exact commit, and pull request, or refuses before mutation.
-8. CLI/receipt surfaces reconstruct contract, decision, gate, branch, commit, PR evidence, branch-protection state, and proof gaps separately.
+Protected Actions product = install, protected tools, contract/receipt surfaces,
+gateway adapter posture, and first receipt activation.
 
-Second demo:
-Agent retries with changed content or a different path.
-Handshake refuses before GitHub mutation.
+Cloud = hosted operation, retention, search, alerts, audit export, and supported
+integrations after activation.
 ```
-
-Protected repo-write-to-PR is the first adapter-backed workflow, not the whole product. Preview deploy remains a buyer-legible narrative and later gateway integration. Do not imply preview-deploy control until a preview gateway consumes exact greenlights before deployment. Package-install and current repo-write reference proofs remain conformance evidence, not the first product shape.
 
 Then ask 10 platform/security/AI enablement buyers:
 

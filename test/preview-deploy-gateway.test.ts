@@ -73,7 +73,7 @@ describe("local preview deploy fixture", () => {
     });
 
     expect(reconciliation.createdProofGap?.gapPhase).toBe("mutation");
-    expect(reconciliation.createdProofGap?.reasonCode).toBe("downstream_status_unknown");
+    expect(reconciliation.createdProofGap?.reasonCode).toBe("orphan_mitigation_required");
   });
 });
 

@@ -1,4 +1,6 @@
 import type { Context } from "hono";
+import { transitionErrorResult, type TransitionErrorContext } from "./transition-error-envelope";
+import { HandshakeProtocolError } from "../protocol/errors";
 
 export type TransitionCallerRole = "control_plane" | "runtime_evidence" | "gateway_custody" | "review_custody";
 
@@ -22,43 +24,47 @@ export function authorizeTransitionCaller(
   c: Context<{ Bindings: CallerAuthWorkerBindings }>,
   configuredTokens: CallerAuthTokens | undefined,
   role: TransitionCallerRole,
+  context: TransitionErrorContext = {},
 ): Response | null {
   const expectedToken = configuredTokenForRole(c.env, configuredTokens, role);
   if (!expectedToken) {
-    return c.json(
-      {
-        error: {
-          code: "caller_auth_not_configured",
-          message: `${role} transition routes require an explicit bearer token binding.`,
-        },
-      },
-      503,
+    return errorResponse(
+      c,
+      new HandshakeProtocolError(
+        "caller_auth_not_configured",
+        `${role} transition routes require an explicit bearer token binding.`,
+        503,
+        { retryability: "terminal", commitState: "not_started" },
+      ),
+      context,
     );
   }
 
   const providedToken = parseBearerToken(c.req.header("authorization"));
   if (!providedToken) {
     c.header("WWW-Authenticate", 'Bearer realm="handshake"');
-    return c.json(
-      {
-        error: {
-          code: "caller_auth_required",
-          message: `${role} transition routes require a bearer token.`,
-        },
-      },
-      401,
+    return errorResponse(
+      c,
+      new HandshakeProtocolError(
+        "caller_auth_required",
+        `${role} transition routes require a bearer token.`,
+        401,
+        { retryability: "terminal", commitState: "not_started" },
+      ),
+      context,
     );
   }
 
   if (!constantTimeTokenEquals(providedToken, expectedToken)) {
-    return c.json(
-      {
-        error: {
-          code: "caller_auth_forbidden",
-          message: `Bearer token does not satisfy ${role} transition custody.`,
-        },
-      },
-      403,
+    return errorResponse(
+      c,
+      new HandshakeProtocolError(
+        "caller_auth_forbidden",
+        `Bearer token does not satisfy ${role} transition custody.`,
+        403,
+        { retryability: "terminal", commitState: "not_started" },
+      ),
+      context,
     );
   }
 
@@ -106,4 +112,13 @@ function constantTimeTokenEquals(providedToken: string, expectedToken: string): 
     diff |= (providedToken.charCodeAt(index) || 0) ^ (expectedToken.charCodeAt(index) || 0);
   }
   return diff === 0;
+}
+
+function errorResponse(
+  c: Context<{ Bindings: CallerAuthWorkerBindings }>,
+  error: HandshakeProtocolError,
+  context: TransitionErrorContext,
+): Response {
+  const result = transitionErrorResult(error, context);
+  return c.json(result.body, result.status as 400);
 }

@@ -16,8 +16,8 @@ import type {
   RuntimeExecutionRecord,
   ToolCapability,
 } from "../protocol/schemas";
-import type { GatewayCheckResult } from "../protocol/gateway-check-artifacts";
-import type { SurfaceOperationReconciliationResult } from "../protocol/surface-operation-reconciliations";
+import type { GatewayCheckResult } from "../protocol/gateway-gate";
+import type { SurfaceOperationReconciliationResult } from "../protocol/operation-lifecycle";
 import type {
   CompileIntentInput,
   CreateBreakerDecisionInput,
@@ -35,9 +35,18 @@ import type {
   GatewayCheckInput,
   TransitionRecoveryRecommendationStatusInput,
 } from "../protocol/inputs";
-import type { RecoveryRecommendationStatusChange } from "../protocol/recovery-recommendation-status";
-import type { RecoveryTerminalConflictResolution } from "../protocol/recovery-terminal-conflict-resolutions";
+import type { RecoveryRecommendationStatusChange, RecoveryTerminalConflictResolution } from "../protocol/recovery";
+import { PROTOCOL_VERSION } from "../protocol/schemas";
 import type { CallerAuthTokens, TransitionCallerRole } from "../http/caller-auth";
+import {
+  TransitionErrorResponseSchema,
+  type TransitionErrorEnvelope,
+} from "../http/transition-error-envelope";
+import {
+  HANDSHAKE_ORIGINATING_IDENTITY_HEADER,
+  HANDSHAKE_PROTOCOL_VERSION_HEADER,
+  HANDSHAKE_REQUEST_IDENTITY_HEADER,
+} from "../http/transition-request-context";
 
 export type HandshakeFetch = (
   input: Parameters<typeof fetch>[0],
@@ -47,7 +56,37 @@ export type HandshakeFetch = (
 export type HandshakeClientOptions = {
   transitionToken?: string;
   transitionTokens?: CallerAuthTokens;
+  protocolVersion?: string;
+  requestIdentityFactory?: () => string;
+  originatingIdentity?: string;
 };
+
+export class HandshakeClientError extends Error {
+  public readonly code: string;
+  public readonly transitionName: string | null;
+  public readonly callerCustodyRole: TransitionCallerRole | null;
+  public readonly retryability: TransitionErrorEnvelope["retryability"];
+  public readonly commitState: TransitionErrorEnvelope["commitState"];
+  public readonly requestIdentity: string | null;
+  public readonly proofRef: string | null;
+  public readonly refusalRef: string | null;
+
+  constructor(
+    public readonly status: number,
+    public readonly envelope: TransitionErrorEnvelope,
+  ) {
+    super(`Handshake ${envelope.transitionName ?? "request"} failed: ${envelope.code}`);
+    this.name = "HandshakeClientError";
+    this.code = envelope.code;
+    this.transitionName = envelope.transitionName;
+    this.callerCustodyRole = envelope.callerCustodyRole;
+    this.retryability = envelope.retryability;
+    this.commitState = envelope.commitState;
+    this.requestIdentity = envelope.requestIdentity;
+    this.proofRef = envelope.proofRef;
+    this.refusalRef = envelope.refusalRef;
+  }
+}
 
 export class HandshakeClient {
   constructor(
@@ -140,7 +179,14 @@ export class HandshakeClient {
   }
 
   private async post<T>(path: string, body: unknown, role: TransitionCallerRole): Promise<T> {
-    const headers: Record<string, string> = { "content-type": "application/json" };
+    const headers: Record<string, string> = {
+      "content-type": "application/json",
+      [HANDSHAKE_PROTOCOL_VERSION_HEADER]: this.options.protocolVersion ?? PROTOCOL_VERSION,
+      [HANDSHAKE_REQUEST_IDENTITY_HEADER]: this.nextRequestIdentity(),
+    };
+    if (this.options.originatingIdentity) {
+      headers[HANDSHAKE_ORIGINATING_IDENTITY_HEADER] = this.options.originatingIdentity;
+    }
     const token = this.options.transitionTokens?.[role] ?? this.options.transitionToken;
     if (token) headers.authorization = `Bearer ${token}`;
     const response = await this.fetchImpl(new URL(path, this.baseUrl), {
@@ -149,8 +195,39 @@ export class HandshakeClient {
       body: JSON.stringify(body),
     });
     if (!response.ok) {
-      throw new Error(`Handshake request failed: ${response.status} ${await response.text()}`);
+      throw new HandshakeClientError(response.status, await this.errorEnvelopeForResponse(response));
     }
     return (await response.json()) as T;
+  }
+
+  private nextRequestIdentity(): string {
+    return this.options.requestIdentityFactory?.() ?? crypto.randomUUID();
+  }
+
+  private async errorEnvelopeForResponse(response: Response): Promise<TransitionErrorEnvelope> {
+    const parsedBody = await parseJsonBody(response);
+    const parsedError = TransitionErrorResponseSchema.safeParse(parsedBody);
+    if (parsedError.success) return parsedError.data.error;
+    return {
+      code: "http_error",
+      message: `Handshake request failed with HTTP ${response.status}.`,
+      transitionName: null,
+      callerCustodyRole: null,
+      retryability: response.status >= 500 ? "retryable" : "terminal",
+      commitState: "unknown",
+      requestIdentity: response.headers.get(HANDSHAKE_REQUEST_IDENTITY_HEADER),
+      proofRef: null,
+      refusalRef: null,
+    };
+  }
+}
+
+async function parseJsonBody(response: Response): Promise<unknown> {
+  const text = await response.text();
+  if (!text.trim()) return null;
+  try {
+    return JSON.parse(text);
+  } catch {
+    return null;
   }
 }

@@ -1,33 +1,26 @@
 import { describe, expect, it } from "bun:test";
 import { HandshakeProtocolError } from "../src/protocol/errors";
 import { HandshakeKernel } from "../src/protocol/kernel";
-import { protectedPathPostureScopeKeyForContract } from "../src/protocol/protected-path-postures";
+import { protectedPathPostureScopeKeyForContract } from "../src/protocol/protected-path-posture";
 import { ProtocolRecorder } from "../src/protocol/records";
 import { digestCanonical } from "../src/protocol/canonical";
 import type {
-  ContractStreamEvent,
   GatewayRegistryEntry,
   ProofGap,
-  ProtocolObjectType,
   RecoveryRecommendationStatusTransition,
 } from "../src/protocol/schemas";
 import { InMemoryProtocolStore } from "../src/storage/memory";
-import type {
-  ProtocolCommit,
-  ProtocolCommitResult,
-  GatewayCheckCommit,
-  GatewayCheckCommitResult,
-  StoredProtocolRecord,
-} from "../src/storage/store";
 import {
   createGreenlitContract,
   futureIso,
+  type KernelFixture,
   makeKernelFixture,
   makePackageInstallCandidate,
   proposalInputForCompilation,
   recordUnknownDownstreamProofGap,
   registerFixtureObjects,
 } from "./fixtures";
+import { FaultInjectingProtocolStore } from "./support/fault-injecting-protocol-store";
 
 describe("Handshake kernel invariants", () => {
   it("records compiler uncertainty when catalog and gateway records are not durable", async () => {
@@ -433,8 +426,9 @@ describe("Handshake kernel invariants", () => {
 
   it("rejects duplicate greenlight issuance through the durable action-contract claim", async () => {
     const base = makeKernelFixture();
-    const store = new GreenlightListBlindStore();
+    const store = new FaultInjectingProtocolStore(new InMemoryProtocolStore());
     const fixture = await createGreenlitContract({ ...base, store, kernel: new HandshakeKernel(store) });
+    store.hideListRecordsByTypeOnce("greenlight");
 
     await expect(
       fixture.kernel.evaluatePolicy({
@@ -447,7 +441,13 @@ describe("Handshake kernel invariants", () => {
   });
 
   it("requires fresh gateway_checked protected-path posture before policy can greenlight", async () => {
-    const fixture = await createContractRequiringGatewayCheckedPosture();
+    const base = makeKernelFixture();
+    const store = new FaultInjectingProtocolStore(new InMemoryProtocolStore());
+    const fixture = await createContractRequiringGatewayCheckedPosture("idem_posture_required", {
+      ...base,
+      store,
+      kernel: new HandshakeKernel(store),
+    });
 
     const missingPosture = await fixture.kernel.evaluatePolicy({
       actionContractId: fixture.contract.actionContractId,
@@ -501,6 +501,29 @@ describe("Handshake kernel invariants", () => {
       protectedPathPostureScopeKeyForContract(fixture.contract),
     );
     expect(currentPosture?.payload.protectedPathPostureId).toBe(posture.protectedPathPostureId);
+    if (!currentPosture) throw new Error("expected current posture");
+
+    store.hideCurrentProtectedPathPostureOnce(protectedPathPostureScopeKeyForContract(fixture.contract));
+    const delayedIndex = await fixture.kernel.evaluatePolicy({
+      actionContractId: fixture.contract.actionContractId,
+      envelopeId: fixture.envelope.envelopeId,
+    });
+    expect(delayedIndex.decision.decision).toBe("refuse");
+    expect(delayedIndex.decision.decisionReasonCode).toBe("protected_path_posture_missing");
+
+    store.replaceCurrentProtectedPathPostureOnce({
+      ...currentPosture,
+      payload: {
+        ...currentPosture.payload,
+        expiresAt: new Date(Date.now() - 1_000).toISOString(),
+      },
+    });
+    const staleIndex = await fixture.kernel.evaluatePolicy({
+      actionContractId: fixture.contract.actionContractId,
+      envelopeId: fixture.envelope.envelopeId,
+    });
+    expect(staleIndex.decision.decision).toBe("refuse");
+    expect(staleIndex.decision.decisionReasonCode).toBe("protected_path_posture_stale");
 
     const greenlit = await fixture.kernel.evaluatePolicy({
       actionContractId: fixture.contract.actionContractId,
@@ -618,16 +641,17 @@ describe("Handshake kernel invariants", () => {
       "action_greenlit",
       "gateway_checked",
       "mutation_attempted",
+      "protected_surface_operation_claimed",
       "receipt_emitted",
     ]);
-    expect(afterGate.map((event) => event.offset)).toEqual([0, 1, 2, 3, 4, 5]);
+    expect(afterGate.map((event) => event.offset)).toEqual([0, 1, 2, 3, 4, 5, 6]);
     for (let index = 1; index < afterGate.length; index += 1) {
       expect(afterGate[index]?.previousEventDigest).toBe(afterGate[index - 1]?.eventDigest);
     }
 
     const runEvents = fixture.store.listEventsForPartition(streamId, `run:${fixture.contract.runId}`);
     expect(runEvents.map((event) => event.eventType)).toEqual(afterGate.map((event) => event.eventType));
-    expect(runEvents.map((event) => event.offset)).toEqual([0, 1, 2, 3, 4, 5]);
+    expect(runEvents.map((event) => event.offset)).toEqual([0, 1, 2, 3, 4, 5, 6]);
     expect(runEvents.every((event) => event.streamScope === "run")).toBe(true);
     for (let index = 1; index < runEvents.length; index += 1) {
       expect(runEvents[index]?.previousEventDigest).toBe(runEvents[index - 1]?.eventDigest);
@@ -638,7 +662,7 @@ describe("Handshake kernel invariants", () => {
       `protected_surface_resource:${fixture.contract.gatewayId}:${fixture.contract.resourceRef}`,
     );
     expect(resourceEvents.map((event) => event.eventType)).toEqual(afterGate.map((event) => event.eventType));
-    expect(resourceEvents.map((event) => event.offset)).toEqual([0, 1, 2, 3, 4, 5]);
+    expect(resourceEvents.map((event) => event.offset)).toEqual([0, 1, 2, 3, 4, 5, 6]);
     expect(resourceEvents.every((event) => event.streamScope === "protected_surface_resource")).toBe(true);
     for (let index = 1; index < resourceEvents.length; index += 1) {
       expect(resourceEvents[index]?.previousEventDigest).toBe(resourceEvents[index - 1]?.eventDigest);
@@ -650,7 +674,7 @@ describe("Handshake kernel invariants", () => {
     if (!actionReceiptEvent || !runReceiptEvent || !resourceReceiptEvent) {
       throw new Error("expected receipt events for action, run, and gateway resource partitions");
     }
-    expect(gate.receipt.streamEventIds).toHaveLength(9);
+    expect(gate.receipt.streamEventIds).toHaveLength(12);
     expect(gate.receipt.receiptDigest).toMatch(/^sha256:/);
     expect(gate.receipt.auditChainDigest).toMatch(/^sha256:/);
     expect(gate.receipt.streamOffsets).toEqual([
@@ -659,7 +683,7 @@ describe("Handshake kernel invariants", () => {
         streamScope: "organization",
         partitionKey,
         offsetStart: 0,
-        offsetEnd: 5,
+        offsetEnd: 6,
         terminalEventDigest: actionReceiptEvent.eventDigest,
       },
       {
@@ -667,7 +691,7 @@ describe("Handshake kernel invariants", () => {
         streamScope: "run",
         partitionKey: `run:${fixture.contract.runId}`,
         offsetStart: 0,
-        offsetEnd: 5,
+        offsetEnd: 6,
         terminalEventDigest: runReceiptEvent.eventDigest,
       },
       {
@@ -675,7 +699,7 @@ describe("Handshake kernel invariants", () => {
         streamScope: "protected_surface_resource",
         partitionKey: `protected_surface_resource:${fixture.contract.gatewayId}:${fixture.contract.resourceRef}`,
         offsetStart: 0,
-        offsetEnd: 5,
+        offsetEnd: 6,
         terminalEventDigest: resourceReceiptEvent.eventDigest,
       },
     ]);
@@ -976,7 +1000,10 @@ describe("Handshake kernel invariants", () => {
 
   it("does not record a follow-up action contract when recovery terminal claim loses a race", async () => {
     const base = makeKernelFixture();
-    const store = new RecoveryTerminalConflictOnceStore();
+    const store = new FaultInjectingProtocolStore(new InMemoryProtocolStore()).injectProtocolCommitResultOnce(
+      "recovery_terminal_conflict",
+      { when: (commit) => Boolean(commit.recoveryTerminalClaims?.length) },
+    );
     const fixture = await createGreenlitContract({ ...base, store, kernel: new HandshakeKernel(store) });
     const gate = await fixture.kernel.gatewayCheck({
       actionContractId: fixture.contract.actionContractId,
@@ -1049,7 +1076,10 @@ describe("Handshake kernel invariants", () => {
 
   it("resolves a recovery terminal conflict proof gap against the observed winning transition", async () => {
     const base = makeKernelFixture();
-    const store = new RecoveryTerminalConflictOnceStore();
+    const store = new FaultInjectingProtocolStore(new InMemoryProtocolStore()).injectProtocolCommitResultOnce(
+      "recovery_terminal_conflict",
+      { when: (commit) => Boolean(commit.recoveryTerminalClaims?.length) },
+    );
     const fixture = await createGreenlitContract({ ...base, store, kernel: new HandshakeKernel(store) });
     const gate = await fixture.kernel.gatewayCheck({
       actionContractId: fixture.contract.actionContractId,
@@ -1185,7 +1215,10 @@ describe("Handshake kernel invariants", () => {
 
   it("rebuilds gateway check stream events after an offset conflict", async () => {
     const base = makeKernelFixture();
-    const store = new StreamConflictOnceStore();
+    const store = new FaultInjectingProtocolStore(new InMemoryProtocolStore()).injectGatewayCommitResultOnce(
+      "stream_conflict",
+      { appendCompetingEvent: true },
+    );
     const fixture = await createGreenlitContract({ ...base, store, kernel: new HandshakeKernel(store) });
     const streamId = `stream_${fixture.contract.tenantId}_${fixture.contract.organizationId}`;
     const partitionKey = `action:${fixture.contract.actionContractId}`;
@@ -1210,7 +1243,10 @@ describe("Handshake kernel invariants", () => {
 
   it("rebuilds action proposal events after an offset conflict", async () => {
     const base = makeKernelFixture();
-    const store = new ProtocolStreamConflictOnceStore("action_proposed");
+    const store = new FaultInjectingProtocolStore(new InMemoryProtocolStore()).injectProtocolCommitResultOnce(
+      "stream_conflict",
+      { targetEventType: "action_proposed", appendCompetingEvent: true },
+    );
     const fixture = await createGreenlitContract({ ...base, store, kernel: new HandshakeKernel(store) });
     const streamId = `stream_${fixture.contract.tenantId}_${fixture.contract.organizationId}`;
     const partitionKey = `action:${fixture.contract.actionContractId}`;
@@ -1227,7 +1263,10 @@ describe("Handshake kernel invariants", () => {
 
   it("rebuilds policy and greenlight events after an offset conflict", async () => {
     const base = makeKernelFixture();
-    const store = new ProtocolStreamConflictOnceStore("policy_decision_recorded");
+    const store = new FaultInjectingProtocolStore(new InMemoryProtocolStore()).injectProtocolCommitResultOnce(
+      "stream_conflict",
+      { targetEventType: "policy_decision_recorded", appendCompetingEvent: true },
+    );
     const fixture = await createGreenlitContract({ ...base, store, kernel: new HandshakeKernel(store) });
     const streamId = `stream_${fixture.contract.tenantId}_${fixture.contract.organizationId}`;
     const partitionKey = `action:${fixture.contract.actionContractId}`;
@@ -1248,14 +1287,12 @@ describe("Handshake kernel invariants", () => {
   });
 
   it("records a replay refusal without mutation when greenlight consumption loses a race", async () => {
-    const fixture = await createGreenlitContract();
-    await fixture.store.consumeGreenlight({
-      greenlightId: fixture.greenlight.greenlightId,
-      gateAttemptId: "gat_other",
-      actionContractId: fixture.contract.actionContractId,
-      idempotencyKey: fixture.contract.idempotencyKey,
-      consumedAt: new Date().toISOString(),
-    });
+    const base = makeKernelFixture();
+    const store = new FaultInjectingProtocolStore(new InMemoryProtocolStore()).injectGatewayCommitResultOnce(
+      "already_consumed",
+      { when: (commit) => Boolean(commit.consumption) },
+    );
+    const fixture = await createGreenlitContract({ ...base, store, kernel: new HandshakeKernel(store) });
 
     const result = await fixture.kernel.gatewayCheck({
       actionContractId: fixture.contract.actionContractId,
@@ -1270,6 +1307,29 @@ describe("Handshake kernel invariants", () => {
     expect(greenlightRecord?.payload).toMatchObject({ consumedAt: null, consumedByGateAttemptId: null });
     expect(fixture.store.countRecordsOfType("gateway_check_attempt")).toBe(1);
     expect(fixture.store.countRecordsOfType("mutation_attempt")).toBe(0);
+    expect(fixture.store.countRecordsOfType("receipt")).toBe(1);
+  });
+
+  it("records an operation-claim conflict refusal without mutation authority", async () => {
+    const base = makeKernelFixture();
+    const store = new FaultInjectingProtocolStore(new InMemoryProtocolStore()).injectGatewayCommitResultOnce(
+      "operation_claim_conflict",
+      { when: (commit) => Boolean(commit.protectedSurfaceOperationClaimIndexEntries?.length) },
+    );
+    const fixture = await createGreenlitContract({ ...base, store, kernel: new HandshakeKernel(store) });
+
+    const result = await fixture.kernel.gatewayCheck({
+      actionContractId: fixture.contract.actionContractId,
+      greenlightId: fixture.greenlight.greenlightId,
+      observedParameters: { package: "hono", versionRange: "^4.12.19" },
+    });
+
+    expect(result.gateAttempt.gateDecision).toBe("refused");
+    expect(result.gateAttempt.gateDecisionReasonCode).toBe("protected_surface_operation_in_progress");
+    expect(result.receipt.greenlightConsumptionStatus).toBe("not_consumed");
+    expect(result.mutationAttempt).toBeNull();
+    expect(fixture.store.countRecordsOfType("mutation_attempt")).toBe(0);
+    expect(fixture.store.countRecordsOfType("protected_surface_operation_claim")).toBe(0);
     expect(fixture.store.countRecordsOfType("receipt")).toBe(1);
   });
 
@@ -1451,12 +1511,19 @@ describe("Handshake kernel invariants", () => {
   });
 
   it("refuses incompatible gateway policy drift before mutation", async () => {
-    const fixture = await createGreenlitContract();
-    await replaceGatewayRecordOutOfBand(fixture, {
-      ...fixture.gateway,
-      gatewayRegistryVersion: "v2",
-      gatewayPolicyVersion: "v2",
+    const base = makeKernelFixture();
+    const store = new FaultInjectingProtocolStore(new InMemoryProtocolStore());
+    const fixture = await createGreenlitContract({ ...base, store, kernel: new HandshakeKernel(store) });
+    const recorder = new ProtocolRecorder(fixture.store);
+    const driftedGateway = await recorder.buildRecord({
+      objectType: "gateway_registry_entry",
+      payload: {
+        ...fixture.gateway,
+        gatewayRegistryVersion: "v2",
+        gatewayPolicyVersion: "v2",
+      },
     });
+    store.replaceRecordOnce(driftedGateway);
 
     const result = await fixture.kernel.gatewayCheck({
       actionContractId: fixture.contract.actionContractId,
@@ -1634,6 +1701,112 @@ describe("Handshake kernel invariants", () => {
     expect(fixture.store.countRecordsOfType("mutation_attempt")).toBe(1);
   });
 
+  it("refuses a second same-surface gateway check while an operation claim is active", async () => {
+    const fixture = await createGreenlitContract();
+    const firstGate = await fixture.kernel.gatewayCheck({
+      actionContractId: fixture.contract.actionContractId,
+      greenlightId: fixture.greenlight.greenlightId,
+      observedParameters: { package: "hono", versionRange: "^4.12.19" },
+    });
+    expect(firstGate.gateAttempt.gateDecision).toBe("passed");
+
+    const second = await createAdditionalGreenlitPackageContract(fixture, {
+      sequenceNumber: 2,
+      idempotencyKey: "idem_package_hono_second",
+    });
+    const secondGate = await fixture.kernel.gatewayCheck({
+      actionContractId: second.contract.actionContractId,
+      greenlightId: second.greenlight.greenlightId,
+      observedParameters: { package: "hono", versionRange: "^4.12.19" },
+    });
+
+    expect(secondGate.gateAttempt.gateDecision).toBe("refused");
+    expect(secondGate.gateAttempt.gateDecisionReasonCode).toBe("protected_surface_operation_in_progress");
+    expect(secondGate.mutationAttempt).toBeNull();
+    expect(fixture.store.countRecordsOfType("mutation_attempt")).toBe(1);
+    expect(fixture.store.countRecordsOfType("protected_surface_operation_claim")).toBe(1);
+  });
+
+  it("allows unrelated protected surfaces while another operation claim is active", async () => {
+    const base = makeKernelFixture();
+    base.envelope = { ...base.envelope, allowedResources: ["npm:hono", "npm:zod"] };
+    const fixture = await createGreenlitContract(base);
+    await fixture.kernel.gatewayCheck({
+      actionContractId: fixture.contract.actionContractId,
+      greenlightId: fixture.greenlight.greenlightId,
+      observedParameters: { package: "hono", versionRange: "^4.12.19" },
+    });
+
+    const second = await createAdditionalGreenlitPackageContract(fixture, {
+      sequenceNumber: 2,
+      resourceRef: "npm:zod",
+      parameters: { package: "zod", versionRange: "^4.0.0" },
+      nonSecretParamsSummary: { package: "zod", versionRange: "^4.0.0" },
+      idempotencyKey: "idem_package_zod",
+    });
+    const secondGate = await fixture.kernel.gatewayCheck({
+      actionContractId: second.contract.actionContractId,
+      greenlightId: second.greenlight.greenlightId,
+      observedParameters: { package: "zod", versionRange: "^4.0.0" },
+    });
+
+    expect(secondGate.gateAttempt.gateDecision).toBe("passed");
+    expect(secondGate.mutationAttempt).not.toBeNull();
+    expect(fixture.store.countRecordsOfType("mutation_attempt")).toBe(2);
+  });
+
+  it("keeps orphan claims blocking and creates scoped isolation when configured", async () => {
+    const isolationFixture = await createGreenlitContract();
+    const isolationGate = await isolationFixture.kernel.gatewayCheck({
+      actionContractId: isolationFixture.contract.actionContractId,
+      greenlightId: isolationFixture.greenlight.greenlightId,
+      observedParameters: { package: "hono", versionRange: "^4.12.19" },
+    });
+    if (!isolationGate.mutationAttempt) throw new Error("expected mutation attempt");
+
+    const orphan = await isolationFixture.kernel.reconcileSurfaceOperation({
+      mutationAttemptId: isolationGate.mutationAttempt.mutationAttemptId,
+      idempotencyKey: isolationFixture.contract.idempotencyKey,
+      observedSurfaceOperationRef: isolationGate.mutationAttempt.surfaceOperationRef,
+      observedDownstreamStatus: "unknown",
+      evidenceRefs: [],
+      resolvedProofGapIds: [],
+      orphanIsolationRequested: true,
+    });
+    expect(orphan.createdProofGap?.reasonCode).toBe("orphan_mitigation_required");
+    expect(isolationFixture.store.countRecordsOfType("isolation_state")).toBe(1);
+
+    const fixture = await createGreenlitContract();
+    const gate = await fixture.kernel.gatewayCheck({
+      actionContractId: fixture.contract.actionContractId,
+      greenlightId: fixture.greenlight.greenlightId,
+      observedParameters: { package: "hono", versionRange: "^4.12.19" },
+    });
+    if (!gate.mutationAttempt) throw new Error("expected mutation attempt");
+    await fixture.kernel.reconcileSurfaceOperation({
+      mutationAttemptId: gate.mutationAttempt.mutationAttemptId,
+      idempotencyKey: fixture.contract.idempotencyKey,
+      observedSurfaceOperationRef: gate.mutationAttempt.surfaceOperationRef,
+      observedDownstreamStatus: "unknown",
+      evidenceRefs: ["policy:orphan-isolation"],
+      resolvedProofGapIds: [],
+    });
+    expect(fixture.store.countRecordsOfType("isolation_state")).toBe(0);
+
+    const second = await createAdditionalGreenlitPackageContract(fixture, {
+      sequenceNumber: 2,
+      idempotencyKey: "idem_package_hono_after_orphan",
+    });
+    const secondGate = await fixture.kernel.gatewayCheck({
+      actionContractId: second.contract.actionContractId,
+      greenlightId: second.greenlight.greenlightId,
+      observedParameters: { package: "hono", versionRange: "^4.12.19" },
+    });
+    expect(secondGate.gateAttempt.gateDecision).toBe("refused");
+    expect(secondGate.gateAttempt.gateDecisionReasonCode).toBe("protected_surface_operation_in_progress");
+    expect(secondGate.mutationAttempt).toBeNull();
+  });
+
   it("resolves a downstream unknown proof gap by reconciling the same mutation attempt", async () => {
     const fixture = await createGreenlitContract();
     const gate = await fixture.kernel.gatewayCheck({
@@ -1693,60 +1866,6 @@ describe("Handshake kernel invariants", () => {
   });
 });
 
-class StreamConflictOnceStore extends InMemoryProtocolStore {
-  private conflictInjected = false;
-
-  override async commitGatewayCheck(commit: GatewayCheckCommit): Promise<GatewayCheckCommitResult> {
-    if (!this.conflictInjected) {
-      this.conflictInjected = true;
-      const firstEvent = commit.events[0];
-      if (firstEvent) await this.appendEvent(await buildCompetingStreamEvent(firstEvent));
-      return "stream_conflict";
-    }
-    return super.commitGatewayCheck(commit);
-  }
-}
-
-class ProtocolStreamConflictOnceStore extends InMemoryProtocolStore {
-  private conflictInjected = false;
-
-  constructor(private readonly targetEventType: ContractStreamEvent["eventType"]) {
-    super();
-  }
-
-  override async commitProtocolRecords(commit: ProtocolCommit): Promise<ProtocolCommitResult> {
-    const targetEvent = commit.events.find((event) => event.eventType === this.targetEventType);
-    if (!this.conflictInjected && targetEvent) {
-      this.conflictInjected = true;
-      await this.appendEvent(await buildCompetingStreamEvent(targetEvent));
-      return "stream_conflict";
-    }
-    return super.commitProtocolRecords(commit);
-  }
-}
-
-class RecoveryTerminalConflictOnceStore extends InMemoryProtocolStore {
-  private conflictInjected = false;
-
-  override async commitProtocolRecords(commit: ProtocolCommit): Promise<ProtocolCommitResult> {
-    if (!this.conflictInjected && commit.recoveryTerminalClaims?.length) {
-      this.conflictInjected = true;
-      return "recovery_terminal_conflict";
-    }
-    return super.commitProtocolRecords(commit);
-  }
-}
-
-class GreenlightListBlindStore extends InMemoryProtocolStore {
-  override async listRecordsByType<T>(
-    objectType: ProtocolObjectType,
-    scope: { tenantId?: string; organizationId?: string } = {},
-  ): Promise<StoredProtocolRecord<T>[]> {
-    if (objectType === "greenlight") return [];
-    return super.listRecordsByType<T>(objectType, scope);
-  }
-}
-
 async function replaceGatewayRecordOutOfBand(
   fixture: Awaited<ReturnType<typeof createGreenlitContract>>,
   gateway: GatewayRegistryEntry,
@@ -1755,8 +1874,10 @@ async function replaceGatewayRecordOutOfBand(
   await fixture.store.putRecord(await recorder.buildRecord({ objectType: "gateway_registry_entry", payload: gateway }));
 }
 
-async function createContractRequiringGatewayCheckedPosture(idempotencyKey = "idem_posture_required") {
-  const fixture = makeKernelFixture();
+async function createContractRequiringGatewayCheckedPosture<T extends KernelFixture = ReturnType<typeof makeKernelFixture>>(
+  idempotencyKey = "idem_posture_required",
+  fixture: T = makeKernelFixture() as unknown as T,
+) {
   fixture.envelope = {
     ...fixture.envelope,
     envelopeId: "env_posture_required",
@@ -1782,28 +1903,33 @@ async function createContractRequiringGatewayCheckedPosture(idempotencyKey = "id
   return { ...fixture, compilation, contract };
 }
 
-async function buildCompetingStreamEvent(event: ContractStreamEvent): Promise<ContractStreamEvent> {
-  const competingEvent = {
-    ...event,
-    streamEventId: "evt_competing_writer",
-    objectRefs: ["gat_competing_writer", event.objectRefs[1] ?? "act_competing"],
-    payload: {
-      gateDecision: "refused",
-      reasonCode: "competing_writer",
-    },
-  } satisfies ContractStreamEvent;
-  const eventSeed = {
-    streamId: competingEvent.streamId,
-    partitionKey: competingEvent.partitionKey,
-    offset: competingEvent.offset,
-    eventType: competingEvent.eventType,
-    eventTime: competingEvent.eventTime,
-    objectRefs: competingEvent.objectRefs,
-    previousEventDigest: competingEvent.previousEventDigest,
-    payload: competingEvent.payload,
-  };
-  return {
-    ...competingEvent,
-    eventDigest: await digestCanonical(eventSeed),
-  };
+async function createAdditionalGreenlitPackageContract(
+  fixture: Awaited<ReturnType<typeof createGreenlitContract>>,
+  candidateOverrides: Parameters<typeof makePackageInstallCandidate>[1] = {},
+) {
+  const compilation = await fixture.kernel.compileIntent({
+    tenantId: "tenant_demo",
+    organizationId: "org_demo",
+    principalIntentRef: `intent:additional package ${candidateOverrides.idempotencyKey ?? "install"}`,
+    principalId: "principal_demo",
+    agentId: "agent_demo",
+    runId: "run_demo",
+    runtimeAdapterId: "runtime_codex",
+    operatingEnvelopeId: fixture.envelope.envelopeId,
+    toolCatalogRef: "tool_catalog_demo@v1",
+    actionCatalogRef: "action_catalog_demo@v1",
+    gatewayRegistryRef: "gateway_registry@v1",
+    generatedCodeOrSpecRefs: ["code:generated-plan"],
+    declaredAssumptions: ["package name is explicit"],
+    requiredEvidenceRefs: ["evidence:package-lock-diff"],
+    candidate: makePackageInstallCandidate(fixture, candidateOverrides),
+  });
+  const contract = await fixture.kernel.proposeActionContract(proposalInputForCompilation(compilation, "test-secret"));
+  const policy = await fixture.kernel.evaluatePolicy({
+    actionContractId: contract.actionContractId,
+    envelopeId: fixture.envelope.envelopeId,
+    signingSecret: "test-secret",
+  });
+  if (!policy.greenlight) throw new Error("additional fixture did not greenlight");
+  return { compilation, contract, decision: policy.decision, greenlight: policy.greenlight };
 }

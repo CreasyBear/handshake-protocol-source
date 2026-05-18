@@ -262,4 +262,9 @@ Disqualify when:
 5. Receipt timeline sample.
 6. Technical scoping checklist for runtime and gateway owners.
 
-Active next product shipment: create the one-page Handshake CLI/MCP pilot brief and use this scorecard on the first 10 design-partner conversations. The brief must identify the runtime/tool owner, first gateway adapter owner, GitHub App/gateway owner for the repo-write proof, raw credential removal posture, allowed repo/ref/path bounds, receipt evidence, and budget owner.
+Active shipment scope is owned by
+[`canonical-product.md`](./canonical-product.md). This ICP doc owns buyer
+qualification and seller assets. The pilot brief should identify the runtime/tool
+owner, first gateway adapter owner, credential owner, raw credential removal
+posture, allowed protected-surface bounds, receipt evidence, and budget owner
+for whichever active protected action path the canonical product doc names.

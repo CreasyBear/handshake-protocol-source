@@ -1,17 +1,24 @@
-import type { ContractStreamEvent, IsolationState, ProtectedPathPosture, ProtocolObjectType } from "../protocol/schemas";
 import type {
+  ContractStreamEvent,
   GreenlightConsumption,
   GreenlightIssuanceClaim,
+  IsolationState,
   ProtocolCommit,
   ProtocolCommitResult,
   ProtocolStore,
+  ProtocolObjectType,
   RecoveryTerminalClaim,
+  ProtectedPathPosture,
   ProtectedPathPostureIndexEntry,
+  ProtectedSurfaceOperationClaim,
+  ProtectedSurfaceOperationClaimIndexEntry,
+  Receipt,
+  ReceiptMutationAttemptIndexEntry,
   GatewayCheckCommit,
   GatewayCheckCommitResult,
   StoredProtocolRecord,
   StreamTail,
-} from "./store";
+} from "../protocol/store-port";
 
 export class InMemoryProtocolStore implements ProtocolStore {
   private records = new Map<string, StoredProtocolRecord>();
@@ -20,6 +27,8 @@ export class InMemoryProtocolStore implements ProtocolStore {
   private greenlightIssuanceClaims = new Map<string, GreenlightIssuanceClaim>();
   private recoveryTerminalClaims = new Map<string, RecoveryTerminalClaim>();
   private currentProtectedPathPostures = new Map<string, ProtectedPathPostureIndexEntry>();
+  private currentProtectedSurfaceOperationClaims = new Map<string, ProtectedSurfaceOperationClaimIndexEntry>();
+  private receiptsByMutationAttempt = new Map<string, ReceiptMutationAttemptIndexEntry>();
 
   async putRecord(record: StoredProtocolRecord): Promise<void> {
     this.records.set(recordKey(record.objectType, record.objectId), structuredClone(record));
@@ -78,6 +87,23 @@ export class InMemoryProtocolStore implements ProtocolStore {
     return this.getRecord<ProtectedPathPosture>("protected_path_posture", entry.protectedPathPostureId);
   }
 
+  async getCurrentProtectedSurfaceOperationClaim(
+    claimKeyDigest: string,
+  ): Promise<StoredProtocolRecord<ProtectedSurfaceOperationClaim> | null> {
+    const entry = this.currentProtectedSurfaceOperationClaims.get(claimKeyDigest);
+    if (!entry) return null;
+    return this.getRecord<ProtectedSurfaceOperationClaim>(
+      "protected_surface_operation_claim",
+      entry.protectedSurfaceOperationClaimId,
+    );
+  }
+
+  async getReceiptByMutationAttemptId(mutationAttemptId: string): Promise<StoredProtocolRecord<Receipt> | null> {
+    const entry = this.receiptsByMutationAttempt.get(mutationAttemptId);
+    if (!entry) return null;
+    return this.getRecord<Receipt>("receipt", entry.receiptId);
+  }
+
   async appendEvent(event: ContractStreamEvent): Promise<void> {
     this.events.push(structuredClone(event));
     await this.putRecord({
@@ -126,6 +152,8 @@ export class InMemoryProtocolStore implements ProtocolStore {
     const nextGreenlightIssuanceClaims = new Map(this.greenlightIssuanceClaims);
     const nextRecoveryTerminalClaims = new Map(this.recoveryTerminalClaims);
     const nextCurrentProtectedPathPostures = new Map(this.currentProtectedPathPostures);
+    const nextCurrentProtectedSurfaceOperationClaims = new Map(this.currentProtectedSurfaceOperationClaims);
+    const nextReceiptsByMutationAttempt = new Map(this.receiptsByMutationAttempt);
     for (const claim of commit.greenlightIssuanceClaims ?? []) {
       nextGreenlightIssuanceClaims.set(claim.actionContractId, structuredClone(claim));
     }
@@ -135,18 +163,36 @@ export class InMemoryProtocolStore implements ProtocolStore {
     for (const entry of commit.protectedPathPostureIndexEntries ?? []) {
       nextCurrentProtectedPathPostures.set(entry.postureScopeKey, structuredClone(entry));
     }
+    for (const claimKeyDigest of commit.protectedSurfaceOperationClaimIndexReleases ?? []) {
+      nextCurrentProtectedSurfaceOperationClaims.delete(claimKeyDigest);
+    }
+    for (const entry of commit.protectedSurfaceOperationClaimIndexEntries ?? []) {
+      nextCurrentProtectedSurfaceOperationClaims.set(entry.claimKeyDigest, structuredClone(entry));
+    }
+    for (const entry of commit.receiptMutationAttemptIndexEntries ?? []) {
+      nextReceiptsByMutationAttempt.set(entry.mutationAttemptId, structuredClone(entry));
+    }
     this.stageRecordsAndEvents(nextRecords, nextEvents, commit.records, commit.events);
     this.records = nextRecords;
     this.events = nextEvents;
     this.greenlightIssuanceClaims = nextGreenlightIssuanceClaims;
     this.recoveryTerminalClaims = nextRecoveryTerminalClaims;
     this.currentProtectedPathPostures = nextCurrentProtectedPathPostures;
+    this.currentProtectedSurfaceOperationClaims = nextCurrentProtectedSurfaceOperationClaims;
+    this.receiptsByMutationAttempt = nextReceiptsByMutationAttempt;
     return "committed";
   }
 
   async commitGatewayCheck(commit: GatewayCheckCommit): Promise<GatewayCheckCommitResult> {
     if (commit.consumption && this.consumptions.has(commit.consumption.greenlightId)) {
       return "already_consumed";
+    }
+    if (
+      commit.protectedSurfaceOperationClaimIndexEntries?.some((entry) =>
+        this.currentProtectedSurfaceOperationClaims.has(entry.claimKeyDigest),
+      )
+    ) {
+      return "operation_claim_conflict";
     }
     if (commit.events.some((event) => this.hasStreamOffset(event))) {
       return "stream_conflict";
@@ -155,9 +201,17 @@ export class InMemoryProtocolStore implements ProtocolStore {
     const nextRecords = new Map(this.records);
     const nextEvents = [...this.events];
     const nextConsumptions = new Map(this.consumptions);
+    const nextCurrentProtectedSurfaceOperationClaims = new Map(this.currentProtectedSurfaceOperationClaims);
+    const nextReceiptsByMutationAttempt = new Map(this.receiptsByMutationAttempt);
 
     if (commit.consumption) {
       nextConsumptions.set(commit.consumption.greenlightId, structuredClone(commit.consumption));
+    }
+    for (const entry of commit.protectedSurfaceOperationClaimIndexEntries ?? []) {
+      nextCurrentProtectedSurfaceOperationClaims.set(entry.claimKeyDigest, structuredClone(entry));
+    }
+    for (const entry of commit.receiptMutationAttemptIndexEntries ?? []) {
+      nextReceiptsByMutationAttempt.set(entry.mutationAttemptId, structuredClone(entry));
     }
 
     this.stageRecordsAndEvents(nextRecords, nextEvents, commit.records, commit.events);
@@ -165,6 +219,8 @@ export class InMemoryProtocolStore implements ProtocolStore {
     this.records = nextRecords;
     this.events = nextEvents;
     this.consumptions = nextConsumptions;
+    this.currentProtectedSurfaceOperationClaims = nextCurrentProtectedSurfaceOperationClaims;
+    this.receiptsByMutationAttempt = nextReceiptsByMutationAttempt;
     return "committed";
   }
 

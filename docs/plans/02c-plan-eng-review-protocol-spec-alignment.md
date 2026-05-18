@@ -1,14 +1,14 @@
 # Plan Eng Review 02c: Broker-Grade Protocol Lifecycle Alignment
 
-Status: Draft integration plan
-Version: v0.2.3 protocol-spec alignment review
+Status: Implemented integration checkpoint
+Version: v0.2.4 protocol-spec alignment checkpoint
 Audience: Protocol implementers, SDK authors, runtime builders, gateway owners, platform engineering, security engineering
-Implementation status: Planning only; no code changes in this document
+Implementation status: Integrated for local alpha; request context, lifecycle matrix, protected-surface claims, orphan proof gaps, explicit orphan isolation request, receipt lookup by mutation attempt, and adapter no-mutation conformance are covered. ADR 0005 hosted caller identity and redacted public evidence APIs remain deferred.
 Canonical owner: Protocol owner
 Follows: [`02b-plan-eng-review-module-boundaries.md`](./02b-plan-eng-review-module-boundaries.md)
-References: [`../api-protocol.md`](../api-protocol.md), [`../specs/00-product-requirements-spine.md`](../specs/00-product-requirements-spine.md), [`../adr/0001-kernel-evidence-boundaries.md`](../adr/0001-kernel-evidence-boundaries.md), [Open Service Broker API spec](https://github.com/cloudfoundry/servicebroker/blob/master/spec.md)
+References: [`../protocol/api-protocol.md`](../protocol/api-protocol.md), [`../specs/00-product-requirements-spine.md`](../specs/00-product-requirements-spine.md), [`../adr/0001-kernel-evidence-boundaries.md`](../adr/0001-kernel-evidence-boundaries.md), [`../adr/0005-hosted-transition-caller-identity.md`](../adr/0005-hosted-transition-caller-identity.md), [Open Service Broker API spec](https://github.com/cloudfoundry/servicebroker/blob/master/spec.md)
 Coordinates with: [`03-plan-eng-review-generated-execution-graph-coverage.md`](./03-plan-eng-review-generated-execution-graph-coverage.md)
-Blocks: gateway-backed mutation integration in `03+` until the `02b` boundary checklist and this plan's protocol lifecycle checklist are implemented or explicitly deferred
+Blocks: no longer blocks local adapter-backed `03` work; hosted/public claims remain blocked on ADR 0005 hosted caller identity, redacted evidence APIs, and provider-side enforcement decisions
 Last reviewed: 2026-05-18
 
 ## Invariant At Stake
@@ -41,6 +41,18 @@ If a gateway starts consequence, times out, returns ambiguous state, or races an
 ## Decision
 
 Adopt the useful protocol discipline from the Open Service Broker API without importing its marketplace product shape.
+
+Implementation sequence is not optional:
+
+```text
+02b boundary hardening
+  -> 02c-A transition request context
+  -> 02c-B operation lifecycle, claims, orphan handling, adapter conformance
+  -> 03 adapter-backed generated execution claims
+```
+
+Do not keep "either order" wording. `03` may use existing evidence work for
+planning, but adapter-backed claims wait for these boundary and lifecycle gates.
 
 Keep:
 
@@ -91,7 +103,7 @@ This plan should implement five narrow protocol adjustments:
    - Require `X-Handshake-Protocol-Version` on HTTP transition requests.
    - Accept `X-Handshake-Request-Identity` as a non-empty correlation value and echo it in HTTP responses.
    - Accept optional `X-Handshake-Originating-Identity` only as an opaque audit ref or digest.
-   - Record a canonical request-context digest on transition-created stream events or records.
+  - Record a dedicated `transition_request_context` protocol record and carry its digest/reference on accepted transition-created stream events.
    - Refuse unsupported versions before any transition commits records.
 
 2. Promote operation lifecycle semantics.
@@ -105,7 +117,7 @@ This plan should implement five narrow protocol adjustments:
    - Do not let orphan mitigation reuse the original greenlight.
 
 4. Add protected-surface operation claims.
-   - Add an atomic current-operation index for D1 and memory stores keyed by tenant, organization, gateway, action class, resource, and operation intent.
+  - Add a `ProtectedSurfaceOperationClaim` protocol record and atomic current-claim index for D1 and memory stores keyed by canonical `claimKeyDigest`.
    - A pending active operation on the same protected surface causes a named refusal before a second mutation attempt is committed.
    - Release or terminally mark the claim only through final reconciliation, proof gap isolation, or explicit recovery terminal transition.
 
@@ -437,7 +449,14 @@ This plan does not replace `03-plan-eng-review-generated-execution-graph-coverag
     unsupported sibling nodes cannot hide consequence.
 ```
 
-They can be implemented in either order if `03` remains pre-mutation graph evidence only. They must be integrated before `03+` claims a protected end-to-end adapter path.
+They must be implemented in this order for adapter-backed claims:
+
+```text
+02b -> 02c-A -> 02c-B -> 03 adapter-backed claims
+```
+
+`03` planning may continue as a read-only/generated-execution analysis artifact,
+but protected end-to-end adapter claims wait for `02c-B`.
 
 Required before or with this plan:
 
@@ -446,14 +465,18 @@ Required before or with this plan:
 - Route custody completeness test exists.
 - Per-role SDK transition token tests exist.
 
-### Phase 1: Transition Request Context
+### Phase 1: `02c-A` Transition Request Context
 
 Implementation targets:
 
-- HTTP middleware for version/request identity parsing.
-- SDK defaults for `X-Handshake-Protocol-Version` and request identity.
+- HTTP boundary parsing for `X-Handshake-Protocol-Version`,
+  `X-Handshake-Request-Identity`, and optional originating identity digest/ref.
+- A dedicated `transition_request_context` protocol record.
+- SDK defaults for protocol version and injectable UUID request identity.
 - OpenAPI security/header documentation.
-- Transition event or record context digest.
+- Request context commits only with accepted transitions. Missing/unsupported
+  version or invalid body commits no protocol records.
+- Accepted HTTP transitions echo `X-Handshake-Request-Identity`.
 
 Tests:
 
@@ -463,12 +486,13 @@ Tests:
 - request context digest appears in resulting event/record;
 - role token and version checks compose in the right order.
 
-### Phase 2: Operation Lifecycle Contract
+### Phase 2: `02c-B` Operation Lifecycle Contract
 
 Implementation targets:
 
 - Docs/OpenAPI wording for `SurfaceOperationReconciliation` as operation observation.
-- Explicit mapping from downstream state to finality, proof gap, and operation claim state.
+- A typed lifecycle matrix mapping downstream status, reconciliation status,
+  finality, claim state, receipt status, and proof-gap behavior.
 - Tests for pending, succeeded, refused, failed, and unknown branches.
 
 Tests:
@@ -494,14 +518,19 @@ Tests:
 - old greenlight replay during cleanup refuses;
 - unresolved orphan proof gap prevents unsafe future greenlight or gateway check for the same scope when configured.
 
-### Phase 4: Protected-Surface Operation Claims
+### Phase 4: `02c-B` Protected-Surface Operation Claims
 
 Implementation targets:
 
-- Add memory and D1 atomic claim support.
+- Add `ProtectedSurfaceOperationClaim` as both a protocol record and atomic
+  current-claim index.
+- Use canonical `claimKeyDigest` as the unique/indexed key.
 - Claim during gateway check commit before adapter mutation.
-- Terminally update claim through reconciliation or isolation/recovery handling.
+- Release claims only through explicit reconciliation, orphan proof-gap isolation
+  or recovery handling, or authorized terminal transition. No TTL auto-release.
 - Add gateway refusal reason `protected_surface_operation_in_progress`.
+- Add indexed receipt lookup by `mutationAttemptId`; stop scanning all receipts
+  during reconciliation.
 
 Tests:
 
@@ -511,13 +540,14 @@ Tests:
 - unrelated resource/action/gateway scopes do not conflict;
 - claim commit races resolve atomically in D1 and memory stores.
 
-### Phase 5: Adapter Conformance
+### Phase 5: `02c-B` Adapter Conformance
 
 Implementation targets:
 
-- Shared conformance test helper for gateway adapters.
+- Minimal `ProtectedMutationAdapter` conformance test contract.
 - Apply to package install, repo write, and preview deploy fixtures.
 - Add protocol docs for adapter readiness.
+- Do not build a full adapter framework in this slice.
 
 Tests:
 
@@ -531,37 +561,38 @@ Tests:
 ```text
 CODE PATHS
 [+] TransitionRequestContext
-  |-- [GAP] missing protocol version refuses before commit
-  |-- [GAP] unsupported protocol version refuses with 412
-  |-- [GAP] request identity echoed and digested
-  |-- [GAP] originating identity stored only as digest/ref
-  `-- [GAP] SDK defaults match HTTP/OpenAPI
+  |-- [DONE] missing protocol version refuses before commit
+  |-- [DONE] unsupported protocol version refuses with 412
+  |-- [DONE] request identity echoed and request context digested
+  |-- [DONE] originating identity accepts only digest/ref and rejects raw identity
+  `-- [DONE] SDK defaults match HTTP/OpenAPI
 
 [+] Operation lifecycle
-  |-- [GAP] pending remains non-final
-  |-- [GAP] succeeded becomes final only with acceptable evidence
-  |-- [GAP] refused/failed stay reconstructable and recoverable
-  |-- [GAP] unknown creates proof gap
-  `-- [GAP] reconciliation cannot mutate or retry
+  |-- [DONE] pending remains non-final
+  |-- [DONE] succeeded becomes final only with acceptable evidence
+  |-- [DONE] refused/failed stay reconstructable and recoverable
+  |-- [DONE] unknown creates proof gap
+  `-- [DONE] reconciliation cannot mutate or retry
 
 [+] Orphan mitigation
-  |-- [GAP] lost response after possible mutation records orphan proof gap
-  |-- [GAP] cleanup requires fresh ActionContract -> PolicyDecision -> Greenlight -> GatewayCheckAttempt
-  |-- [GAP] old greenlight replay refuses
-  `-- [GAP] unresolved orphan gap can block future unsafe same-surface work
+  |-- [DONE] lost response after possible mutation records orphan proof gap
+  |-- [DONE] cleanup requires fresh ActionContract -> PolicyDecision -> Greenlight -> GatewayCheckAttempt
+  |-- [DONE] old greenlight replay refuses
+  |-- [DONE] unresolved orphan gap can block future unsafe same-surface work
+  `-- [DONE] scoped isolation requires explicit orphanIsolationRequested, not evidenceRefs
 
 [+] Protected-surface operation claim
-  |-- [GAP] first active operation claims resource atomically
-  |-- [GAP] second same-surface mutation refuses before mutation
-  |-- [GAP] D1 race produces exactly one active claim
-  |-- [GAP] memory race produces exactly one active claim
-  `-- [GAP] terminal reconciliation updates claim state
+  |-- [DONE] first active operation claims resource atomically
+  |-- [DONE] second same-surface mutation refuses before mutation
+  |-- [DONE] D1 race produces exactly one active claim
+  |-- [PARTIAL] memory store covers same-surface refusal; add concurrent race fixture before hosted claims
+  `-- [DONE] terminal reconciliation updates claim state
 
 [+] Adapter conformance
-  |-- [GAP] package-install fixture passes conformance
-  |-- [GAP] repo-write fixture passes conformance
-  |-- [GAP] preview-deploy fixture passes conformance
-  `-- [GAP] conformance blocks adapter that mutates without VerifiedGatewayCheck
+  |-- [DONE] package-install fixture passes no-mutation conformance
+  |-- [DONE] repo-write fixture passes no-mutation conformance
+  |-- [DONE] preview-deploy fixture passes no-mutation conformance
+  `-- [DONE] conformance blocks adapter that mutates without VerifiedGatewayCheck
 ```
 
 Coverage target: 100% of new authority, lifecycle, orphan, and concurrency branches.
@@ -570,8 +601,9 @@ Required commands for implementation closeout:
 
 ```bash
 bun test
-npm run typecheck -- --pretty false
-npm run build -- --pretty false
+bun run typecheck -- --pretty false
+bun run build -- --pretty false
+bun audit --audit-level high
 git diff --check
 rg -n -i "Open Service Broker compatible|Cloud Foundry compatible|service marketplace|provider-side enforcement|provider enforcement|request identity.*authority|originating identity.*authority|reconciliation.*authority|retry.*old greenlight" README.md docs src test
 rg -n -i "orphan mitigation.*reuse.*greenlight|cleanup.*reuse.*greenlight|last operation.*mutation authority|operation observation.*mutation authority" README.md docs src test
@@ -581,10 +613,12 @@ For docs-only changes to this plan:
 
 ```bash
 git diff --check
+python3 /Users/joelchan/.codex/skills/quality-contract/scripts/check_quality_contract.py docs/plans/02c-plan-eng-review-protocol-spec-alignment.md
 rg -n -i "Open Service Broker compatible|Cloud Foundry compatible|service marketplace|provider-side enforcement|provider enforcement" docs/plans/02c-plan-eng-review-protocol-spec-alignment.md
 ```
 
-Expected docs-only scan result: hits only in explicit non-claims or cut-scope sections.
+Expected docs-only scan result: hits only in explicit non-claims, cut-scope sections,
+quality hard stops, or scan-command examples.
 
 ## Failure Modes
 
@@ -600,16 +634,69 @@ Expected docs-only scan result: hits only in explicit non-claims or cut-scope se
 | Adapter passes happy path only | New gateways cannot prove refusal/idempotency/finality behavior. | Shared conformance suite. |
 | OSB analogy widens product | Team builds marketplace objects instead of execution control. | Non-claims and "cut" list above. |
 
+## Paranoid Boundary Review
+
+Assume generated execution code is adversarial, impatient, and good at making
+unsafe behavior look like ordinary lifecycle ambiguity. `02c` is not ready until
+each of these attacks has an explicit refusal, proof gap, isolation path, or
+redacted evidence path.
+
+| Attack | What breaks if accepted | Required defense |
+|---|---|---|
+| Runtime fabricates `X-Handshake-Originating-Identity` as an admin or platform actor. | Request metadata launders authority into the receipt chain. | Store digest/ref only; never derive principal authority, caller custody, or policy subject from the header. |
+| SDK sends a supported protocol-version header with an old or malformed body. | Version evidence masks schema drift. | Version check is necessary but not sufficient; body schema validation still blocks commit. |
+| Agent retries after a timeout with a new request identity and same protected surface. | Lost-response orphan becomes duplicate mutation. | Active operation claim refuses same-surface mutation until reconciliation, isolation, or proof-gap recovery resolves it. |
+| Cleanup path tries to call the gateway adapter with the original greenlight. | Recovery pressure turns one-use authority into ambient authority. | Cleanup and verification are new action contracts with fresh policy, greenlight, gateway check, and receipt. |
+| Adapter returns `surfaceOperationRef` for a different resource or action class. | Receipt reconstructs the wrong protected consequence. | Conformance requires contract/resource/action binding checks before finality evidence is accepted. |
+| Adapter reports `pending` or HTTP `202` as success. | Receipt claims downstream finality that does not exist. | Pending remains non-final; sequence dependencies requiring final success cannot advance. |
+| Provider finality cannot be observed after a gateway-passed mutation attempt. | Unknown consequence gets smoothed into success or harmless failure. | Emit orphan proof gap; hold or isolate unsafe scope until recovery or reconciliation gives acceptable evidence. |
+| Public API pressure adds `/operations/:id`, `/claims/:key`, or raw record reads. | Internal lifecycle state becomes a polling or authority surface. | Refuse as public API; expose only transition outputs, refusal codes, redacted receipts, proof gaps, and exports. |
+| Operation claim commit races across D1 or memory stores. | Two exact but conflicting greenlights mutate the same protected resource. | Atomic claim write is part of gateway-check commit; exactly one winner, all losers get named refusal. |
+| Sibling or raw tool mutates the same surface outside the gateway wrapper. | The generated code escaped the contract boundary. | Record bypass posture/proof gap and isolate affected scope; do not pretend the receipt proves downstream control. |
+| Stream event contains raw provider payload, token material, or full originating identity. | Audit evidence becomes a secret leak. | Redaction and digesting happen before commit; public errors and exports never include raw sensitive material. |
+| Conformance fixture only proves the happy path. | New adapters can be branded Handshake-compatible while bypassing the invariant. | Adapter conformance must include mismatch, replay, pending, unknown, active-claim, and no-mutation-on-refusal tests. |
+
+Brutal acceptance gate: if any one of these cases ends in "log it and continue",
+"best effort", "adapter responsibility", or "operator can inspect later", the
+implementation is advisory, not Handshake.
+
+## Security And Hardening Contract
+
+This plan changes protocol and API boundary behavior. Treat every HTTP header,
+request body, SDK default, gateway observation, provider payload, adapter return
+value, and originating identity value as hostile until it is validated, reduced
+into canonical evidence, and passed through the existing authority path.
+
+Hard requirements:
+
+- Boundary validation: every transition input remains schema-validated before it can influence protocol state. Header values must be parsed, normalized, length-bounded, and rejected before any record commit when invalid.
+- Auth and authorization: caller custody is required before mutation-adjacent transition bodies can affect state. Request identity and originating identity are audit evidence only; they cannot substitute for principal authority, caller custody, policy, or gateway checks.
+- Storage exposure: `TransitionRequestContext`, `protected_surface_operation_claims`, raw protocol records, stream tails, caller-custody token config, and adapter-local provider payloads are internal-only unless deliberately redacted into receipt, refusal, proof-gap, or export evidence.
+- D1 and memory safety: operation-claim writes must be parameterized and committed atomically with the related gateway-check or reconciliation records/events. Race losers become named refusals or proof gaps, never partial state.
+- Error hygiene: public errors use stable refusal or reason codes and must not reveal bearer tokens, raw originating identities, raw provider responses, stack traces, claim keys, or secret-bearing request material.
+- Cleanup and orphan mitigation: cleanup, verification, and recovery actions are fresh action contracts. Old greenlights cannot authorize cleanup, retry, or orphan mitigation.
+- Dependency and release gate: before release, run `bun audit --audit-level high` or record an explicit skipped reason. Reachable critical or high dependency findings block release until fixed, patched, replaced, or accepted with owner and review date.
+
+Out of scope for this plan: new password/session flows, CORS changes, file uploads, payment data, or new PII retention. If implementation adds any of those, reopen the Security / CSO lens before coding.
+
 ## Quality Contract
 
 | Lens | Applies? | Target | Hard Stops | Evidence Required | Closeout |
 |---|---:|---:|---|---|---|
-| Product / CEO | yes | hard gate | Plan implies service marketplace, provider enforcement, or OSB compatibility | Non-claims scan and docs review | planned |
-| Engineering | yes | hard gate | Operation lifecycle state is ambiguous or duplicated | State machine, store claims, transition guards | planned |
-| Security / CSO | yes | hard gate | Request identity or originating identity becomes authority | Header tests, docs, refusal tests | planned |
-| DevEx | yes | 8/10 | SDK/OpenAPI/HTTP headers disagree | SDK and OpenAPI tests | planned |
-| Architecture | yes | 8/10 | New objects duplicate existing reconciliation/proof-gap semantics | Reuse map and module review | planned |
-| Domain Invariant | yes | hard gate | Retry/cleanup/concurrency can mutate without fresh exact authority | Invariant tests and adapter conformance | planned |
+| Product / CEO | yes | hard gate | Plan implies service marketplace, provider enforcement, OSB compatibility, public polling surface, "best effort" lifecycle control, or broader lifecycle claim than the gateway can prove. | Non-claims scan, docs review, public-interface boundary review, paranoid boundary review retained, scope/cut list retained. | implemented for local alpha |
+| Engineering | yes | hard gate | Operation lifecycle state is ambiguous or duplicated; operation-claim release path is undefined; critical lifecycle or paranoid-boundary branch lacks deterministic tests. | State machine, store claims, transition guards, D1/memory race tests, paranoid-boundary fixture matrix, full command suite. | implemented; memory concurrent race fixture remains hosted-claim follow-up |
+| Security / CSO | yes | hard gate | Caller/request/originating identity becomes authority; raw records, provider payloads, tokens, claim keys, or raw identity values leak through public API; cleanup/retry bypasses fresh contract and gateway authority; adapter output is trusted without binding checks; reachable high/critical dependency finding is unaddressed for release. | Threat notes in this plan, header/auth boundary tests, refusal tests, redaction/export tests, adapter binding tests, D1 parameterization/atomicity review, `bun audit --audit-level high` or documented skip. | implemented for local alpha; ADR 0005 hosted caller identity/redaction deferred |
+| DevEx | yes | 8/10 | SDK/OpenAPI/HTTP headers disagree; breaking transition behavior lacks migration notes; public docs teach internal records, operation claims, or debug reads as API. | SDK/OpenAPI/header tests, route/schema/docs consistency scan, migration note, error/refusal code examples. | implemented |
+| Design | conditional | hard gate | Any review, receipt, recovery, or evidence-viewing surface lets a human approve or interpret a summary that is not bound to the exact contract, policy input, gateway check, or proof-gap evidence. | If UI/review/export surface is touched: state matrix, stale/error/empty states, exact digest-binding evidence, rendered artifact tests. Otherwise record no UI scope in closeout. | not applicable; no UI surface |
+| Architecture | yes | 8/10 | New objects duplicate reconciliation/proof-gap semantics; operation claims become caller-managed public state; authority, policy, evidence, or cleanup rules are duplicated across adapters. | Reuse map, module map, deletion-test note for operation-claim helpers, adapter conformance at the interface. | implemented |
+| Domain Invariant | yes | hard gate | Retry, cleanup, concurrency, reconciliation, or orphan mitigation can mutate without exact ActionContract -> PolicyDecision -> one-use Greenlight -> GatewayCheckAttempt; pending/unknown finality is smoothed into success; missing evidence is not recorded as a proof gap. | Invariant tests, adapter conformance, receipt/refusal/proof-gap examples, raw/sibling bypass posture scan. | implemented |
+
+### Quality Decisions
+
+- Design lens is conditional because this plan does not add UI. It reopens immediately if review artifact rendering, receipt export presentation, recovery UX, or evidence-viewing surfaces change.
+- Security / CSO is a hard gate because `02c` introduces request identity, protocol-version headers, operation claims, orphan mitigation, and provider lifecycle observation. These are all authority-laundering or evidence-leakage risks if handled loosely.
+- The paranoid boundary review is part of closeout evidence, not commentary. Each attack needs an implemented refusal, proof gap, isolation path, or redacted evidence path before `02c` can be considered integrated.
+- `bun audit --audit-level high` is release-bound evidence, not docs-only evidence. A skipped audit needs an owner, reason, and revisit trigger.
 
 ## GSTACK Review Report
 
@@ -640,7 +727,7 @@ The plan is strong if it stays centered on operation lifecycle, orphan mitigatio
 
 ### Recommendation
 
-Implement this as a narrow `v0.2.4` alpha schema/protocol change after `02b`.
+Keep this as a narrow `v0.2.4` alpha schema/protocol layer after `02b`.
 
 Do not fold this into the CLI/MCP plan as incidental cleanup. It is protocol infrastructure, and it deserves its own invariant tests before more surfaces depend on it.
 

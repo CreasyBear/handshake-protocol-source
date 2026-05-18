@@ -1,61 +1,34 @@
-import type { ContractStreamEvent, IsolationState, ProtectedPathPosture, ProtocolObjectType } from "../protocol/schemas";
 import type {
+  ContractStreamEvent,
   GreenlightConsumption,
-  GreenlightIssuanceClaim,
+  IsolationState,
   ProtocolCommit,
   ProtocolCommitResult,
   ProtocolStore,
-  RecoveryTerminalClaim,
-  ProtectedPathPostureIndexEntry,
+  ProtocolObjectType,
+  ProtectedPathPosture,
+  ProtectedSurfaceOperationClaim,
+  Receipt,
   GatewayCheckCommit,
   GatewayCheckCommitResult,
   StoredProtocolRecord,
   StreamTail,
-} from "./store";
+} from "../protocol/store-port";
+import { D1ProtocolStatements } from "./d1-statements";
 
 export class D1ProtocolStore implements ProtocolStore {
-  constructor(private readonly db: D1Database) {}
+  private readonly statements: D1ProtocolStatements;
+
+  constructor(private readonly db: D1Database) {
+    this.statements = new D1ProtocolStatements(db);
+  }
 
   async putRecord(record: StoredProtocolRecord): Promise<void> {
-    await this.db
-      .prepare(
-        `INSERT OR REPLACE INTO protocol_records
-          (object_id, object_type, tenant_id, organization_id, schema_version, canonical_digest, payload_json, created_at, source_event_id)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      )
-      .bind(
-        record.objectId,
-        record.objectType,
-        record.tenantId,
-        record.organizationId,
-        record.schemaVersion,
-        record.canonicalDigest,
-        JSON.stringify(record.payload),
-        record.createdAt,
-        record.sourceEventId,
-      )
-      .run();
+    await this.statements.recordStatement(record).run();
   }
 
   async putRecordIfAbsentOrSame(record: StoredProtocolRecord): Promise<"inserted" | "unchanged" | "conflict"> {
-    await this.db
-      .prepare(
-        `INSERT OR IGNORE INTO protocol_records
-          (object_id, object_type, tenant_id, organization_id, schema_version, canonical_digest, payload_json, created_at, source_event_id)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      )
-      .bind(
-        record.objectId,
-        record.objectType,
-        record.tenantId,
-        record.organizationId,
-        record.schemaVersion,
-        record.canonicalDigest,
-        JSON.stringify(record.payload),
-        record.createdAt,
-        record.sourceEventId,
-      )
-      .run();
+    await this.statements.recordIfAbsentStatement(record).run();
 
     const existing = await this.getRecord(record.objectType, record.objectId);
     if (!existing) return "conflict";
@@ -162,6 +135,39 @@ export class D1ProtocolStore implements ProtocolStore {
     return this.getRecord<ProtectedPathPosture>("protected_path_posture", row.protected_path_posture_id);
   }
 
+  async getCurrentProtectedSurfaceOperationClaim(
+    claimKeyDigest: string,
+  ): Promise<StoredProtocolRecord<ProtectedSurfaceOperationClaim> | null> {
+    const row = await this.db
+      .prepare(
+        `SELECT protected_surface_operation_claim_id
+         FROM protected_surface_operation_claim_current
+         WHERE claim_key_digest = ?
+         LIMIT 1`,
+      )
+      .bind(claimKeyDigest)
+      .first<{ protected_surface_operation_claim_id: string }>();
+    if (!row) return null;
+    return this.getRecord<ProtectedSurfaceOperationClaim>(
+      "protected_surface_operation_claim",
+      row.protected_surface_operation_claim_id,
+    );
+  }
+
+  async getReceiptByMutationAttemptId(mutationAttemptId: string): Promise<StoredProtocolRecord<Receipt> | null> {
+    const row = await this.db
+      .prepare(
+        `SELECT receipt_id
+         FROM receipt_by_mutation_attempt
+         WHERE mutation_attempt_id = ?
+         LIMIT 1`,
+      )
+      .bind(mutationAttemptId)
+      .first<{ receipt_id: string }>();
+    if (!row) return null;
+    return this.getRecord<Receipt>("receipt", row.receipt_id);
+  }
+
   async listIsolationStates(scopeIds: string[]): Promise<IsolationState[]> {
     if (scopeIds.length === 0) return [];
     const placeholders = scopeIds.map(() => "?").join(",");
@@ -180,20 +186,7 @@ export class D1ProtocolStore implements ProtocolStore {
 
   async consumeGreenlight(consumption: GreenlightConsumption): Promise<"consumed" | "already_consumed"> {
     try {
-      await this.db
-        .prepare(
-          `INSERT INTO greenlight_consumptions
-            (greenlight_id, gate_attempt_id, action_contract_id, idempotency_key, consumed_at)
-           VALUES (?, ?, ?, ?, ?)`,
-        )
-        .bind(
-          consumption.greenlightId,
-          consumption.gateAttemptId,
-          consumption.actionContractId,
-          consumption.idempotencyKey,
-          consumption.consumedAt,
-        )
-        .run();
+      await this.statements.greenlightConsumptionStatement(consumption).run();
       return "consumed";
     } catch {
       return "already_consumed";
@@ -202,7 +195,7 @@ export class D1ProtocolStore implements ProtocolStore {
 
   async commitProtocolRecords(commit: ProtocolCommit): Promise<ProtocolCommitResult> {
     try {
-      await this.db.batch(this.protocolCommitStatements(commit.records, commit.events, commit));
+      await this.db.batch(this.statements.protocolCommitStatements(commit.records, commit.events, commit));
       return "committed";
     } catch (error) {
       if (isGreenlightIssuanceConflict(error)) {
@@ -221,9 +214,15 @@ export class D1ProtocolStore implements ProtocolStore {
   async commitGatewayCheck(commit: GatewayCheckCommit): Promise<GatewayCheckCommitResult> {
     const statements: D1PreparedStatement[] = [];
     if (commit.consumption) {
-      statements.push(this.greenlightConsumptionStatement(commit.consumption));
+      statements.push(this.statements.greenlightConsumptionStatement(commit.consumption));
     }
-    statements.push(...this.protocolCommitStatements(commit.records, commit.events, {}));
+    for (const entry of commit.protectedSurfaceOperationClaimIndexEntries ?? []) {
+      statements.push(this.statements.protectedSurfaceOperationClaimIndexStatement(entry, "insert"));
+    }
+    for (const entry of commit.receiptMutationAttemptIndexEntries ?? []) {
+      statements.push(this.statements.receiptMutationAttemptIndexStatement(entry));
+    }
+    statements.push(...this.statements.protocolCommitStatements(commit.records, commit.events, {}));
 
     try {
       await this.db.batch(statements);
@@ -232,157 +231,14 @@ export class D1ProtocolStore implements ProtocolStore {
       if (commit.consumption && (await this.hasGreenlightConsumption(commit.consumption.greenlightId))) {
         return "already_consumed";
       }
+      if (isProtectedSurfaceOperationClaimConflict(error)) {
+        return "operation_claim_conflict";
+      }
       if (isStreamConflict(error)) {
         return "stream_conflict";
       }
       throw error;
     }
-  }
-
-  private protocolCommitStatements(
-    records: StoredProtocolRecord[],
-    events: ContractStreamEvent[],
-    options: Pick<
-      ProtocolCommit,
-      "greenlightIssuanceClaims" | "recoveryTerminalClaims" | "protectedPathPostureIndexEntries"
-    > = {},
-  ): D1PreparedStatement[] {
-    const statements: D1PreparedStatement[] = [];
-    for (const claim of options.greenlightIssuanceClaims ?? []) {
-      statements.push(this.greenlightIssuanceClaimStatement(claim));
-    }
-    for (const claim of options.recoveryTerminalClaims ?? []) {
-      statements.push(this.recoveryTerminalClaimStatement(claim));
-    }
-    for (const entry of options.protectedPathPostureIndexEntries ?? []) {
-      statements.push(this.protectedPathPostureIndexStatement(entry));
-    }
-    for (const record of records) {
-      statements.push(this.recordStatement(record));
-    }
-    for (const event of events) {
-      statements.push(this.streamEventStatement(event));
-      statements.push(
-        this.recordStatement({
-          objectId: event.streamEventId,
-          objectType: "contract_stream_event",
-          tenantId: event.tenantId,
-          organizationId: event.organizationId,
-          schemaVersion: event.schemaVersion,
-          canonicalDigest: event.eventDigest,
-          payload: event,
-          createdAt: event.createdAt,
-          sourceEventId: null,
-        }),
-      );
-    }
-    return statements;
-  }
-
-  private recordStatement(record: StoredProtocolRecord): D1PreparedStatement {
-    return this.db
-      .prepare(
-        `INSERT OR REPLACE INTO protocol_records
-          (object_id, object_type, tenant_id, organization_id, schema_version, canonical_digest, payload_json, created_at, source_event_id)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      )
-      .bind(
-        record.objectId,
-        record.objectType,
-        record.tenantId,
-        record.organizationId,
-        record.schemaVersion,
-        record.canonicalDigest,
-        JSON.stringify(record.payload),
-        record.createdAt,
-        record.sourceEventId,
-      );
-  }
-
-  private streamEventStatement(event: ContractStreamEvent): D1PreparedStatement {
-    return this.db
-      .prepare(
-        `INSERT INTO stream_events
-          (stream_event_id, tenant_id, organization_id, stream_id, partition_key, "offset", event_type, event_time, event_digest, previous_event_digest, payload_json)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      )
-      .bind(
-        event.streamEventId,
-        event.tenantId,
-        event.organizationId,
-        event.streamId,
-        event.partitionKey,
-        event.offset,
-        event.eventType,
-        event.eventTime,
-        event.eventDigest,
-        event.previousEventDigest,
-        JSON.stringify(event),
-      );
-  }
-
-  private greenlightConsumptionStatement(consumption: GreenlightConsumption): D1PreparedStatement {
-    return this.db
-      .prepare(
-        `INSERT INTO greenlight_consumptions
-          (greenlight_id, gate_attempt_id, action_contract_id, idempotency_key, consumed_at)
-         VALUES (?, ?, ?, ?, ?)`,
-      )
-      .bind(
-        consumption.greenlightId,
-        consumption.gateAttemptId,
-        consumption.actionContractId,
-        consumption.idempotencyKey,
-        consumption.consumedAt,
-      );
-  }
-
-  private greenlightIssuanceClaimStatement(claim: GreenlightIssuanceClaim): D1PreparedStatement {
-    return this.db
-      .prepare(
-        `INSERT INTO greenlight_issuances
-          (action_contract_id, greenlight_id, policy_decision_id, tenant_id, organization_id, claimed_at)
-         VALUES (?, ?, ?, ?, ?, ?)`,
-      )
-      .bind(
-        claim.actionContractId,
-        claim.greenlightId,
-        claim.policyDecisionId,
-        claim.tenantId,
-        claim.organizationId,
-        claim.claimedAt,
-      );
-  }
-
-  private recoveryTerminalClaimStatement(claim: RecoveryTerminalClaim): D1PreparedStatement {
-    return this.db
-      .prepare(
-        `INSERT INTO recovery_terminal_claims
-          (recovery_recommendation_id, status_transition_id, next_status, claimed_at)
-         VALUES (?, ?, ?, ?)`,
-      )
-      .bind(
-        claim.recoveryRecommendationId,
-        claim.statusTransitionId,
-        claim.nextStatus,
-        claim.claimedAt,
-      );
-  }
-
-  private protectedPathPostureIndexStatement(entry: ProtectedPathPostureIndexEntry): D1PreparedStatement {
-    return this.db
-      .prepare(
-        `INSERT OR REPLACE INTO protected_path_posture_current
-          (posture_scope_key, protected_path_posture_id, tenant_id, organization_id, updated_at)
-         VALUES (?, ?, ?, ?, ?)`,
-      )
-      .bind(
-        entry.postureScopeKey,
-        entry.protectedPathPostureId,
-        entry.tenantId,
-        entry.organizationId,
-        entry.updatedAt,
-      );
   }
 
   private async hasGreenlightConsumption(greenlightId: string): Promise<boolean> {
@@ -426,6 +282,14 @@ function isGreenlightIssuanceConflict(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error);
   return (
     message.includes("greenlight_issuances") &&
+    (message.includes("UNIQUE") || message.includes("unique") || message.includes("constraint"))
+  );
+}
+
+function isProtectedSurfaceOperationClaimConflict(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return (
+    message.includes("protected_surface_operation_claim_current") &&
     (message.includes("UNIQUE") || message.includes("unique") || message.includes("constraint"))
   );
 }

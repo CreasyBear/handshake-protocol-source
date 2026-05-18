@@ -69,10 +69,12 @@ describe("package install end-to-end reference flow", () => {
       "action_greenlit",
       "gateway_checked",
       "mutation_attempted",
+      "protected_surface_operation_claimed",
       "receipt_emitted",
       "surface_operation_reconciled",
+      "protected_surface_operation_released",
     ]);
-    expect(events.map((event) => event.offset)).toEqual([0, 1, 2, 3, 4, 5, 6]);
+    expect(events.map((event) => event.offset)).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8]);
     for (let index = 1; index < events.length; index += 1) {
       expect(events[index]?.previousEventDigest).toBe(events[index - 1]?.eventDigest);
     }

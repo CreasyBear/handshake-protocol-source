@@ -1,14 +1,11 @@
 import { z } from "zod";
+import type { ActionContract, ProposeActionContractInput } from "../../protocol/action-contract";
 import { digestCanonical } from "../../protocol/canonical";
 import { digestUtf8Content, utf8ByteLength } from "../../protocol/content-digests";
 import type {
   CompileIntentInput,
-  ProposeActionContractInput,
-} from "../../protocol/inputs";
-import type {
-  ActionContract,
   IntentCompilationRecord,
-} from "../../protocol/schemas";
+} from "../../protocol/intent-compilation";
 
 export const RepoWriteToolCallSchema = z.strictObject({
   principalIntentRef: z.string().min(1),

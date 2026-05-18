@@ -206,4 +206,11 @@ Strongest signal:
 We will pay for one guarded action family now, and we know the second action family we want next.
 ```
 
-Active next product shipment: build the Handshake Protected Actions CLI/MCP pilot narrative and validation script, using protected repo-write-to-PR as the first GitHub App-backed gateway adapter. Score each call against blocked action value, ability to route the agent through protected Handshake tools instead of raw gateway tools, ability to remove raw GitHub credentials from the agent for the first adapter, GitHub App/gateway installation owner, gateway-enforcement value, pilot path, and budget owner. Reference gateway proofs may support the call, but the pilot must be framed around an installed gateway check, not a proof packet.
+Active shipment scope is owned by
+[`canonical-product.md`](./canonical-product.md). This GTM doc owns validation
+questions and PMF evidence: score each call against blocked action value,
+ability to route the agent through protected Handshake tools instead of raw
+gateway tools, raw credential removal posture, gateway installation owner,
+gateway-enforcement value, pilot path, and budget owner. Reference gateway
+proofs may support the call, but the pilot must be framed around an installed
+gateway check, not a proof packet.

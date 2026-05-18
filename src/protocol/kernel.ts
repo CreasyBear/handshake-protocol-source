@@ -1,68 +1,62 @@
-import { proposeActionContract as proposeActionContractTransition } from "./action-contracts";
-import { createBreakerDecision as createBreakerDecisionTransition, type BreakerDecisionResult } from "./breaker-decisions";
+import { proposeActionContract as proposeActionContractTransition } from "./action-contract";
+import type { ActionContract, ProposeActionContractInput } from "./action-contract";
+import { guardCatalogRegistration } from "./catalog-envelope";
 import { HandshakeProtocolError } from "./errors";
+import { gatewayCheck as gatewayCheckTransition, type GatewayCheckResult } from "./gateway-gate";
+import type { GatewayCheckInput } from "./gateway-gate";
 import { compileIntent as compileIntentTransition } from "./intent-compilation";
-import { createIsolationState as createIsolationStateTransition } from "./isolation-states";
-import type {
-  CompileIntentInput,
-  CreateBreakerDecisionInput,
-  CreateIsolationInput,
-  CreateProtectedPathPostureInput,
-  CreateRecoveryRecommendationInput,
-  CreateReceiptExportInput,
-  CreateReviewArtifactInput,
-  CreateReviewDecisionInput,
-  CreateRuntimeExecutionInput,
-  EvaluatePolicyInput,
-  ProposeActionContractInput,
-  ReconcileSurfaceOperationInput,
-  ResolveRecoveryTerminalConflictInput,
-  GatewayCheckInput,
-  TransitionRecoveryRecommendationStatusInput,
-} from "./inputs";
-import { evaluatePolicy as evaluatePolicyTransition } from "./policy-decisions";
-import { createProtectedPathPosture as createProtectedPathPostureTransition } from "./protected-path-postures";
-import { createReceiptExport as createReceiptExportTransition } from "./receipt-exports";
+import type { CompileIntentInput, IntentCompilationRecord } from "./intent-compilation";
 import {
-  transitionRecoveryRecommendationStatus as transitionRecoveryRecommendationStatusTransition,
-  type RecoveryRecommendationStatusChange,
-} from "./recovery-recommendation-status";
-import { createRecoveryRecommendation as createRecoveryRecommendationTransition } from "./recovery-recommendations";
-import { createReviewArtifact as createReviewArtifactTransition } from "./review-artifacts";
-import { createRuntimeExecution as createRuntimeExecutionTransition } from "./runtime-executions";
+  createBreakerDecision as createBreakerDecisionTransition,
+  createIsolationState as createIsolationStateTransition,
+  type BreakerDecisionResult,
+} from "./isolation-breaker";
+import type { CreateBreakerDecisionInput, CreateIsolationInput, IsolationState } from "./isolation-breaker";
+import type { ProtocolRecord } from "./object-registry/schemas";
+import { evaluatePolicy as evaluatePolicyTransition } from "./policy-greenlight";
+import type { EvaluatePolicyInput, Greenlight, PolicyDecision } from "./policy-greenlight";
+import { createProtectedPathPosture as createProtectedPathPostureTransition } from "./protected-path-posture";
+import type { CreateProtectedPathPostureInput, ProtectedPathPosture } from "./protected-path-posture";
+import { createReceiptExport as createReceiptExportTransition } from "./receipt-export";
+import type { CreateReceiptExportInput, ReceiptExport } from "./receipt-export";
 import {
+  createRecoveryRecommendation as createRecoveryRecommendationTransition,
   resolveRecoveryTerminalConflictProofGap as resolveRecoveryTerminalConflictProofGapTransition,
   type RecoveryTerminalConflictResolution,
-} from "./recovery-terminal-conflict-resolutions";
+  transitionRecoveryRecommendationStatus as transitionRecoveryRecommendationStatusTransition,
+  type RecoveryRecommendationStatusChange,
+} from "./recovery";
+import type {
+  CreateRecoveryRecommendationInput,
+  RecoveryRecommendation,
+  ResolveRecoveryTerminalConflictInput,
+  TransitionRecoveryRecommendationStatusInput,
+} from "./recovery";
+import {
+  createReviewArtifact as createReviewArtifactTransition,
+  createReviewDecision as createReviewDecisionTransition,
+} from "./review-binding";
+import type { CreateReviewArtifactInput, CreateReviewDecisionInput, ReviewArtifactRecord, ReviewDecision } from "./review-binding";
+import { createRuntimeExecution as createRuntimeExecutionTransition } from "./runtime-evidence";
+import type { CreateRuntimeExecutionInput, RuntimeExecutionRecord } from "./runtime-evidence";
 import {
   reconcileSurfaceOperation as reconcileSurfaceOperationTransition,
   type SurfaceOperationReconciliationResult,
-} from "./surface-operation-reconciliations";
+} from "./operation-lifecycle/index";
+import type { ReconcileSurfaceOperationInput } from "./operation-lifecycle";
 import { ProtocolRecorder } from "./records";
-import { gatewayCheck as gatewayCheckTransition, type GatewayCheckResult } from "./gateway-check-attempts";
-import { createReviewDecision as createReviewDecisionTransition } from "./review-decisions";
-import type {
-  ActionContract,
-  Greenlight,
-  IntentCompilationRecord,
-  IsolationState,
-  PolicyDecision,
-  ProtocolRecord,
-  ProtectedPathPosture,
-  ReceiptExport,
-  RecoveryRecommendation,
-  ReviewArtifactRecord,
-  ReviewDecision,
-  RuntimeExecutionRecord,
-} from "./schemas";
-import { guardCatalogRegistration, type TransitionGuardResult } from "./transitions";
-import type { ProtocolStore } from "../storage/store";
+import type { TransitionGuardResult } from "./transition-guards";
+import type { TransitionRequestContextDraft } from "./transition-request-contexts";
+import type { ProtocolStore } from "./store-port";
 
 export class HandshakeKernel {
   private readonly recorder: ProtocolRecorder;
 
-  constructor(private readonly store: ProtocolStore) {
-    this.recorder = new ProtocolRecorder(store);
+  constructor(
+    private readonly store: ProtocolStore,
+    transitionRequestContext?: TransitionRequestContextDraft,
+  ) {
+    this.recorder = new ProtocolRecorder(store, transitionRequestContext);
   }
 
   async putCatalogObject(record: ProtocolRecord): Promise<void> {

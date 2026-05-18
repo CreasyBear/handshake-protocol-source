@@ -9,10 +9,8 @@ import {
   type RepoWriteRuntimeConfig,
   type RepoWriteRuntimeProtocol,
 } from "../repo-write/tool-wrapper";
-import type {
-  ActionContract,
-  IntentCompilationRecord,
-} from "../../protocol/schemas";
+import type { ActionContract } from "../../protocol/action-contract";
+import type { IntentCompilationRecord } from "../../protocol/intent-compilation";
 
 const CodemodePackageInstallActionSchema = z.strictObject({
   actionClass: z.literal("package.install"),

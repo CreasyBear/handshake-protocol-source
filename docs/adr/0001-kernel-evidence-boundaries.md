@@ -1,8 +1,10 @@
 # ADR 0001: Kernel Evidence Boundaries
 
-Status: Accepted and implemented
+Status: Implemented
 Date: 2026-05-18
 Owner: Protocol owner
+Narrowed by:
+[`0005-hosted-transition-caller-identity.md`](./0005-hosted-transition-caller-identity.md)
 
 ## Invariant At Stake
 
@@ -67,28 +69,27 @@ schema and transition changes.
   gateway authority. It is only an HTTP caller custody check before transition
   code runs.
 
-## Rollout Sequence
+## Consequences
 
-1. Add schema/version changes, ADR, and storage support for current posture.
-2. Add transition APIs for runtime execution, protected path posture, and review artifacts.
-3. Bind runtime execution evidence into intent compilation and action contracts.
-4. Bind protected posture into policy input digest and gateway re-checks.
-5. Bind review decisions to durable review artifacts.
-6. Add the local preview-deploy runtime and gateway fixture.
-7. Update HTTP, SDK, OpenAPI, docs, and invariant tests.
-8. Add caller custody checks to HTTP transition routes and SDK token forwarding.
+Good:
 
-## Quality Contract
+- The kernel can record richer runtime, posture, and review evidence without
+  letting those records become authority.
+- Policy can refuse when protected-path posture is stale, unsafe, or missing for
+  a required enforcing path.
+- Review decisions are tied to durable rendered artifacts and exact digests
+  instead of loose summaries.
+- Gateway registry entries carry credential custody and enforcement-mode fields
+  that can be pinned into candidates and contracts.
 
-| Lens | Applies? | Target | Hard Stops | Evidence Required | Closeout |
-|---|---:|---:|---|---|---|
-| Product / CEO | yes | hard gate | Product claim exceeds gateway enforcement | non-claim scan, tier-state docs | closed |
-| Engineering | yes | hard gate | Ambiguous transition or untested branch | state tests, D1 tests, typecheck | closed |
-| Security / CSO | yes | hard gate | Caller self-asserts authority or hides raw bypass | posture, custody, gateway refusal tests | closed |
-| DevEx | yes | 8/10 | SDK, HTTP, docs, or OpenAPI disagree | Hono, SDK, OpenAPI tests | closed |
-| Design | conditional | hard gate | Review can approve a summary not bound to exact digest | review artifact binding tests | closed |
-| Architecture | yes | 8/10 | Evidence objects duplicate authority semantics | module map, ADR, deletion test | closed |
-| Domain Invariant | yes | hard gate | Mutation without exact contract, greenlight, gateway check, or proof gap | invariant test matrix | closed |
+Cost:
+
+- Every new evidence object needs transition-created records and tests that prove
+  it cannot create policy, greenlights, gateway checks, or mutations.
+- Current-posture pointers become a second storage concern and must remain indexes
+  over append-only evidence, not mutable truth.
+- Local preview-deploy proof is easy to overread as provider enforcement; docs and
+  scans must keep that non-claim visible.
 
 ## Outside-Voice Risk Accepted
 
@@ -100,8 +101,12 @@ policy and gate evidence, and preview deploy must remain local fixture proof.
 
 ## Smallest Next Mechanism
 
-Replace static transition bearer tokens with organization-scoped caller identity
-and role claims before any multi-tenant hosted deployment.
+Replace static transition bearer tokens with server-derived
+`TransitionCallerIdentity` before any multi-tenant hosted deployment.
+
+ADR 0005 owns this hosted caller-identity boundary: caller scope and custody role
+for transition route admission only. Static transition bearer tokens remain local
+caller custody only.
 
 ## Closeout
 

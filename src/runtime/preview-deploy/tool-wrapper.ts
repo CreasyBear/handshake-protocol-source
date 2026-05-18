@@ -1,13 +1,10 @@
 import { z } from "zod";
+import type { ActionContract, ProposeActionContractInput } from "../../protocol/action-contract";
 import { digestCanonical } from "../../protocol/canonical";
 import type {
   CompileIntentInput,
-  ProposeActionContractInput,
-} from "../../protocol/inputs";
-import type {
-  ActionContract,
   IntentCompilationRecord,
-} from "../../protocol/schemas";
+} from "../../protocol/intent-compilation";
 
 export const PreviewDeployToolCallSchema = z.strictObject({
   principalIntentRef: z.string().min(1),

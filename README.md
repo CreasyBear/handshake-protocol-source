@@ -43,26 +43,20 @@ The protocol kernel is split by control primitive, not product feature:
 
 - `src/protocol/schemas.ts`: durable protocol objects.
 - `src/protocol/inputs.ts`: HTTP/SDK command schemas.
-- `src/protocol/intent-compilation.ts`: catalog-bound candidate validation and intent-compilation record emission.
-- `src/protocol/runtime-executions.ts`: generated execution-block evidence records.
-- `src/protocol/protected-path-postures.ts`: protected-path posture records, scope keys, and policy/gate posture evaluation.
-- `src/protocol/action-contracts.ts`: exact gateway-bound contract proposal.
-- `src/protocol/policy-decisions.ts`: deterministic policy decisions and one-use greenlight issuance.
-- `src/protocol/review-artifacts.ts`: rendered review artifact digest-binding records.
-- `src/protocol/review-decisions.ts`: exact review binding records.
-- `src/protocol/isolation-states.ts`: durable interdict state writes.
-- `src/protocol/transitions.ts`: invalid state-edge guards.
-- `src/protocol/policy.ts`: deterministic envelope/isolation policy.
-- `src/protocol/gateway-check.ts`: gateway drift, finality, and status helpers.
-- `src/protocol/gateway-check-attempts.ts`: final gateway-check enforcement before mutation.
-- `src/protocol/gateway-check-artifacts.ts`: structured gate attempts, mutation attempts, receipts, and events.
-- `src/protocol/surface-operation-reconciliations.ts`: same-mutation downstream reconciliation.
-- `src/protocol/proof-gaps.ts`: proof-gap construction and resolution.
-- `src/protocol/recovery-recommendations.ts`: narrowed recovery path records after refusal or proof gap.
-- `src/protocol/recovery-action-linkage.ts`: evidence-only validation for recovery-linked follow-up contracts.
-- `src/protocol/recovery-recommendation-status.ts`: explicit expired/superseded recommendation transitions.
-- `src/protocol/recovery-terminal-conflicts.ts`: recovery-phase proof gaps for lost terminal-claim races.
-- `src/protocol/recovery-terminal-conflict-resolutions.ts`: proof-gap resolution once a winning terminal transition is observed.
+- `src/protocol/runtime-evidence/`: generated execution-block evidence records.
+- `src/protocol/intent-compilation/`: catalog-bound candidate validation and intent-compilation record emission.
+- `src/protocol/action-contract/`: exact gateway-bound contract proposal.
+- `src/protocol/policy-greenlight/`: deterministic policy decisions, sequence dependencies, and one-use greenlight issuance.
+- `src/protocol/protected-path-posture/`: protected-path posture records, scope keys, and policy/gate posture evaluation.
+- `src/protocol/gateway-gate/`: final gateway-check enforcement, replay refusal, mutation attempts, receipts, and gateway drift helpers.
+- `src/protocol/operation-lifecycle/`: operation claims and same-mutation downstream reconciliation.
+- `src/protocol/review-binding/`: rendered review artifact and exact review decision binding records.
+- `src/protocol/receipt-export/`: receipt drop-copy export without creating execution proof.
+- `src/protocol/recovery/`: narrowed recovery paths, follow-up linkage, terminal conflicts, and proof-gap resolution.
+- `src/protocol/isolation-breaker/`: durable isolation state writes and breaker decisions.
+- `src/protocol/proof-gap/`: generic proof-gap construction and resolution.
+- `src/protocol/object-registry/`: protocol object metadata, ID selectors, schema collection, and export/read posture.
+- `src/protocol/transitions.ts`: transition metadata and compatibility guard exports.
 - `src/protocol/content-digests.ts`: deterministic UTF-8 content digests for content-bound gateway contracts.
 - `src/protocol/events.ts`: stream partitioning, offsets, and digest chaining.
 - `src/protocol/records.ts`: durable record plus stream-event commit helper.
@@ -131,9 +125,11 @@ GET  /v0.2/records/:objectType/:objectId
 ## Reference Flow
 
 ```ts
-import { HandshakeKernel, InMemoryProtocolStore } from "./src";
+import { HandshakeClient } from "./src";
 
-const kernel = new HandshakeKernel(new InMemoryProtocolStore());
+const client = new HandshakeClient("http://127.0.0.1:8787", fetch, {
+  transitionToken: "local-transition-token",
+});
 
 // 1. Register catalog objects and an operating envelope.
 // 2. createRuntimeExecution(...) may record generated execution-block evidence.
@@ -151,10 +147,10 @@ const kernel = new HandshakeKernel(new InMemoryProtocolStore());
 The package-install gateway adapter demonstrates the gateway side of the loop:
 
 ```ts
-import { runPackageInstallGateway } from "./src";
+import { experimentalRunPackageInstallGateway } from "./src";
 
-await runPackageInstallGateway({
-  protocol: kernel,
+await experimentalRunPackageInstallGateway({
+  protocol: client,
   surface: packageManifestSurface,
   actionContractId,
   greenlightId,
@@ -231,4 +227,4 @@ Stream events are chained per partition. Action lifecycle events emit into `acti
 
 The test suite includes a D1-compatible Hono integration path that applies the migration, drives the public `/v0.2/*` routes through pending mutation reconciliation, and asserts contiguous stream offsets, digest predecessor links, one mutation attempt, and one reconciliation record. The package-install adapter path uses the same Hono/D1 surface through `HandshakeClient`, including a durable gateway refusal that records a gate attempt and receipt without creating a mutation attempt, an unknown-finality proof gap created by surface-operation reconciliation after passed-gate mutation, a recovery-linked follow-up proposal that records no second mutation or greenlight, an explicit expired recovery status transition, and a terminal-claim race that records a recovery-phase proof gap. The repo-write adapter path proves the gateway-check seam is not package-manager-specific by enforcing content digest binding before writing a file.
 
-The compact completion audit is in `docs/protocol-completion-audit-v0.2.md`. It maps the plan obligations to current modules, routes, D1 evidence, runtime wrappers, gateway adapters, and invariant tests.
+The compact completion audit is in `docs/audits/protocol-completion-audit-v0.2.md`. It maps the plan obligations to current modules, routes, D1 evidence, runtime wrappers, gateway adapters, and invariant tests.

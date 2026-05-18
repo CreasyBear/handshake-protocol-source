@@ -62,6 +62,29 @@ CREATE TABLE IF NOT EXISTS protected_path_posture_current (
 CREATE INDEX IF NOT EXISTS idx_protected_path_posture_current_scope
   ON protected_path_posture_current (tenant_id, organization_id, posture_scope_key);
 
+CREATE TABLE IF NOT EXISTS protected_surface_operation_claim_current (
+  claim_key_digest TEXT PRIMARY KEY,
+  protected_surface_operation_claim_id TEXT NOT NULL,
+  tenant_id TEXT NOT NULL,
+  organization_id TEXT NOT NULL,
+  claim_state TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_protected_surface_operation_claim_current_scope
+  ON protected_surface_operation_claim_current (tenant_id, organization_id, claim_key_digest);
+
+CREATE TABLE IF NOT EXISTS receipt_by_mutation_attempt (
+  mutation_attempt_id TEXT PRIMARY KEY,
+  receipt_id TEXT NOT NULL,
+  tenant_id TEXT NOT NULL,
+  organization_id TEXT NOT NULL,
+  created_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_receipt_by_mutation_attempt_scope
+  ON receipt_by_mutation_attempt (tenant_id, organization_id, mutation_attempt_id);
+
 CREATE TABLE IF NOT EXISTS stream_events (
   stream_event_id TEXT PRIMARY KEY,
   tenant_id TEXT NOT NULL,

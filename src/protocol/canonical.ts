@@ -1,4 +1,4 @@
-import type { JsonValue } from "./schemas";
+import type { JsonValue } from "./schema-core";
 
 export const CANONICALIZER_VERSION = "handshake-jcs-lite-0.2";
 
