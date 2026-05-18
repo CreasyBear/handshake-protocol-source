@@ -1,11 +1,11 @@
 # Handshake v0.2 Canonical Docs
 
 Status: Canonical public alpha
-Version: v0.2.3
+Version: v0.2.4
 Audience: Agent-runtime builders, gateway owners, platform engineering, security engineering
 Implementation status: Backed by the v0.2 protocol kernel and reference gateway harness; real gateway integrations are target work
 Canonical owner: Product owner
-Last reviewed: 2026-05-18
+Last reviewed: 2026-05-19
 
 ## Invariant
 
@@ -168,9 +168,9 @@ The product moment is narrower:
 
 An agent runtime attempts a consequential action. Handshake reduces it to an exact action contract. Policy decides. The gateway check checks the exact greenlight before mutation. The receipt timeline reconstructs what happened.
 
-Current kernel checkpoint: ADR 0001 expands the evidence boundary for generated execution blocks, protected-path posture, and review artifacts. Those records can inform policy and audit; they still cannot authorize mutation. Authority remains exact `ActionContract` -> `PolicyDecision` -> one-use `Greenlight` -> `GatewayCheckAttempt`.
+Current kernel checkpoint: ADR 0001 expands the evidence boundary for generated execution blocks, protected-path posture, and review artifacts. ADR 0002 now adds kernel-level `GeneratedExecutionGraph` evidence between generated runtime blocks and candidate extraction. Those records can inform policy and audit; they still cannot authorize mutation. Authority remains exact `ActionContract` -> `PolicyDecision` -> one-use `Greenlight` -> `GatewayCheckAttempt`.
 
-Proposed next protocol boundary: ADR 0002 owns the generated execution graph coverage decision and non-claims; Plan 03 owns implementation sequencing, source-study detail, hostile fixtures, quality gates, and tests. A shell or codemode block may produce candidates only after the whole generated execution graph is schema-valid, authorized-issuer-bound, catalog-resolved, gateway-registry-bound, redacted, cleanly classified, and digest-bound; unsupported, ambiguous, bypass-prone, hidden-trigger, observer-only, guard-fail-open, guard-bypass, or coverage-gap sibling nodes block contract proposal for the whole block.
+Current generated-execution boundary: ADR 0002 owns the generated execution graph coverage decision and non-claims; Plan 03 owns implementation sequencing, source-study detail, hostile fixtures, quality gates, and tests. A shell or codemode block may produce candidates only after the whole generated execution graph is schema-valid, authorized-issuer-bound, catalog-resolved, gateway-registry-bound, redacted, cleanly classified, and digest-bound; unsupported, ambiguous, bypass-prone, hidden-trigger, observer-only, guard-fail-open, guard-bypass, or coverage-gap sibling nodes block contract proposal for the whole block. The v0.2.4 slice is kernel-only: it exposes schemas and a kernel transition, not an HTTP/SDK/OpenAPI graph route.
 
 Protocol lifecycle alignment: Plan 02c defines the next API/protocol boundary work for protocol-version evidence, request identity evidence, operation observation, orphan mitigation, protected-surface operation claims, and adapter conformance. It exposes transition semantics, not raw storage state: operation claims, raw request context, and debug records are internal unless a later redacted evidence API is designed.
 

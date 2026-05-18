@@ -1,6 +1,6 @@
 # ADR 0002: Generated Execution Graph Coverage Boundary
 
-Status: Proposed
+Status: Accepted; v0.2.4 kernel slice partially implemented
 Date: 2026-05-18
 Owner: Protocol owner
 Governing implementation plan:
@@ -47,7 +47,7 @@ exact ActionContract
 
 ## Context
 
-The v0.2.3 kernel already records `RuntimeExecutionRecord` evidence for
+Before ADR 0002, the v0.2.3 kernel already recorded `RuntimeExecutionRecord` evidence for
 `shell_exec_block` and `codemode_block` execution shapes. That record can say a
 runtime executed or generated a block. It does not prove that every consequential
 path inside the block was classified or gateway-bound.
@@ -176,6 +176,38 @@ For a generated execution node to become contractable:
     graph nodes must not be mutated later to point back to candidates.
 
 Coverage is block-level, not target-node-level.
+
+## Implementation Status
+
+The v0.2.4 kernel slice implements the first local graph boundary:
+
+- `GeneratedExecutionGraph` is a first-class protocol object owned by
+  `src/protocol/generated-execution-graph/`.
+- `HandshakeKernel.createGeneratedExecutionGraph(...)` records graph evidence
+  through a trusted issuer context, not caller self-certification.
+- The object registry, event schema, transition matrix, root exports, and tests
+  know about `generated_execution_graph` and
+  `generated_execution_graph_recorded`.
+- `compileIntent` refuses shell/codemode candidates when graph coverage is
+  missing or not `fully_covered_no_unsupported_nodes`.
+- `compileIntent` binds contractable candidates to graph ID/digest, node
+  ID/digest, coverage status, catalog snapshot digest, gateway registry snapshot
+  digest, registry-binding-set digest, and node gateway-binding digest.
+- `proposeActionContract` reloads the graph and refuses graph, node, coverage,
+  runtime, or node gateway-binding drift before creating an `ActionContract`.
+- Missing graph, unsupported graph, unsupported sibling, clean binding, issuer
+  mismatch, truncated graph, raw argv material, bypass posture, fail-open
+  classifier evidence, observer-only evidence, hidden triggers, and unknown node
+  kinds are covered by kernel tests.
+
+Still open before this ADR is fully implemented:
+
+- explicit durable graph drift fixture;
+- catalog or gateway registry miss fixture;
+- codemode multi-action whole-block partial-credit refusal;
+- runtime wrapper graph production beyond the local preview fixture;
+- public HTTP/SDK/OpenAPI graph surface, if still justified after the kernel
+  behavior stabilizes.
 
 ## First Slice
 

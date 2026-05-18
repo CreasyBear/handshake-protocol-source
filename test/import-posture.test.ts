@@ -5,6 +5,7 @@ import { join, relative } from "node:path";
 const protocolAreas = [
   "action-contract",
   "catalog-envelope",
+  "generated-execution-graph",
   "gateway-gate",
   "intent-compilation",
   "isolation-breaker",
@@ -95,7 +96,7 @@ describe("protocol module import posture", () => {
   it("keeps storage adapters from importing primitive behavior modules", () => {
     const violations = importViolations(["src/storage"], [
       /from\s+["'][^"']*protocol\/(?:schemas|inputs)(?:["']|\/)/,
-      /from\s+["'][^"']*protocol\/(?:operation-lifecycle|gateway-gate|policy-greenlight|action-contract|catalog-envelope|intent-compilation|review-binding|recovery|receipt-export|isolation-breaker|runtime-evidence|protected-path-posture|proof-gap)(?:\/|["'])/,
+      /from\s+["'][^"']*protocol\/(?:operation-lifecycle|gateway-gate|policy-greenlight|action-contract|catalog-envelope|generated-execution-graph|intent-compilation|review-binding|recovery|receipt-export|isolation-breaker|runtime-evidence|protected-path-posture|proof-gap)(?:\/|["'])/,
     ]);
 
     expect(violations).toEqual([]);
@@ -240,6 +241,7 @@ describe("protocol module import posture", () => {
       "../catalog-envelope/schemas",
       "../event-schemas",
       "../gateway-gate/schemas",
+      "../generated-execution-graph/schemas",
       "../intent-compilation/schemas",
       "../isolation-breaker/schemas",
       "../operation-lifecycle/schemas",

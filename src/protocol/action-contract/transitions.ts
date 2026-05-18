@@ -2,6 +2,7 @@ import { CANONICALIZER_VERSION, digestCanonical, signCanonicalHmac } from "../ca
 import type { ActionType, GatewayRegistryEntry, OperatingEnvelope, ToolCapability } from "../catalog-envelope";
 import { HandshakeProtocolError } from "../errors";
 import { actionLifecycleStreamRefs } from "../events";
+import type { GeneratedExecutionGraph } from "../generated-execution-graph";
 import { createId, nowIso } from "../ids";
 import type { CandidateAction, IntentCompilationRecord } from "../intent-compilation";
 import { ProposeActionContractInputSchema, type ProposeActionContractInput } from "./types";
@@ -35,7 +36,7 @@ export async function proposeActionContract(
   );
   const candidate = compilation.payload.candidateAction;
   assertCandidateMatchesProposal(candidate, input.candidateActionId, input.candidateDigest);
-  const [envelopeRecord, gatewayRecord, toolRecord, actionTypeRecord, runtimeExecutionRecord] = await Promise.all([
+  const [envelopeRecord, gatewayRecord, toolRecord, actionTypeRecord, runtimeExecutionRecord, generatedExecutionGraphRecord] = await Promise.all([
     recorder.requiredRecord<OperatingEnvelope>("operating_envelope", candidate.operatingEnvelopeId, "envelope_missing"),
     recorder.requiredRecord<GatewayRegistryEntry>(
       "gateway_registry_entry",
@@ -51,6 +52,13 @@ export async function proposeActionContract(
           "runtime_execution_missing",
         )
       : Promise.resolve(null),
+    candidate.generatedExecutionGraphId
+      ? recorder.requiredRecord<GeneratedExecutionGraph>(
+          "generated_execution_graph",
+          candidate.generatedExecutionGraphId,
+          "generated_execution_graph_missing",
+        )
+      : Promise.resolve(null),
   ]);
   assertPinnedDigest("operating_envelope", envelopeRecord.canonicalDigest, candidate.operatingEnvelopeDigest);
   assertPinnedDigest("gateway_registry_entry", gatewayRecord.canonicalDigest, candidate.gatewayRegistryDigest);
@@ -58,6 +66,9 @@ export async function proposeActionContract(
   assertPinnedDigest("action_type", actionTypeRecord.canonicalDigest, candidate.actionTypeDigest);
   if (runtimeExecutionRecord) {
     assertPinnedDigest("runtime_execution", runtimeExecutionRecord.payload.runtimeExecutionDigest, candidate.runtimeExecutionDigest);
+  }
+  if (generatedExecutionGraphRecord) {
+    assertGeneratedExecutionGraphPinned(candidate, generatedExecutionGraphRecord.payload);
   }
   const recomputedParamsDigest = await digestCanonical({
     parameters: candidate.parameters,
@@ -145,6 +156,15 @@ export async function proposeActionContract(
     requiredProtectedPathState: envelope.requiredProtectedPathState,
     runtimeExecutionId: candidate.runtimeExecutionId,
     runtimeExecutionDigest: candidate.runtimeExecutionDigest,
+    generatedExecutionGraphId: candidate.generatedExecutionGraphId,
+    generatedExecutionGraphDigest: candidate.generatedExecutionGraphDigest,
+    generatedExecutionCoverageStatus: candidate.generatedExecutionCoverageStatus,
+    generatedExecutionNodeId: candidate.generatedExecutionNodeId,
+    generatedExecutionNodeDigest: candidate.generatedExecutionNodeDigest,
+    generatedExecutionCatalogSnapshotDigest: candidate.generatedExecutionCatalogSnapshotDigest,
+    generatedExecutionGatewayRegistrySnapshotDigest: candidate.generatedExecutionGatewayRegistrySnapshotDigest,
+    generatedExecutionRegistryBindingSetDigest: candidate.generatedExecutionRegistryBindingSetDigest,
+    generatedExecutionNodeGatewayBindingDigest: candidate.generatedExecutionNodeGatewayBindingDigest,
     paramsDigest: candidate.paramsDigest,
     purposeCode: candidate.purposeCode,
     expectedSideEffectCodes: candidate.expectedSideEffectCodes,
@@ -268,6 +288,56 @@ function assertPinnedDigest(objectType: string, currentDigest: string, candidate
     throw new HandshakeProtocolError(
       "candidate_catalog_digest_drift",
       `Candidate pinned ${objectType} digest does not match the durable record now loaded for proposal.`,
+      409,
+    );
+  }
+}
+
+function assertGeneratedExecutionGraphPinned(candidate: CandidateAction, graph: GeneratedExecutionGraph): void {
+  assertPinnedDigest("generated_execution_graph", graph.graphDigest, candidate.generatedExecutionGraphDigest);
+  if (
+    graph.runtimeExecutionId !== candidate.runtimeExecutionId ||
+    graph.runtimeExecutionDigest !== candidate.runtimeExecutionDigest
+  ) {
+    throw new HandshakeProtocolError(
+      "candidate_generated_execution_graph_runtime_mismatch",
+      "Candidate generated execution graph is not bound to the same runtime execution as the candidate.",
+      409,
+    );
+  }
+  if (graph.coverageStatus !== "fully_covered_no_unsupported_nodes") {
+    throw new HandshakeProtocolError(
+      "candidate_generated_execution_graph_not_contractable",
+      "Generated execution graph must be fully covered before an action contract can be proposed.",
+      409,
+    );
+  }
+  if (candidate.generatedExecutionCoverageStatus !== graph.coverageStatus) {
+    throw new HandshakeProtocolError(
+      "candidate_generated_execution_graph_status_mismatch",
+      "Candidate generated execution graph coverage status no longer matches the stored graph.",
+      409,
+    );
+  }
+  const node = graph.nodes.find((entry) => entry.nodeId === candidate.generatedExecutionNodeId) ?? null;
+  if (!node) {
+    throw new HandshakeProtocolError(
+      "candidate_generated_execution_node_missing",
+      "Candidate generated execution node was not found in the stored graph.",
+      409,
+    );
+  }
+  if (node.nodeDigest !== candidate.generatedExecutionNodeDigest) {
+    throw new HandshakeProtocolError(
+      "candidate_generated_execution_node_digest_mismatch",
+      "Candidate generated execution node digest no longer matches the stored graph node.",
+      409,
+    );
+  }
+  if (node.nodeGatewayBindingDigest !== candidate.generatedExecutionNodeGatewayBindingDigest) {
+    throw new HandshakeProtocolError(
+      "candidate_generated_execution_node_gateway_binding_mismatch",
+      "Candidate generated execution node gateway binding no longer matches the stored graph node.",
       409,
     );
   }

@@ -1,11 +1,11 @@
 # Non-Claims And Theatre
 
 Status: Canonical public alpha
-Version: v0.2.3
+Version: v0.2.4
 Audience: Product, engineering, security, runtime builders, gateway owners
 Implementation status: Product doctrine; enforced by doc review and protocol tests
 Canonical owner: Product owner
-Last reviewed: 2026-05-18
+Last reviewed: 2026-05-19
 
 ## Invariant At Stake
 
@@ -18,6 +18,7 @@ Handshake must not imply more control than the gateway-checked protocol actually
 - Handshake issues one-use greenlights or records refusals.
 - Handshake requires the gateway check before mutation in the protocol loop.
 - Handshake records generated execution-block evidence for Code Mode-style runtimes, including loop/retry/branch posture, dynamic tool construction, and unobserved regions.
+- Handshake can record kernel-level `GeneratedExecutionGraph` evidence for shell/codemode blocks and refuse candidate extraction when the whole generated block is missing, unsupported, truncated, raw-material-bearing, bypass-risk, fail-open, or only observer evidence.
 - Handshake can require fresh `gateway_checked` protected-path posture before policy and gateway checks proceed.
 - Handshake binds review approval to a rendered artifact whose contract, policy-input, uncertainty, and artifact digests match durable records.
 - Handshake records receipts and proof gaps so the chain can be reconstructed.
@@ -29,6 +30,9 @@ Handshake must not imply more control than the gateway-checked protocol actually
 - A human review of a summary is the same as binding to an exact contract digest.
 - A runtime trace is execution proof.
 - A `RuntimeExecutionRecord` is permission.
+- A `GeneratedExecutionGraph` is permission.
+- A clean `GeneratedExecutionGraph` is an `ActionContract`.
+- A command-risk classifier allow/no-match result is authorization.
 - A `ProtectedPathPosture` is a gateway check.
 - A `ReviewArtifactRecord` is review approval.
 - A receipt proves downstream business success.
@@ -52,6 +56,8 @@ If the rendered UI says one thing and the action contract says another, this is 
 
 If generated code can call an unwrapped consequential tool, the generated code escaped the contract boundary.
 
+If a generated block has one eligible node and one unsupported sibling, the eligible node cannot get partial credit.
+
 If the agent keeps raw gateway credentials while Handshake claims control, this is advisory theatre.
 
 If a human decision binds to a plan but not the exact gateway mutation, the decision is theatre.
@@ -72,4 +78,4 @@ If the local preview-deploy fixture is described as Vercel, Cloudflare, GitHub D
 
 If raw request context, operation claims, or debug record reads are treated as public API, this is storage theatre.
 
-Active next mechanism: audit every claim in docs and UI against ADR 0001 plus the installed protected action surface and its gateway adapters. A valid claim must name the exact protocol object, gateway check, credential-owning adapter, posture record, review artifact, or proof gap it depends on. The local preview-deploy adapter is fixture proof only. Proof packets and fixture runners are evidence mechanisms only, not authority claims.
+Active next mechanism: finish Plan 03 graph drift, catalog/registry miss, and codemode whole-block tests before adding a public graph route or runtime helper. The local preview-deploy adapter is fixture proof only. Proof packets, graph records, and fixture runners are evidence mechanisms only, not authority claims.

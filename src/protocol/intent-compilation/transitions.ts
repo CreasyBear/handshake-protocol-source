@@ -1,6 +1,7 @@
 import { digestCanonical } from "../canonical";
 import type { ActionType, GatewayRegistryEntry, OperatingEnvelope, ToolCapability } from "../catalog-envelope";
 import { HandshakeProtocolError } from "../errors";
+import type { GeneratedExecutionGraph, GeneratedExecutionNode } from "../generated-execution-graph";
 import { createId, nowIso } from "../ids";
 import { CompileIntentInputSchema, type CompileIntentInput } from "./types";
 import type { ProtocolRecorder } from "../records";
@@ -25,13 +26,16 @@ export async function compileIntent(
   const uncertaintyMarkers: string[] = [];
   const overreachReasonCodes: string[] = [];
 
-  const [toolRecord, actionTypeRecord, gatewayRecord, envelopeRecord, runtimeExecutionRecord] = await Promise.all([
+  const [toolRecord, actionTypeRecord, gatewayRecord, envelopeRecord, runtimeExecutionRecord, generatedExecutionGraphRecord] = await Promise.all([
     store.getRecord<ToolCapability>("tool_capability", input.candidate.toolCapabilityId),
     store.getRecord<ActionType>("action_type", input.candidate.actionTypeId),
     store.getRecord<GatewayRegistryEntry>("gateway_registry_entry", input.candidate.gatewayRegistryEntryId),
     store.getRecord<OperatingEnvelope>("operating_envelope", input.operatingEnvelopeId),
     input.runtimeExecutionId
       ? store.getRecord<RuntimeExecutionRecord>("runtime_execution", input.runtimeExecutionId)
+      : Promise.resolve(null),
+    input.generatedExecutionGraphId
+      ? store.getRecord<GeneratedExecutionGraph>("generated_execution_graph", input.generatedExecutionGraphId)
       : Promise.resolve(null),
   ]);
 
@@ -40,12 +44,18 @@ export async function compileIntent(
   const gateway = gatewayRecord?.payload ?? null;
   const envelope = envelopeRecord?.payload ?? null;
   const runtimeExecution = runtimeExecutionRecord?.payload ?? null;
+  const generatedExecutionGraph = generatedExecutionGraphRecord?.payload ?? null;
+  const paramsDigest = await digestCanonical({
+    parameters: input.candidate.parameters,
+    secretRefs: input.candidate.secretRefs,
+  });
 
   if (!tool) uncertaintyMarkers.push("unknown_tool_capability");
   if (!actionType) uncertaintyMarkers.push("unknown_action_type");
   if (!gateway) uncertaintyMarkers.push("unknown_gateway_registry_entry");
   if (!envelope) uncertaintyMarkers.push("unknown_operating_envelope");
   if (input.runtimeExecutionId && !runtimeExecution) uncertaintyMarkers.push("unknown_runtime_execution");
+  if (input.generatedExecutionGraphId && !generatedExecutionGraph) uncertaintyMarkers.push("unknown_generated_execution_graph");
   if (runtimeExecution) {
     if (
       runtimeExecution.tenantId !== input.tenantId ||
@@ -68,6 +78,18 @@ export async function compileIntent(
       overreachReasonCodes.push(...runtimeExecution.refusalReasonCodes.map((code) => `runtime_${code}`));
     }
   }
+  if (runtimeExecution && requiresGeneratedExecutionGraph(runtimeExecution.executionShape) && !generatedExecutionGraph) {
+    overreachReasonCodes.push("generated_execution_graph_missing");
+  }
+  const generatedExecutionNode = generatedExecutionGraph
+    ? assertGeneratedExecutionCoverage({
+        input,
+        runtimeExecution,
+        generatedExecutionGraph,
+        paramsDigest,
+        overreachReasonCodes,
+      })
+    : null;
   if (tool?.readWriteClassification === "consequential" && tool.wrapperStatus !== "wrapped") {
     overreachReasonCodes.push("unwrapped_consequential_tool");
   }
@@ -116,10 +138,6 @@ export async function compileIntent(
   const refusalReasonCodes = [...uncertaintyMarkers, ...overreachReasonCodes];
   const candidateStatus = refusalReasonCodes.length === 0 ? "contractable" : "rejected";
   const candidateActionId = createId("cand");
-  const paramsDigest = await digestCanonical({
-    parameters: input.candidate.parameters,
-    secretRefs: input.candidate.secretRefs,
-  });
   const candidateBase = {
     candidateActionId,
     candidateStatus,
@@ -156,6 +174,15 @@ export async function compileIntent(
     generatedCodeOrSpecRefs: input.generatedCodeOrSpecRefs,
     runtimeExecutionId: runtimeExecution?.runtimeExecutionId ?? null,
     runtimeExecutionDigest: runtimeExecution?.runtimeExecutionDigest ?? null,
+    generatedExecutionGraphId: generatedExecutionGraph?.generatedExecutionGraphId ?? null,
+    generatedExecutionGraphDigest: generatedExecutionGraph?.graphDigest ?? null,
+    generatedExecutionCoverageStatus: generatedExecutionGraph?.coverageStatus ?? null,
+    generatedExecutionNodeId: generatedExecutionNode?.nodeId ?? null,
+    generatedExecutionNodeDigest: generatedExecutionNode?.nodeDigest ?? null,
+    generatedExecutionCatalogSnapshotDigest: generatedExecutionGraph?.catalogSnapshotDigest ?? null,
+    generatedExecutionGatewayRegistrySnapshotDigest: generatedExecutionGraph?.gatewayRegistrySnapshotDigest ?? null,
+    generatedExecutionRegistryBindingSetDigest: generatedExecutionGraph?.registryBindingSetDigest ?? null,
+    generatedExecutionNodeGatewayBindingDigest: generatedExecutionNode?.nodeGatewayBindingDigest ?? null,
   } satisfies CandidateAction;
   const candidateDigest =
     candidateStatus === "contractable"
@@ -248,4 +275,66 @@ function candidateDigestMaterial(input: ReturnType<typeof CompileIntentInputSche
     runtimeExecutionDigest: candidate.runtimeExecutionDigest,
     candidateAction: { ...candidate, candidateDigest: null },
   };
+}
+
+function requiresGeneratedExecutionGraph(executionShape: RuntimeExecutionRecord["executionShape"]): boolean {
+  return executionShape === "shell_exec_block" || executionShape === "codemode_block";
+}
+
+function assertGeneratedExecutionCoverage(args: {
+  input: ReturnType<typeof CompileIntentInputSchema.parse>;
+  runtimeExecution: RuntimeExecutionRecord | null;
+  generatedExecutionGraph: GeneratedExecutionGraph;
+  paramsDigest: string;
+  overreachReasonCodes: string[];
+}): GeneratedExecutionNode | null {
+  const { input, runtimeExecution, generatedExecutionGraph, paramsDigest, overreachReasonCodes } = args;
+  if (!runtimeExecution) {
+    overreachReasonCodes.push("generated_execution_graph_without_runtime_execution");
+    return null;
+  }
+  if (
+    generatedExecutionGraph.tenantId !== input.tenantId ||
+    generatedExecutionGraph.organizationId !== input.organizationId
+  ) {
+    overreachReasonCodes.push("generated_execution_graph_scope_mismatch");
+  }
+  if (
+    generatedExecutionGraph.runtimeExecutionId !== runtimeExecution.runtimeExecutionId ||
+    generatedExecutionGraph.runtimeExecutionDigest !== runtimeExecution.runtimeExecutionDigest ||
+    generatedExecutionGraph.executionBlockDigest !== runtimeExecution.executionBlockDigest
+  ) {
+    overreachReasonCodes.push("generated_execution_graph_runtime_mismatch");
+  }
+  if (generatedExecutionGraph.coverageStatus !== "fully_covered_no_unsupported_nodes") {
+    overreachReasonCodes.push("generated_execution_graph_not_contractable");
+  }
+
+  const requestedNodeId = input.generatedExecutionNodeId;
+  if (!requestedNodeId) {
+    overreachReasonCodes.push("generated_execution_node_missing");
+    return null;
+  }
+  const node = generatedExecutionGraph.nodes.find((candidate) => candidate.nodeId === requestedNodeId) ?? null;
+  if (!node) {
+    overreachReasonCodes.push("generated_execution_node_missing");
+    return null;
+  }
+  if (node.classification !== "candidate_action_eligible") {
+    overreachReasonCodes.push("generated_execution_node_not_contractable");
+  }
+  if (!node.nodeGatewayBindingDigest) {
+    overreachReasonCodes.push("generated_execution_node_gateway_binding_missing");
+  }
+  if (
+    node.actionClass !== input.candidate.actionClass ||
+    node.toolCapabilityId !== input.candidate.toolCapabilityId ||
+    node.actionTypeId !== input.candidate.actionTypeId ||
+    node.gatewayRegistryEntryId !== input.candidate.gatewayRegistryEntryId ||
+    node.resourceRef !== input.candidate.resourceRef ||
+    node.paramsDigest !== paramsDigest
+  ) {
+    overreachReasonCodes.push("generated_execution_node_binding_mismatch");
+  }
+  return node;
 }

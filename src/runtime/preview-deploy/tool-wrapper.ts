@@ -36,6 +36,8 @@ export type PreviewDeployRuntimeConfig = {
   gatewayId: string;
   contractExpiresAt: string;
   runtimeExecutionId?: string | null;
+  generatedExecutionGraphId?: string | null;
+  generatedExecutionNodeId?: string | null;
   signingSecret?: string;
 };
 
@@ -92,6 +94,8 @@ export async function proposePreviewDeployActionContract(
     actionCatalogRef: config.actionCatalogRef,
     gatewayRegistryRef: config.gatewayRegistryRef,
     runtimeExecutionId: config.runtimeExecutionId ?? null,
+    generatedExecutionGraphId: config.generatedExecutionGraphId ?? null,
+    generatedExecutionNodeId: config.generatedExecutionNodeId ?? null,
     generatedCodeOrSpecRefs: [toolCall.generatedCodeOrSpecRef],
     declaredAssumptions: ["preview deploy tool call provided explicit provider, project, branch, and commit"],
     requiredEvidenceRefs: ["evidence:local-preview-artifact"],

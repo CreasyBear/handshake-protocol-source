@@ -6,7 +6,15 @@ import { runPreviewDeployGateway, type PreviewDeploySurface } from "../src/adapt
 import { digestCanonical } from "../src/protocol/canonical";
 import { HandshakeKernel } from "../src/protocol/kernel";
 import { nowIso } from "../src/protocol/ids";
-import { PROTOCOL_VERSION, type ActionType, type GatewayRegistryEntry, type OperatingEnvelope, type ToolCapability } from "../src/protocol/schemas";
+import {
+  PROTOCOL_VERSION,
+  type ActionType,
+  type GeneratedExecutionNodeInput,
+  type GatewayRegistryEntry,
+  type JsonValue,
+  type OperatingEnvelope,
+  type ToolCapability,
+} from "../src/protocol/schemas";
 import { proposePreviewDeployActionContract, previewDeployResourceRef } from "../src/runtime/preview-deploy/tool-wrapper";
 import { InMemoryProtocolStore } from "../src/storage/memory";
 import { futureIso } from "./fixtures";
@@ -120,6 +128,40 @@ async function createPreviewDeployFixture(idempotencyMarker = "preview") {
     evidenceRefs: ["evidence:local-preview-posture"],
     expiresAt: futureIso(),
   });
+  const parameters = {
+    provider: "local",
+    projectRef: "demo-web",
+    branchRef: "feature/handshake",
+    commitRef: "commit_123",
+    previewUrlHint: "http://127.0.0.1/preview/demo-web",
+  };
+  const graphNodeId = "node_preview_deploy";
+  const graph = await kernel.createGeneratedExecutionGraph(
+    {
+      runtimeExecutionId: runtimeExecution.runtimeExecutionId,
+      graphNonce: `nonce_preview_${idempotencyMarker}`,
+      parserVersion: "test-codemode-preview-parser-0.1",
+      supportedGrammarVersion: "structured-action-list-0.1",
+      entryNodeIds: [graphNodeId],
+      edges: [],
+      catalogSnapshotDigest: await digestCanonical({ catalog: "tool_catalog_preview@v1" }),
+      gatewayRegistrySnapshotDigest: await digestCanonical({ gatewayRegistry: "gateway_registry_preview@v1" }),
+      registryBindingSetDigest: await digestCanonical({ bindings: ["preview_deploy.create"] }),
+      nodes: [await previewDeployGraphNode(objects, graphNodeId, parameters)],
+    },
+    {
+      tenantId: objects.tool.tenantId,
+      organizationId: objects.tool.organizationId,
+      principalIntentRef: "intent:create local preview",
+      principalId: objects.envelope.principalId,
+      agentId: objects.envelope.agentId,
+      runId: "run_preview",
+      runtimeAdapterId: objects.tool.runtimeAdapterId,
+      graphIssuerRef: "runtime-adapter:preview-fixture",
+      graphIssuerAuthority: "kernel_fixture",
+      graphIssuedAt: runtimeExecution.createdAt,
+    },
+  );
   const proposal = await proposePreviewDeployActionContract(kernel, {
     tenantId: objects.tool.tenantId,
     organizationId: objects.tool.organizationId,
@@ -137,15 +179,13 @@ async function createPreviewDeployFixture(idempotencyMarker = "preview") {
     gatewayId: objects.gateway.gatewayId,
     contractExpiresAt: futureIso(),
     runtimeExecutionId: runtimeExecution.runtimeExecutionId,
+    generatedExecutionGraphId: graph.generatedExecutionGraphId,
+    generatedExecutionNodeId: graphNodeId,
     signingSecret: "test-secret",
   }, {
     principalIntentRef: "intent:create local preview",
     generatedCodeOrSpecRef: "code:preview-deploy-block",
-    provider: "local",
-    projectRef: "demo-web",
-    branchRef: "feature/handshake",
-    commitRef: "commit_123",
-    previewUrlHint: "http://127.0.0.1/preview/demo-web",
+    ...parameters,
   });
   if (proposal.outcome !== "action_contract_proposed") throw new Error("expected preview contract");
   const policy = await kernel.evaluatePolicy({
@@ -162,14 +202,41 @@ async function createPreviewDeployFixture(idempotencyMarker = "preview") {
     runtimeExecution,
     contract: proposal.actionContract,
     greenlight: policy.greenlight,
-    parameters: {
-      provider: "local",
-      projectRef: "demo-web",
-      branchRef: "feature/handshake",
-      commitRef: "commit_123",
-      previewUrlHint: "http://127.0.0.1/preview/demo-web",
-    },
+    parameters,
     surface: await createLocalPreviewSurface(),
+  };
+}
+
+async function previewDeployGraphNode(
+  objects: ReturnType<typeof makePreviewDeployObjects>,
+  nodeId: string,
+  parameters: Record<string, JsonValue>,
+): Promise<GeneratedExecutionNodeInput> {
+  const paramsDigest = await digestCanonical({ parameters, secretRefs: {} });
+  return {
+    nodeId,
+    nodeKind: "codemode_action",
+    classification: "candidate_action_eligible",
+    actionClass: objects.actionType.actionClass,
+    toolCapabilityId: objects.tool.toolCapabilityId,
+    actionTypeId: objects.actionType.actionTypeId,
+    gatewayRegistryEntryId: objects.gateway.gatewayRegistryEntryId,
+    resourceRef: objects.resourceRef,
+    paramsDigest,
+    nodeGatewayBindingDigest: await digestCanonical({
+      actionClass: objects.actionType.actionClass,
+      toolCapabilityId: objects.tool.toolCapabilityId,
+      actionTypeId: objects.actionType.actionTypeId,
+      gatewayRegistryEntryId: objects.gateway.gatewayRegistryEntryId,
+      resourceRef: objects.resourceRef,
+      paramsDigest,
+    }),
+    sourceSpanDigest: await digestCanonical({ source: "tools.previewDeploy.create" }),
+    redactedArgvSummary: ["tools.previewDeploy.create"],
+    argvRedactionStatus: "redacted",
+    stdinRedactionStatus: "digest_only",
+    rawSecretMaterialDetected: false,
+    commandRiskClassifierPosture: "advisory_no_match",
   };
 }
 

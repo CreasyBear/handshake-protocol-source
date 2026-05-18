@@ -7,6 +7,7 @@ export type KernelTransitionMethod =
   | "putCatalogObject"
   | "compileIntent"
   | "createRuntimeExecution"
+  | "createGeneratedExecutionGraph"
   | "createProtectedPathPosture"
   | "proposeActionContract"
   | "evaluatePolicy"
@@ -34,10 +35,10 @@ export type TransitionOutcomeClass =
   | "exported";
 
 export type TransitionMatrixEntry = {
-  routeId: TransitionRouteId;
+  routeId: TransitionRouteId | null;
   kernelMethod: KernelTransitionMethod;
-  path: `/v0.2/${string}`;
-  callerCustodyRole: TransitionCallerRole;
+  path: `/v0.2/${string}` | null;
+  callerCustodyRole: TransitionCallerRole | "graph_evidence_issuer";
   inputSchema: string;
   outcomeClasses: TransitionOutcomeClass[];
   recordsWritten: ProtocolObjectType[];
@@ -73,6 +74,21 @@ export const transitionMatrix = [
     commitConflictBehavior: ["stream_conflict rebuilds event chain without minting authority"],
     illegalAuthorityClaims: ["intent compilation is not an ActionContract", "candidate evidence is not mutation authority"],
     invariantTests: ["kernel refuses unwrapped consequential tool before contract", "runtime execution evidence alone never mints authority"],
+  },
+  {
+    routeId: null,
+    kernelMethod: "createGeneratedExecutionGraph",
+    path: null,
+    callerCustodyRole: "graph_evidence_issuer",
+    inputSchema: "CreateGeneratedExecutionGraphInputSchema + GraphEvidenceIssuerContextSchema",
+    outcomeClasses: ["recorded", "refusal"],
+    recordsWritten: ["generated_execution_graph", "contract_stream_event"],
+    eventsEmitted: ["generated_execution_graph_recorded"],
+    indexEffects: ["appends generated execution graph evidence for a runtime execution block"],
+    proofOrRefusalObligation: "records whole-block graph coverage, unsupported siblings, redaction posture, command-risk posture, and graph issuer custody without authorizing mutation",
+    commitConflictBehavior: ["stream_conflict rebuilds graph event chain without minting authority", "nonce replay refuses duplicate graph evidence for the same runtime execution"],
+    illegalAuthorityClaims: ["generated graph evidence is not permission", "a clean graph is not an ActionContract"],
+    invariantTests: ["missing or unsafe graph coverage rejects generated-block candidates before contract", "graph transition never creates policy, greenlight, gate, mutation, or proof gap"],
   },
   {
     routeId: "createRuntimeExecution",
@@ -301,7 +317,7 @@ export const transitionMatrix = [
 ] as const satisfies readonly TransitionMatrixEntry[];
 
 export const transitionMatrixByRouteId = Object.fromEntries(
-  transitionMatrix.map((entry) => [entry.routeId, entry]),
+  transitionMatrix.filter((entry) => entry.routeId !== null).map((entry) => [entry.routeId, entry]),
 ) as Record<TransitionRouteId, TransitionMatrixEntry>;
 
 export function transitionKernelMethods(): KernelTransitionMethod[] {

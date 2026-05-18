@@ -1,11 +1,11 @@
 # Protocol Kernel
 
 Status: Canonical public alpha
-Version: v0.2.3
+Version: v0.2.4
 Audience: Protocol implementers, runtime builders, gateway owners, platform engineering
 Implementation status: Backed by TypeScript schemas, Hono routes, and reference storage in this repo
 Canonical owner: Protocol owner
-Last reviewed: 2026-05-18
+Last reviewed: 2026-05-19
 
 ## Invariant At Stake
 
@@ -15,6 +15,7 @@ Authority must pass through the protocol loop:
 
 ```text
 intent compilation
+  -> generated execution graph coverage when the runtime block is shell/codemode
   -> action contract
   -> policy decision
   -> greenlight or refusal
@@ -37,6 +38,16 @@ intent compilation
 
 `RuntimeExecutionRecord` records the generated execution block that produced candidate actions: execution shape, runtime posture, execution block digest, generated code/spec refs, allowed tools, observed tool calls, consequential call count, loop/retry/branch flags, dynamic tool construction, unobserved regions, access posture, uncertainty, refusal codes, and evidence refs. It is evidence only. It cannot create policy, a greenlight, a gateway check, mutation authority, or execution proof.
 
+`GeneratedExecutionGraph` records whole-block coverage for `shell_exec_block` and
+`codemode_block` runtime evidence. It binds to the exact runtime execution digest
+and execution block digest, records graph issuer custody, nonce, schema/parser
+versions, topology, coverage status, redaction posture, command-risk classifier
+posture, catalog snapshot digest, gateway registry snapshot digest,
+registry-binding-set digest, and node gateway binding digest. Only
+`fully_covered_no_unsupported_nodes` can produce a contractable candidate. The
+graph creates no policy, greenlight, gateway check, mutation, receipt, or proof
+gap.
+
 `ProtectedPathPosture` records the current runtime/gateway/resource posture for one protected path: gateway ID, runtime adapter, action class, resource ref, protected surface kind, posture state, credential custody, raw sibling tool status, source authority, freshness, evidence, and digest. The record is append-only; D1 and memory stores also maintain a current-posture pointer keyed by tenant/org/runtime/gateway/action/resource. The pointer is committed atomically with the posture record and stream event. Only `gateway_probe`, `conformance_fixture`, or `hosted_monitor` source authority can satisfy a contract that requires `gateway_checked`; runtime probes and operator attestations remain evidence, not enforcement proof.
 
 `ReviewArtifactRecord` records a rendered review artifact and the exact digest bindings it displayed: rendered contract digest, rendered policy input digest, rendered uncertainty digest, action contract ID/digest, policy decision ID/input digest, gateway policy version, render schema version, renderer ref, evidence, and artifact digest. Review approval must bind through this artifact; a summary without exact digest binding is review theatre.
@@ -44,6 +55,10 @@ intent compilation
 `IntentCompilationRecord` records what the compiler saw: principal intent, runtime identity, catalogs, generated code or spec refs, assumptions, uncertainty markers, rejected overreach, and candidate actions.
 
 `ActionContract` is the exact proposed commitment: gateway registry entry/version, gateway policy, gateway credential custody, enforcement mode, gateway authority holder, action class, resource, required protected-path state, optional runtime execution binding, parameters, parameter digest, bounds, expected side effects, idempotency key, sequence number, required prior action contract IDs, optional recovery recommendation linkage, and canonical digest.
+For generated shell/codemode blocks, it also pins the generated execution graph
+ID/digest, node ID/digest, coverage status, catalog snapshot digest, gateway
+registry snapshot digest, registry-binding-set digest, and node gateway binding
+digest.
 
 `PolicyDecision` evaluates the exact contract against the envelope, policy pack, isolation state, declared sequence dependencies, and any required current protected-path posture. If a contract requires `gateway_checked` posture and current posture is missing, stale, unsafe, or non-enforcing, policy refuses before any greenlight.
 
@@ -101,6 +116,12 @@ The repo-write reference flow exercises the same primitive against a different c
 
 The codemode multi-action reference flow exercises generated orchestration. It emits ordered package-install and repo-write contract proposals through the same Hono/D1 protocol surface, records candidate refusals as compiler evidence, binds later contracts to prior contract IDs, and proves the runtime wrapper receives no policy, greenlight, gateway-check, or mutation authority. Policy refuses a later contract while any required predecessor is missing, refused, or not greenlit. The gateway check refuses a later contract while any required predecessor lacks a final passed receipt.
 
+Plan 03 is tightening that reference flow: generated shell/codemode blocks now
+require clean `GeneratedExecutionGraph` evidence before candidate extraction. The
+current v0.2.4 graph transition is kernel-only; HTTP, SDK, OpenAPI, and runtime
+wrapper graph helpers remain deliberately deferred until the remaining graph
+drift, catalog/registry miss, and codemode whole-block tests land.
+
 The local preview-deploy fixture exercises the first preview-deploy action class, `preview_deploy.create`, through a local provider-shaped adapter and temp local preview surface. It proves local gateway-checked preview evidence only. It does not claim provider-side enforcement for Vercel, Cloudflare, GitHub Deployments, or any other production provider.
 
 ## Transition Guards
@@ -112,6 +133,8 @@ The reference kernel exports an explicit transition table in `src/protocol/trans
 | external configuration -> durable catalog/envelope | Only catalog objects and operating envelopes may be written directly. |
 | principal intent -> intent compilation | Compilation records uncertainty; it does not mint authority. |
 | generated runtime execution block -> runtime execution recorded | Runtime evidence records orchestration shape only; it cannot mint policy, greenlight, gate, or mutation authority. |
+| runtime execution recorded -> generated execution graph recorded | Graph evidence records whole-block coverage only; it cannot mint policy, greenlight, gate, mutation, receipt, or proof gap. |
+| generated execution graph -> intent compilation | Shell/codemode candidates require clean whole-block coverage and exact graph/node digest binding; unsafe siblings refuse the whole block before contract. |
 | runtime/gateway/resource probe -> protected path posture recorded | Posture records append-only evidence and atomically updates the current posture pointer. |
 | clean intent compilation -> action proposed | Compilation, envelope, gateway, principal, agent, run, tenant, and organization bindings must match. |
 | action proposed -> policy decision | Policy may evaluate only the envelope pinned by the action contract, and a greenlight candidate must satisfy declared prior contract dependencies plus required current protected-path posture. |
@@ -138,6 +161,7 @@ greenlight -> downstream success
 receipt -> downstream success
 proof gap -> success
 review screen -> authority
+generated graph -> authority
 reconciliation -> new mutation authority
 recovery recommendation -> mutation authority
 ```
@@ -156,4 +180,7 @@ Contracts must be canonicalized deterministically. Policy must evaluate the cano
 
 The model may compile intent. It may propose. It may render. None of that is authority.
 
-Protocol next mechanism: keep ADR 0001 as the canonical boundary for the v0.2.3 evidence expansion, implement the `02b` module-boundary cleanup, then decide whether `02c` protocol lifecycle alignment lands before or alongside generated execution graph coverage. `02c` may add request-context digests, protocol-version headers, operation-observation semantics, orphan-mitigation reason codes, and internal protected-surface operation claims. Those claims must remain internal protocol state, not public polling APIs. Local preview-deploy remains fixture proof until a production provider gateway owns the provider mutation credential and checks the exact greenlight before mutation.
+Protocol next mechanism: finish Plan 03's remaining graph hardening tests before
+adding public graph API surface or runtime helper surface. Local preview-deploy
+remains fixture proof until a production provider gateway owns the provider
+mutation credential and checks the exact greenlight before mutation.

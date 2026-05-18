@@ -12,7 +12,10 @@ import {
 
 describe("foundation transition matrix", () => {
   it("covers every public transition route and invoker exactly once", () => {
-    const matrixIds = transitionMatrix.map((entry) => String(entry.routeId)).sort();
+    const matrixIds = transitionMatrix
+      .filter((entry) => entry.routeId !== null)
+      .map((entry) => String(entry.routeId))
+      .sort();
     const routeIds = transitionRouteDefinitions
       .map((route) => String(route.routeId))
       .sort();
@@ -66,6 +69,7 @@ describe("foundation transition matrix", () => {
     const nonAuthorityRoutes = [
       "compileIntent",
       "createRuntimeExecution",
+      null,
       "createProtectedPathPosture",
       "createReviewArtifact",
       "createReviewDecision",
@@ -76,7 +80,8 @@ describe("foundation transition matrix", () => {
     ] as const;
 
     for (const routeId of nonAuthorityRoutes) {
-      expect(transitionMatrixByRouteId[routeId].illegalAuthorityClaims.join(" ")).toMatch(/not|cannot/);
+      const entry = routeId === null ? transitionMatrix.find((candidate) => candidate.kernelMethod === "createGeneratedExecutionGraph") : transitionMatrixByRouteId[routeId];
+      expect(entry?.illegalAuthorityClaims.join(" ")).toMatch(/not|cannot/);
     }
   });
 });

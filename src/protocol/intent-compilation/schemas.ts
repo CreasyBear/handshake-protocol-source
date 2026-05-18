@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { GeneratedExecutionCoverageStatusSchema } from "../generated-execution-graph/schemas";
 import { DigestSchema, IdSchema, IsoDateSchema, JsonValueSchema, ProtocolBaseSchema, ReasonCodeSchema, ResourceRefSchema } from "../schema-core";
 
 export const CandidateActionStatusSchema = z.enum(["contractable", "rejected"]);
@@ -40,6 +41,15 @@ export const CandidateActionSchema = z.strictObject({
   generatedCodeOrSpecRefs: z.array(z.string()).default([]),
   runtimeExecutionId: IdSchema.nullable().default(null),
   runtimeExecutionDigest: DigestSchema.nullable().default(null),
+  generatedExecutionGraphId: IdSchema.nullable().default(null),
+  generatedExecutionGraphDigest: DigestSchema.nullable().default(null),
+  generatedExecutionCoverageStatus: GeneratedExecutionCoverageStatusSchema.nullable().default(null),
+  generatedExecutionNodeId: IdSchema.nullable().default(null),
+  generatedExecutionNodeDigest: DigestSchema.nullable().default(null),
+  generatedExecutionCatalogSnapshotDigest: DigestSchema.nullable().default(null),
+  generatedExecutionGatewayRegistrySnapshotDigest: DigestSchema.nullable().default(null),
+  generatedExecutionRegistryBindingSetDigest: DigestSchema.nullable().default(null),
+  generatedExecutionNodeGatewayBindingDigest: DigestSchema.nullable().default(null),
 });
 export type CandidateAction = z.infer<typeof CandidateActionSchema>;
 

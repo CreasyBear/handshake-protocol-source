@@ -4,6 +4,12 @@ import { guardCatalogRegistration } from "./catalog-envelope";
 import { HandshakeProtocolError } from "./errors";
 import { gatewayCheck as gatewayCheckTransition, type GatewayCheckResult } from "./gateway-gate";
 import type { GatewayCheckInput } from "./gateway-gate";
+import { createGeneratedExecutionGraph as createGeneratedExecutionGraphTransition } from "./generated-execution-graph";
+import type {
+  CreateGeneratedExecutionGraphInput,
+  GeneratedExecutionGraph,
+  GraphEvidenceIssuerContext,
+} from "./generated-execution-graph";
 import { compileIntent as compileIntentTransition } from "./intent-compilation";
 import type { CompileIntentInput, IntentCompilationRecord } from "./intent-compilation";
 import {
@@ -73,6 +79,13 @@ export class HandshakeKernel {
 
   createRuntimeExecution(input: CreateRuntimeExecutionInput): Promise<RuntimeExecutionRecord> {
     return createRuntimeExecutionTransition(this.recorder, input);
+  }
+
+  createGeneratedExecutionGraph(
+    input: CreateGeneratedExecutionGraphInput,
+    issuerContext: GraphEvidenceIssuerContext,
+  ): Promise<GeneratedExecutionGraph> {
+    return createGeneratedExecutionGraphTransition(this.store, this.recorder, input, issuerContext);
   }
 
   createProtectedPathPosture(input: CreateProtectedPathPostureInput): Promise<ProtectedPathPosture> {

@@ -3,6 +3,7 @@ import { ActionContractSchema } from "../action-contract/schemas";
 import { ActionTypeSchema, GatewayRegistryEntrySchema, OperatingEnvelopeSchema, ToolCapabilitySchema } from "../catalog-envelope/schemas";
 import { ContractStreamEventSchema } from "../event-schemas";
 import { GatewayCheckAttemptSchema, MutationAttemptSchema } from "../gateway-gate/schemas";
+import { GeneratedExecutionGraphSchema } from "../generated-execution-graph/schemas";
 import { IntentCompilationRecordSchema } from "../intent-compilation/schemas";
 import { BreakerDecisionSchema, IsolationStateSchema } from "../isolation-breaker/schemas";
 import { ProtectedSurfaceOperationClaimSchema, SurfaceOperationReconciliationSchema } from "../operation-lifecycle/schemas";
@@ -22,6 +23,7 @@ export const ProtocolObjectTypeSchema = z.enum([
   "operating_envelope",
   "transition_request_context",
   "runtime_execution",
+  "generated_execution_graph",
   "protected_path_posture",
   "intent_compilation",
   "action_contract",
@@ -51,6 +53,7 @@ export const ProtocolRecordSchema = z.discriminatedUnion("objectType", [
   z.strictObject({ objectType: z.literal("operating_envelope"), payload: OperatingEnvelopeSchema }),
   z.strictObject({ objectType: z.literal("transition_request_context"), payload: TransitionRequestContextSchema }),
   z.strictObject({ objectType: z.literal("runtime_execution"), payload: RuntimeExecutionRecordSchema }),
+  z.strictObject({ objectType: z.literal("generated_execution_graph"), payload: GeneratedExecutionGraphSchema }),
   z.strictObject({ objectType: z.literal("protected_path_posture"), payload: ProtectedPathPostureSchema }),
   z.strictObject({ objectType: z.literal("intent_compilation"), payload: IntentCompilationRecordSchema }),
   z.strictObject({ objectType: z.literal("action_contract"), payload: ActionContractSchema }),

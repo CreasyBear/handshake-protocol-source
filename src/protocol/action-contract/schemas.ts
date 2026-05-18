@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { DigestSchema, IdSchema, IsoDateSchema, JsonValueSchema, ProtocolBaseSchema, ResourceRefSchema, SignatureSchema } from "../schema-core";
 import { CredentialCustodyStatusSchema, GatewayEnforcementModeSchema, RequiredProtectedPathStateSchema } from "../catalog-envelope/schemas";
+import { GeneratedExecutionCoverageStatusSchema } from "../generated-execution-graph/schemas";
 
 export const ActionContractSchema = ProtocolBaseSchema.extend({
   actionContractId: IdSchema,
@@ -40,6 +41,15 @@ export const ActionContractSchema = ProtocolBaseSchema.extend({
   requiredProtectedPathState: RequiredProtectedPathStateSchema,
   runtimeExecutionId: IdSchema.nullable(),
   runtimeExecutionDigest: DigestSchema.nullable(),
+  generatedExecutionGraphId: IdSchema.nullable().default(null),
+  generatedExecutionGraphDigest: DigestSchema.nullable().default(null),
+  generatedExecutionCoverageStatus: GeneratedExecutionCoverageStatusSchema.nullable().default(null),
+  generatedExecutionNodeId: IdSchema.nullable().default(null),
+  generatedExecutionNodeDigest: DigestSchema.nullable().default(null),
+  generatedExecutionCatalogSnapshotDigest: DigestSchema.nullable().default(null),
+  generatedExecutionGatewayRegistrySnapshotDigest: DigestSchema.nullable().default(null),
+  generatedExecutionRegistryBindingSetDigest: DigestSchema.nullable().default(null),
+  generatedExecutionNodeGatewayBindingDigest: DigestSchema.nullable().default(null),
   parameters: z.record(z.string(), JsonValueSchema),
   paramsDigest: DigestSchema,
   nonSecretParamsSummary: z.record(z.string(), JsonValueSchema),

@@ -197,15 +197,15 @@ result: whole block refuses; node 1 cannot produce a contract
 
 | Module | Responsibility | Must Not Do |
 |---|---|---|
-| `src/protocol/schemas.ts` | Define graph, node, coverage, and binding schemas. | Decide policy or parse shell semantics. |
-| `src/protocol/inputs.ts` | Accept graph recording input and candidate graph refs. | Accept raw script as proof of safety. |
-| `src/protocol/generated-execution-graphs.ts` | First-slice deep module for graph recording, issuer context, redaction checks, command-risk classifier posture, topology validation, graph limits, digest material, coverage status, and contractability result. | Emit contracts, policy, greenlights, receipts, parser-specific shell semantics, or shallow helpers that callers must compose correctly. |
+| `src/protocol/generated-execution-graph/` | Own graph schemas, input schemas, graph recording, issuer context, redaction checks, command-risk classifier posture, topology validation, graph limits, digest material, coverage status, and contractability result. | Emit contracts, policy, greenlights, receipts, parser-specific shell semantics, or shallow helpers that callers must compose correctly. |
+| `src/protocol/schemas.ts` | Compatibility export for graph, node, coverage, and binding schemas. | Decide policy or parse shell semantics. |
+| `src/protocol/inputs.ts` | Compatibility export for graph recording input and candidate graph refs. | Accept raw script as proof of safety. |
 | `src/protocol/intent-compilation/` | Reject candidates when graph coverage is missing or unsafe. | Treat graph evidence as permission. |
 | `src/protocol/action-contract/` | Re-check pinned graph/node digests before proposal. | Trust caller-supplied coverage without loading graph. |
 | `src/protocol/transitions.ts` | Centralize coverage guard behavior. | Add runtime-specific parser logic. |
 | `src/runtime/*` | Supply graph evidence from runtime wrappers later. | Hold gateway authority or mutate protected surfaces. |
 
-Deletion test: if `src/protocol/generated-execution-graphs.ts` is deleted,
+Deletion test: if `src/protocol/generated-execution-graph/` is deleted,
 issuer checks, redaction posture, command-risk classifier posture, graph limits,
 topology validation, and contractability rules should not reappear across callers.
 If they do, the module is too shallow and the seam is wrong.
@@ -447,17 +447,16 @@ Files:
 
 - `src/protocol/schemas.ts`
 - `src/protocol/inputs.ts`
-- `src/protocol/generated-execution-graphs.ts`
+- `src/protocol/generated-execution-graph/`
 - `src/protocol/kernel.ts`
-- `src/protocol/transitions.ts`
-- `src/storage/store.ts`
-- `test/kernel.test.ts`
+- `src/protocol/object-registry/`
+- `test/generated-execution-graph.test.ts`
 
 Tasks:
 
 - Bump protocol/package version to `0.2.4`.
 - Add graph and node schemas.
-- Add `recordGeneratedExecutionGraph(input, issuerContext)`.
+- Add `createGeneratedExecutionGraph(input, issuerContext)`.
 - Add protocol record type and object id mapping.
 - Add stream event type `generated_execution_graph_recorded`.
 - Add graph issuer custody, same-scope binding, nonce, and replay checks.
@@ -496,6 +495,26 @@ Tasks:
   the whole generated program, then pass graph/node bindings into child
   compilations.
 - Add red-green tests T3, T4, T5, T7, and T13.
+
+Implemented in the first v0.2.4 slice:
+
+- Candidate and contract schemas now carry graph/node binding fields.
+- `compileIntent` refuses `shell_exec_block` and `codemode_block` candidates
+  without clean graph coverage and exact node binding.
+- `proposeActionContract` reloads the graph and refuses coverage, runtime,
+  node digest, and node gateway-binding drift.
+- T1, T2, T3, T4, T7, T8, T9, T10, T11, and T12 are covered in
+  `test/generated-execution-graph.test.ts`.
+- The local preview-deploy fixture now records a clean codemode graph node before
+  proposing its preview contract, so it does not bypass the new boundary.
+
+Still open before Plan 03 closes:
+
+- T5 explicit durable graph drift fixture.
+- T6 catalog or gateway registry miss at node binding.
+- T13 codemode multi-action whole-block partial-credit refusal.
+- Runtime wrapper graph production beyond the local preview fixture and any
+  public HTTP/SDK/OpenAPI surface.
 
 ### Slice 3: D1/Hono/SDK Surface
 
@@ -636,11 +655,12 @@ unless a future ADR adds a separate pre-contract evidence lifecycle.
 
 ## Smallest Next Mechanism
 
-Start the first TDD tracer bullet:
+Continue the graph hardening sequence:
 
 ```text
-RED: a shell_exec_block or codemode_block runtime execution with no
-GeneratedExecutionGraph cannot produce an ActionContract.
+RED: a generated execution graph pinned by a candidate drifts or loses node
+gateway binding before proposal, and proposeActionContract refuses before
+ActionContract creation.
 ```
 
 ## GSTACK REVIEW REPORT
@@ -672,7 +692,10 @@ Minimum necessary changes:
 
 Complexity check:
 
-- The original module split was premature. Slice 1 now starts with `src/protocol/generated-execution-graphs.ts` and splits only if validation, coverage, and recording become hard to review in one file.
+- The original root-level module split was premature. Slice 1 now uses
+  `src/protocol/generated-execution-graph/` as an area-owned protocol module and
+  splits only inside that area if validation, coverage, and recording become
+  hard to review in one file.
 - Scope became broader in one place for safety: codemode is included because excluding it would preserve the exact bypass ADR 0002 is meant to close.
 
 ### Architecture Findings

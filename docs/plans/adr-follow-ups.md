@@ -26,22 +26,19 @@ Priority follows enforcement sequence:
 
 ## Priority Order
 
-1. Finish Plan 05 foundation mechanisms so Plan 03 builds on stable primitive
-   ownership and reusable failure simulation.
-2. `ADR-FU-0002-A`: start Plan 03 with the missing-graph red test after the
-   foundation gates exist.
-3. `ADR-FU-0002-C`: choose the hostile command-risk fixture categories before
-   broadening graph coverage tests.
-4. `ADR-FU-0006-A`: after the first Tier 2 protected path exists, prove two
+1. Finish Plan 03 graph hardening before adding public graph routes or runtime
+   helper surface. Remaining local blockers are explicit graph drift,
+   catalog/registry miss, and codemode whole-block tests.
+2. `ADR-FU-0006-A`: after the first Tier 2 protected path exists, prove two
    surfaces for the same logical action bind to the same contract posture.
-5. `ADR-FU-0008-A` and `ADR-FU-0009-A`: before self-improvement, replay, setup,
+3. `ADR-FU-0008-A` and `ADR-FU-0009-A`: before self-improvement, replay, setup,
    spend, generated-artifact, or concurrent-action claims, prove those inputs
    stay provenance/protected-resource evidence instead of authority.
-6. `ADR-FU-0007-A`: before A2A, remote-agent, hosted continuation, scheduled-job,
+4. `ADR-FU-0007-A`: before A2A, remote-agent, hosted continuation, scheduled-job,
    or retry claims, prove resumed or delegated work does not mint authority.
-7. `ADR-FU-0002-D`: pick a public helper only after the graph kernel behavior is
+5. `ADR-FU-0002-D`: pick a public helper only after the graph kernel behavior is
    proven.
-8. `ADR-FU-0010-A`: defer Tier 4 conformance until Tier 2 and Tier 3 evidence
+6. `ADR-FU-0010-A`: defer Tier 4 conformance until Tier 2 and Tier 3 evidence
    exists.
 
 `ADR-FU-0001-A` and `ADR-FU-0001-B` are separate claim blockers: they become P0
@@ -52,8 +49,6 @@ access. `ADR-FU-0001-A` is now planned by Plan 04, but remains unimplemented.
 
 | ID | Priority | Source | Status | Owning plan | Boundary | Smallest next mechanism |
 |---|---|---|---|---|---|---|
-| ADR-FU-0002-A | P0-local | [ADR 0002](../adr/0002-generated-execution-graph-coverage.md) | next implementation item | [Plan 03](./03-plan-eng-review-generated-execution-graph-coverage.md) | Runtime execution evidence is not enough to issue an action contract. | Write the red test proving `shell_exec_block` or `codemode_block` runtime evidence without `GeneratedExecutionGraph` coverage cannot produce an `ActionContract`. |
-| ADR-FU-0002-C | P1 | [ADR 0002](../adr/0002-generated-execution-graph-coverage.md) | open fixture selection | [Plan 03](./03-plan-eng-review-generated-execution-graph-coverage.md) | Command-risk fixtures are hostile evidence, not enforcement. | Select the first `destructive_command_guard` categories to copy into unsupported/bypass-risk graph coverage tests. |
 | ADR-FU-0002-D | P2 | [ADR 0002](../adr/0002-generated-execution-graph-coverage.md) | open DevEx decision | [Plan 03](./03-plan-eng-review-generated-execution-graph-coverage.md) | Public helpers must not expose generated graph evidence as authority. | Choose the first public DevEx surface: SDK helper, CLI diagnostic, or runtime wrapper fixture. |
 | ADR-FU-0001-A | P0-hosted | [ADR 0001](../adr/0001-kernel-evidence-boundaries.md), [ADR 0005](../adr/0005-hosted-transition-caller-identity.md) | planned; implementation blocker | [Plan 04](./04-plan-eng-review-hosted-caller-identity.md) | Static transition bearer tokens are local caller custody only, not principal/org authority. | Add the red hosted HTTP test proving a valid local custody token cannot write a hosted transition for an unmatched tenant/org scope, then implement server-derived `TransitionCallerIdentity` with custody-role and tenant/org scope checks before hosted records commit. |
 | ADR-FU-0001-B | P0-public | [ADR 0001](../adr/0001-kernel-evidence-boundaries.md), [Plan 02b](./02b-plan-eng-review-module-boundaries.md), [Plan 02c](./02c-plan-eng-review-protocol-spec-alignment.md) | deferred public API blocker | future evidence-read plan | Raw records, request context, claims, and provider payloads are internal control-plane evidence, not a public API. | Design a redacted evidence/read API before exposing record reads outside local/control-plane debug use. |
@@ -67,6 +62,8 @@ access. `ADR-FU-0001-A` is now planned by Plan 04, but remains unimplemented.
 
 | ID | Source | Resolution | Boundary Preserved |
 |---|---|---|---|
+| ADR-FU-0002-A | [ADR 0002](../adr/0002-generated-execution-graph-coverage.md), [Plan 03](./03-plan-eng-review-generated-execution-graph-coverage.md) | Resolved by `test/generated-execution-graph.test.ts`: a `shell_exec_block` runtime execution without a `GeneratedExecutionGraph` yields `generated_execution_graph_missing`, creates no `ActionContract`, and creates no `ProofGap`. | Runtime execution evidence is not enough to issue an action contract. |
+| ADR-FU-0002-C | [ADR 0002](../adr/0002-generated-execution-graph-coverage.md), [Plan 03](./03-plan-eng-review-generated-execution-graph-coverage.md) | Resolved for the first local fixture set: unsupported sibling, truncated graph, raw argv material, bypass-detected classifier posture, fail-open classifier posture, observer-only evidence, hidden-trigger evidence, and unknown node kind are covered as graph refusal evidence. | Command-risk fixtures remain hostile evidence; classifier output does not become enforcement or authorization. |
 | ADR-FU-0003-A | [ADR 0003](../adr/0003-protocol-module-ownership.md), [Plan 02d](./02d-plan-eng-review-protocol-module-architecture.md) | Resolved by Plan 02d closeout: protocol behavior moved behind invariant-owned area modules; `HandshakeKernel` imports area public indexes; `store-port.ts` owns the protocol storage port; root `schemas.ts` and `inputs.ts` are compatibility aggregators only; deprecated root primitive shims were removed; import-posture, object-registry, and root-export tests guard the boundary. | Module ownership is current implementation behavior, not only architecture intent. |
 | ADR-FU-0003-B | [ADR 0003](../adr/0003-protocol-module-ownership.md), [Plan 02d](./02d-plan-eng-review-protocol-module-architecture.md) | Resolved by implementing `object-registry` before schema/input sharding. It owns object type metadata, ID extraction, schema collection, export posture, raw-read posture, and scope selectors while tests prevent primitive logic creep. | Schema/input ownership moved to areas without recreating a central primitive gravity well. |
 | ADR-FU-0002-B | [ADR 0002](../adr/0002-generated-execution-graph-coverage.md), [ADR 0004](../adr/0004-pre-contract-refusal-evidence-boundary.md) | Resolved by ADR 0004: pre-contract coverage gaps remain graph/compiler refusal evidence in Plan 03. The current `ProofGap` lifecycle starts only after an `ActionContract` exists. | Compiler refusal cannot be confused with post-gateway proof gaps. |
@@ -94,9 +91,9 @@ Do not add vague TODOs such as "clean up architecture," "improve auth," or
 4. the smallest next mechanism;
 5. whether it blocks local alpha, hosted deployment, or public API claims.
 
-Smallest next mechanism: finish Plan 05 foundation mechanisms, starting with
-`FaultInjectingProtocolStore`. After the foundation gates exist, implement
-`ADR-FU-0002-A` as the first Plan 03 red test. If the next claim is hosted or
+Smallest next mechanism: continue Plan 03 with an explicit graph drift fixture
+where a candidate pins graph/node binding and `proposeActionContract` refuses
+when durable graph evidence no longer matches. If the next claim is hosted or
 multi-tenant, implement Plan 04's `ADR-FU-0001-A` red test first. After the
 first Tier 2 protected path exists, implement `ADR-FU-0006-A` before adding more
 entry surfaces.

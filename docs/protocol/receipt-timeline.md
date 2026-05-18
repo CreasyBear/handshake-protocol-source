@@ -1,11 +1,11 @@
 # Receipt Timeline
 
 Status: Canonical public alpha
-Version: v0.2.3
+Version: v0.2.4
 Audience: Developers, platform engineering, security engineering, auditors
 Implementation status: Product surface definition; underlying receipt objects exist in the v0.2 kernel
 Canonical owner: Product owner
-Last reviewed: 2026-05-18
+Last reviewed: 2026-05-19
 
 ## Invariant At Stake
 
@@ -21,6 +21,8 @@ It must show:
 
 - principal and agent references;
 - runtime and compilation references;
+- generated execution graph and node digests when the contract came from a
+  shell/codemode block;
 - gateway ID and gateway policy version;
 - gateway registry entry/version and gateway policy drift status;
 - action class;
@@ -42,6 +44,7 @@ The Receipt Timeline reconstructs one action chain:
 
 ```text
 intent compilation evidence recorded
+  -> generated execution graph recorded for shell/codemode blocks
   -> action proposed
   -> policy decision recorded
   -> greenlight issued or refusal recorded

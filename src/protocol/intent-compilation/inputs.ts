@@ -14,6 +14,8 @@ export const CompileIntentInputSchema = z.strictObject({
   actionCatalogRef: z.string().min(1),
   gatewayRegistryRef: z.string().min(1),
   runtimeExecutionId: z.string().min(1).nullable().default(null),
+  generatedExecutionGraphId: z.string().min(1).nullable().default(null),
+  generatedExecutionNodeId: z.string().min(1).nullable().default(null),
   generatedCodeOrSpecRefs: z.array(z.string()).default([]),
   declaredAssumptions: z.array(z.string()).default([]),
   requiredEvidenceRefs: z.array(z.string()).default([]),

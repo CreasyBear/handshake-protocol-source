@@ -10,6 +10,7 @@ export const ContractStreamEventSchema = ProtocolBaseSchema.extend({
   eventType: z.enum([
     "intent_compiled",
     "runtime_execution_recorded",
+    "generated_execution_graph_recorded",
     "protected_path_posture_recorded",
     "action_proposed",
     "policy_decision_recorded",

@@ -1,11 +1,11 @@
 # API Protocol Reference
 
 Status: Canonical public alpha reference
-Version: v0.2.3
+Version: v0.2.4
 Audience: Protocol implementers, SDK authors, runtime and gateway integrators
-Implementation status: Backed by current `/v0.2/*` routes, `GET /openapi.json`, SDK calls, and D1-backed adapter tests, including recovery terminal conflict proof gaps
+Implementation status: Backed by current `/v0.2/*` routes, `GET /openapi.json`, SDK calls, D1-backed adapter tests, and kernel-only generated-execution graph evidence
 Canonical owner: Protocol owner
-Last reviewed: 2026-05-18
+Last reviewed: 2026-05-19
 
 ## Authority Boundary
 
@@ -14,6 +14,7 @@ The API does not let callers jump from intent to mutation. Every consequential a
 ```text
 intent compilation
   -> optional runtime execution evidence
+  -> generated execution graph coverage for shell/codemode blocks
   -> action contract
   -> policy decision
   -> greenlight
@@ -51,6 +52,12 @@ proof gap -> success
 | `POST /v0.2/recovery-recommendations` | Records a narrowed recovery path from refusal or proof-gap evidence without reusing a greenlight or mutating a gateway. |
 | `POST /v0.2/recovery-recommendation-status-transitions` | Moves an open recovery recommendation to expired or superseded with durable transition evidence; losing terminal-claim races record recovery-phase proof gaps. |
 | `POST /v0.2/recovery-terminal-conflict-resolutions` | Resolves a recovery terminal conflict proof gap only after loading the winning terminal transition. |
+
+`GeneratedExecutionGraph` is intentionally not a public HTTP route in v0.2.4.
+It is a kernel/runtime-wrapper transition exposed through schemas and
+`HandshakeKernel.createGeneratedExecutionGraph(...)` while Plan 03 hardens graph
+drift, catalog/registry miss, and codemode whole-block tests. Public
+HTTP/SDK/OpenAPI exposure waits until that kernel contract is stable.
 
 ## Transition Caller Custody
 
@@ -139,6 +146,12 @@ resourceRef
 requiredProtectedPathState
 runtimeExecutionId
 runtimeExecutionDigest
+generatedExecutionGraphId
+generatedExecutionGraphDigest
+generatedExecutionNodeDigest
+generatedExecutionCoverageStatus
+generatedExecutionRegistryBindingSetDigest
+generatedExecutionNodeGatewayBindingDigest
 paramsDigest
 bounds
 idempotencyKey

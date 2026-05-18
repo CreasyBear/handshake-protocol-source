@@ -1,11 +1,11 @@
 # Gateway Integration
 
 Status: Canonical public alpha
-Version: v0.2.3
+Version: v0.2.4
 Audience: Gateway owners, platform engineering, security engineering, protocol implementers
 Implementation status: Reference gateway check, verified gateway-check artifact, package-install and repo-write adapter harnesses, recovery terminal conflict proof gaps, and Hono/D1 end-to-end package-install flow exist in v0.2; production gateways are target integrations
 Canonical owner: Protocol owner
-Last reviewed: 2026-05-18
+Last reviewed: 2026-05-19
 
 ## Invariant At Stake
 

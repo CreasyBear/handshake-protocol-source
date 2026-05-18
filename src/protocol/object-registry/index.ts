@@ -8,6 +8,7 @@ import {
 } from "../catalog-envelope/schemas";
 import { ContractStreamEventSchema } from "../event-schemas";
 import { GatewayCheckAttemptSchema, MutationAttemptSchema } from "../gateway-gate/schemas";
+import { GeneratedExecutionGraphSchema } from "../generated-execution-graph/schemas";
 import { IntentCompilationRecordSchema } from "../intent-compilation/schemas";
 import { BreakerDecisionSchema, IsolationStateSchema } from "../isolation-breaker/schemas";
 import {
@@ -52,6 +53,7 @@ export const protocolObjectRegistry = {
   operating_envelope: entry("operating_envelope", OperatingEnvelopeSchema, (record) => record.payload.envelopeId, "catalog_public", "control_plane_read"),
   transition_request_context: entry("transition_request_context", TransitionRequestContextSchema, (record) => record.payload.transitionRequestContextId, "internal_evidence", "internal_only"),
   runtime_execution: entry("runtime_execution", RuntimeExecutionRecordSchema, (record) => record.payload.runtimeExecutionId, "transition_evidence", "audit_read"),
+  generated_execution_graph: entry("generated_execution_graph", GeneratedExecutionGraphSchema, (record) => record.payload.generatedExecutionGraphId, "transition_evidence", "audit_read"),
   protected_path_posture: entry("protected_path_posture", ProtectedPathPostureSchema, (record) => record.payload.protectedPathPostureId, "transition_evidence", "audit_read"),
   intent_compilation: entry("intent_compilation", IntentCompilationRecordSchema, (record) => record.payload.intentCompilationId, "transition_evidence", "audit_read"),
   action_contract: entry("action_contract", ActionContractSchema, (record) => record.payload.actionContractId, "transition_evidence", "audit_read"),

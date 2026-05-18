@@ -1,4 +1,5 @@
 export * from "./runtime-evidence/inputs";
+export * from "./generated-execution-graph/inputs";
 export * from "./protected-path-posture/inputs";
 export * from "./review-binding/inputs";
 export * from "./intent-compilation/inputs";

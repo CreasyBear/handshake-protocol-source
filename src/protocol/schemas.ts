@@ -2,6 +2,7 @@ export * from "./schema-core";
 export * from "./transition-request-context-schemas";
 export * from "./catalog-envelope/schemas";
 export * from "./runtime-evidence/schemas";
+export * from "./generated-execution-graph/schemas";
 export * from "./protected-path-posture/schemas";
 export * from "./intent-compilation/schemas";
 export * from "./action-contract/schemas";

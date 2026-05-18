@@ -16,6 +16,7 @@ const idFields = {
   operating_envelope: "envelopeId",
   transition_request_context: "transitionRequestContextId",
   runtime_execution: "runtimeExecutionId",
+  generated_execution_graph: "generatedExecutionGraphId",
   protected_path_posture: "protectedPathPostureId",
   intent_compilation: "intentCompilationId",
   action_contract: "actionContractId",
