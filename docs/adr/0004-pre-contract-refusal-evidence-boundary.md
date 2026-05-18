@@ -1,6 +1,6 @@
 # ADR 0004: Pre-Contract Refusal Evidence Boundary
 
-Status: Accepted
+Status: Implemented locally
 Date: 2026-05-18
 Owner: Protocol owner
 Implementation owner: [`03-plan-eng-review-generated-execution-graph-coverage.md`](../plans/03-plan-eng-review-generated-execution-graph-coverage.md)

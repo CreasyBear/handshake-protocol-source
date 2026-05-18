@@ -200,12 +200,14 @@ The v0.2.4 kernel slice implements the first local graph boundary:
   raw argv material, bypass posture, fail-open classifier evidence,
   observer-only evidence, hidden triggers, and unknown node kinds are covered by
   kernel tests.
-- The existing codemode multi-action wrapper refuses the whole generated program
-  before minting any `ActionContract` when one sibling candidate is refused.
+- The existing codemode multi-action wrapper records one `RuntimeExecutionRecord`
+  and one `GeneratedExecutionGraph` for the generated program, binds every child
+  compilation and contract to the graph/node evidence, and refuses the whole
+  generated program before minting any `ActionContract` when one sibling
+  candidate is refused.
 
 Still open before this ADR is fully implemented:
 
-- runtime wrapper graph production beyond the local preview fixture;
 - public HTTP/SDK/OpenAPI graph surface, if still justified after the kernel
   behavior stabilizes.
 

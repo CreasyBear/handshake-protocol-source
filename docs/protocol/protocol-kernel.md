@@ -114,13 +114,13 @@ The recovery recommendation path exercises the post-failure boundary. A proof-ga
 
 The repo-write reference flow exercises the same primitive against a different consequence shape. It binds repository file content by digest and byte length, omits raw content from the `ActionContract`, recomputes the digest at the gateway adapter, and refuses mutation when actual content diverges from the contract.
 
-The codemode multi-action reference flow exercises generated orchestration. It emits ordered package-install and repo-write contract proposals through the same Hono/D1 protocol surface, records candidate refusals as compiler evidence, binds later contracts to prior contract IDs, and proves the runtime wrapper receives no policy, greenlight, gateway-check, or mutation authority. Policy refuses a later contract while any required predecessor is missing, refused, or not greenlit. The gateway check refuses a later contract while any required predecessor lacks a final passed receipt.
+The codemode multi-action reference flow exercises generated orchestration. It records one `RuntimeExecutionRecord` and one `GeneratedExecutionGraph` for the generated program, emits ordered package-install and repo-write contract proposals through the kernel transition surface, records candidate refusals as compiler evidence, binds later contracts to prior contract IDs, and proves the runtime wrapper receives no policy, greenlight, gateway-check, or mutation authority. Policy refuses a later contract while any required predecessor is missing, refused, or not greenlit. The gateway check refuses a later contract while any required predecessor lacks a final passed receipt.
 
 Plan 03 tightened that reference flow: generated shell/codemode blocks now
 require clean `GeneratedExecutionGraph` evidence before candidate extraction.
-The current v0.2.4 graph transition is kernel-only; HTTP, SDK, OpenAPI, and
-runtime wrapper graph helpers remain deliberately deferred until runtime graph
-production beyond the local preview fixture is justified and designed.
+The current v0.2.4 graph transition is kernel-only; HTTP, SDK, and OpenAPI graph
+surfaces remain deliberately deferred until a public helper is justified and
+designed.
 
 The local preview-deploy fixture exercises the first preview-deploy action class, `preview_deploy.create`, through a local provider-shaped adapter and temp local preview surface. It proves local gateway-checked preview evidence only. It does not claim provider-side enforcement for Vercel, Cloudflare, GitHub Deployments, or any other production provider.
 
@@ -180,7 +180,7 @@ Contracts must be canonicalized deterministically. Policy must evaluate the cano
 
 The model may compile intent. It may propose. It may render. None of that is authority.
 
-Protocol next mechanism: design runtime graph production beyond the local preview
-fixture before adding any public graph API surface. Local preview-deploy remains
-fixture proof until a production provider gateway owns the provider mutation
-credential and checks the exact greenlight before mutation.
+Protocol next mechanism: keep public graph API surface cut unless ADR-FU-0002-D
+selects and proves a helper surface. Local preview-deploy remains fixture proof
+until a production provider gateway owns the provider mutation credential and
+checks the exact greenlight before mutation.

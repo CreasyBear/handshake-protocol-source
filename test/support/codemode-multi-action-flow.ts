@@ -1,4 +1,5 @@
 import type { HandshakeClient } from "../../src/sdk/client";
+import type { HandshakeKernel } from "../../src/protocol/kernel";
 import type { CodemodeMultiActionRuntimeConfig } from "../../src/runtime/codemode-multi-action/wrapper";
 import { makeKernelFixture } from "../fixtures";
 import {
@@ -56,6 +57,19 @@ export async function registerCodemodeMultiActionFixtureObjectsWithClient(
   await client.registerActionType(fixture.repoWrite.actionType);
   await client.registerGatewayRegistryEntry(fixture.repoWrite.gateway);
   await client.registerOperatingEnvelope(fixture.packageInstall.envelope);
+}
+
+export async function registerCodemodeMultiActionFixtureObjectsWithKernel(
+  kernel: HandshakeKernel,
+  fixture: CodemodeMultiActionFixtureObjects,
+): Promise<void> {
+  await kernel.putCatalogObject({ objectType: "tool_capability", payload: fixture.packageInstall.tool });
+  await kernel.putCatalogObject({ objectType: "action_type", payload: fixture.packageInstall.actionType });
+  await kernel.putCatalogObject({ objectType: "gateway_registry_entry", payload: fixture.packageInstall.gateway });
+  await kernel.putCatalogObject({ objectType: "tool_capability", payload: fixture.repoWrite.tool });
+  await kernel.putCatalogObject({ objectType: "action_type", payload: fixture.repoWrite.actionType });
+  await kernel.putCatalogObject({ objectType: "gateway_registry_entry", payload: fixture.repoWrite.gateway });
+  await kernel.putCatalogObject({ objectType: "operating_envelope", payload: fixture.packageInstall.envelope });
 }
 
 export function codemodeMultiActionRuntimeConfig(

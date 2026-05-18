@@ -83,6 +83,13 @@ export async function compileRepoWriteIntent(
   config: RepoWriteRuntimeConfig,
   toolCallValue: RepoWriteToolCall,
 ): Promise<IntentCompilationRecord> {
+  return protocol.compileIntent(await buildRepoWriteCompileIntentInput(config, toolCallValue));
+}
+
+export async function buildRepoWriteCompileIntentInput(
+  config: RepoWriteRuntimeConfig,
+  toolCallValue: RepoWriteToolCall,
+): Promise<CompileIntentInput> {
   const toolCall = RepoWriteToolCallSchema.parse(toolCallValue);
   const resourceRef = repoWriteResourceRef(toolCall.repositoryRef, toolCall.filePath);
   const contentDigest = await digestUtf8Content(toolCall.content);
@@ -100,7 +107,7 @@ export async function compileRepoWriteIntent(
     contentDigest,
     contentByteLength,
   };
-  return protocol.compileIntent({
+  return {
     tenantId: config.tenantId,
     organizationId: config.organizationId,
     principalIntentRef: toolCall.principalIntentRef,
@@ -139,7 +146,7 @@ export async function compileRepoWriteIntent(
       rollbackHint: "restore previous file content from receipt evidence",
       expiresAt: config.contractExpiresAt,
     },
-  });
+  };
 }
 
 export function refusalReasonCodesForCompilation(intentCompilation: IntentCompilationRecord): string[] {

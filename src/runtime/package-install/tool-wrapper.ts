@@ -80,9 +80,16 @@ export async function compilePackageInstallIntent(
   config: PackageInstallRuntimeConfig,
   toolCallValue: PackageInstallToolCall,
 ): Promise<IntentCompilationRecord> {
+  return protocol.compileIntent(buildPackageInstallCompileIntentInput(config, toolCallValue));
+}
+
+export function buildPackageInstallCompileIntentInput(
+  config: PackageInstallRuntimeConfig,
+  toolCallValue: PackageInstallToolCall,
+): CompileIntentInput {
   const toolCall = PackageInstallToolCallSchema.parse(toolCallValue);
   const parameters = { package: toolCall.package, versionRange: toolCall.versionRange };
-  return protocol.compileIntent({
+  return {
     tenantId: config.tenantId,
     organizationId: config.organizationId,
     principalIntentRef: toolCall.principalIntentRef,
@@ -121,7 +128,7 @@ export async function compilePackageInstallIntent(
       rollbackHint: "remove package and restore manifest from receipt evidence",
       expiresAt: config.contractExpiresAt,
     },
-  });
+  };
 }
 
 export function refusalReasonCodesForCompilation(intentCompilation: IntentCompilationRecord): string[] {

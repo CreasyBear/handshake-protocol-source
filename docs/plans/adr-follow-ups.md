@@ -26,11 +26,9 @@ Priority follows enforcement sequence:
 
 ## Priority Order
 
-1. Finish Plan 03 graph hardening before adding public graph routes or runtime
-   helper surface. Local graph drift, catalog/registry miss, and codemode
-   whole-block tests are resolved; remaining blockers are runtime graph
-   production beyond the local preview fixture and any justified public graph
-   surface.
+1. Keep Plan 03 public graph routes cut. Local graph drift, catalog/registry
+   miss, codemode runtime graph production, and codemode whole-block tests are
+   resolved; the remaining blocker is any justified public graph surface.
 2. `ADR-FU-0006-A`: after the first Tier 2 protected path exists, prove two
    surfaces for the same logical action bind to the same contract posture.
 3. `ADR-FU-0008-A` and `ADR-FU-0009-A`: before self-improvement, replay, setup,
@@ -93,9 +91,8 @@ Do not add vague TODOs such as "clean up architecture," "improve auth," or
 4. the smallest next mechanism;
 5. whether it blocks local alpha, hosted deployment, or public API claims.
 
-Smallest next mechanism: continue Plan 03 with an explicit graph drift fixture
-where a candidate pins graph/node binding and `proposeActionContract` refuses
-when durable graph evidence no longer matches. If the next claim is hosted or
-multi-tenant, implement Plan 04's `ADR-FU-0001-A` red test first. After the
-first Tier 2 protected path exists, implement `ADR-FU-0006-A` before adding more
-entry surfaces.
+Smallest next mechanism: keep public graph APIs cut unless `ADR-FU-0002-D`
+selects and proves a helper surface. If the next claim is hosted or multi-tenant,
+implement Plan 04's `ADR-FU-0001-A` red test first. After the first Tier 2
+protected path exists, implement `ADR-FU-0006-A` before adding more entry
+surfaces.

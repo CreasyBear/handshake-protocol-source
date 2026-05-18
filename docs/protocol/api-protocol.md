@@ -55,9 +55,10 @@ proof gap -> success
 
 `GeneratedExecutionGraph` is intentionally not a public HTTP route in v0.2.4.
 It is a kernel/runtime-wrapper transition exposed through schemas and
-`HandshakeKernel.createGeneratedExecutionGraph(...)`. Public HTTP/SDK/OpenAPI
-exposure waits until runtime graph production beyond the local preview fixture is
-designed and the public contract is justified.
+`HandshakeKernel.createGeneratedExecutionGraph(...)`. The codemode multi-action
+wrapper records graph evidence through that kernel transition. Public
+HTTP/SDK/OpenAPI exposure waits until ADR-FU-0002-D selects and proves a helper
+surface.
 
 ## Transition Caller Custody
 
@@ -560,4 +561,4 @@ The reference suite also runs the package-install runtime wrapper and gateway ad
 
 A second Hono/D1 adapter path covers repository file writes. It proves a runtime can contract a repo mutation by content digest and byte length, not raw content, and that the gateway refuses a changed-content attempt before creating a `MutationAttempt`.
 
-The codemode multi-action wrapper covers generated programs that propose multiple consequential actions in order. It records one `IntentCompilationRecord` per candidate and one `ActionContract` per clean candidate, but no `PolicyDecision`, `Greenlight`, `GatewayCheckAttempt`, or `MutationAttempt`. Ordered proposal is not ordered execution authority.
+The codemode multi-action wrapper covers generated programs that propose multiple consequential actions in order. It records one `RuntimeExecutionRecord`, one `GeneratedExecutionGraph`, one `IntentCompilationRecord` per candidate, and one `ActionContract` per clean candidate, but no `PolicyDecision`, `Greenlight`, `GatewayCheckAttempt`, or `MutationAttempt`. Ordered proposal is not ordered execution authority.

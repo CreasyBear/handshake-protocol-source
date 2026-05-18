@@ -1,6 +1,6 @@
 # Plan 03: Generated Execution Graph Coverage Boundary
 
-Status: Implemented locally; runtime graph producer and public-surface follow-ups remain open
+Status: Implemented locally; public-surface follow-up remains open
 Date: 2026-05-18
 Owner: Protocol owner
 References:
@@ -507,13 +507,16 @@ Implemented in the first v0.2.4 slice:
   covered in `test/generated-execution-graph.test.ts`.
 - The local preview-deploy fixture now records a clean codemode graph node before
   proposing its preview contract, so it does not bypass the new boundary.
+- The codemode multi-action wrapper now records one `RuntimeExecutionRecord` and
+  one `GeneratedExecutionGraph` for the generated program, then passes graph/node
+  bindings into every child compilation.
 - T13 is covered in `test/codemode-multi-action-runtime.test.ts`: one refused
   sibling blocks every `ActionContract` from that generated program.
 
-Still open before Plan 03 closes:
+Still open after local Plan 03 closeout:
 
-- Runtime wrapper graph production beyond the local preview fixture and any
-  public HTTP/SDK/OpenAPI surface.
+- Any public HTTP/SDK/OpenAPI graph surface. Keep it cut unless ADR-FU-0002-D
+  selects a public helper and proves graph evidence will not become authority.
 
 ### Slice 3: D1/Hono/SDK Surface
 
@@ -585,13 +588,25 @@ Hard requirements:
 
 | Lens | Applies? | Target | Hard Stops | Evidence Required | Closeout |
 |---|---:|---:|---|---|---|
-| Product / CEO | yes | 8/10 | Plan claims arbitrary shell/codemode control or omits bypass/non-goals. | Product claim, non-claims, spine mapping, scope/risk note. | planned |
-| Engineering | yes | hard gate | Contract proposal skips graph coverage; state/data flow ambiguous; critical refusal path untested; codemode partial success remains possible. | Data-flow diagram, T1-T13 focused tests, full verification commands. | planned |
-| Security / CSO | yes | hard gate | Raw secrets enter graph records; caller self-asserts graph authority; protected mutation bypasses policy/gateway; guard fail-open/bypass is accepted as clean coverage; observer evidence counts as enforcement. | Threat notes, graph issuer checks, redaction tests, classifier posture tests, boundary/refusal tests. | planned |
-| DevEx | conditional | 8/10 | Refusal lacks problem/cause/fix; future SDK/HTTP examples require custom wrapper logic for core behavior. | Structured refusal samples, fixture helper examples, docs/schema consistency check. | planned |
-| Design | no | n/a | No UI or review renderer in this slice; any future review UI not bound to exact contract is a hard stop. | Not applicable now; future state matrix if UI enters scope. | planned |
-| Architecture | yes | 8/10 | Shallow graph coverage module; callers must compose issuer, redaction, graph limits, and contractability rules; evidence rules duplicated across callers. | Module seam map, deletion-test note, interface responsibility statement, interface-level tests. | planned |
-| Domain Invariant | yes | hard gate | Generated execution becomes permission; graph parser becomes enforcement; one graph authorizes unsafe siblings; missing evidence smoothed over. | Candidate/action-contract binding tests, gateway non-authority checks, refusal/gap/bypass posture. | planned |
+| Product / CEO | yes | 8/10 | Plan claims arbitrary shell/codemode control or omits bypass/non-goals. | Product claim, non-claims, spine mapping, scope/risk note. | done |
+| Engineering | yes | hard gate | Contract proposal skips graph coverage; state/data flow ambiguous; critical refusal path untested; codemode partial success remains possible. | Data-flow diagram, T1-T13 focused tests, full verification commands. | done |
+| Security / CSO | yes | hard gate | Raw secrets enter graph records; caller self-asserts graph authority; protected mutation bypasses policy/gateway; guard fail-open/bypass is accepted as clean coverage; observer evidence counts as enforcement. | Threat notes, graph issuer checks, redaction tests, classifier posture tests, boundary/refusal tests. | done |
+| DevEx | conditional | 8/10 | Refusal lacks problem/cause/fix; future SDK/HTTP examples require custom wrapper logic for core behavior. | Structured refusal samples, fixture helper examples, docs/schema consistency check. | deferred |
+| Design | no | n/a | No UI or review renderer in this slice; any future review UI not bound to exact contract is a hard stop. | Not applicable now; future state matrix if UI enters scope. | deferred |
+| Architecture | yes | 8/10 | Shallow graph coverage module; callers must compose issuer, redaction, graph limits, and contractability rules; evidence rules duplicated across callers. | Module seam map, deletion-test note, interface responsibility statement, interface-level tests. | done |
+| Domain Invariant | yes | hard gate | Generated execution becomes permission; graph parser becomes enforcement; one graph authorizes unsafe siblings; missing evidence smoothed over. | Candidate/action-contract binding tests, gateway non-authority checks, refusal/gap/bypass posture. | done |
+
+## Quality Closeout
+
+| Lens | Planned Target | Actual Result | Evidence | Delta | Status |
+|---|---:|---:|---|---|---|
+| Product / CEO | 8/10 | Local graph boundary remains scoped to kernel/runtime-wrapper proof. | ADR 0002 non-claims, docs scans for public graph/provider overclaims. | Public graph helper remains cut. | pass |
+| Engineering | hard gate | All local T1-T13 graph paths are covered, including codemode runtime graph production. | `test/generated-execution-graph.test.ts`, `test/codemode-multi-action-runtime.test.ts`, full suite closeout. | Public HTTP/SDK graph surface not implemented by design. | pass |
+| Security / CSO | hard gate | Graph issuer context is kernel-supplied; codemode graph nodes omit raw repo content and do not mint authority. | Issuer mismatch tests, redaction tests, codemode graph payload raw-content assertion. | Arbitrary TypeScript/shell parsing remains out of scope. | pass |
+| DevEx | 8/10 | Runtime wrapper fixture is usable locally; public helper design remains deferred. | Runtime wrapper tests and docs. | ADR-FU-0002-D still owns public helper choice. | deferred |
+| Design | n/a | No UI or review renderer added. | No changed UI surface. | Future review UI must bind exact contract/graph digests. | deferred |
+| Architecture | 8/10 | Graph behavior stays in `generated-execution-graph`; wrappers produce evidence but do not own policy/gateway meaning. | Import-posture tests and wrapper boundary tests. | None for local slice. | pass |
+| Domain Invariant | hard gate | Generated execution graph evidence is required before codemode child candidates become contracts; unsafe siblings mint zero contracts. | Candidate/contract graph binding tests and codemode whole-block refusal tests. | Public graph APIs remain cut. | pass |
 
 ## Test Plan
 
