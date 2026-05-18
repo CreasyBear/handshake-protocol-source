@@ -18,7 +18,7 @@ import {
   type IntentCompilationRecord,
   type JsonValue,
   type OperatingEnvelope,
-  type ReceiverRegistryEntry,
+  type GatewayRegistryEntry,
 } from "./schemas";
 import { guardActionProposal, type TransitionGuardResult } from "./transitions";
 
@@ -27,21 +27,21 @@ export async function proposeActionContract(
   inputValue: ProposeActionContractInput,
 ): Promise<ActionContract> {
   const input = ProposeActionContractInputSchema.parse(inputValue);
-  const [compilation, envelopeRecord, receiverRecord] = await Promise.all([
+  const [compilation, envelopeRecord, gatewayRecord] = await Promise.all([
     recorder.requiredRecord<IntentCompilationRecord>(
       "intent_compilation",
       input.intentCompilationId,
       "intent_compilation_missing",
     ),
     recorder.requiredRecord<OperatingEnvelope>("operating_envelope", input.envelopeId, "envelope_missing"),
-    recorder.requiredRecord<ReceiverRegistryEntry>(
-      "receiver_registry_entry",
-      input.receiverRegistryEntryId,
-      "receiver_registry_entry_missing",
+    recorder.requiredRecord<GatewayRegistryEntry>(
+      "gateway_registry_entry",
+      input.gatewayRegistryEntryId,
+      "gateway_registry_entry_missing",
     ),
   ]);
   const envelope = envelopeRecord.payload;
-  const receiver = receiverRecord.payload;
+  const gateway = gatewayRecord.payload;
   const recoveryLinkage = await loadRecoveryActionLinkage(recorder, input.recoveryRecommendationId);
 
   assertTransition(
@@ -52,10 +52,10 @@ export async function proposeActionContract(
       agentId: input.agentId,
       runId: input.runId,
       envelopeId: input.envelopeId,
-      receiverId: input.receiverId,
+      gatewayId: input.gatewayId,
       compilation: compilation.payload,
       envelope,
-      receiver,
+      gateway,
     }),
   );
 
@@ -77,11 +77,11 @@ export async function proposeActionContract(
     recoveryRecommendationDigest: recoveryLinkage?.recommendation.recommendationDigest ?? null,
     issuedAt: createdAt,
     expiresAt: input.expiresAt,
-    receiverRegistryEntryId: receiver.receiverRegistryEntryId,
-    receiverRegistryVersion: receiver.receiverRegistryVersion,
-    receiverId: receiver.receiverId,
-    receiverPolicyContractId: receiver.receiverPolicyContractId,
-    receiverPolicyVersion: receiver.receiverPolicyVersion,
+    gatewayRegistryEntryId: gateway.gatewayRegistryEntryId,
+    gatewayRegistryVersion: gateway.gatewayRegistryVersion,
+    gatewayId: gateway.gatewayId,
+    gatewayPolicyContractId: gateway.gatewayPolicyContractId,
+    gatewayPolicyVersion: gateway.gatewayPolicyVersion,
     actionClass: input.actionClass,
     resourceRef: input.resourceRef,
     paramsDigest,
@@ -141,7 +141,7 @@ export async function proposeActionContract(
           streamRefs: actionLifecycleStreamRefs(contract),
           payload: {
             actionClass: contract.actionClass,
-            receiverId: contract.receiverId,
+            gatewayId: contract.gatewayId,
             resourceRef: contract.resourceRef,
             recoveryRecommendationId: contract.recoveryRecommendationId,
           },

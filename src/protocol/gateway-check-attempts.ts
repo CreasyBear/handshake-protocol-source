@@ -2,52 +2,52 @@ import { digestCanonical } from "./canonical";
 import { actionLifecycleStreamRefs, buildEventChain } from "./events";
 import { HandshakeProtocolError } from "./errors";
 import { createId, nowIso } from "./ids";
-import { ReceiverGateInputSchema, type ReceiverGateInput } from "./inputs";
+import { GatewayCheckInputSchema, type GatewayCheckInput } from "./inputs";
 import { isolationSnapshotRef } from "./policy";
 import {
   buildGateArtifacts,
   gateEventDescriptors,
   gateProtocolRecords,
   withReceiptStreamReferences,
-  type ReceiverGateResult,
-} from "./receiver-gate-artifacts";
+  type GatewayCheckResult,
+} from "./gateway-check-artifacts";
 import type { ProtocolRecorder } from "./records";
 import {
-  checkReceiverPolicyDrift,
+  checkGatewayPolicyDrift,
   gateRefusalReason,
-  type ReceiverPolicyDriftCheck,
-} from "./receiver-gate";
+  type GatewayPolicyDriftCheck,
+} from "./gateway-check";
 import {
   PROTOCOL_VERSION,
   ReceiptSchema,
-  ReceiverGateAttemptSchema,
+  GatewayCheckAttemptSchema,
   type ActionContract,
   type Greenlight,
   type IsolationState,
   type JsonValue,
   type PolicyDecision,
   type Receipt,
-  type ReceiverGateAttempt,
-  type ReceiverRegistryEntry,
+  type GatewayCheckAttempt,
+  type GatewayRegistryEntry,
 } from "./schemas";
 import {
-  loadReceiverGateSequenceDependencyStates,
-  receiverGateSequenceDependencyRefusalReason,
+  loadGatewayCheckSequenceDependencyStates,
+  gatewayCheckSequenceDependencyRefusalReason,
 } from "./sequence-dependencies";
 import type { ProtocolStore } from "../storage/store";
 import { scopeIdsForContract, scopeIdsForGreenlight } from "../storage/store";
-import { guardReceiverGateAuthority, type TransitionGuardResult } from "./transitions";
+import { guardGatewayCheckAuthority, type TransitionGuardResult } from "./transitions";
 
 const MAX_STREAM_COMMIT_RETRIES = 3;
 
-export type { ReceiverGateResult } from "./receiver-gate-artifacts";
+export type { GatewayCheckResult } from "./gateway-check-artifacts";
 
-export async function receiverGate(
+export async function gatewayCheck(
   store: ProtocolStore,
   recorder: ProtocolRecorder,
-  inputValue: ReceiverGateInput,
-): Promise<ReceiverGateResult> {
-  const input = ReceiverGateInputSchema.parse(inputValue);
+  inputValue: GatewayCheckInput,
+): Promise<GatewayCheckResult> {
+  const input = GatewayCheckInputSchema.parse(inputValue);
   const contract = await recorder.requiredRecord<ActionContract>("action_contract", input.actionContractId, "contract_missing");
   const greenlight = await recorder.requiredRecord<Greenlight>("greenlight", input.greenlightId, "greenlight_missing");
   const policyDecision = await recorder.requiredRecord<PolicyDecision>(
@@ -55,18 +55,18 @@ export async function receiverGate(
     greenlight.payload.policyDecisionId,
     "policy_decision_missing",
   );
-  assertTransition(guardReceiverGateAuthority(greenlight.payload, policyDecision.payload));
+  assertTransition(guardGatewayCheckAuthority(greenlight.payload, policyDecision.payload));
 
   const now = nowIso();
-  const receiverPolicyDrift = await currentReceiverPolicyDrift(store, contract.payload, greenlight.payload);
+  const gatewayPolicyDrift = await currentGatewayPolicyDrift(store, contract.payload, greenlight.payload);
   const observedParamsDigest = await digestCanonical(input.observedParameters);
   const greenlightDigestSeen = await digestCanonical(greenlight.payload as unknown as JsonValue);
   const isolationStates = await store.listIsolationStates([
     ...scopeIdsForContract(contract.payload),
     ...scopeIdsForGreenlight(greenlight.payload),
   ]);
-  const sequenceDependencyStates = await loadReceiverGateSequenceDependencyStates(store, contract.payload);
-  const sequenceDependencyReasonCode = receiverGateSequenceDependencyRefusalReason(sequenceDependencyStates);
+  const sequenceDependencyStates = await loadGatewayCheckSequenceDependencyStates(store, contract.payload);
+  const sequenceDependencyReasonCode = gatewayCheckSequenceDependencyRefusalReason(sequenceDependencyStates);
   const gateAttemptId = createId("gat");
   const refusal = gateRefusalReason(
     contract.payload,
@@ -74,7 +74,7 @@ export async function receiverGate(
     observedParamsDigest,
     isolationStates,
     now,
-    receiverPolicyDrift.reasonCode,
+    gatewayPolicyDrift.reasonCode,
     sequenceDependencyReasonCode,
   );
   const artifacts = buildGateArtifacts({
@@ -87,7 +87,7 @@ export async function receiverGate(
     observedParamsDigest,
     greenlightDigestSeen,
     isolationStates,
-    receiverPolicyDrift,
+    gatewayPolicyDrift,
   });
   const streamRefs = actionLifecycleStreamRefs(contract.payload);
   const events = gateEventDescriptors(artifacts, streamRefs);
@@ -116,38 +116,38 @@ export async function receiverGate(
           observedParamsDigest,
           greenlightDigestSeen,
           isolationStates,
-          receiverPolicyDrift,
+          gatewayPolicyDrift,
         },
         finalizedResult,
       ).map((record) => recorder.buildRecord(record)),
     );
-    const commitResult = await store.commitReceiverGate({ consumption, records, events: streamEvents });
+    const commitResult = await store.commitGatewayCheck({ consumption, records, events: streamEvents });
     if (commitResult === "committed") return finalizedResult;
     if (commitResult === "already_consumed") {
       return commitReplayRefusal(store, recorder, contract.payload, greenlight.payload, {
         observedParamsDigest,
         isolationStates,
-        receiverPolicyDrift,
+        gatewayPolicyDrift,
       });
     }
   }
   throw new HandshakeProtocolError(
     "stream_append_conflict",
-    "Receiver gate could not commit a contiguous contract stream after retrying fresh stream tails.",
+    "Gateway gate could not commit a contiguous contract stream after retrying fresh stream tails.",
     409,
   );
 }
 
-async function currentReceiverPolicyDrift(
+async function currentGatewayPolicyDrift(
   store: ProtocolStore,
   contract: ActionContract,
   greenlight: Greenlight,
-): Promise<ReceiverPolicyDriftCheck> {
-  const currentReceiverRecord = await store.getRecord<ReceiverRegistryEntry>(
-    "receiver_registry_entry",
-    contract.receiverRegistryEntryId,
+): Promise<GatewayPolicyDriftCheck> {
+  const currentGatewayRecord = await store.getRecord<GatewayRegistryEntry>(
+    "gateway_registry_entry",
+    contract.gatewayRegistryEntryId,
   );
-  return checkReceiverPolicyDrift(contract, greenlight, currentReceiverRecord?.payload ?? null);
+  return checkGatewayPolicyDrift(contract, greenlight, currentGatewayRecord?.payload ?? null);
 }
 
 async function commitReplayRefusal(
@@ -158,9 +158,9 @@ async function commitReplayRefusal(
   context: {
     observedParamsDigest: `sha256:${string}`;
     isolationStates: IsolationState[];
-    receiverPolicyDrift: ReceiverPolicyDriftCheck;
+    gatewayPolicyDrift: GatewayPolicyDriftCheck;
   },
-): Promise<ReceiverGateResult> {
+): Promise<GatewayCheckResult> {
   const now = nowIso();
   const greenlightDigestSeen = await digestCanonical(greenlight as unknown as JsonValue);
   const gateAttempt = buildReplayGateAttempt(contract, greenlight, context, greenlightDigestSeen, now);
@@ -177,11 +177,11 @@ async function commitReplayRefusal(
     );
     const records = await Promise.all(
       [
-        { objectType: "receiver_gate_attempt" as const, payload: finalizedResult.gateAttempt },
+        { objectType: "gateway_check_attempt" as const, payload: finalizedResult.gateAttempt },
         { objectType: "receipt" as const, payload: finalizedResult.receipt },
       ].map((record) => recorder.buildRecord(record)),
     );
-    const commitResult = await store.commitReceiverGate({ consumption: null, records, events });
+    const commitResult = await store.commitGatewayCheck({ consumption: null, records, events });
     if (commitResult === "committed" || commitResult === "already_consumed") {
       return finalizedResult;
     }
@@ -199,23 +199,23 @@ function buildReplayGateAttempt(
   context: {
     observedParamsDigest: `sha256:${string}`;
     isolationStates: IsolationState[];
-    receiverPolicyDrift: ReceiverPolicyDriftCheck;
+    gatewayPolicyDrift: GatewayPolicyDriftCheck;
   },
   greenlightDigestSeen: `sha256:${string}`,
   now: string,
-): ReceiverGateAttempt {
-  return ReceiverGateAttemptSchema.parse({
+): GatewayCheckAttempt {
+  return GatewayCheckAttemptSchema.parse({
     schemaVersion: PROTOCOL_VERSION,
     tenantId: contract.tenantId,
     organizationId: contract.organizationId,
     createdAt: now,
     gateAttemptId: createId("gat"),
-    receiverId: contract.receiverId,
-    receiverPolicyContractId: contract.receiverPolicyContractId,
-    receiverPolicyVersion: contract.receiverPolicyVersion,
-    pinnedReceiverPolicyVersion: contract.receiverPolicyVersion,
-    currentReceiverPolicyVersion: context.receiverPolicyDrift.currentReceiverPolicyVersion,
-    receiverPolicyDriftStatus: context.receiverPolicyDrift.status,
+    gatewayId: contract.gatewayId,
+    gatewayPolicyContractId: contract.gatewayPolicyContractId,
+    gatewayPolicyVersion: contract.gatewayPolicyVersion,
+    pinnedGatewayPolicyVersion: contract.gatewayPolicyVersion,
+    currentGatewayPolicyVersion: context.gatewayPolicyDrift.currentGatewayPolicyVersion,
+    gatewayPolicyDriftStatus: context.gatewayPolicyDrift.status,
     actionContractId: contract.actionContractId,
     greenlightId: greenlight.greenlightId,
     contractDigestSeen: contract.actionContractDigest,
@@ -233,7 +233,7 @@ function buildReplayGateAttempt(
 function buildReplayReceipt(
   contract: ActionContract,
   greenlight: Greenlight,
-  gateAttempt: ReceiverGateAttempt,
+  gateAttempt: GatewayCheckAttempt,
   now: string,
 ): Receipt {
   return ReceiptSchema.parse({
@@ -247,9 +247,9 @@ function buildReplayReceipt(
     greenlightId: greenlight.greenlightId,
     gateAttemptId: gateAttempt.gateAttemptId,
     mutationAttemptId: null,
-    receiverId: contract.receiverId,
+    gatewayId: contract.gatewayId,
     policyDecisionStatus: "greenlight",
-    receiverGateStatus: "refused",
+    gatewayCheckStatus: "refused",
     greenlightConsumptionStatus: "replayed",
     mutationAttemptStatus: "not_attempted",
     downstreamExecutionStatus: "not_started",

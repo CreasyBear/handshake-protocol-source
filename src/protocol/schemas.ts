@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const PROTOCOL_VERSION = "0.2.0";
+export const PROTOCOL_VERSION = "0.2.1";
 
 export type JsonValue =
   | null
@@ -59,7 +59,7 @@ export const ActionTypeSchema = ProtocolBaseSchema.extend({
   actionCatalogId: IdSchema,
   actionCatalogVersion: z.string().min(1),
   actionClass: z.string().min(1),
-  receiverKind: z.string().min(1),
+  protectedSurfaceKind: z.string().min(1),
   requiredContractFields: z.array(z.string().min(1)),
   canonicalParameterSchemaRef: z.string().min(1),
   resourceRefSchemaRef: z.string().min(1),
@@ -71,18 +71,18 @@ export const ActionTypeSchema = ProtocolBaseSchema.extend({
 });
 export type ActionType = z.infer<typeof ActionTypeSchema>;
 
-export const ReceiverRegistryEntrySchema = ProtocolBaseSchema.extend({
-  receiverRegistryEntryId: IdSchema,
-  receiverRegistryVersion: z.string().min(1),
-  receiverId: IdSchema,
-  receiverKind: z.string().min(1),
-  receiverAdapterId: IdSchema,
-  receiverAdapterVersion: z.string().min(1),
+export const GatewayRegistryEntrySchema = ProtocolBaseSchema.extend({
+  gatewayRegistryEntryId: IdSchema,
+  gatewayRegistryVersion: z.string().min(1),
+  gatewayId: IdSchema,
+  protectedSurfaceKind: z.string().min(1),
+  gatewayAdapterId: IdSchema,
+  gatewayAdapterVersion: z.string().min(1),
   gateEndpointRef: z.string().min(1),
-  receiverPolicyContractId: IdSchema,
-  receiverPolicyVersion: z.string().min(1),
-  receiverPolicyDriftMode: z.enum(["refuse_on_drift", "allow_compatible_stricter"]),
-  compatiblePreviousReceiverPolicyVersions: z.array(z.string().min(1)).default([]),
+  gatewayPolicyContractId: IdSchema,
+  gatewayPolicyVersion: z.string().min(1),
+  gatewayPolicyDriftMode: z.enum(["refuse_on_drift", "allow_compatible_stricter"]),
+  compatiblePreviousGatewayPolicyVersions: z.array(z.string().min(1)).default([]),
   acceptedActionCatalogVersions: z.array(z.string().min(1)),
   resourceNamespaceRef: z.string().min(1),
   canonicalizerVersion: z.string().min(1),
@@ -90,7 +90,7 @@ export const ReceiverRegistryEntrySchema = ProtocolBaseSchema.extend({
   isolationCheckCapabilityStatus: z.enum(["available", "unavailable", "unknown"]),
   supersededAt: IsoDateSchema.nullable(),
 });
-export type ReceiverRegistryEntry = z.infer<typeof ReceiverRegistryEntrySchema>;
+export type GatewayRegistryEntry = z.infer<typeof GatewayRegistryEntrySchema>;
 
 export const OperatingEnvelopeSchema = ProtocolBaseSchema.extend({
   envelopeId: IdSchema,
@@ -98,7 +98,7 @@ export const OperatingEnvelopeSchema = ProtocolBaseSchema.extend({
   agentId: IdSchema,
   objectiveRef: z.string().min(1),
   allowedActionClasses: z.array(z.string().min(1)),
-  allowedReceivers: z.array(IdSchema),
+  allowedGateways: z.array(IdSchema),
   allowedResources: z.array(ResourceRefSchema),
   evidenceRequirements: z.array(z.string()).default([]),
   policyPackRef: z.string().min(1),
@@ -119,7 +119,7 @@ export const IntentCompilationRecordSchema = ProtocolBaseSchema.extend({
   operatingEnvelopeId: IdSchema,
   toolCatalogRef: z.string().min(1),
   actionCatalogRef: z.string().min(1),
-  receiverRegistryRef: z.string().min(1),
+  gatewayRegistryRef: z.string().min(1),
   generatedCodeOrSpecRefs: z.array(z.string()).default([]),
   declaredAssumptions: z.array(z.string()).default([]),
   uncertaintyMarkers: z.array(z.string()).default([]),
@@ -145,11 +145,11 @@ export const ActionContractSchema = ProtocolBaseSchema.extend({
   recoveryRecommendationDigest: DigestSchema.nullable(),
   issuedAt: IsoDateSchema,
   expiresAt: IsoDateSchema,
-  receiverRegistryEntryId: IdSchema,
-  receiverRegistryVersion: z.string().min(1),
-  receiverId: IdSchema,
-  receiverPolicyContractId: IdSchema,
-  receiverPolicyVersion: z.string().min(1),
+  gatewayRegistryEntryId: IdSchema,
+  gatewayRegistryVersion: z.string().min(1),
+  gatewayId: IdSchema,
+  gatewayPolicyContractId: IdSchema,
+  gatewayPolicyVersion: z.string().min(1),
   actionClass: z.string().min(1),
   resourceRef: ResourceRefSchema,
   parameters: z.record(z.string(), JsonValueSchema),
@@ -193,10 +193,10 @@ export const GreenlightSchema = ProtocolBaseSchema.extend({
   greenlightId: IdSchema,
   actionContractId: IdSchema,
   policyDecisionId: IdSchema,
-  receiverRegistryEntryId: IdSchema,
-  receiverRegistryVersion: z.string().min(1),
-  receiverId: IdSchema,
-  receiverPolicyVersion: z.string().min(1),
+  gatewayRegistryEntryId: IdSchema,
+  gatewayRegistryVersion: z.string().min(1),
+  gatewayId: IdSchema,
+  gatewayPolicyVersion: z.string().min(1),
   actionClass: z.string().min(1),
   resourceRef: ResourceRefSchema,
   paramsDigest: DigestSchema,
@@ -221,7 +221,7 @@ export const ReviewDecisionSchema = ProtocolBaseSchema.extend({
   actionContractId: IdSchema,
   actionContractDigest: DigestSchema,
   policyInputDigest: DigestSchema,
-  receiverPolicyVersion: z.string().min(1),
+  gatewayPolicyVersion: z.string().min(1),
   decision: z.enum(["approve", "reject", "needs_changes"]),
   decisionReasonCode: ReasonCodeSchema,
   decisionExpiresAt: IsoDateSchema,
@@ -262,12 +262,12 @@ export const BreakerDecisionSchema = ProtocolBaseSchema.extend({
   decision: BreakerIsolationDecisionSchema,
   decisionReasonCode: ReasonCodeSchema,
   decisionReason: z.string().min(1).max(1000),
-  targetScopeType: z.enum(["tenant", "organization", "agent", "run", "envelope", "action_class", "receiver", "resource"]),
+  targetScopeType: z.enum(["tenant", "organization", "agent", "run", "envelope", "action_class", "gateway", "resource"]),
   targetScopeId: IdSchema,
   createdIsolationStateId: IdSchema,
   agentId: IdSchema.nullable(),
   runId: IdSchema.nullable(),
-  receiverId: IdSchema.nullable(),
+  gatewayId: IdSchema.nullable(),
   resourceRef: ResourceRefSchema.nullable(),
   actionClass: z.string().min(1).nullable(),
   sequenceRiskScore: z.number().min(0).max(1),
@@ -283,7 +283,7 @@ export type BreakerDecision = z.infer<typeof BreakerDecisionSchema>;
 
 export const IsolationStateSchema = ProtocolBaseSchema.extend({
   isolationStateId: IdSchema,
-  scopeType: z.enum(["tenant", "organization", "agent", "run", "envelope", "action_class", "receiver", "resource"]),
+  scopeType: z.enum(["tenant", "organization", "agent", "run", "envelope", "action_class", "gateway", "resource"]),
   scopeId: IdSchema,
   state: z.enum(["active", "review_only", "rate_limited", "quarantined", "halted", "revoked", "state_suspect"]),
   reasonCode: ReasonCodeSchema,
@@ -300,14 +300,14 @@ export type IsolationState = z.infer<typeof IsolationStateSchema>;
 export const GateDecisionSchema = z.enum(["passed", "refused", "proof_gap"]);
 export type GateDecision = z.infer<typeof GateDecisionSchema>;
 
-export const ReceiverGateAttemptSchema = ProtocolBaseSchema.extend({
+export const GatewayCheckAttemptSchema = ProtocolBaseSchema.extend({
   gateAttemptId: IdSchema,
-  receiverId: IdSchema,
-  receiverPolicyContractId: IdSchema,
-  receiverPolicyVersion: z.string().min(1),
-  pinnedReceiverPolicyVersion: z.string().min(1),
-  currentReceiverPolicyVersion: z.string().min(1).nullable(),
-  receiverPolicyDriftStatus: z.enum(["same_version", "compatible_stricter", "incompatible", "unknown"]),
+  gatewayId: IdSchema,
+  gatewayPolicyContractId: IdSchema,
+  gatewayPolicyVersion: z.string().min(1),
+  pinnedGatewayPolicyVersion: z.string().min(1),
+  currentGatewayPolicyVersion: z.string().min(1).nullable(),
+  gatewayPolicyDriftStatus: z.enum(["same_version", "compatible_stricter", "incompatible", "unknown"]),
   actionContractId: IdSchema,
   greenlightId: IdSchema,
   contractDigestSeen: DigestSchema,
@@ -320,34 +320,34 @@ export const ReceiverGateAttemptSchema = ProtocolBaseSchema.extend({
   consumedGreenlight: z.boolean(),
   mutationAttemptId: IdSchema.nullable(),
 });
-export type ReceiverGateAttempt = z.infer<typeof ReceiverGateAttemptSchema>;
+export type GatewayCheckAttempt = z.infer<typeof GatewayCheckAttemptSchema>;
 
 export const MutationAttemptSchema = ProtocolBaseSchema.extend({
   mutationAttemptId: IdSchema,
   gateAttemptId: IdSchema,
   actionContractId: IdSchema,
   greenlightId: IdSchema,
-  receiverId: IdSchema,
+  gatewayId: IdSchema,
   actionClass: z.string().min(1),
   resourceRef: ResourceRefSchema,
   idempotencyKey: IdSchema,
   outcome: z.enum(["not_attempted", "submitted", "succeeded", "downstream_refused", "failed", "unknown"]),
   outcomeReasonCode: ReasonCodeSchema,
-  receiverOperationRef: z.string().min(1).nullable(),
+  surfaceOperationRef: z.string().min(1).nullable(),
   startedAt: IsoDateSchema,
   finishedAt: IsoDateSchema.nullable(),
 });
 export type MutationAttempt = z.infer<typeof MutationAttemptSchema>;
 
-export const ReceiverOperationReconciliationSchema = ProtocolBaseSchema.extend({
+export const SurfaceOperationReconciliationSchema = ProtocolBaseSchema.extend({
   reconciliationId: IdSchema,
   mutationAttemptId: IdSchema,
   gateAttemptId: IdSchema,
   actionContractId: IdSchema,
   greenlightId: IdSchema,
-  receiverId: IdSchema,
+  gatewayId: IdSchema,
   idempotencyKey: IdSchema,
-  receiverOperationRef: z.string().min(1).nullable(),
+  surfaceOperationRef: z.string().min(1).nullable(),
   previousMutationOutcome: MutationAttemptSchema.shape.outcome,
   observedDownstreamStatus: z.enum(["pending", "succeeded", "refused", "failed", "unknown"]),
   observedAt: IsoDateSchema,
@@ -356,7 +356,7 @@ export const ReceiverOperationReconciliationSchema = ProtocolBaseSchema.extend({
   reconciliationStatus: z.enum(["pending", "resolved", "still_unknown", "failed"]),
   finalityStatus: z.enum(["final", "pending", "suspect", "unknown"]),
 });
-export type ReceiverOperationReconciliation = z.infer<typeof ReceiverOperationReconciliationSchema>;
+export type SurfaceOperationReconciliation = z.infer<typeof SurfaceOperationReconciliationSchema>;
 
 export const ProofGapSchema = ProtocolBaseSchema.extend({
   proofGapId: IdSchema,
@@ -377,7 +377,7 @@ export type ProofGap = z.infer<typeof ProofGapSchema>;
 
 export const ReceiptStreamReferenceSchema = z.strictObject({
   streamId: IdSchema,
-  streamScope: z.enum(["tenant", "organization", "run", "receiver_resource"]),
+  streamScope: z.enum(["tenant", "organization", "run", "protected_surface_resource"]),
   partitionKey: z.string().min(1),
   offsetStart: z.number().int().nonnegative(),
   offsetEnd: z.number().int().nonnegative(),
@@ -395,9 +395,9 @@ export const ReceiptSchema = ProtocolBaseSchema.extend({
   greenlightId: IdSchema.nullable(),
   gateAttemptId: IdSchema.nullable(),
   mutationAttemptId: IdSchema.nullable(),
-  receiverId: IdSchema,
+  gatewayId: IdSchema,
   policyDecisionStatus: PolicyDecisionValueSchema,
-  receiverGateStatus: GateDecisionSchema.nullable(),
+  gatewayCheckStatus: GateDecisionSchema.nullable(),
   greenlightConsumptionStatus: z.enum(["not_applicable", "not_consumed", "consumed", "replayed"]),
   mutationAttemptStatus: z.enum(["not_attempted", "submitted", "succeeded", "downstream_refused", "failed", "unknown"]),
   downstreamExecutionStatus: z.enum(["not_started", "pending", "succeeded", "refused", "failed", "unknown"]),
@@ -420,14 +420,14 @@ export const ReceiptExportSchema = ProtocolBaseSchema.extend({
   greenlightId: IdSchema.nullable(),
   gateAttemptId: IdSchema.nullable(),
   mutationAttemptId: IdSchema.nullable(),
-  receiverId: IdSchema,
+  gatewayId: IdSchema,
   principalId: IdSchema,
   agentId: IdSchema,
   runId: IdSchema,
-  receiverPolicyVersion: z.string().min(1),
+  gatewayPolicyVersion: z.string().min(1),
   policyDecisionStatus: PolicyDecisionValueSchema,
-  receiverGateCheckStatus: GateDecisionSchema.nullable(),
-  receiverGateCheckedAt: IsoDateSchema.nullable(),
+  gatewayCheckStatus: GateDecisionSchema.nullable(),
+  gatewayCheckedAt: IsoDateSchema.nullable(),
   greenlightConsumptionStatus: ReceiptSchema.shape.greenlightConsumptionStatus,
   mutationAttemptStatus: ReceiptSchema.shape.mutationAttemptStatus,
   downstreamExecutionStatus: ReceiptSchema.shape.downstreamExecutionStatus,
@@ -451,7 +451,7 @@ export type ReceiptExport = z.infer<typeof ReceiptExportSchema>;
 
 export const RecoveryRecommendedPathSchema = z.enum([
   "narrower_action_contract_required",
-  "receiver_reconciliation_required",
+  "gateway_reconciliation_required",
   "human_review_required",
   "compensating_action_contract_required",
   "halt_without_retry",
@@ -474,7 +474,7 @@ export const RecoveryRecommendationSchema = ProtocolBaseSchema.extend({
   sourceMutationAttemptId: IdSchema.nullable(),
   sourceRefusalOrGapRef: z.string().min(1),
   sourceFinalityStatus: ReceiptSchema.shape.finalityStatus,
-  sourceReceiverGateStatus: GateDecisionSchema.nullable(),
+  sourceGatewayCheckStatus: GateDecisionSchema.nullable(),
   sourceMutationAttemptStatus: ReceiptSchema.shape.mutationAttemptStatus,
   sourceDownstreamExecutionStatus: ReceiptSchema.shape.downstreamExecutionStatus,
   recommendedPath: RecoveryRecommendedPathSchema,
@@ -488,7 +488,7 @@ export const RecoveryRecommendationSchema = ProtocolBaseSchema.extend({
   principalId: IdSchema,
   agentId: IdSchema,
   runId: IdSchema,
-  receiverId: IdSchema,
+  gatewayId: IdSchema,
   resourceRef: ResourceRefSchema,
   actionClass: z.string().min(1),
   failureReceiptRef: IdSchema,
@@ -507,7 +507,7 @@ export const RecoveryRecommendationSchema = ProtocolBaseSchema.extend({
   retryNotBefore: IsoDateSchema.nullable(),
   mustCreateNewActionContract: z.literal(true),
   mayReuseGreenlight: z.literal(false),
-  mayMutateReceiver: z.literal(false),
+  mayMutateProtectedSurface: z.literal(false),
   recommendationStatus: RecoveryRecommendationStatusSchema,
   statusChangedAt: IsoDateSchema.nullable(),
   statusChangedByRef: z.string().min(1).nullable(),
@@ -538,7 +538,7 @@ export type RecoveryRecommendationStatusTransition = z.infer<typeof RecoveryReco
 export const ContractStreamEventSchema = ProtocolBaseSchema.extend({
   streamEventId: IdSchema,
   streamId: IdSchema,
-  streamScope: z.enum(["tenant", "organization", "run", "receiver_resource"]),
+  streamScope: z.enum(["tenant", "organization", "run", "protected_surface_resource"]),
   offset: z.number().int().nonnegative(),
   partitionKey: z.string().min(1),
   eventType: z.enum([
@@ -548,10 +548,10 @@ export const ContractStreamEventSchema = ProtocolBaseSchema.extend({
     "action_greenlit",
     "action_refused",
     "review_required",
-    "receiver_gate_checked",
+    "gateway_checked",
     "mutation_attempted",
-    "receiver_operation_reconciled",
-    "receiver_refused",
+    "surface_operation_reconciled",
+    "gateway_refused",
     "review_decision_recorded",
     "breaker_decision_recorded",
     "receipt_emitted",
@@ -574,7 +574,7 @@ export type ContractStreamEvent = z.infer<typeof ContractStreamEventSchema>;
 export const ProtocolRecordSchema = z.discriminatedUnion("objectType", [
   z.strictObject({ objectType: z.literal("tool_capability"), payload: ToolCapabilitySchema }),
   z.strictObject({ objectType: z.literal("action_type"), payload: ActionTypeSchema }),
-  z.strictObject({ objectType: z.literal("receiver_registry_entry"), payload: ReceiverRegistryEntrySchema }),
+  z.strictObject({ objectType: z.literal("gateway_registry_entry"), payload: GatewayRegistryEntrySchema }),
   z.strictObject({ objectType: z.literal("operating_envelope"), payload: OperatingEnvelopeSchema }),
   z.strictObject({ objectType: z.literal("intent_compilation"), payload: IntentCompilationRecordSchema }),
   z.strictObject({ objectType: z.literal("action_contract"), payload: ActionContractSchema }),
@@ -583,9 +583,9 @@ export const ProtocolRecordSchema = z.discriminatedUnion("objectType", [
   z.strictObject({ objectType: z.literal("review_decision"), payload: ReviewDecisionSchema }),
   z.strictObject({ objectType: z.literal("breaker_decision"), payload: BreakerDecisionSchema }),
   z.strictObject({ objectType: z.literal("isolation_state"), payload: IsolationStateSchema }),
-  z.strictObject({ objectType: z.literal("receiver_gate_attempt"), payload: ReceiverGateAttemptSchema }),
+  z.strictObject({ objectType: z.literal("gateway_check_attempt"), payload: GatewayCheckAttemptSchema }),
   z.strictObject({ objectType: z.literal("mutation_attempt"), payload: MutationAttemptSchema }),
-  z.strictObject({ objectType: z.literal("receiver_operation_reconciliation"), payload: ReceiverOperationReconciliationSchema }),
+  z.strictObject({ objectType: z.literal("surface_operation_reconciliation"), payload: SurfaceOperationReconciliationSchema }),
   z.strictObject({ objectType: z.literal("proof_gap"), payload: ProofGapSchema }),
   z.strictObject({ objectType: z.literal("receipt"), payload: ReceiptSchema }),
   z.strictObject({ objectType: z.literal("receipt_export"), payload: ReceiptExportSchema }),

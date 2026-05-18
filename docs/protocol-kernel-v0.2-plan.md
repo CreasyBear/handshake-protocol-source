@@ -1,10 +1,10 @@
 # Handshake v0.2 Protocol Kernel Plan
 
-Status: Non-canonical implementation planning artifact  
-Version: v0.2.0  
-Audience: Protocol implementers  
-Implementation status: Superseded as product documentation by `docs/protocol-kernel.md`; still useful as implementation history  
-Canonical owner: Protocol owner  
+Status: Non-canonical implementation planning artifact
+Version: v0.2.1
+Audience: Protocol implementers
+Implementation status: Superseded as product documentation by `docs/protocol-kernel.md`; still useful as implementation history
+Canonical owner: Protocol owner
 Last reviewed: 2026-05-17
 
 ## Invariant At Stake
@@ -30,7 +30,7 @@ Wave 2: Kernel transitions
   -> propose action contract
   -> evaluate policy
   -> issue one-use greenlight/refusal/review/halt/quarantine
-  -> receiver gate check
+  -> gateway check check
   -> receipt/proof gap
   -> isolation interdict
 
@@ -49,11 +49,11 @@ Wave 4: Verification
 
 | Deferred work | Rationale |
 |---|---|
-| Broad management UI | A management UI cannot enforce receiver-gated authority. |
+| Broad management UI | A management UI cannot enforce gateway-checked authority. |
 | Broad connector library | One reference gate is enough to prove the protocol loop. |
 | Multi-party dispute workflow | Receipts and proof gaps must exist before disputes mean anything. |
 | Enterprise policy compiler | v0.2 starts with deterministic policy inputs and explicit refusals. |
-| General browser enforcement | Browser-side tools remain bypass-prone unless the receiver enforces. |
+| General browser enforcement | Browser-side tools remain bypass-prone unless the gateway enforces. |
 
 ## Protocol Loop
 
@@ -64,13 +64,13 @@ principal intent
   -> action contract
   -> policy decision
   -> greenlight/refusal/review/halt/quarantine
-  -> receiver gate attempt
+  -> gateway check attempt
   -> mutation/refusal/proof gap
   -> receipt
   -> stream event chain
   -> isolation state for future decisions/gates
 ```
 
-## First Reference Receiver
+## First Reference Gateway
 
-The first receiver is a generic reference gate, not a real deploy/package manager. It proves the invariant by refusing missing, replayed, mismatched, expired, or isolated greenlights before a simulated mutation is recorded.
+The first gateway is a generic reference gate, not a real deploy/package manager. It proves the invariant by refusing missing, replayed, mismatched, expired, or isolated greenlights before a simulated mutation is recorded.

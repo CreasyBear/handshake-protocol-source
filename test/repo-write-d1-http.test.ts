@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { runRepoWriteReceiver } from "../src/adapters/repo-write/receiver";
+import { runRepoWriteGateway } from "../src/adapters/repo-write/gateway";
 import { digestUtf8Content, utf8ByteLength } from "../src/protocol/content-digests";
 import { HandshakeClient } from "../src/sdk/client";
 import { proposeRepoWriteActionContract } from "../src/runtime/repo-write/tool-wrapper";
@@ -21,8 +21,8 @@ type CountRow = {
   count: number;
 };
 
-describe("repo write Hono/D1 reference receiver", () => {
-  it("mutates a repository file only after a content-digest-bound receiver gate", async () => {
+describe("repo write Hono/D1 reference gateway", () => {
+  it("mutates a repository file only after a content-digest-bound gateway check", async () => {
     const harness = await createD1HttpHarness();
     try {
       const content = "export const generatedValue = 42;\n";
@@ -37,7 +37,7 @@ describe("repo write Hono/D1 reference receiver", () => {
       expect(JSON.stringify(actionContract.parameters)).not.toContain(content);
       expect(await surface.readFile(fixture.filePath)).toBeNull();
 
-      const receiverResult = await runRepoWriteReceiver({
+      const gatewayResult = await runRepoWriteGateway({
         protocol: client,
         surface,
         actionContractId: actionContract.actionContractId,
@@ -45,13 +45,13 @@ describe("repo write Hono/D1 reference receiver", () => {
         repositoryRef: fixture.repositoryRef,
         filePath: fixture.filePath,
         content,
-        receiverOperationRef: "receiver-op:d1-http-repo-write",
+        surfaceOperationRef: "surface-op:d1-http-repo-write",
       });
 
-      expect(receiverResult.outcome).toBe("mutation_reconciled");
-      expect(receiverResult.receiverGate.gateAttempt.gateDecision).toBe("passed");
-      expect(receiverResult.receiverGate.receipt.finalityStatus).toBe("pending");
-      expect(receiverResult.reconciliation?.finalityStatus).toBe("final");
+      expect(gatewayResult.outcome).toBe("mutation_reconciled");
+      expect(gatewayResult.gatewayCheck.gateAttempt.gateDecision).toBe("passed");
+      expect(gatewayResult.gatewayCheck.receipt.finalityStatus).toBe("pending");
+      expect(gatewayResult.reconciliation?.finalityStatus).toBe("final");
       expect(await surface.readFile(fixture.filePath)).toBe(content);
       expect(surface.mutationCount).toBe(1);
 
@@ -60,10 +60,10 @@ describe("repo write Hono/D1 reference receiver", () => {
         "action_proposed",
         "policy_decision_recorded",
         "action_greenlit",
-        "receiver_gate_checked",
+        "gateway_checked",
         "mutation_attempted",
         "receipt_emitted",
-        "receiver_operation_reconciled",
+        "surface_operation_reconciled",
       ]);
       expect(events.map((event) => event.offset)).toEqual([0, 1, 2, 3, 4, 5, 6]);
       for (let index = 1; index < events.length; index += 1) {
@@ -71,7 +71,7 @@ describe("repo write Hono/D1 reference receiver", () => {
       }
 
       expect(await recordCount(harness, "mutation_attempt")).toBe(1);
-      expect(await recordCount(harness, "receiver_operation_reconciliation")).toBe(1);
+      expect(await recordCount(harness, "surface_operation_reconciliation")).toBe(1);
     } finally {
       await harness.dispose();
     }
@@ -87,7 +87,7 @@ describe("repo write Hono/D1 reference receiver", () => {
         proposedContent,
       );
 
-      const receiverResult = await runRepoWriteReceiver({
+      const gatewayResult = await runRepoWriteGateway({
         protocol: client,
         surface,
         actionContractId: actionContract.actionContractId,
@@ -95,13 +95,13 @@ describe("repo write Hono/D1 reference receiver", () => {
         repositoryRef: fixture.repositoryRef,
         filePath: fixture.filePath,
         content: differentContent,
-        receiverOperationRef: "receiver-op:d1-http-repo-write-mismatch",
+        surfaceOperationRef: "surface-op:d1-http-repo-write-mismatch",
       });
 
-      expect(receiverResult.outcome).toBe("receiver_gate_refused");
-      expect(receiverResult.receiverGate.gateAttempt.gateDecision).toBe("refused");
-      expect(receiverResult.receiverGate.gateAttempt.gateDecisionReasonCode).toBe("params_mismatch");
-      expect(receiverResult.receiverGate.receipt.downstreamExecutionStatus).toBe("not_started");
+      expect(gatewayResult.outcome).toBe("gateway_check_refused");
+      expect(gatewayResult.gatewayCheck.gateAttempt.gateDecision).toBe("refused");
+      expect(gatewayResult.gatewayCheck.gateAttempt.gateDecisionReasonCode).toBe("params_mismatch");
+      expect(gatewayResult.gatewayCheck.receipt.downstreamExecutionStatus).toBe("not_started");
       expect(await surface.readFile(fixture.filePath)).toBeNull();
       expect(surface.mutationCount).toBe(0);
 
@@ -110,11 +110,11 @@ describe("repo write Hono/D1 reference receiver", () => {
         "action_proposed",
         "policy_decision_recorded",
         "action_greenlit",
-        "receiver_gate_checked",
+        "gateway_checked",
         "receipt_emitted",
       ]);
       expect(await recordCount(harness, "mutation_attempt")).toBe(0);
-      expect(await recordCount(harness, "receiver_gate_attempt")).toBe(1);
+      expect(await recordCount(harness, "gateway_check_attempt")).toBe(1);
       expect(await recordCount(harness, "receipt")).toBe(1);
     } finally {
       await harness.dispose();

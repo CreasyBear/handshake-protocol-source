@@ -4,7 +4,7 @@
 
 Planning memory is useful only if it does not become accidental authority.
 
-For Handshake, local planning artifacts may compile vague intent into proposed work, candidate contracts, review findings, and proof expectations. They must not become permission, receiver proof, product claims, or durable protocol canon until deliberately promoted.
+For Handshake, local planning artifacts may compile vague intent into proposed work, candidate contracts, review findings, and proof expectations. They must not become permission, gateway proof, product claims, or durable protocol canon until deliberately promoted.
 
 ## Primitive
 
@@ -22,7 +22,7 @@ There are two stores:
 2. `docs/`, source files, tests, and ADRs
    Tracked, reviewable, durable project state.
 
-Nothing in `.planning/` grants execution authority. A `PLAN.md`, `SPEC.md`, `CONTEXT.md`, review report, or generated contract draft is still intent compilation. Only receiver-gated execution against an exact greenlight can authorize consequence.
+Nothing in `.planning/` grants execution authority. A `PLAN.md`, `SPEC.md`, `CONTEXT.md`, review report, or generated contract draft is still intent compilation. Only gateway-checked execution against an exact greenlight can authorize consequence.
 
 ## What Belongs in `.planning/`
 
@@ -30,7 +30,7 @@ Use `.planning/` for artifacts that are valuable during active work but should n
 
 - project state, phase state, and session handoff notes
 - GSD artifacts: `PROJECT.md`, `REQUIREMENTS.md`, `ROADMAP.md`, `STATE.md`, phase directories, UAT notes, summaries, and local config
-- codebase maps, mutation-surface inventories, receiver inventories, and technical reconnaissance
+- codebase maps, mutation-surface inventories, gateway inventories, and technical reconnaissance
 - draft specs, draft plans, research notes, uncertainty markers, and open questions
 - candidate action contracts, canonicalization notes, policy-tabletop results, proof-gap ledgers, and receipt expectations
 - GStack review outputs before they are distilled into tracked issues, docs, tests, or code
@@ -44,45 +44,16 @@ Do not store secrets, credentials, customer data, private production payloads, o
 ```text
 .planning/
   PROJECT.md
-  REQUIREMENTS.md
   ROADMAP.md
   STATE.md
-  config.json
-
-  codebase/
-    architecture-map.md
-    mutation-surface.md
-    receiver-registry.md
-    action-catalog.md
-    bypass-risks.md
-
-  phases/
-    01-example-phase/
-      SPEC.md
-      CONTEXT.md
-      RESEARCH.md
-      PLAN.md
-      CONTRACTS.md
-      POLICY-TABLETOP.md
-      RECEIPT-EXPECTATIONS.md
-      PROOF-GAPS.md
-      UAT.md
-      REVIEW.md
-      SUMMARY.md
-
-  reviews/
-    plan-eng-review.md
-    plan-ceo-review.md
-    security-review.md
-    qa-report.md
-
-  handoff/
-    pause-work.md
-    resume-work.md
-    milestone-summary.md
+  MAP.md
+  WORKFLOW.md
+  TEMPLATES.md
 ```
 
-This layout is a convention, not a runtime contract. Runtime contracts live in typed schemas and receiver gates, not markdown folders.
+This layout is deliberately small. Add a new file only when it replaces or significantly shortens one of these six files.
+
+Runtime contracts live in typed schemas and gateway checks, not markdown folders.
 
 ## Skill Routing
 
@@ -121,16 +92,16 @@ Handshake invariants override all generic skill workflows.
 
 ## Handshake Phase Requirements
 
-Every consequential Handshake phase should maintain these local artifacts before implementation:
+Every consequential Handshake phase should answer these inside `STATE.md`, `MAP.md`, or a short temporary scratch section:
 
-- `SPEC.md`: invariant, primitive, failure modes, explicit non-goals
-- `CONTEXT.md`: implementation constraints, receiver assumptions, policy context
-- `CONTRACTS.md`: proposed action types, canonical fields, receiver bindings, idempotency keys
-- `POLICY-TABLETOP.md`: greenlight/refusal/review/halt/quarantine scenarios
-- `RECEIPT-EXPECTATIONS.md`: evidence required for proposal, policy decision, receiver check, execution result, refusal, and proof gap
-- `PROOF-GAPS.md`: missing evidence, downstream uncertainty, stale policy, receiver drift, and unresolved bypass paths
+- invariant: what can break?
+- primitive: what control mechanism is being added or changed?
+- boundary: where is authority enforced?
+- contract: what exact gateway-bound action is proposed?
+- policy: what greenlight/refusal/review/halt/quarantine outcomes exist?
+- receipt: what proves gateway check, mutation attempt, downstream finality, refusal, or proof gap?
 
-If a phase cannot name the receiver gate, it is not ready for execution.
+If a phase cannot name the gateway check, it is not ready for execution. If the answers need to become durable, promote them into tracked docs, schemas, tests, or ADRs.
 
 ## Promotion Rules
 
@@ -139,7 +110,7 @@ Promote from `.planning/` into tracked files only when the artifact has become d
 Promote to `docs/` when:
 
 - the decision changes the product kernel, protocol model, or public architecture
-- the artifact defines a stable receiver integration, action catalog, policy primitive, or receipt model
+- the artifact defines a stable gateway integration, action catalog, policy primitive, or receipt model
 - future agents need the fact outside the active planning session
 - the claim has been reviewed and no longer depends on raw brainstorming context
 
@@ -153,7 +124,7 @@ Promote to issues when:
 
 - work is independently grabbable
 - scope and acceptance criteria are clear
-- the issue names the invariant, primitive, receiver boundary, and expected evidence
+- the issue names the invariant, primitive, gateway boundary, and expected evidence
 
 Do not promote raw GSD plans, review transcripts, model research dumps, or tentative claims directly.
 
@@ -179,7 +150,7 @@ If `.planning/` is treated as tracked truth, stale generated plans will pollute 
 
 If `.planning/` is treated as permission, this is approval theatre.
 
-If a GSD phase executes broad mutations without a receiver boundary, the generated code escaped the contract boundary.
+If a GSD phase executes broad mutations without a gateway boundary, the generated code escaped the contract boundary.
 
 If a review artifact says one thing and the exact action contract says another, this is review theatre.
 
@@ -187,6 +158,6 @@ If the final docs cannot reconstruct why a primitive exists without `.planning/`
 
 ## Brutal Verdict
 
-Keep `.planning/` as the canonical local working store. Keep `docs/` as the durable canon. Promote only reviewed, stable, mechanism-level facts.
+Keep `.planning/` as local working memory. Keep it small. Keep `docs/` as durable canon. Promote only reviewed, stable, mechanism-level facts.
 
-Smallest next mechanism to build: add reusable templates under `.planning/templates/` for `SPEC.md`, `CONTRACTS.md`, `RECEIPT-EXPECTATIONS.md`, and `PROOF-GAPS.md` so future GSD phases start with Handshake-native fields.
+Smallest next mechanism to build: update `GatewayConformanceReport` in schemas/tests/docs instead of creating more planning documents.

@@ -13,7 +13,7 @@ import type { ProtocolStore } from "../storage/store";
 export type ActionLifecycleStreamRefs = {
   actionContractId: string;
   runId: string;
-  receiverId: string;
+  gatewayId: string;
   resourceRef: string;
 };
 
@@ -60,12 +60,12 @@ export async function buildEventChain(
 }
 
 export function actionLifecycleStreamRefs(
-  contract: Pick<ActionContract, "actionContractId" | "runId" | "receiverId" | "resourceRef">,
+  contract: Pick<ActionContract, "actionContractId" | "runId" | "gatewayId" | "resourceRef">,
 ): ActionLifecycleStreamRefs {
   return {
     actionContractId: contract.actionContractId,
     runId: contract.runId,
-    receiverId: contract.receiverId,
+    gatewayId: contract.gatewayId,
     resourceRef: contract.resourceRef,
   };
 }
@@ -114,8 +114,8 @@ function streamBindings(descriptor: EventDescriptor): StreamBinding[] {
       },
       {
         streamId,
-        streamScope: "receiver_resource",
-        partitionKey: `receiver_resource:${descriptor.streamRefs.receiverId}:${descriptor.streamRefs.resourceRef}`,
+        streamScope: "protected_surface_resource",
+        partitionKey: `protected_surface_resource:${descriptor.streamRefs.gatewayId}:${descriptor.streamRefs.resourceRef}`,
       },
     );
   }

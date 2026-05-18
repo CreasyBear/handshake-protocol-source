@@ -1,9 +1,9 @@
 # Product And Protocol Diagrams
 
 Status: Draft canonical visual model
-Version: v0.2.0
-Audience: Product, protocol implementers, runtime builders, receiver owners, platform engineering, security engineering
-Implementation status: Drawn against the current v0.2 protocol kernel, runtime wrappers, receiver adapters, D1 records, and completion audit
+Version: v0.2.1
+Audience: Product, protocol implementers, runtime builders, gateway owners, platform engineering, security engineering
+Implementation status: Drawn against the current v0.2 protocol kernel, runtime wrappers, gateway adapters, D1 records, and completion audit
 Canonical owner: Product owner
 Last reviewed: 2026-05-18
 
@@ -11,7 +11,7 @@ Last reviewed: 2026-05-18
 
 No consequential autonomous action executes outside declared bounds, and divergent behavior must be haltable, isolatable, and reconstructable.
 
-These diagrams are not product promises. They are visual checks on the protocol boundary. If a path reaches receiver mutation without an exact action contract, policy decision, one-use greenlight, receiver gate, and receipt or proof gap, that path is not Handshake.
+These diagrams are not product promises. They are visual checks on the protocol boundary. If a path reaches gateway mutation without an exact action contract, policy decision, one-use greenlight, gateway check, and receipt or proof gap, that path is not Handshake.
 
 ## Product Loop
 
@@ -21,14 +21,15 @@ This is the customer-facing loop. It shows why Handshake exists without pretendi
 flowchart LR
   principal["Principal gives vague intent"]
   runtime["Agent runtime compiles intent into generated orchestration"]
+  surface["Handshake CLI/MCP protected action surface"]
   candidate["Handshake extracts exact action candidate"]
   policy["Atomic policy evaluates exact contract"]
-  gate["Receiver gate checks exact one-use greenlight"]
-  consequence["Receiver mutation attempted"]
+  gate["Gateway gate checks exact one-use greenlight"]
+  consequence["Gateway mutation attempted"]
   evidence["Receipt, refusal, or proof gap recorded"]
   recovery["Recovery, isolation, or next narrowed contract"]
 
-  principal --> runtime --> candidate --> policy
+  principal --> runtime --> surface --> candidate --> policy
   policy -->|"greenlight"| gate
   policy -->|"refuse, review, halt, quarantine"| evidence
   gate -->|"pass"| consequence --> evidence
@@ -41,8 +42,9 @@ Product reading:
 
 - The operating envelope permits attempts, not mutation.
 - The agent proposes. It does not authorize.
+- CLI/MCP is the reusable product surface for protected proposals, setup, inspection, and conformance.
 - Policy clears the exact contract, not a plan summary.
-- The receiver gate enforces before consequence.
+- The gateway check enforces before consequence.
 - Evidence can be a success receipt, refusal, pending downstream status, or proof gap.
 
 ## Authority Boundary
@@ -54,21 +56,21 @@ flowchart TB
   subgraph issuer["Issuer side: useful but not authority"]
     intent["Vague principal intent"]
     code["Generated code, MCP calls, browser actions, scheduled jobs, tool sequences"]
-    hook["Runtime hook or protected tool wrapper"]
+    hook["Handshake CLI/MCP protected proposal surface"]
     compilation["IntentCompilationRecord with assumptions, uncertainty, overreach"]
     contract["ActionContract proposal"]
   end
 
   subgraph kernel["Handshake kernel: contract clearing"]
-    canonical["Canonicalize exact receiver-bound contract"]
+    canonical["Canonicalize exact gateway-bound contract"]
     decision["PolicyDecision"]
     greenlight["Greenlight maxUses = 1"]
     isolation["Current IsolationState"]
     stream["ContractStreamEvent chain"]
   end
 
-  subgraph receiver["Receiver side: enforcement before consequence"]
-    gate["ReceiverGateAttempt"]
+  subgraph gateway["Gateway side: enforcement before consequence"]
+    gate["GatewayCheckAttempt"]
     ledger["Greenlight consumption ledger"]
     mutation["MutationAttempt"]
     receipt["Receipt or ProofGap"]
@@ -90,10 +92,11 @@ flowchart TB
 
 Forbidden reading:
 
-- A runtime hook is not receiver enforcement.
+- A runtime hook is not gateway enforcement.
+- The CLI/MCP surface is not gateway enforcement.
 - A generated plan is not an action contract.
 - A review screen is not authority unless bound to the exact contract and policy digest.
-- A greenlight cannot authorize more than one receiver-gated attempt.
+- A greenlight cannot authorize more than one gateway-checked attempt.
 
 ## Protocol Object Graph
 
@@ -103,7 +106,7 @@ This is the durable object graph the current v0.2 kernel persists or derives fro
 flowchart TD
   tool["ToolCapability"]
   actionType["ActionType"]
-  receiverEntry["ReceiverRegistryEntry"]
+  gatewayEntry["GatewayRegistryEntry"]
   envelope["OperatingEnvelope"]
   compilation["IntentCompilationRecord"]
   contract["ActionContract"]
@@ -111,10 +114,10 @@ flowchart TD
   review["ReviewDecision"]
   issuance["greenlight_issuances row"]
   greenlight["Greenlight"]
-  gate["ReceiverGateAttempt"]
+  gate["GatewayCheckAttempt"]
   consumption["greenlight_consumptions row"]
   mutation["MutationAttempt"]
-  reconciliation["ReceiverOperationReconciliation"]
+  reconciliation["SurfaceOperationReconciliation"]
   proofGap["ProofGap"]
   receipt["Receipt"]
   export["ReceiptExport"]
@@ -127,10 +130,10 @@ flowchart TD
 
   tool --> compilation
   actionType --> compilation
-  receiverEntry --> compilation
+  gatewayEntry --> compilation
   envelope --> compilation
   compilation --> contract
-  receiverEntry --> contract
+  gatewayEntry --> contract
   envelope --> contract
   contract --> policy
   isolation --> policy
@@ -138,7 +141,7 @@ flowchart TD
   policy -->|"claim action contract"| issuance -->|"greenlight"| greenlight
   greenlight --> gate
   contract --> gate
-  receiverEntry --> gate
+  gatewayEntry --> gate
   isolation --> gate
   gate -->|"pass"| consumption --> mutation
   gate -->|"refuse or proof gap"| receipt
@@ -164,11 +167,11 @@ Protocol reading:
 
 - Catalog objects bind the compiler before a contract exists.
 - `ActionContract` is a proposed commitment, not execution authority.
-- `Greenlight` is exact, receiver-bound, and one-use; issuance is claimed once per action contract before the record is committed.
+- `Greenlight` is exact, gateway-bound, and one-use; issuance is claimed once per action contract before the record is committed.
 - `ProofGap` is a first-class object, not receipt prose or mutation authority.
-- Recovery creates a narrowed future proposal path. It does not reuse a greenlight or mutate a receiver.
+- Recovery creates a narrowed future proposal path. It does not reuse a greenlight or mutate a gateway.
 
-## Receiver-Gated Mutation Sequence
+## Gateway-Gated Mutation Sequence
 
 This is the normal successful path with the exact enforcement point shown.
 
@@ -178,30 +181,30 @@ sequenceDiagram
   participant Runtime as Agent Runtime
   participant Kernel as Handshake Kernel
   participant Policy as Policy Evaluator
-  participant Receiver as Receiver Gate
+  participant Gateway as Gateway Check
   participant Surface as Consequence Surface
   participant Store as Receipt Store
 
   Principal->>Runtime: Vague intent
   Runtime->>Kernel: compileIntent(candidate, catalogs, envelope)
   Kernel-->>Runtime: IntentCompilationRecord
-  Runtime->>Kernel: proposeActionContract(exact receiver, resource, params)
+  Runtime->>Kernel: proposeActionContract(exact gateway, resource, params)
   Kernel-->>Runtime: ActionContract digest
   Runtime->>Policy: evaluate exact contract
   Policy->>Store: record PolicyDecision
   Policy-->>Runtime: Greenlight or refusal
-  Runtime->>Receiver: actionContractId + greenlightId + observed parameters
-  Receiver->>Kernel: receiverGate(...)
+  Runtime->>Gateway: actionContractId + greenlightId + observed parameters
+  Gateway->>Kernel: gatewayCheck(...)
   Kernel->>Kernel: verify binding, freshness, drift, isolation, replay
-  Kernel->>Store: consume greenlight and record ReceiverGateAttempt
-  Kernel-->>Receiver: VerifiedReceiverGateCheck
-  Receiver->>Surface: mutate only after verified gate
-  Receiver->>Kernel: reconcile receiver operation evidence
+  Kernel->>Store: consume greenlight and record GatewayCheckAttempt
+  Kernel-->>Gateway: VerifiedGatewayCheck
+  Gateway->>Surface: mutate only after verified gate
+  Gateway->>Kernel: reconcile surface operation evidence
   Kernel->>Store: record MutationAttempt, Receipt, stream events
   Store-->>Principal: reconstructable receipt timeline
 ```
 
-If the receiver mutates before `VerifiedReceiverGateCheck`, this is advisory, not Handshake.
+If the gateway mutates before `VerifiedGatewayCheck`, this is advisory, not Handshake.
 
 ## Refusal And Proof-Gap Paths
 
@@ -222,10 +225,10 @@ stateDiagram-v2
   PolicyDecision --> Quarantined: quarantine isolation
   PolicyDecision --> Greenlit: exact greenlight
 
-  Greenlit --> ReceiverGateChecking
-  ReceiverGateChecking --> ReceiverRefused: missing, replayed, mismatched, drifted, isolated
-  ReceiverGateChecking --> ProofGapRecorded: required evidence unavailable or downstream unknown
-  ReceiverGateChecking --> MutationAttempted: gate passed
+  Greenlit --> GatewayCheckPending
+  GatewayCheckPending --> GatewayRefused: missing, replayed, mismatched, drifted, isolated
+  GatewayCheckPending --> ProofGapRecorded: required evidence unavailable or downstream unknown
+  GatewayCheckPending --> MutationAttempted: check passed
 
   MutationAttempted --> ReceiptFinal: downstream succeeded
   MutationAttempted --> ReceiptPending: downstream pending
@@ -235,7 +238,7 @@ stateDiagram-v2
   Refused --> ReceiptOrCompilerEvidence
   ReviewRequired --> ReviewDecision
   ReviewDecision --> PolicyDecision: exact digest-bound approval
-  ReceiverRefused --> ReceiptOrCompilerEvidence
+  GatewayRefused --> ReceiptOrCompilerEvidence
   ProofGapRecorded --> RecoveryRecommendation
   ReceiptPending --> RecoveryRecommendation
   ReceiptFinal --> [*]
@@ -258,7 +261,7 @@ flowchart TD
   bounds["ExecutionBlockBounds"]
   contract["ActionContract proposal"]
   policy["PolicyDecision"]
-  receiver["ReceiverGateAttempt"]
+  gateway["GatewayCheckAttempt"]
 
   observed --> classify
   classify -->|"read_only"| readOnly
@@ -266,17 +269,17 @@ flowchart TD
   classify -->|"unwrapped_bypass"| bypass
   classify -->|"consequential"| consequential
   bounds --> consequential
-  consequential --> contract --> policy --> receiver
+  consequential --> contract --> policy --> gateway
 
   readOnly -.->|"no authority created"| observed
   ambiguous -.->|"no clean contract"| observed
   bypass -.->|"no control claim"| observed
 ```
 
-02 should add issuer-side conformance evidence, not weaken receiver-side enforcement.
+02 should add issuer-side conformance evidence, not weaken gateway-side enforcement.
 
 ## Brutal Verdict
 
-Keep these diagrams narrow. The product diagram is allowed to be simple, but the protocol diagrams must remain unforgiving: every consequential mutation path either reaches receiver-gated authority or records refusal, proof gap, bypass evidence, or isolation.
+Keep these diagrams narrow. The product diagram is allowed to be simple, but the protocol diagrams must remain unforgiving: every consequential mutation path either reaches gateway-checked authority or records refusal, proof gap, bypass evidence, or isolation.
 
 Smallest next mechanism: turn the runtime conformance direction into concrete `ExecutionBlockBounds` and `RuntimeAttemptObservation` schemas before adding another runtime integration.

@@ -12,9 +12,9 @@ import type {
   CreateReviewDecisionInput,
   EvaluatePolicyInput,
   ProposeActionContractInput,
-  ReconcileReceiverOperationInput,
+  ReconcileSurfaceOperationInput,
   ResolveRecoveryTerminalConflictInput,
-  ReceiverGateInput,
+  GatewayCheckInput,
   TransitionRecoveryRecommendationStatusInput,
 } from "./inputs";
 import { evaluatePolicy as evaluatePolicyTransition } from "./policy-decisions";
@@ -29,11 +29,11 @@ import {
   type RecoveryTerminalConflictResolution,
 } from "./recovery-terminal-conflict-resolutions";
 import {
-  reconcileReceiverOperation as reconcileReceiverOperationTransition,
-  type ReceiverOperationReconciliationResult,
-} from "./receiver-operation-reconciliations";
+  reconcileSurfaceOperation as reconcileSurfaceOperationTransition,
+  type SurfaceOperationReconciliationResult,
+} from "./surface-operation-reconciliations";
 import { ProtocolRecorder } from "./records";
-import { receiverGate as receiverGateTransition, type ReceiverGateResult } from "./receiver-gate-attempts";
+import { gatewayCheck as gatewayCheckTransition, type GatewayCheckResult } from "./gateway-check-attempts";
 import { createReviewDecision as createReviewDecisionTransition } from "./review-decisions";
 import type {
   ActionContract,
@@ -73,16 +73,16 @@ export class HandshakeKernel {
     return evaluatePolicyTransition(this.store, this.recorder, input);
   }
 
-  receiverGate(input: ReceiverGateInput): Promise<ReceiverGateResult> {
-    return receiverGateTransition(this.store, this.recorder, input);
+  gatewayCheck(input: GatewayCheckInput): Promise<GatewayCheckResult> {
+    return gatewayCheckTransition(this.store, this.recorder, input);
   }
 
   createReviewDecision(input: CreateReviewDecisionInput): Promise<ReviewDecision> {
     return createReviewDecisionTransition(this.recorder, input);
   }
 
-  reconcileReceiverOperation(input: ReconcileReceiverOperationInput): Promise<ReceiverOperationReconciliationResult> {
-    return reconcileReceiverOperationTransition(this.store, this.recorder, input);
+  reconcileSurfaceOperation(input: ReconcileSurfaceOperationInput): Promise<SurfaceOperationReconciliationResult> {
+    return reconcileSurfaceOperationTransition(this.store, this.recorder, input);
   }
 
   createIsolationState(input: CreateIsolationInput): Promise<IsolationState> {

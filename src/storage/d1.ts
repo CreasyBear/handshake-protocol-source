@@ -6,8 +6,8 @@ import type {
   ProtocolCommitResult,
   ProtocolStore,
   RecoveryTerminalClaim,
-  ReceiverGateCommit,
-  ReceiverGateCommitResult,
+  GatewayCheckCommit,
+  GatewayCheckCommitResult,
   StoredProtocolRecord,
   StreamTail,
 } from "./store";
@@ -177,7 +177,7 @@ export class D1ProtocolStore implements ProtocolStore {
     }
   }
 
-  async commitReceiverGate(commit: ReceiverGateCommit): Promise<ReceiverGateCommitResult> {
+  async commitGatewayCheck(commit: GatewayCheckCommit): Promise<GatewayCheckCommitResult> {
     const statements: D1PreparedStatement[] = [];
     if (commit.consumption) {
       statements.push(this.greenlightConsumptionStatement(commit.consumption));

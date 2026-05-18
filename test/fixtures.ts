@@ -3,7 +3,7 @@ import { nowIso } from "../src/protocol/ids";
 import type {
   ActionType,
   OperatingEnvelope,
-  ReceiverRegistryEntry,
+  GatewayRegistryEntry,
   ToolCapability,
 } from "../src/protocol/schemas";
 import { InMemoryProtocolStore } from "../src/storage/memory";
@@ -18,7 +18,7 @@ export function makeKernelFixture() {
   const createdAt = nowIso();
 
   const tool: ToolCapability = {
-    schemaVersion: "0.2.0",
+    schemaVersion: "0.2.1",
     tenantId: "tenant_demo",
     organizationId: "org_demo",
     createdAt,
@@ -40,7 +40,7 @@ export function makeKernelFixture() {
   };
 
   const actionType: ActionType = {
-    schemaVersion: "0.2.0",
+    schemaVersion: "0.2.1",
     tenantId: "tenant_demo",
     organizationId: "org_demo",
     createdAt,
@@ -48,8 +48,8 @@ export function makeKernelFixture() {
     actionCatalogId: "action_catalog_demo",
     actionCatalogVersion: "v1",
     actionClass: "package.install",
-    receiverKind: "package_manager",
-    requiredContractFields: ["receiverId", "resourceRef", "paramsDigest", "idempotencyKey"],
+    protectedSurfaceKind: "package_manager",
+    requiredContractFields: ["gatewayId", "resourceRef", "paramsDigest", "idempotencyKey"],
     canonicalParameterSchemaRef: "schema:package-install-params",
     resourceRefSchemaRef: "schema:package-resource",
     requiredEvidenceTypes: ["package_lock_diff"],
@@ -59,22 +59,22 @@ export function makeKernelFixture() {
     supersededAt: null,
   };
 
-  const receiver: ReceiverRegistryEntry = {
-    schemaVersion: "0.2.0",
+  const gateway: GatewayRegistryEntry = {
+    schemaVersion: "0.2.1",
     tenantId: "tenant_demo",
     organizationId: "org_demo",
     createdAt,
-    receiverRegistryEntryId: "receiver_registry_package",
-    receiverRegistryVersion: "v1",
-    receiverId: "receiver_package_manager",
-    receiverKind: "package_manager",
-    receiverAdapterId: "adapter_reference_package",
-    receiverAdapterVersion: "v1",
+    gatewayRegistryEntryId: "gateway_registry_package",
+    gatewayRegistryVersion: "v1",
+    gatewayId: "gateway_package_manager",
+    protectedSurfaceKind: "package_manager",
+    gatewayAdapterId: "adapter_reference_package",
+    gatewayAdapterVersion: "v1",
     gateEndpointRef: "internal:reference-package-gate",
-    receiverPolicyContractId: "receiver_policy_package",
-    receiverPolicyVersion: "v1",
-    receiverPolicyDriftMode: "refuse_on_drift",
-    compatiblePreviousReceiverPolicyVersions: [],
+    gatewayPolicyContractId: "gateway_policy_package",
+    gatewayPolicyVersion: "v1",
+    gatewayPolicyDriftMode: "refuse_on_drift",
+    compatiblePreviousGatewayPolicyVersions: [],
     acceptedActionCatalogVersions: ["v1"],
     resourceNamespaceRef: "npm:package",
     canonicalizerVersion: "handshake-jcs-lite-0.2",
@@ -84,7 +84,7 @@ export function makeKernelFixture() {
   };
 
   const envelope: OperatingEnvelope = {
-    schemaVersion: "0.2.0",
+    schemaVersion: "0.2.1",
     tenantId: "tenant_demo",
     organizationId: "org_demo",
     createdAt,
@@ -93,7 +93,7 @@ export function makeKernelFixture() {
     agentId: "agent_demo",
     objectiveRef: "intent:install-approved-package",
     allowedActionClasses: ["package.install"],
-    allowedReceivers: ["receiver_package_manager"],
+    allowedGateways: ["gateway_package_manager"],
     allowedResources: ["npm:hono"],
     evidenceRequirements: ["package_lock_diff"],
     policyPackRef: "policy:demo",
@@ -103,13 +103,13 @@ export function makeKernelFixture() {
     revokedAt: null,
   };
 
-  return { store, kernel, tool, actionType, receiver, envelope };
+  return { store, kernel, tool, actionType, gateway, envelope };
 }
 
 export async function registerFixtureObjects(fixture: ReturnType<typeof makeKernelFixture>) {
   await fixture.kernel.putCatalogObject({ objectType: "tool_capability", payload: fixture.tool });
   await fixture.kernel.putCatalogObject({ objectType: "action_type", payload: fixture.actionType });
-  await fixture.kernel.putCatalogObject({ objectType: "receiver_registry_entry", payload: fixture.receiver });
+  await fixture.kernel.putCatalogObject({ objectType: "gateway_registry_entry", payload: fixture.gateway });
   await fixture.kernel.putCatalogObject({ objectType: "operating_envelope", payload: fixture.envelope });
 }
 
@@ -126,16 +126,16 @@ export async function createGreenlitContract(fixture = makeKernelFixture()) {
     operatingEnvelopeId: "env_demo",
     toolCatalogRef: "tool_catalog_demo@v1",
     actionCatalogRef: "action_catalog_demo@v1",
-    receiverRegistryRef: "receiver_registry@v1",
+    gatewayRegistryRef: "gateway_registry@v1",
     generatedCodeOrSpecRefs: ["code:generated-plan"],
     declaredAssumptions: ["package name is explicit"],
     requiredEvidenceRefs: ["evidence:package-lock-diff"],
     candidate: {
       toolCapabilityId: fixture.tool.toolCapabilityId,
       actionTypeId: fixture.actionType.actionTypeId,
-      receiverRegistryEntryId: fixture.receiver.receiverRegistryEntryId,
+      gatewayRegistryEntryId: fixture.gateway.gatewayRegistryEntryId,
       actionClass: "package.install",
-      receiverId: fixture.receiver.receiverId,
+      gatewayId: fixture.gateway.gatewayId,
       resourceRef: "npm:hono",
     },
   });
@@ -145,8 +145,8 @@ export async function createGreenlitContract(fixture = makeKernelFixture()) {
     organizationId: "org_demo",
     intentCompilationId: compilation.intentCompilationId,
     envelopeId: fixture.envelope.envelopeId,
-    receiverRegistryEntryId: fixture.receiver.receiverRegistryEntryId,
-    receiverId: fixture.receiver.receiverId,
+    gatewayRegistryEntryId: fixture.gateway.gatewayRegistryEntryId,
+    gatewayId: fixture.gateway.gatewayId,
     principalId: "principal_demo",
     agentId: "agent_demo",
     runId: "run_demo",

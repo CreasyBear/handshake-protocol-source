@@ -1,38 +1,38 @@
 import { HandshakeProtocolError } from "./errors";
 import { actionLifecycleStreamRefs } from "./events";
 import { createId, nowIso } from "./ids";
-import { ReconcileReceiverOperationInputSchema, type ReconcileReceiverOperationInput } from "./inputs";
+import { ReconcileSurfaceOperationInputSchema, type ReconcileSurfaceOperationInput } from "./inputs";
 import { buildProofGap, resolveProofGaps } from "./proof-gaps";
 import type { ProtocolRecorder } from "./records";
 import {
   reconciliationFinalityFor,
   reconciliationStatusFor,
-} from "./receiver-gate";
+} from "./gateway-check";
 import {
   PROTOCOL_VERSION,
-  ReceiverOperationReconciliationSchema,
+  SurfaceOperationReconciliationSchema,
   type ActionContract,
   type MutationAttempt,
   type ProofGap,
   type ProtocolRecord,
   type Receipt,
-  type ReceiverOperationReconciliation,
+  type SurfaceOperationReconciliation,
 } from "./schemas";
-import { guardReceiverOperationReconciliation, type TransitionGuardResult } from "./transitions";
+import { guardSurfaceOperationReconciliation, type TransitionGuardResult } from "./transitions";
 import type { ProtocolStore } from "../storage/store";
 
-export type ReceiverOperationReconciliationResult = {
-  reconciliation: ReceiverOperationReconciliation;
+export type SurfaceOperationReconciliationResult = {
+  reconciliation: SurfaceOperationReconciliation;
   resolvedProofGaps: ProofGap[];
   createdProofGap: ProofGap | null;
 };
 
-export async function reconcileReceiverOperation(
+export async function reconcileSurfaceOperation(
   store: ProtocolStore,
   recorder: ProtocolRecorder,
-  inputValue: ReconcileReceiverOperationInput,
-): Promise<ReceiverOperationReconciliationResult> {
-  const input = ReconcileReceiverOperationInputSchema.parse(inputValue);
+  inputValue: ReconcileSurfaceOperationInput,
+): Promise<SurfaceOperationReconciliationResult> {
+  const input = ReconcileSurfaceOperationInputSchema.parse(inputValue);
   if (input.observedDownstreamStatus === "unknown" && input.resolvedProofGapIds.length > 0) {
     throw new HandshakeProtocolError(
       "invalid_transition_unknown_reconciliation_cannot_resolve_proof_gap",
@@ -51,15 +51,15 @@ export async function reconcileReceiverOperation(
     "contract_missing",
   );
   assertTransition(
-    guardReceiverOperationReconciliation(mutationRecord.payload, {
+    guardSurfaceOperationReconciliation(mutationRecord.payload, {
       mutationAttemptId: input.mutationAttemptId,
       idempotencyKey: input.idempotencyKey,
-      observedReceiverOperationRef: input.observedReceiverOperationRef,
+      observedSurfaceOperationRef: input.observedSurfaceOperationRef,
     }),
   );
 
   const now = nowIso();
-  const reconciliation = ReceiverOperationReconciliationSchema.parse({
+  const reconciliation = SurfaceOperationReconciliationSchema.parse({
     schemaVersion: PROTOCOL_VERSION,
     tenantId: mutationRecord.payload.tenantId,
     organizationId: mutationRecord.payload.organizationId,
@@ -69,9 +69,9 @@ export async function reconcileReceiverOperation(
     gateAttemptId: mutationRecord.payload.gateAttemptId,
     actionContractId: mutationRecord.payload.actionContractId,
     greenlightId: mutationRecord.payload.greenlightId,
-    receiverId: mutationRecord.payload.receiverId,
+    gatewayId: mutationRecord.payload.gatewayId,
     idempotencyKey: mutationRecord.payload.idempotencyKey,
-    receiverOperationRef: input.observedReceiverOperationRef ?? mutationRecord.payload.receiverOperationRef,
+    surfaceOperationRef: input.observedSurfaceOperationRef ?? mutationRecord.payload.surfaceOperationRef,
     previousMutationOutcome: mutationRecord.payload.outcome,
     observedDownstreamStatus: input.observedDownstreamStatus,
     observedAt: now,
@@ -92,14 +92,14 @@ export async function reconcileReceiverOperation(
       : null;
   await recorder.commitRecordsWithEvents(
     [
-      { objectType: "receiver_operation_reconciliation", payload: reconciliation },
+      { objectType: "surface_operation_reconciliation", payload: reconciliation },
       ...resolvedProofGaps.map((proofGap): ProtocolRecord => ({ objectType: "proof_gap", payload: proofGap })),
       ...(createdProofGap ? ([{ objectType: "proof_gap", payload: createdProofGap }] satisfies ProtocolRecord[]) : []),
     ],
     [
       {
         source: reconciliation,
-        eventType: "receiver_operation_reconciled",
+        eventType: "surface_operation_reconciled",
         objectRefs: [reconciliation.reconciliationId, reconciliation.mutationAttemptId, reconciliation.actionContractId],
         streamRefs: actionLifecycleStreamRefs(contractRecord.payload),
         payload: {

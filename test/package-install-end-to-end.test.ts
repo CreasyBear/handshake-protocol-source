@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { runPackageInstallReceiver } from "../src/adapters/package-install/receiver";
+import { runPackageInstallGateway } from "../src/adapters/package-install/gateway";
 import { proposePackageInstallActionContract } from "../src/runtime/package-install/tool-wrapper";
 import { makeKernelFixture, registerFixtureObjects } from "./fixtures";
 import {
@@ -8,7 +8,7 @@ import {
 } from "./support/package-install-flow";
 
 describe("package install end-to-end reference flow", () => {
-  it("turns generated orchestration into one greenlit receiver-gated mutation chain", async () => {
+  it("turns generated orchestration into one greenlit gateway-checked mutation chain", async () => {
     const fixture = makeKernelFixture();
     await registerFixtureObjects(fixture);
     const surface = await createPackageManifestSurface("handshake-package-e2e-");
@@ -35,19 +35,19 @@ describe("package install end-to-end reference flow", () => {
     expect(policy.greenlight).not.toBeNull();
     if (!policy.greenlight) throw new Error("expected greenlight");
 
-    const receiverResult = await runPackageInstallReceiver({
+    const gatewayResult = await runPackageInstallGateway({
       protocol: fixture.kernel,
       surface,
       actionContractId: proposed.actionContract.actionContractId,
       greenlightId: policy.greenlight.greenlightId,
       observedParameters: { package: "hono", versionRange: "^4.12.19" },
-      receiverOperationRef: "receiver-op:e2e-package-install-hono",
+      surfaceOperationRef: "surface-op:e2e-package-install-hono",
     });
 
-    expect(receiverResult.outcome).toBe("mutation_reconciled");
-    expect(receiverResult.receiverGate.gateAttempt.gateDecision).toBe("passed");
-    expect(receiverResult.receiverGate.receipt.finalityStatus).toBe("pending");
-    expect(receiverResult.reconciliation?.finalityStatus).toBe("final");
+    expect(gatewayResult.outcome).toBe("mutation_reconciled");
+    expect(gatewayResult.gatewayCheck.gateAttempt.gateDecision).toBe("passed");
+    expect(gatewayResult.gatewayCheck.receipt.finalityStatus).toBe("pending");
+    expect(gatewayResult.reconciliation?.finalityStatus).toBe("final");
     expect((await surface.readManifest()).dependencies).toEqual({ hono: "^4.12.19" });
     expect(surface.mutationCount).toBe(1);
 
@@ -55,9 +55,9 @@ describe("package install end-to-end reference flow", () => {
     expect(fixture.store.countRecordsOfType("action_contract")).toBe(1);
     expect(fixture.store.countRecordsOfType("policy_decision")).toBe(1);
     expect(fixture.store.countRecordsOfType("greenlight")).toBe(1);
-    expect(fixture.store.countRecordsOfType("receiver_gate_attempt")).toBe(1);
+    expect(fixture.store.countRecordsOfType("gateway_check_attempt")).toBe(1);
     expect(fixture.store.countRecordsOfType("mutation_attempt")).toBe(1);
-    expect(fixture.store.countRecordsOfType("receiver_operation_reconciliation")).toBe(1);
+    expect(fixture.store.countRecordsOfType("surface_operation_reconciliation")).toBe(1);
 
     const events = fixture.store.listEventsForPartition(
       `stream_${proposed.actionContract.tenantId}_${proposed.actionContract.organizationId}`,
@@ -67,10 +67,10 @@ describe("package install end-to-end reference flow", () => {
       "action_proposed",
       "policy_decision_recorded",
       "action_greenlit",
-      "receiver_gate_checked",
+      "gateway_checked",
       "mutation_attempted",
       "receipt_emitted",
-      "receiver_operation_reconciled",
+      "surface_operation_reconciled",
     ]);
     expect(events.map((event) => event.offset)).toEqual([0, 1, 2, 3, 4, 5, 6]);
     for (let index = 1; index < events.length; index += 1) {

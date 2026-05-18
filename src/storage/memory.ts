@@ -6,8 +6,8 @@ import type {
   ProtocolCommitResult,
   ProtocolStore,
   RecoveryTerminalClaim,
-  ReceiverGateCommit,
-  ReceiverGateCommitResult,
+  GatewayCheckCommit,
+  GatewayCheckCommitResult,
   StoredProtocolRecord,
   StreamTail,
 } from "./store";
@@ -120,7 +120,7 @@ export class InMemoryProtocolStore implements ProtocolStore {
     return "committed";
   }
 
-  async commitReceiverGate(commit: ReceiverGateCommit): Promise<ReceiverGateCommitResult> {
+  async commitGatewayCheck(commit: GatewayCheckCommit): Promise<GatewayCheckCommitResult> {
     if (commit.consumption && this.consumptions.has(commit.consumption.greenlightId)) {
       return "already_consumed";
     }

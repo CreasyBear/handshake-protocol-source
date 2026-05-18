@@ -6,7 +6,7 @@ import type {
   OperatingEnvelope,
   PolicyDecision,
   ProtocolRecord,
-  ReceiverRegistryEntry,
+  GatewayRegistryEntry,
 } from "./schemas";
 
 export type TransitionGuardResult =
@@ -23,7 +23,7 @@ export const PROTOCOL_TRANSITIONS = {
   registerProtocolConfiguration: {
     from: "external_configuration",
     to: "durable_catalog_or_envelope",
-    guard: "Only tool capabilities, action types, receiver registry entries, and operating envelopes may be inserted directly.",
+    guard: "Only tool capabilities, action types, gateway registry entries, and operating envelopes may be inserted directly.",
   },
   compileIntent: {
     from: "principal_intent_plus_catalog_refs",
@@ -33,7 +33,7 @@ export const PROTOCOL_TRANSITIONS = {
   proposeActionContract: {
     from: "clean_intent_compilation",
     to: "action_proposed",
-    guard: "Compilation, envelope, receiver, principal, agent, run, tenant, and organization bindings must match.",
+    guard: "Compilation, envelope, gateway, principal, agent, run, tenant, and organization bindings must match.",
   },
   evaluatePolicy: {
     from: "action_proposed",
@@ -55,25 +55,25 @@ export const PROTOCOL_TRANSITIONS = {
     to: "breaker_decision_recorded_and_isolation_changed",
     guard: "Breaker decisions must atomically record observed stream watermarks and the resulting isolation state.",
   },
-  receiverGate: {
+  gatewayCheck: {
     from: "action_greenlit",
-    to: "receiver_gate_checked",
-    guard: "A receiver gate may proceed only from a greenlight policy decision; binding mismatches become receiver refusals before mutation.",
+    to: "gateway_checked",
+    guard: "A gateway check may proceed only from a greenlight policy decision; binding mismatches become gateway refusals before mutation.",
   },
-  reconcileReceiverOperation: {
+  reconcileSurfaceOperation: {
     from: "mutation_attempted_pending_or_unknown",
-    to: "receiver_operation_reconciled",
+    to: "surface_operation_reconciled",
     guard: "Reconciliation may inspect only the same mutation attempt and idempotency key; it cannot create another mutation attempt.",
   },
   exportReceipt: {
     from: "receipt_emitted",
     to: "receipt_exported",
-    guard: "Receipt export may package existing evidence only; it cannot create execution proof or mutate receiver state.",
+    guard: "Receipt export may package existing evidence only; it cannot create execution proof or mutate gateway state.",
   },
   recommendRecovery: {
     from: "receipt_refusal_or_proof_gap",
     to: "recovery_recommended",
-    guard: "Recovery may recommend a narrower future contract or review path only; it cannot reuse a greenlight or mutate receiver state.",
+    guard: "Recovery may recommend a narrower future contract or review path only; it cannot reuse a greenlight or mutate gateway state.",
   },
   linkRecoveryToActionContract: {
     from: "recovery_recommended",
@@ -91,7 +91,7 @@ export function guardCatalogRegistration(record: ProtocolRecord): TransitionGuar
   if (
     record.objectType === "tool_capability" ||
     record.objectType === "action_type" ||
-    record.objectType === "receiver_registry_entry" ||
+    record.objectType === "gateway_registry_entry" ||
     record.objectType === "operating_envelope"
   ) {
     return ok();
@@ -109,10 +109,10 @@ export function guardActionProposal(input: {
   agentId: string;
   runId: string;
   envelopeId: string;
-  receiverId: string;
+  gatewayId: string;
   compilation: IntentCompilationRecord;
   envelope: OperatingEnvelope;
-  receiver: ReceiverRegistryEntry;
+  gateway: GatewayRegistryEntry;
 }): TransitionGuardResult {
   if (input.compilation.uncertaintyMarkers.length > 0 || input.compilation.overreachReasonCodes.length > 0) {
     return fail(
@@ -123,21 +123,21 @@ export function guardActionProposal(input: {
   if (input.compilation.operatingEnvelopeId !== input.envelope.envelopeId || input.envelopeId !== input.envelope.envelopeId) {
     return fail("invalid_transition_envelope_mismatch", "Action contract must use the envelope pinned by the intent compilation.");
   }
-  if (input.receiver.receiverId !== input.receiverId) {
-    return fail("receiver_registry_mismatch", "Action contract receiver must match the durable receiver registry entry.");
+  if (input.gateway.gatewayId !== input.gatewayId) {
+    return fail("gateway_registry_mismatch", "Action contract gateway must match the durable gateway registry entry.");
   }
-  if (input.receiver.receiptCapabilityStatus !== "available" || input.receiver.isolationCheckCapabilityStatus !== "available") {
-    return fail("receiver_not_enforcing", "Receiver registry entry does not prove receipt and isolation check capability.");
+  if (input.gateway.receiptCapabilityStatus !== "available" || input.gateway.isolationCheckCapabilityStatus !== "available") {
+    return fail("gateway_not_enforcing", "Gateway registry entry does not prove receipt and isolation check capability.");
   }
   if (
     input.tenantId !== input.compilation.tenantId ||
     input.tenantId !== input.envelope.tenantId ||
-    input.tenantId !== input.receiver.tenantId ||
+    input.tenantId !== input.gateway.tenantId ||
     input.organizationId !== input.compilation.organizationId ||
     input.organizationId !== input.envelope.organizationId ||
-    input.organizationId !== input.receiver.organizationId
+    input.organizationId !== input.gateway.organizationId
   ) {
-    return fail("invalid_transition_scope_mismatch", "Action contract scope must match compilation, envelope, and receiver scope.");
+    return fail("invalid_transition_scope_mismatch", "Action contract scope must match compilation, envelope, and gateway scope.");
   }
   if (
     input.principalId !== input.compilation.principalId ||
@@ -187,7 +187,7 @@ export function guardReviewDecision(contract: ActionContract, policyDecision: Po
   return ok();
 }
 
-export function guardReceiverGateAuthority(
+export function guardGatewayCheckAuthority(
   greenlight: Greenlight,
   policyDecision: PolicyDecision,
 ): TransitionGuardResult {
@@ -198,17 +198,17 @@ export function guardReceiverGateAuthority(
     return fail("invalid_transition_policy_contract_mismatch", "Greenlight policy decision must bind to the same action contract.");
   }
   if (policyDecision.decision !== "greenlight") {
-    return fail("invalid_transition_policy_not_greenlight", "Receiver gate requires a policy decision whose value is greenlight.");
+    return fail("invalid_transition_policy_not_greenlight", "Gateway gate requires a policy decision whose value is greenlight.");
   }
   return ok();
 }
 
-export function guardReceiverOperationReconciliation(
+export function guardSurfaceOperationReconciliation(
   mutationAttempt: MutationAttempt,
   input: {
     mutationAttemptId: string;
     idempotencyKey: string;
-    observedReceiverOperationRef: string | null;
+    observedSurfaceOperationRef: string | null;
   },
 ): TransitionGuardResult {
   if (mutationAttempt.mutationAttemptId !== input.mutationAttemptId) {
@@ -224,13 +224,13 @@ export function guardReceiverOperationReconciliation(
     );
   }
   if (
-    mutationAttempt.receiverOperationRef !== null &&
-    input.observedReceiverOperationRef !== null &&
-    mutationAttempt.receiverOperationRef !== input.observedReceiverOperationRef
+    mutationAttempt.surfaceOperationRef !== null &&
+    input.observedSurfaceOperationRef !== null &&
+    mutationAttempt.surfaceOperationRef !== input.observedSurfaceOperationRef
   ) {
     return fail(
-      "invalid_transition_receiver_operation_mismatch",
-      "Observed receiver operation reference must match the original mutation attempt.",
+      "invalid_transition_surface_operation_mismatch",
+      "Observed surface operation reference must match the original mutation attempt.",
     );
   }
   return ok();

@@ -15,7 +15,7 @@ type CountRow = {
 };
 
 describe("codemode multi-action runtime wrapper", () => {
-  it("emits ordered package-install and repo-write action contracts without policy or receiver authority", async () => {
+  it("emits ordered package-install and repo-write action contracts without policy or gateway authority", async () => {
     const harness = await createD1HttpHarness();
     try {
       const client = new HandshakeClient("http://handshake.test", harness.fetch);
@@ -55,7 +55,7 @@ describe("codemode multi-action runtime wrapper", () => {
       expect(await recordCount(harness, "action_contract")).toBe(2);
       expect(await recordCount(harness, "policy_decision")).toBe(0);
       expect(await recordCount(harness, "greenlight")).toBe(0);
-      expect(await recordCount(harness, "receiver_gate_attempt")).toBe(0);
+      expect(await recordCount(harness, "gateway_check_attempt")).toBe(0);
       expect(await recordCount(harness, "mutation_attempt")).toBe(0);
     } finally {
       await harness.dispose();
@@ -94,7 +94,7 @@ describe("codemode multi-action runtime wrapper", () => {
       expect(await recordCount(harness, "action_contract")).toBe(1);
       expect(await recordCount(harness, "policy_decision")).toBe(0);
       expect(await recordCount(harness, "greenlight")).toBe(0);
-      expect(await recordCount(harness, "receiver_gate_attempt")).toBe(0);
+      expect(await recordCount(harness, "gateway_check_attempt")).toBe(0);
       expect(await recordCount(harness, "mutation_attempt")).toBe(0);
     } finally {
       await harness.dispose();
@@ -150,14 +150,14 @@ describe("codemode multi-action runtime wrapper", () => {
       expect(laterSecondPolicy.decision.decision).toBe("greenlight");
       expect(laterSecondPolicy.greenlight).not.toBeNull();
       expect(await recordCount(harness, "greenlight")).toBe(2);
-      expect(await recordCount(harness, "receiver_gate_attempt")).toBe(0);
+      expect(await recordCount(harness, "gateway_check_attempt")).toBe(0);
       expect(await recordCount(harness, "mutation_attempt")).toBe(0);
     } finally {
       await harness.dispose();
     }
   });
 
-  it("refuses later receiver gate until its declared prior contract has a final receipt", async () => {
+  it("refuses later gateway check until its declared prior contract has a final receipt", async () => {
     const harness = await createD1HttpHarness();
     try {
       const client = new HandshakeClient("http://handshake.test", harness.fetch);
@@ -193,7 +193,7 @@ describe("codemode multi-action runtime wrapper", () => {
       });
       if (!firstPolicy.greenlight || !secondPolicy.greenlight) throw new Error("expected greenlights");
 
-      const earlySecondGate = await client.receiverGate({
+      const earlySecondGate = await client.gatewayCheck({
         actionContractId: second.actionContractId,
         greenlightId: secondPolicy.greenlight.greenlightId,
         observedParameters: second.parameters,
@@ -204,7 +204,7 @@ describe("codemode multi-action runtime wrapper", () => {
       expect(earlySecondGate.gateAttempt.consumedGreenlight).toBe(false);
       expect(earlySecondGate.mutationAttempt).toBeNull();
 
-      const firstGate = await client.receiverGate({
+      const firstGate = await client.gatewayCheck({
         actionContractId: first.actionContractId,
         greenlightId: firstPolicy.greenlight.greenlightId,
         observedParameters: first.parameters,
@@ -212,14 +212,14 @@ describe("codemode multi-action runtime wrapper", () => {
       });
       expect(firstGate.gateAttempt.gateDecision).toBe("passed");
 
-      const laterSecondGate = await client.receiverGate({
+      const laterSecondGate = await client.gatewayCheck({
         actionContractId: second.actionContractId,
         greenlightId: secondPolicy.greenlight.greenlightId,
         observedParameters: second.parameters,
         downstreamMode: "succeed",
       });
       expect(laterSecondGate.gateAttempt.gateDecision).toBe("passed");
-      expect(await recordCount(harness, "receiver_gate_attempt")).toBe(3);
+      expect(await recordCount(harness, "gateway_check_attempt")).toBe(3);
       expect(await recordCount(harness, "mutation_attempt")).toBe(2);
     } finally {
       await harness.dispose();

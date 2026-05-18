@@ -12,7 +12,7 @@ import {
   type ProofGap,
   type Receipt,
   type ReceiptExport,
-  type ReceiverGateAttempt,
+  type GatewayCheckAttempt,
 } from "./schemas";
 
 export async function createReceiptExport(
@@ -28,7 +28,7 @@ export async function createReceiptExport(
   const [contractRecord, gateAttemptRecord] = await Promise.all([
     recorder.requiredRecord<ActionContract>("action_contract", receipt.actionContractId, "contract_missing"),
     receipt.gateAttemptId
-      ? recorder.requiredRecord<ReceiverGateAttempt>("receiver_gate_attempt", receipt.gateAttemptId, "receiver_gate_attempt_missing")
+      ? recorder.requiredRecord<GatewayCheckAttempt>("gateway_check_attempt", receipt.gateAttemptId, "gateway_check_attempt_missing")
       : Promise.resolve(null),
   ]);
   const proofGaps = await loadProofGaps(recorder, receipt.proofGapIds);
@@ -62,14 +62,14 @@ export async function createReceiptExport(
     greenlightId: receipt.greenlightId,
     gateAttemptId: receipt.gateAttemptId,
     mutationAttemptId: receipt.mutationAttemptId,
-    receiverId: receipt.receiverId,
+    gatewayId: receipt.gatewayId,
     principalId: contractRecord.payload.principalId,
     agentId: contractRecord.payload.agentId,
     runId: contractRecord.payload.runId,
-    receiverPolicyVersion: contractRecord.payload.receiverPolicyVersion,
+    gatewayPolicyVersion: contractRecord.payload.gatewayPolicyVersion,
     policyDecisionStatus: receipt.policyDecisionStatus,
-    receiverGateCheckStatus: receipt.receiverGateStatus,
-    receiverGateCheckedAt: gateAttemptRecord?.payload.createdAt ?? null,
+    gatewayCheckStatus: receipt.gatewayCheckStatus,
+    gatewayCheckedAt: gateAttemptRecord?.payload.createdAt ?? null,
     greenlightConsumptionStatus: receipt.greenlightConsumptionStatus,
     mutationAttemptStatus: receipt.mutationAttemptStatus,
     downstreamExecutionStatus: receipt.downstreamExecutionStatus,

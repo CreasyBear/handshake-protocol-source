@@ -9,12 +9,12 @@ import type {
   PolicyDecision,
   RecoveryRecommendation,
   ReceiptExport,
-  ReceiverRegistryEntry,
+  GatewayRegistryEntry,
   ReviewDecision,
   ToolCapability,
 } from "../protocol/schemas";
-import type { ReceiverGateResult } from "../protocol/receiver-gate-artifacts";
-import type { ReceiverOperationReconciliationResult } from "../protocol/receiver-operation-reconciliations";
+import type { GatewayCheckResult } from "../protocol/gateway-check-artifacts";
+import type { SurfaceOperationReconciliationResult } from "../protocol/surface-operation-reconciliations";
 import type {
   CompileIntentInput,
   CreateBreakerDecisionInput,
@@ -24,9 +24,9 @@ import type {
   CreateReviewDecisionInput,
   EvaluatePolicyInput,
   ProposeActionContractInput,
-  ReconcileReceiverOperationInput,
+  ReconcileSurfaceOperationInput,
   ResolveRecoveryTerminalConflictInput,
-  ReceiverGateInput,
+  GatewayCheckInput,
   TransitionRecoveryRecommendationStatusInput,
 } from "../protocol/inputs";
 import type { RecoveryRecommendationStatusChange } from "../protocol/recovery-recommendation-status";
@@ -51,8 +51,8 @@ export class HandshakeClient {
     return this.post("/v0.2/catalog/action-types", input);
   }
 
-  registerReceiverRegistryEntry(input: ReceiverRegistryEntry): Promise<ReceiverRegistryEntry> {
-    return this.post("/v0.2/catalog/receivers", input);
+  registerGatewayRegistryEntry(input: GatewayRegistryEntry): Promise<GatewayRegistryEntry> {
+    return this.post("/v0.2/catalog/gateways", input);
   }
 
   registerOperatingEnvelope(input: OperatingEnvelope): Promise<OperatingEnvelope> {
@@ -106,12 +106,12 @@ export class HandshakeClient {
     return this.post("/v0.2/recovery-terminal-conflict-resolutions", input);
   }
 
-  receiverGate(input: ReceiverGateInput): Promise<ReceiverGateResult> {
-    return this.post("/v0.2/receiver-gate-attempts", input);
+  gatewayCheck(input: GatewayCheckInput): Promise<GatewayCheckResult> {
+    return this.post("/v0.2/gateway-check-attempts", input);
   }
 
-  reconcileReceiverOperation(input: ReconcileReceiverOperationInput): Promise<ReceiverOperationReconciliationResult> {
-    return this.post("/v0.2/receiver-operation-reconciliations", input);
+  reconcileSurfaceOperation(input: ReconcileSurfaceOperationInput): Promise<SurfaceOperationReconciliationResult> {
+    return this.post("/v0.2/surface-operation-reconciliations", input);
   }
 
   private async post<T>(path: string, body: unknown): Promise<T> {

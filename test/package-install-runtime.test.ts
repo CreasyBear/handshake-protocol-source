@@ -46,7 +46,7 @@ describe("package install runtime wrapper", () => {
     expect(result.refusalReasonCodes).toEqual([
       "unknown_tool_capability",
       "unknown_action_type",
-      "unknown_receiver_registry_entry",
+      "unknown_gateway_registry_entry",
     ]);
     expect(fixture.store.countRecordsOfType("intent_compilation")).toBe(1);
     expect(fixture.store.countRecordsOfType("action_contract")).toBe(0);

@@ -6,7 +6,7 @@ import {
   ProofGapSchema,
   type ActionContract,
   type ProofGap,
-  type ReceiverOperationReconciliation,
+  type SurfaceOperationReconciliation,
 } from "./schemas";
 
 export function buildProofGap(
@@ -31,7 +31,7 @@ export function buildProofGap(
     receiptId: refs.receiptId,
     reasonCode,
     finalityImpact: "unknown",
-    recoveryRequirement: "Reconcile downstream receiver operation before treating receipt as final.",
+    recoveryRequirement: "Reconcile downstream surface operation before treating receipt as final.",
     resolvedAt: null,
     resolvedByRef: null,
   });
@@ -40,7 +40,7 @@ export function buildProofGap(
 export async function resolveProofGaps(
   recorder: ProtocolRecorder,
   proofGapIds: string[],
-  reconciliation: ReceiverOperationReconciliation,
+  reconciliation: SurfaceOperationReconciliation,
   now: string,
 ): Promise<ProofGap[]> {
   const resolved: ProofGap[] = [];

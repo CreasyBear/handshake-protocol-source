@@ -56,12 +56,12 @@ export function evaluateDeterministicPolicy(
       matchedRuleIds: ["action_class_allowed"],
     };
   }
-  if (!envelope.allowedReceivers.includes(contract.receiverId)) {
+  if (!envelope.allowedGateways.includes(contract.gatewayId)) {
     return {
       decision: "refuse",
-      reasonCode: "receiver_outside_envelope",
-      reason: "Receiver is outside the operating envelope.",
-      matchedRuleIds: ["receiver_allowed"],
+      reasonCode: "gateway_outside_envelope",
+      reason: "Gateway is outside the operating envelope.",
+      matchedRuleIds: ["gateway_allowed"],
     };
   }
   if (!envelope.allowedResources.includes("*") && !envelope.allowedResources.includes(contract.resourceRef)) {
@@ -92,7 +92,7 @@ export function reviewDecisionAllowsGreenlight(
     reviewDecision.actionContractId === contract.actionContractId &&
     reviewDecision.actionContractDigest === contract.actionContractDigest &&
     reviewDecision.policyInputDigest === policyInputDigest &&
-    reviewDecision.receiverPolicyVersion === contract.receiverPolicyVersion
+    reviewDecision.gatewayPolicyVersion === contract.gatewayPolicyVersion
   );
 }
 

@@ -1,16 +1,16 @@
 import { z } from "zod";
 import {
-  verifiedReceiverGateCheckFromResult,
-  type ReceiverGateResult,
-  type VerifiedReceiverGateCheck,
-} from "../../protocol/receiver-gate-artifacts";
+  verifiedGatewayCheckFromResult,
+  type GatewayCheckResult,
+  type VerifiedGatewayCheck,
+} from "../../protocol/gateway-check-artifacts";
 import { digestUtf8Content, utf8ByteLength } from "../../protocol/content-digests";
 import type {
-  ReceiverGateInput,
-  ReconcileReceiverOperationInput,
+  GatewayCheckInput,
+  ReconcileSurfaceOperationInput,
 } from "../../protocol/inputs";
-import type { ReceiverOperationReconciliationResult } from "../../protocol/receiver-operation-reconciliations";
-import type { ReceiverOperationReconciliation } from "../../protocol/schemas";
+import type { SurfaceOperationReconciliationResult } from "../../protocol/surface-operation-reconciliations";
+import type { SurfaceOperationReconciliation } from "../../protocol/schemas";
 
 export const RepoWriteParametersSchema = z.strictObject({
   repositoryRef: z.string().min(1),
@@ -21,7 +21,7 @@ export const RepoWriteParametersSchema = z.strictObject({
 export type RepoWriteParameters = z.infer<typeof RepoWriteParametersSchema>;
 
 export type RepoWriteMutationCommand = {
-  verifiedGate: VerifiedReceiverGateCheck;
+  verifiedGate: VerifiedGatewayCheck;
   repositoryRef: string;
   filePath: string;
   content: string;
@@ -31,7 +31,7 @@ export type RepoWriteMutationCommand = {
 
 export type RepoWriteMutationEvidence = {
   evidenceRef: string;
-  receiverOperationRef: string;
+  surfaceOperationRef: string;
   repositoryRef: string;
   filePath: string;
   contentDigest: `sha256:${string}`;
@@ -43,11 +43,11 @@ export interface RepoWriteMutationSurface {
 }
 
 export type RepoWriteProtocol = {
-  receiverGate(input: ReceiverGateInput): Promise<ReceiverGateResult>;
-  reconcileReceiverOperation(input: ReconcileReceiverOperationInput): Promise<ReceiverOperationReconciliationResult>;
+  gatewayCheck(input: GatewayCheckInput): Promise<GatewayCheckResult>;
+  reconcileSurfaceOperation(input: ReconcileSurfaceOperationInput): Promise<SurfaceOperationReconciliationResult>;
 };
 
-export type RepoWriteReceiverInput = {
+export type RepoWriteGatewayInput = {
   protocol: RepoWriteProtocol;
   surface: RepoWriteMutationSurface;
   actionContractId: string;
@@ -55,36 +55,36 @@ export type RepoWriteReceiverInput = {
   repositoryRef: string;
   filePath: string;
   content: string;
-  receiverOperationRef?: string;
+  surfaceOperationRef?: string;
 };
 
-export type RepoWriteReceiverResult =
+export type RepoWriteGatewayResult =
   | {
-      outcome: "receiver_gate_refused";
-      receiverGate: ReceiverGateResult;
+      outcome: "gateway_check_refused";
+      gatewayCheck: GatewayCheckResult;
       reconciliation: null;
       mutationEvidence: null;
     }
   | {
-      outcome: "receiver_gate_not_authoritative";
-      receiverGate: ReceiverGateResult;
+      outcome: "gateway_check_not_authoritative";
+      gatewayCheck: GatewayCheckResult;
       reconciliation: null;
       mutationEvidence: null;
     }
   | {
       outcome: "mutation_reconciled";
-      receiverGate: ReceiverGateResult;
-      reconciliation: ReceiverOperationReconciliation;
+      gatewayCheck: GatewayCheckResult;
+      reconciliation: SurfaceOperationReconciliation;
       mutationEvidence: RepoWriteMutationEvidence;
     }
   | {
       outcome: "mutation_failed";
-      receiverGate: ReceiverGateResult;
-      reconciliation: ReceiverOperationReconciliation;
+      gatewayCheck: GatewayCheckResult;
+      reconciliation: SurfaceOperationReconciliation;
       mutationEvidence: null;
     };
 
-export async function runRepoWriteReceiver(input: RepoWriteReceiverInput): Promise<RepoWriteReceiverResult> {
+export async function runRepoWriteGateway(input: RepoWriteGatewayInput): Promise<RepoWriteGatewayResult> {
   const contentDigest = await digestUtf8Content(input.content);
   const contentByteLength = utf8ByteLength(input.content);
   const observedParameters = RepoWriteParametersSchema.parse({
@@ -93,20 +93,20 @@ export async function runRepoWriteReceiver(input: RepoWriteReceiverInput): Promi
     contentDigest,
     contentByteLength,
   });
-  const receiverOperationRef = input.receiverOperationRef ?? `receiver-op:${input.actionContractId}`;
-  const receiverGate = await input.protocol.receiverGate({
+  const surfaceOperationRef = input.surfaceOperationRef ?? `surface-op:${input.actionContractId}`;
+  const gatewayCheck = await input.protocol.gatewayCheck({
     actionContractId: input.actionContractId,
     greenlightId: input.greenlightId,
     observedParameters,
     downstreamMode: "pending",
-    receiverOperationRef,
+    surfaceOperationRef,
   });
 
-  const verifiedGate = verifiedReceiverGateCheckFromResult(receiverGate);
+  const verifiedGate = verifiedGatewayCheckFromResult(gatewayCheck);
   if (!verifiedGate) {
     const outcome =
-      receiverGate.gateAttempt.gateDecision === "refused" ? "receiver_gate_refused" : "receiver_gate_not_authoritative";
-    return { outcome, receiverGate, reconciliation: null, mutationEvidence: null };
+      gatewayCheck.gateAttempt.gateDecision === "refused" ? "gateway_check_refused" : "gateway_check_not_authoritative";
+    return { outcome, gatewayCheck, reconciliation: null, mutationEvidence: null };
   }
 
   try {
@@ -118,24 +118,24 @@ export async function runRepoWriteReceiver(input: RepoWriteReceiverInput): Promi
       contentDigest,
       contentByteLength,
     });
-    const { reconciliation } = await input.protocol.reconcileReceiverOperation({
+    const { reconciliation } = await input.protocol.reconcileSurfaceOperation({
       mutationAttemptId: verifiedGate.mutationAttemptId,
       idempotencyKey: verifiedGate.idempotencyKey,
-      observedReceiverOperationRef: mutationEvidence.receiverOperationRef,
+      observedSurfaceOperationRef: mutationEvidence.surfaceOperationRef,
       observedDownstreamStatus: "succeeded",
       evidenceRefs: [mutationEvidence.evidenceRef],
       resolvedProofGapIds: [],
     });
-    return { outcome: "mutation_reconciled", receiverGate, reconciliation, mutationEvidence };
+    return { outcome: "mutation_reconciled", gatewayCheck, reconciliation, mutationEvidence };
   } catch {
-    const { reconciliation } = await input.protocol.reconcileReceiverOperation({
+    const { reconciliation } = await input.protocol.reconcileSurfaceOperation({
       mutationAttemptId: verifiedGate.mutationAttemptId,
       idempotencyKey: verifiedGate.idempotencyKey,
-      observedReceiverOperationRef: receiverOperationRef,
+      observedSurfaceOperationRef: surfaceOperationRef,
       observedDownstreamStatus: "failed",
-      evidenceRefs: [`evidence:repo-write-failed:${receiverOperationRef}`],
+      evidenceRefs: [`evidence:repo-write-failed:${surfaceOperationRef}`],
       resolvedProofGapIds: [],
     });
-    return { outcome: "mutation_failed", receiverGate, reconciliation, mutationEvidence: null };
+    return { outcome: "mutation_failed", gatewayCheck, reconciliation, mutationEvidence: null };
   }
 }

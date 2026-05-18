@@ -57,7 +57,7 @@ export async function createBreakerDecision(
     createdIsolationStateId: isolationStateId,
     agentId: input.agentId,
     runId: input.runId,
-    receiverId: input.receiverId,
+    gatewayId: input.gatewayId,
     resourceRef: input.resourceRef,
     actionClass: input.actionClass,
     sequenceRiskScore: sequenceRiskScoreFor(input.decision),

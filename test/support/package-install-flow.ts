@@ -6,7 +6,7 @@ import type { PackageInstallRuntimeConfig } from "../../src/runtime/package-inst
 import type {
   ActionType,
   OperatingEnvelope,
-  ReceiverRegistryEntry,
+  GatewayRegistryEntry,
   ToolCapability,
 } from "../../src/protocol/schemas";
 import { futureIso } from "../fixtures";
@@ -15,7 +15,7 @@ import { FilePackageManifestSurface } from "./package-manifest-surface";
 export type PackageInstallFixtureObjects = {
   tool: ToolCapability;
   actionType: ActionType;
-  receiver: ReceiverRegistryEntry;
+  gateway: GatewayRegistryEntry;
   envelope: OperatingEnvelope;
 };
 
@@ -34,7 +34,7 @@ export async function registerFixtureObjectsWithClient(
 ): Promise<void> {
   await client.registerToolCapability(fixture.tool);
   await client.registerActionType(fixture.actionType);
-  await client.registerReceiverRegistryEntry(fixture.receiver);
+  await client.registerGatewayRegistryEntry(fixture.gateway);
   await client.registerOperatingEnvelope(fixture.envelope);
 }
 
@@ -49,11 +49,11 @@ export function packageInstallRuntimeConfig(fixture: PackageInstallFixtureObject
     operatingEnvelopeId: fixture.envelope.envelopeId,
     toolCatalogRef: "tool_catalog_demo@v1",
     actionCatalogRef: "action_catalog_demo@v1",
-    receiverRegistryRef: "receiver_registry@v1",
+    gatewayRegistryRef: "gateway_registry@v1",
     toolCapabilityId: fixture.tool.toolCapabilityId,
     actionTypeId: fixture.actionType.actionTypeId,
-    receiverRegistryEntryId: fixture.receiver.receiverRegistryEntryId,
-    receiverId: fixture.receiver.receiverId,
+    gatewayRegistryEntryId: fixture.gateway.gatewayRegistryEntryId,
+    gatewayId: fixture.gateway.gatewayId,
     contractExpiresAt: futureIso(),
     signingSecret: "test-secret",
   };

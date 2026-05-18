@@ -1,21 +1,21 @@
 # Handshake Business Spine
 
-Status: Canonical business alpha  
-Version: v0.2.0  
-Audience: Founder, product, GTM, design partners, platform/security buyers  
-Implementation status: Depends on the v0.2 protocol kernel completion audit and current reference receiver proofs; not yet validated by paid pilots
-Canonical owner: Product owner  
-Last reviewed: 2026-05-17
+Status: Canonical business alpha
+Version: v0.2.1
+Audience: Founder, product, GTM, design partners, platform/security buyers
+Implementation status: Depends on the v0.2 protocol kernel completion audit and current reference gateway proofs; not yet validated by paid pilots
+Canonical owner: Product owner
+Last reviewed: 2026-05-18
 
 ## Customer And Moment Of Value
 
 Customer: engineering teams adopting coding agents near production-adjacent work.
 
-Moment of value: a coding agent attempts a consequential action, Handshake turns it into an exact action contract, policy greenlights or refuses it, the receiver gate enforces before mutation, and the receipt reconstructs the run.
+Moment of value: a coding agent attempts a consequential action, Handshake turns it into an exact action contract, policy greenlights or refuses it, the gateway check enforces before mutation, and the receipt reconstructs the run.
 
 ## Business Invariant
 
-Handshake is only commercially real if receiver-gated action control lets customers delegate more valuable work to agents.
+Handshake is only commercially real if gateway-checked action control lets customers delegate more valuable work to agents.
 
 If the product only adds review work, logs, dashboards, or safety language without unlocking more bounded autonomous execution, the business is failing.
 
@@ -24,14 +24,14 @@ If the product only adds review work, logs, dashboards, or safety language witho
 Sell:
 
 ```text
-Handshake Agent Guardrails
-Receiver-gated action contracts and receipts for coding agents doing production-adjacent work.
+Handshake Protected Actions
+Gateway-checked action control for coding agents doing production-adjacent work.
 ```
 
 Do not sell the protocol first. The protocol proves the product is real. The bought product is the workflow unlock:
 
 ```text
-Let coding agents perform larger production-adjacent tasks under receiver-gated bounds instead of ambient authority.
+Let coding agents perform larger production-adjacent tasks under gateway-checked bounds instead of ambient authority.
 ```
 
 ## Canonical Business Docs
@@ -59,6 +59,7 @@ Carry forward:
 - engineering agents are the cheapest first proof;
 - support/billing may be the stronger commercial challenger;
 - embedded agentic SaaS may become the distribution path;
+- AgentCash/x402/payment-rail systems are useful adjacent adapter research, not first-sale language or product center;
 - horizontal market-access language is future category work, not first-sale language.
 
 Reject:
@@ -68,6 +69,7 @@ Reject:
 - broad agent governance;
 - dashboard-first product;
 - audit-only product;
-- marketplace before receiver enforcement.
+- marketplace before gateway enforcement.
+- payment rails, wallets, budgets, settlement, accounting, credit, fraud, or personalized financial-management scope.
 
-Active next product shipment: one design-partner-ready proof packet for a receiver-gated engineering-agent action, using the implemented package-install or repo-write receiver proof until a production preview-deploy receiver exists.
+Active next product shipment: a design-partner pilot for Handshake Protected Actions through the CLI/MCP protected action surface. The bought product is the CLI/MCP integration, Contract Viewer, Receipt Timeline, install posture, and gateway-adapter path that lets a coding agent propose protected actions without ambient authority. The first adapter-backed workflow is protected repo-write-to-PR through a GitHub App-backed `repo_write_gateway`. Proof packets are sales/conformance evidence only.

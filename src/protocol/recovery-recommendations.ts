@@ -57,7 +57,7 @@ export async function createRecoveryRecommendation(
     requiresHumanReview: input.requiresHumanReview,
     mustCreateNewActionContract: true,
     mayReuseGreenlight: false,
-    mayMutateReceiver: false,
+    mayMutateProtectedSurface: false,
     recommendedAt: now,
   } satisfies JsonValue;
   const recommendationDigest = await digestCanonical(recommendationBinding);
@@ -75,7 +75,7 @@ export async function createRecoveryRecommendation(
     sourceMutationAttemptId: receipt.mutationAttemptId,
     sourceRefusalOrGapRef,
     sourceFinalityStatus: receipt.finalityStatus,
-    sourceReceiverGateStatus: receipt.receiverGateStatus,
+    sourceGatewayCheckStatus: receipt.gatewayCheckStatus,
     sourceMutationAttemptStatus: receipt.mutationAttemptStatus,
     sourceDownstreamExecutionStatus: receipt.downstreamExecutionStatus,
     recommendedPath: input.recommendedPath,
@@ -89,7 +89,7 @@ export async function createRecoveryRecommendation(
     principalId: contract.principalId,
     agentId: contract.agentId,
     runId: contract.runId,
-    receiverId: receipt.receiverId,
+    gatewayId: receipt.gatewayId,
     resourceRef: contract.resourceRef,
     actionClass: contract.actionClass,
     failureReceiptRef: receipt.receiptId,
@@ -108,7 +108,7 @@ export async function createRecoveryRecommendation(
     retryNotBefore: input.retryNotBefore,
     mustCreateNewActionContract: true,
     mayReuseGreenlight: false,
-    mayMutateReceiver: false,
+    mayMutateProtectedSurface: false,
     recommendationStatus: "open",
     statusChangedAt: null,
     statusChangedByRef: null,
@@ -137,7 +137,7 @@ export async function createRecoveryRecommendation(
           recommendedPath: recommendation.recommendedPath,
           mustCreateNewActionContract: true,
           mayReuseGreenlight: false,
-          mayMutateReceiver: false,
+          mayMutateProtectedSurface: false,
           recommendationDigest: recommendation.recommendationDigest,
         },
       },
@@ -149,8 +149,8 @@ export async function createRecoveryRecommendation(
 function assertRecoverableReceipt(receipt: Receipt): void {
   const hasRecoverableStatus =
     receipt.proofGapIds.length > 0 ||
-    receipt.receiverGateStatus === "refused" ||
-    receipt.receiverGateStatus === "proof_gap" ||
+    receipt.gatewayCheckStatus === "refused" ||
+    receipt.gatewayCheckStatus === "proof_gap" ||
     receipt.mutationAttemptStatus === "downstream_refused" ||
     receipt.mutationAttemptStatus === "failed" ||
     receipt.mutationAttemptStatus === "unknown" ||
@@ -216,7 +216,7 @@ async function assertReceiptDigests(receipt: DigestedReceipt): Promise<void> {
 
 function defaultSourceRefusalOrGapRef(receipt: Receipt): string {
   if (receipt.proofGapIds[0]) return receipt.proofGapIds[0];
-  if (receipt.receiverGateStatus === "refused") return receipt.gateAttemptId ?? receipt.receiptId;
+  if (receipt.gatewayCheckStatus === "refused") return receipt.gateAttemptId ?? receipt.receiptId;
   if (receipt.mutationAttemptStatus !== "not_attempted") return receipt.mutationAttemptId ?? receipt.gateAttemptId ?? receipt.receiptId;
   return receipt.gateAttemptId ?? receipt.receiptId;
 }

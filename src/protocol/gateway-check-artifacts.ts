@@ -1,22 +1,22 @@
 import { digestCanonical } from "./canonical";
 import { receiptStreamReferencesForEvents, type ActionLifecycleStreamRefs, type EventDescriptor } from "./events";
 import { createId } from "./ids";
-import { ReceiverGateInputSchema } from "./inputs";
+import { GatewayCheckInputSchema } from "./inputs";
 import { isolationSnapshotRef } from "./policy";
 import { buildProofGap } from "./proof-gaps";
 import {
   downstreamStatusFor,
   mutationOutcomeFor,
   receiptFinalityFor,
-  receiverOperationRefFor,
-  type ReceiverPolicyDriftCheck,
-} from "./receiver-gate";
+  surfaceOperationRefFor,
+  type GatewayPolicyDriftCheck,
+} from "./gateway-check";
 import {
   GreenlightSchema,
   MutationAttemptSchema,
   PROTOCOL_VERSION,
   ReceiptSchema,
-  ReceiverGateAttemptSchema,
+  GatewayCheckAttemptSchema,
   type ActionContract,
   type ContractStreamEvent,
   type Greenlight,
@@ -26,31 +26,31 @@ import {
   type ProofGap,
   type ProtocolRecord,
   type Receipt,
-  type ReceiverGateAttempt,
+  type GatewayCheckAttempt,
 } from "./schemas";
 
-export type ReceiverGateResult = {
-  gateAttempt: ReceiverGateAttempt;
+export type GatewayCheckResult = {
+  gateAttempt: GatewayCheckAttempt;
   mutationAttempt: MutationAttempt | null;
   receipt: Receipt;
   proofGap: ProofGap | null;
 };
 
-export type VerifiedReceiverGateCheck = {
-  receiverGateStatus: "passed";
+export type VerifiedGatewayCheck = {
+  gatewayCheckStatus: "passed";
   gateAttemptId: string;
   mutationAttemptId: string;
   actionContractId: string;
   greenlightId: string;
-  receiverId: string;
+  gatewayId: string;
   actionClass: string;
   resourceRef: string;
   idempotencyKey: string;
-  receiverOperationRef: string;
+  surfaceOperationRef: string;
 };
 
-export type ReceiverGateArtifactInput = {
-  input: ReturnType<typeof ReceiverGateInputSchema.parse>;
+export type GatewayCheckArtifactInput = {
+  input: ReturnType<typeof GatewayCheckInputSchema.parse>;
   contract: ActionContract;
   greenlight: Greenlight;
   gateAttemptId: string;
@@ -59,27 +59,27 @@ export type ReceiverGateArtifactInput = {
   observedParamsDigest: `sha256:${string}`;
   greenlightDigestSeen: `sha256:${string}`;
   isolationStates: IsolationState[];
-  receiverPolicyDrift: ReceiverPolicyDriftCheck;
+  gatewayPolicyDrift: GatewayPolicyDriftCheck;
 };
 
-export function verifiedReceiverGateCheckFromResult(result: ReceiverGateResult): VerifiedReceiverGateCheck | null {
-  if (result.gateAttempt.gateDecision !== "passed" || !result.mutationAttempt?.receiverOperationRef) return null;
+export function verifiedGatewayCheckFromResult(result: GatewayCheckResult): VerifiedGatewayCheck | null {
+  if (result.gateAttempt.gateDecision !== "passed" || !result.mutationAttempt?.surfaceOperationRef) return null;
   return {
-    receiverGateStatus: result.gateAttempt.gateDecision,
+    gatewayCheckStatus: result.gateAttempt.gateDecision,
     gateAttemptId: result.gateAttempt.gateAttemptId,
     mutationAttemptId: result.mutationAttempt.mutationAttemptId,
     actionContractId: result.mutationAttempt.actionContractId,
     greenlightId: result.mutationAttempt.greenlightId,
-    receiverId: result.mutationAttempt.receiverId,
+    gatewayId: result.mutationAttempt.gatewayId,
     actionClass: result.mutationAttempt.actionClass,
     resourceRef: result.mutationAttempt.resourceRef,
     idempotencyKey: result.mutationAttempt.idempotencyKey,
-    receiverOperationRef: result.mutationAttempt.receiverOperationRef,
+    surfaceOperationRef: result.mutationAttempt.surfaceOperationRef,
   };
 }
 
-export function buildGateArtifacts(input: ReceiverGateArtifactInput): {
-  result: ReceiverGateResult;
+export function buildGateArtifacts(input: GatewayCheckArtifactInput): {
+  result: GatewayCheckResult;
 } {
   const receiptId = createId("rcp");
   const mutationAttempt = input.refusal ? null : buildMutationAttempt(input);
@@ -92,9 +92,9 @@ export function buildGateArtifacts(input: ReceiverGateArtifactInput): {
 }
 
 export async function withReceiptStreamReferences(
-  result: ReceiverGateResult,
+  result: GatewayCheckResult,
   events: ContractStreamEvent[],
-): Promise<ReceiverGateResult> {
+): Promise<GatewayCheckResult> {
   const receiptWithStreamRefs = {
     ...result.receipt,
     streamEventIds: events.map((event) => event.streamEventId),
@@ -116,14 +116,14 @@ export async function withReceiptStreamReferences(
 }
 
 export function gateEventDescriptors(
-  artifacts: { result: ReceiverGateResult },
+  artifacts: { result: GatewayCheckResult },
   streamRefs: ActionLifecycleStreamRefs,
 ): EventDescriptor[] {
   const { gateAttempt, mutationAttempt, proofGap, receipt } = artifacts.result;
   const descriptors: EventDescriptor[] = [
     {
       source: gateAttempt,
-      eventType: "receiver_gate_checked",
+      eventType: "gateway_checked",
       objectRefs: [gateAttempt.gateAttemptId, streamRefs.actionContractId],
       streamRefs,
       payload: { gateDecision: gateAttempt.gateDecision, reasonCode: gateAttempt.gateDecisionReasonCode },
@@ -157,7 +157,7 @@ export function gateEventDescriptors(
   return descriptors;
 }
 
-function buildMutationAttempt(input: ReceiverGateArtifactInput): MutationAttempt {
+function buildMutationAttempt(input: GatewayCheckArtifactInput): MutationAttempt {
   return MutationAttemptSchema.parse({
     schemaVersion: PROTOCOL_VERSION,
     tenantId: input.contract.tenantId,
@@ -167,20 +167,20 @@ function buildMutationAttempt(input: ReceiverGateArtifactInput): MutationAttempt
     gateAttemptId: input.gateAttemptId,
     actionContractId: input.contract.actionContractId,
     greenlightId: input.greenlight.greenlightId,
-    receiverId: input.contract.receiverId,
+    gatewayId: input.contract.gatewayId,
     actionClass: input.contract.actionClass,
     resourceRef: input.contract.resourceRef,
     idempotencyKey: input.contract.idempotencyKey,
     outcome: mutationOutcomeFor(input.input.downstreamMode),
     outcomeReasonCode: input.input.downstreamMode,
-    receiverOperationRef: receiverOperationRefFor(input.input.downstreamMode, input.input.receiverOperationRef),
+    surfaceOperationRef: surfaceOperationRefFor(input.input.downstreamMode, input.input.surfaceOperationRef),
     startedAt: input.now,
     finishedAt: input.input.downstreamMode === "pending" ? null : input.now,
   });
 }
 
 function buildMutationProofGap(
-  input: ReceiverGateArtifactInput,
+  input: GatewayCheckArtifactInput,
   mutationAttempt: MutationAttempt | null,
   receiptId: string,
 ): ProofGap | null {
@@ -193,23 +193,23 @@ function buildMutationProofGap(
 }
 
 function buildGateAttempt(
-  input: ReceiverGateArtifactInput,
+  input: GatewayCheckArtifactInput,
   gateDecision: "passed" | "refused" | "proof_gap",
   reasonCode: string,
   mutationAttempt: MutationAttempt | null,
-): ReceiverGateAttempt {
-  return ReceiverGateAttemptSchema.parse({
+): GatewayCheckAttempt {
+  return GatewayCheckAttemptSchema.parse({
     schemaVersion: PROTOCOL_VERSION,
     tenantId: input.contract.tenantId,
     organizationId: input.contract.organizationId,
     createdAt: input.now,
     gateAttemptId: input.gateAttemptId,
-    receiverId: input.contract.receiverId,
-    receiverPolicyContractId: input.contract.receiverPolicyContractId,
-    receiverPolicyVersion: input.contract.receiverPolicyVersion,
-    pinnedReceiverPolicyVersion: input.contract.receiverPolicyVersion,
-    currentReceiverPolicyVersion: input.receiverPolicyDrift.currentReceiverPolicyVersion,
-    receiverPolicyDriftStatus: input.receiverPolicyDrift.status,
+    gatewayId: input.contract.gatewayId,
+    gatewayPolicyContractId: input.contract.gatewayPolicyContractId,
+    gatewayPolicyVersion: input.contract.gatewayPolicyVersion,
+    pinnedGatewayPolicyVersion: input.contract.gatewayPolicyVersion,
+    currentGatewayPolicyVersion: input.gatewayPolicyDrift.currentGatewayPolicyVersion,
+    gatewayPolicyDriftStatus: input.gatewayPolicyDrift.status,
     actionContractId: input.contract.actionContractId,
     greenlightId: input.greenlight.greenlightId,
     contractDigestSeen: input.contract.actionContractDigest,
@@ -225,9 +225,9 @@ function buildGateAttempt(
 }
 
 function buildReceipt(
-  input: ReceiverGateArtifactInput,
+  input: GatewayCheckArtifactInput,
   receiptId: string,
-  gateAttempt: ReceiverGateAttempt,
+  gateAttempt: GatewayCheckAttempt,
   mutationAttempt: MutationAttempt | null,
   proofGap: ProofGap | null,
 ): Receipt {
@@ -242,9 +242,9 @@ function buildReceipt(
     greenlightId: input.greenlight.greenlightId,
     gateAttemptId: gateAttempt.gateAttemptId,
     mutationAttemptId: mutationAttempt?.mutationAttemptId ?? null,
-    receiverId: input.contract.receiverId,
+    gatewayId: input.contract.gatewayId,
     policyDecisionStatus: "greenlight",
-    receiverGateStatus: gateAttempt.gateDecision,
+    gatewayCheckStatus: gateAttempt.gateDecision,
     greenlightConsumptionStatus: !input.refusal ? "consumed" : input.refusal === "already_consumed" ? "replayed" : "not_consumed",
     mutationAttemptStatus: mutationAttempt?.outcome ?? "not_attempted",
     downstreamExecutionStatus: downstreamStatusFor(input.input.downstreamMode, gateAttempt.gateDecision),
@@ -260,14 +260,14 @@ function buildReceipt(
 }
 
 export function gateProtocolRecords(
-  input: ReceiverGateArtifactInput,
-  result: ReceiverGateResult,
+  input: GatewayCheckArtifactInput,
+  result: GatewayCheckResult,
 ): ProtocolRecord[] {
   const updatedGreenlight = input.refusal
     ? null
     : GreenlightSchema.parse({ ...input.greenlight, consumedAt: input.now, consumedByGateAttemptId: input.gateAttemptId });
   const records: ProtocolRecord[] = [
-    { objectType: "receiver_gate_attempt", payload: result.gateAttempt },
+    { objectType: "gateway_check_attempt", payload: result.gateAttempt },
     { objectType: "receipt", payload: result.receipt },
   ];
   if (updatedGreenlight) records.push({ objectType: "greenlight", payload: updatedGreenlight });

@@ -19,16 +19,16 @@ export const CompileIntentInputSchema = z.strictObject({
   operatingEnvelopeId: z.string().min(1),
   toolCatalogRef: z.string().min(1),
   actionCatalogRef: z.string().min(1),
-  receiverRegistryRef: z.string().min(1),
+  gatewayRegistryRef: z.string().min(1),
   generatedCodeOrSpecRefs: z.array(z.string()).default([]),
   declaredAssumptions: z.array(z.string()).default([]),
   requiredEvidenceRefs: z.array(z.string()).default([]),
   candidate: z.strictObject({
     toolCapabilityId: z.string().min(1),
     actionTypeId: z.string().min(1),
-    receiverRegistryEntryId: z.string().min(1),
+    gatewayRegistryEntryId: z.string().min(1),
     actionClass: z.string().min(1),
-    receiverId: z.string().min(1),
+    gatewayId: z.string().min(1),
     resourceRef: z.string().min(1),
   }),
   compilerVersion: z.string().min(1).default("handshake-compiler-0.2"),
@@ -40,8 +40,8 @@ export const ProposeActionContractInputSchema = z.strictObject({
   organizationId: z.string().min(1),
   intentCompilationId: z.string().min(1),
   envelopeId: z.string().min(1),
-  receiverRegistryEntryId: z.string().min(1),
-  receiverId: z.string().min(1),
+  gatewayRegistryEntryId: z.string().min(1),
+  gatewayId: z.string().min(1),
   principalId: z.string().min(1),
   agentId: z.string().min(1),
   runId: z.string().min(1),
@@ -85,24 +85,24 @@ export const CreateReviewDecisionInputSchema = z.strictObject({
 });
 export type CreateReviewDecisionInput = z.input<typeof CreateReviewDecisionInputSchema>;
 
-export const ReceiverGateInputSchema = z.strictObject({
+export const GatewayCheckInputSchema = z.strictObject({
   actionContractId: z.string().min(1),
   greenlightId: z.string().min(1),
   observedParameters: z.record(z.string(), JsonValueSchema),
   downstreamMode: z.enum(["succeed", "pending", "refuse", "fail", "unknown"]).default("succeed"),
-  receiverOperationRef: z.string().min(1).optional(),
+  surfaceOperationRef: z.string().min(1).optional(),
 });
-export type ReceiverGateInput = z.input<typeof ReceiverGateInputSchema>;
+export type GatewayCheckInput = z.input<typeof GatewayCheckInputSchema>;
 
-export const ReconcileReceiverOperationInputSchema = z.strictObject({
+export const ReconcileSurfaceOperationInputSchema = z.strictObject({
   mutationAttemptId: z.string().min(1),
   idempotencyKey: z.string().min(1),
   observedDownstreamStatus: z.enum(["pending", "succeeded", "refused", "failed", "unknown"]),
-  observedReceiverOperationRef: z.string().min(1).nullable().default(null),
+  observedSurfaceOperationRef: z.string().min(1).nullable().default(null),
   evidenceRefs: z.array(z.string()).default([]),
   resolvedProofGapIds: z.array(z.string().min(1)).default([]),
 });
-export type ReconcileReceiverOperationInput = z.input<typeof ReconcileReceiverOperationInputSchema>;
+export type ReconcileSurfaceOperationInput = z.input<typeof ReconcileSurfaceOperationInputSchema>;
 
 export const CreateIsolationInputSchema = z.strictObject({
   tenantId: z.string().min(1),
@@ -133,7 +133,7 @@ export const CreateBreakerDecisionInputSchema = z.strictObject({
   targetScopeId: z.string().min(1),
   agentId: z.string().min(1).nullable().default(null),
   runId: z.string().min(1).nullable().default(null),
-  receiverId: z.string().min(1).nullable().default(null),
+  gatewayId: z.string().min(1).nullable().default(null),
   resourceRef: z.string().min(1).nullable().default(null),
   actionClass: z.string().min(1).nullable().default(null),
   matchedBreakerRuleIds: z.array(z.string().min(1)).default([]),

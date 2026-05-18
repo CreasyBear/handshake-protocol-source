@@ -5,7 +5,7 @@ import { nowIso } from "../../src/protocol/ids";
 import type {
   ActionType,
   OperatingEnvelope,
-  ReceiverRegistryEntry,
+  GatewayRegistryEntry,
   ToolCapability,
 } from "../../src/protocol/schemas";
 import type { HandshakeClient } from "../../src/sdk/client";
@@ -19,7 +19,7 @@ import { FileRepoWriteSurface } from "./repo-write-surface";
 export type RepoWriteFixtureObjects = {
   tool: ToolCapability;
   actionType: ActionType;
-  receiver: ReceiverRegistryEntry;
+  gateway: GatewayRegistryEntry;
   envelope: OperatingEnvelope;
   repositoryRef: string;
   filePath: string;
@@ -32,7 +32,7 @@ export function makeRepoWriteFixtureObjects(
   const createdAt = nowIso();
   const resourceRef = repoWriteResourceRef(repositoryRef, filePath);
   const tool: ToolCapability = {
-    schemaVersion: "0.2.0",
+    schemaVersion: "0.2.1",
     tenantId: "tenant_demo",
     organizationId: "org_demo",
     createdAt,
@@ -53,7 +53,7 @@ export function makeRepoWriteFixtureObjects(
     supersededAt: null,
   };
   const actionType: ActionType = {
-    schemaVersion: "0.2.0",
+    schemaVersion: "0.2.1",
     tenantId: "tenant_demo",
     organizationId: "org_demo",
     createdAt,
@@ -61,8 +61,8 @@ export function makeRepoWriteFixtureObjects(
     actionCatalogId: "action_catalog_demo",
     actionCatalogVersion: "v1",
     actionClass: "repo.write",
-    receiverKind: "repository",
-    requiredContractFields: ["receiverId", "resourceRef", "paramsDigest", "idempotencyKey"],
+    protectedSurfaceKind: "repository",
+    requiredContractFields: ["gatewayId", "resourceRef", "paramsDigest", "idempotencyKey"],
     canonicalParameterSchemaRef: "schema:repo-write-params",
     resourceRefSchemaRef: "schema:repo-resource",
     requiredEvidenceTypes: ["repo_file_diff"],
@@ -71,22 +71,22 @@ export function makeRepoWriteFixtureObjects(
     defaultIdempotencyRequirement: "required",
     supersededAt: null,
   };
-  const receiver: ReceiverRegistryEntry = {
-    schemaVersion: "0.2.0",
+  const gateway: GatewayRegistryEntry = {
+    schemaVersion: "0.2.1",
     tenantId: "tenant_demo",
     organizationId: "org_demo",
     createdAt,
-    receiverRegistryEntryId: "receiver_registry_repo_write",
-    receiverRegistryVersion: "v1",
-    receiverId: "receiver_repo_write",
-    receiverKind: "repository",
-    receiverAdapterId: "adapter_reference_repo_write",
-    receiverAdapterVersion: "v1",
+    gatewayRegistryEntryId: "gateway_registry_repo_write",
+    gatewayRegistryVersion: "v1",
+    gatewayId: "gateway_repo_write",
+    protectedSurfaceKind: "repository",
+    gatewayAdapterId: "adapter_reference_repo_write",
+    gatewayAdapterVersion: "v1",
     gateEndpointRef: "internal:reference-repo-write-gate",
-    receiverPolicyContractId: "receiver_policy_repo_write",
-    receiverPolicyVersion: "v1",
-    receiverPolicyDriftMode: "refuse_on_drift",
-    compatiblePreviousReceiverPolicyVersions: [],
+    gatewayPolicyContractId: "gateway_policy_repo_write",
+    gatewayPolicyVersion: "v1",
+    gatewayPolicyDriftMode: "refuse_on_drift",
+    compatiblePreviousGatewayPolicyVersions: [],
     acceptedActionCatalogVersions: ["v1"],
     resourceNamespaceRef: "repo:file",
     canonicalizerVersion: "handshake-jcs-lite-0.2",
@@ -95,7 +95,7 @@ export function makeRepoWriteFixtureObjects(
     supersededAt: null,
   };
   const envelope: OperatingEnvelope = {
-    schemaVersion: "0.2.0",
+    schemaVersion: "0.2.1",
     tenantId: "tenant_demo",
     organizationId: "org_demo",
     createdAt,
@@ -104,7 +104,7 @@ export function makeRepoWriteFixtureObjects(
     agentId: "agent_demo",
     objectiveRef: "intent:write-one-repo-file",
     allowedActionClasses: ["repo.write"],
-    allowedReceivers: ["receiver_repo_write"],
+    allowedGateways: ["gateway_repo_write"],
     allowedResources: [resourceRef],
     evidenceRequirements: ["repo_file_diff"],
     policyPackRef: "policy:demo",
@@ -113,7 +113,7 @@ export function makeRepoWriteFixtureObjects(
     expiresAt: futureIso(),
     revokedAt: null,
   };
-  return { tool, actionType, receiver, envelope, repositoryRef, filePath };
+  return { tool, actionType, gateway, envelope, repositoryRef, filePath };
 }
 
 export async function registerRepoWriteFixtureObjectsWithClient(
@@ -122,7 +122,7 @@ export async function registerRepoWriteFixtureObjectsWithClient(
 ): Promise<void> {
   await client.registerToolCapability(fixture.tool);
   await client.registerActionType(fixture.actionType);
-  await client.registerReceiverRegistryEntry(fixture.receiver);
+  await client.registerGatewayRegistryEntry(fixture.gateway);
   await client.registerOperatingEnvelope(fixture.envelope);
 }
 
@@ -141,11 +141,11 @@ export function repoWriteRuntimeConfig(fixture: RepoWriteFixtureObjects): RepoWr
     operatingEnvelopeId: fixture.envelope.envelopeId,
     toolCatalogRef: "tool_catalog_demo@v1",
     actionCatalogRef: "action_catalog_demo@v1",
-    receiverRegistryRef: "receiver_registry@v1",
+    gatewayRegistryRef: "gateway_registry@v1",
     toolCapabilityId: fixture.tool.toolCapabilityId,
     actionTypeId: fixture.actionType.actionTypeId,
-    receiverRegistryEntryId: fixture.receiver.receiverRegistryEntryId,
-    receiverId: fixture.receiver.receiverId,
+    gatewayRegistryEntryId: fixture.gateway.gatewayRegistryEntryId,
+    gatewayId: fixture.gateway.gatewayId,
     contractExpiresAt: futureIso(),
     signingSecret: "test-secret",
   };

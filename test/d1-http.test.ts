@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { runPackageInstallReceiver } from "../src/adapters/package-install/receiver";
+import { runPackageInstallGateway } from "../src/adapters/package-install/gateway";
 import type {
   ActionContract,
   Greenlight,
@@ -10,11 +10,11 @@ import type {
   RecoveryRecommendation,
   RecoveryRecommendationStatusTransition,
   Receipt,
-  ReceiverOperationReconciliation,
+  SurfaceOperationReconciliation,
 } from "../src/protocol/schemas";
 import { ProtocolRecorder } from "../src/protocol/records";
 import { recordRecoveryTerminalConflictProofGap } from "../src/protocol/recovery-terminal-conflicts";
-import { verifiedReceiverGateCheckFromResult } from "../src/protocol/receiver-gate-artifacts";
+import { verifiedGatewayCheckFromResult } from "../src/protocol/gateway-check-artifacts";
 import { HandshakeClient } from "../src/sdk/client";
 import { proposePackageInstallActionContract } from "../src/runtime/package-install/tool-wrapper";
 import { D1ProtocolStore } from "../src/storage/d1";
@@ -29,13 +29,13 @@ import {
 type IntentCompilationResponse = IntentCompilationRecord;
 type ActionContractResponse = ActionContract;
 type PolicyDecisionResponse = { decision: PolicyDecision; greenlight: Greenlight | null };
-type ReceiverGateResponse = {
+type GatewayCheckResponse = {
   gateAttempt: { gateDecision: string };
   mutationAttempt: MutationAttempt | null;
   receipt: Receipt;
 };
 type ReconciliationResponse = {
-  reconciliation: ReceiverOperationReconciliation;
+  reconciliation: SurfaceOperationReconciliation;
   createdProofGap: ProofGap | null;
 };
 type StreamEventRow = {
@@ -93,7 +93,7 @@ describe("D1-backed Hono protocol surface", () => {
       const fixture = makeKernelFixture();
       await harness.post("/v0.2/catalog/tool-capabilities", fixture.tool);
       await harness.post("/v0.2/catalog/action-types", fixture.actionType);
-      await harness.post("/v0.2/catalog/receivers", fixture.receiver);
+      await harness.post("/v0.2/catalog/gateways", fixture.gateway);
       await harness.post("/v0.2/envelopes", fixture.envelope);
 
       const compilation = await harness.post<IntentCompilationResponse>("/v0.2/intent-compilations", {
@@ -107,16 +107,16 @@ describe("D1-backed Hono protocol surface", () => {
         operatingEnvelopeId: "env_demo",
         toolCatalogRef: "tool_catalog_demo@v1",
         actionCatalogRef: "action_catalog_demo@v1",
-        receiverRegistryRef: "receiver_registry@v1",
+        gatewayRegistryRef: "gateway_registry@v1",
         generatedCodeOrSpecRefs: ["code:d1-http-generated-plan"],
         declaredAssumptions: ["package name is explicit"],
         requiredEvidenceRefs: ["evidence:package-lock-diff"],
         candidate: {
           toolCapabilityId: fixture.tool.toolCapabilityId,
           actionTypeId: fixture.actionType.actionTypeId,
-          receiverRegistryEntryId: fixture.receiver.receiverRegistryEntryId,
+          gatewayRegistryEntryId: fixture.gateway.gatewayRegistryEntryId,
           actionClass: "package.install",
-          receiverId: fixture.receiver.receiverId,
+          gatewayId: fixture.gateway.gatewayId,
           resourceRef: "npm:hono",
         },
       });
@@ -126,8 +126,8 @@ describe("D1-backed Hono protocol surface", () => {
         organizationId: "org_demo",
         intentCompilationId: compilation.intentCompilationId,
         envelopeId: fixture.envelope.envelopeId,
-        receiverRegistryEntryId: fixture.receiver.receiverRegistryEntryId,
-        receiverId: fixture.receiver.receiverId,
+        gatewayRegistryEntryId: fixture.gateway.gatewayRegistryEntryId,
+        gatewayId: fixture.gateway.gatewayId,
         principalId: "principal_demo",
         agentId: "agent_demo",
         runId: "run_demo",
@@ -153,21 +153,21 @@ describe("D1-backed Hono protocol surface", () => {
       });
       if (!policy.greenlight) throw new Error("expected policy to greenlight exact D1 contract");
 
-      const gate = await harness.post<ReceiverGateResponse>("/v0.2/receiver-gate-attempts", {
+      const gate = await harness.post<GatewayCheckResponse>("/v0.2/gateway-check-attempts", {
         actionContractId: contract.actionContractId,
         greenlightId: policy.greenlight.greenlightId,
         observedParameters: { package: "hono", versionRange: "^4.12.19" },
         downstreamMode: "pending",
-        receiverOperationRef: "receiver-op:d1-pending-install",
+        surfaceOperationRef: "surface-op:d1-pending-install",
       });
-      if (!gate.mutationAttempt) throw new Error("expected receiver gate to record a mutation attempt");
+      if (!gate.mutationAttempt) throw new Error("expected gateway check to record a mutation attempt");
 
-      const reconciliation = await harness.post<ReconciliationResponse>("/v0.2/receiver-operation-reconciliations", {
+      const reconciliation = await harness.post<ReconciliationResponse>("/v0.2/surface-operation-reconciliations", {
         mutationAttemptId: gate.mutationAttempt.mutationAttemptId,
         idempotencyKey: contract.idempotencyKey,
-        observedReceiverOperationRef: "receiver-op:d1-pending-install",
+        observedSurfaceOperationRef: "surface-op:d1-pending-install",
         observedDownstreamStatus: "succeeded",
-        evidenceRefs: ["evidence:d1-receiver-operation-complete"],
+        evidenceRefs: ["evidence:d1-surface-operation-complete"],
       });
 
       expect(gate.gateAttempt.gateDecision).toBe("passed");
@@ -185,10 +185,10 @@ describe("D1-backed Hono protocol surface", () => {
         "action_proposed",
         "policy_decision_recorded",
         "action_greenlit",
-        "receiver_gate_checked",
+        "gateway_checked",
         "mutation_attempted",
         "receipt_emitted",
-        "receiver_operation_reconciled",
+        "surface_operation_reconciled",
       ]);
       expect(events.map((event) => event.offset)).toEqual([0, 1, 2, 3, 4, 5, 6]);
       expect(events[0]?.previous_event_digest).toBeNull();
@@ -217,11 +217,11 @@ describe("D1-backed Hono protocol surface", () => {
          FROM stream_events
          WHERE partition_key = ?
          ORDER BY "offset"`,
-        `receiver_resource:${contract.receiverId}:${contract.resourceRef}`,
+        `protected_surface_resource:${contract.gatewayId}:${contract.resourceRef}`,
       );
       expect(resourceEvents.map((event) => event.event_type)).toEqual(events.map((event) => event.event_type));
       expect(resourceEvents.map((event) => event.offset)).toEqual([0, 1, 2, 3, 4, 5, 6]);
-      expect(resourceEvents.every((event) => event.stream_scope === "receiver_resource")).toBe(true);
+      expect(resourceEvents.every((event) => event.stream_scope === "protected_surface_resource")).toBe(true);
       for (let index = 1; index < resourceEvents.length; index += 1) {
         expect(resourceEvents[index]?.previous_event_digest).toBe(resourceEvents[index - 1]?.event_digest);
       }
@@ -230,7 +230,7 @@ describe("D1-backed Hono protocol surface", () => {
       const runReceiptEvent = runEvents[5];
       const resourceReceiptEvent = resourceEvents[5];
       if (!actionReceiptEvent || !runReceiptEvent || !resourceReceiptEvent) {
-        throw new Error("expected receipt events for action, run, and receiver resource partitions");
+        throw new Error("expected receipt events for action, run, and gateway resource partitions");
       }
       expect(gate.receipt.streamEventIds).toHaveLength(9);
       expect(gate.receipt.receiptDigest).toMatch(/^sha256:/);
@@ -254,8 +254,8 @@ describe("D1-backed Hono protocol surface", () => {
         },
         {
           streamId: `stream_${contract.tenantId}_${contract.organizationId}`,
-          streamScope: "receiver_resource",
-          partitionKey: `receiver_resource:${contract.receiverId}:${contract.resourceRef}`,
+          streamScope: "protected_surface_resource",
+          partitionKey: `protected_surface_resource:${contract.gatewayId}:${contract.resourceRef}`,
           offsetStart: 0,
           offsetEnd: 5,
           terminalEventDigest: resourceReceiptEvent.event_digest,
@@ -277,7 +277,7 @@ describe("D1-backed Hono protocol surface", () => {
       );
       const reconciliationCounts = await harness.query<CountRow>(
         "SELECT COUNT(*) AS count FROM protocol_records WHERE object_type = ?",
-        "receiver_operation_reconciliation",
+        "surface_operation_reconciliation",
       );
       expect(mutationCounts[0]?.count).toBe(1);
       expect(reconciliationCounts[0]?.count).toBe(1);
@@ -286,7 +286,7 @@ describe("D1-backed Hono protocol surface", () => {
     }
   });
 
-  it("runs the package-install runtime and receiver adapters through the Hono/D1 protocol surface", async () => {
+  it("runs the package-install runtime and gateway adapters through the Hono/D1 protocol surface", async () => {
     const harness = await createD1HttpHarness();
     try {
       const { actionContract, client, greenlight, surface } = await createHttpPackageInstallContract(
@@ -296,19 +296,19 @@ describe("D1-backed Hono protocol surface", () => {
       expect((await surface.readManifest()).dependencies).toEqual({});
       expect(surface.mutationCount).toBe(0);
 
-      const receiverResult = await runPackageInstallReceiver({
+      const gatewayResult = await runPackageInstallGateway({
         protocol: client,
         surface,
         actionContractId: actionContract.actionContractId,
         greenlightId: greenlight.greenlightId,
         observedParameters: { package: "hono", versionRange: "^4.12.19" },
-        receiverOperationRef: "receiver-op:d1-http-package-install-hono",
+        surfaceOperationRef: "surface-op:d1-http-package-install-hono",
       });
 
-      expect(receiverResult.outcome).toBe("mutation_reconciled");
-      expect(receiverResult.receiverGate.gateAttempt.gateDecision).toBe("passed");
-      expect(receiverResult.receiverGate.receipt.finalityStatus).toBe("pending");
-      expect(receiverResult.reconciliation?.finalityStatus).toBe("final");
+      expect(gatewayResult.outcome).toBe("mutation_reconciled");
+      expect(gatewayResult.gatewayCheck.gateAttempt.gateDecision).toBe("passed");
+      expect(gatewayResult.gatewayCheck.receipt.finalityStatus).toBe("pending");
+      expect(gatewayResult.reconciliation?.finalityStatus).toBe("final");
       expect((await surface.readManifest()).dependencies).toEqual({ hono: "^4.12.19" });
       expect(surface.mutationCount).toBe(1);
 
@@ -323,10 +323,10 @@ describe("D1-backed Hono protocol surface", () => {
         "action_proposed",
         "policy_decision_recorded",
         "action_greenlit",
-        "receiver_gate_checked",
+        "gateway_checked",
         "mutation_attempted",
         "receipt_emitted",
-        "receiver_operation_reconciled",
+        "surface_operation_reconciled",
       ]);
       expect(events.map((event) => event.offset)).toEqual([0, 1, 2, 3, 4, 5, 6]);
       expect(events[0]?.previous_event_digest).toBeNull();
@@ -340,7 +340,7 @@ describe("D1-backed Hono protocol surface", () => {
       );
       const reconciliationCounts = await harness.query<CountRow>(
         "SELECT COUNT(*) AS count FROM protocol_records WHERE object_type = ?",
-        "receiver_operation_reconciliation",
+        "surface_operation_reconciliation",
       );
       expect(mutationCounts[0]?.count).toBe(1);
       expect(reconciliationCounts[0]?.count).toBe(1);
@@ -349,7 +349,7 @@ describe("D1-backed Hono protocol surface", () => {
     }
   });
 
-  it("records a Hono/D1 receiver refusal without mutating the package manifest", async () => {
+  it("records a Hono/D1 gateway refusal without mutating the package manifest", async () => {
     const harness = await createD1HttpHarness();
     try {
       const { actionContract, client, greenlight, surface } = await createHttpPackageInstallContract(
@@ -357,19 +357,19 @@ describe("D1-backed Hono protocol surface", () => {
         "code:codemode-package-install-http-parameter-mismatch",
       );
 
-      const receiverResult = await runPackageInstallReceiver({
+      const gatewayResult = await runPackageInstallGateway({
         protocol: client,
         surface,
         actionContractId: actionContract.actionContractId,
         greenlightId: greenlight.greenlightId,
         observedParameters: { package: "hono", versionRange: "^5.0.0" },
-        receiverOperationRef: "receiver-op:d1-http-package-install-mismatch",
+        surfaceOperationRef: "surface-op:d1-http-package-install-mismatch",
       });
 
-      expect(receiverResult.outcome).toBe("receiver_gate_refused");
-      expect(receiverResult.receiverGate.gateAttempt.gateDecision).toBe("refused");
-      expect(receiverResult.receiverGate.gateAttempt.gateDecisionReasonCode).toBe("params_mismatch");
-      expect(receiverResult.receiverGate.receipt.downstreamExecutionStatus).toBe("not_started");
+      expect(gatewayResult.outcome).toBe("gateway_check_refused");
+      expect(gatewayResult.gatewayCheck.gateAttempt.gateDecision).toBe("refused");
+      expect(gatewayResult.gatewayCheck.gateAttempt.gateDecisionReasonCode).toBe("params_mismatch");
+      expect(gatewayResult.gatewayCheck.receipt.downstreamExecutionStatus).toBe("not_started");
       expect((await surface.readManifest()).dependencies).toEqual({});
       expect(surface.mutationCount).toBe(0);
 
@@ -384,7 +384,7 @@ describe("D1-backed Hono protocol surface", () => {
         "action_proposed",
         "policy_decision_recorded",
         "action_greenlit",
-        "receiver_gate_checked",
+        "gateway_checked",
         "receipt_emitted",
       ]);
       expect(events.map((event) => event.offset)).toEqual([0, 1, 2, 3, 4]);
@@ -395,7 +395,7 @@ describe("D1-backed Hono protocol surface", () => {
       );
       const gateCounts = await harness.query<CountRow>(
         "SELECT COUNT(*) AS count FROM protocol_records WHERE object_type = ?",
-        "receiver_gate_attempt",
+        "gateway_check_attempt",
       );
       const receiptCounts = await harness.query<CountRow>(
         "SELECT COUNT(*) AS count FROM protocol_records WHERE object_type = ?",
@@ -416,12 +416,12 @@ describe("D1-backed Hono protocol surface", () => {
         harness,
         "code:codemode-package-install-receipt-export",
       );
-      const gate = await client.receiverGate({
+      const gate = await client.gatewayCheck({
         actionContractId: actionContract.actionContractId,
         greenlightId: greenlight.greenlightId,
         observedParameters: { package: "hono", versionRange: "^4.12.19" },
         downstreamMode: "succeed",
-        receiverOperationRef: "receiver-op:d1-receipt-export-install",
+        surfaceOperationRef: "surface-op:d1-receipt-export-install",
       });
       const receiptExport = await client.createReceiptExport({
         receiptId: gate.receipt.receiptId,
@@ -462,12 +462,12 @@ describe("D1-backed Hono protocol surface", () => {
         harness,
         "code:codemode-package-install-recovery",
       );
-      const gate = await client.receiverGate({
+      const gate = await client.gatewayCheck({
         actionContractId: actionContract.actionContractId,
         greenlightId: greenlight.greenlightId,
         observedParameters: { package: "hono", versionRange: "^4.12.19" },
         downstreamMode: "unknown",
-        receiverOperationRef: "receiver-op:d1-recovery-unknown",
+        surfaceOperationRef: "surface-op:d1-recovery-unknown",
       });
       const proofGapId = gate.proofGap?.proofGapId;
       if (!proofGapId) throw new Error("expected proof gap before recovery recommendation");
@@ -477,17 +477,17 @@ describe("D1-backed Hono protocol surface", () => {
         sourceRefusalOrGapRef: proofGapId,
         recommendedPath: "narrower_action_contract_required",
         allowedNextActionClasses: [actionContract.actionClass],
-        requiredNewEvidence: ["receiver_finality_evidence"],
+        requiredNewEvidence: ["gateway_finality_evidence"],
         requiresHumanReview: true,
         reasonCode: "downstream_status_unknown",
-        reasonSummary: "Receiver did not produce downstream finality evidence.",
+        reasonSummary: "Gateway did not produce downstream finality evidence.",
       });
 
       expect(recommendation.sourceReceiptId).toBe(gate.receipt.receiptId);
       expect(recommendation.sourceRefusalOrGapRef).toBe(proofGapId);
       expect(recommendation.mustCreateNewActionContract).toBe(true);
       expect(recommendation.mayReuseGreenlight).toBe(false);
-      expect(recommendation.mayMutateReceiver).toBe(false);
+      expect(recommendation.mayMutateProtectedSurface).toBe(false);
       expect(recommendation.recommendationDigest).toMatch(/^sha256:/);
 
       const followUpCompilation = await client.compileIntent({
@@ -501,16 +501,16 @@ describe("D1-backed Hono protocol surface", () => {
         operatingEnvelopeId: fixture.envelope.envelopeId,
         toolCatalogRef: "tool_catalog_demo@v1",
         actionCatalogRef: "action_catalog_demo@v1",
-        receiverRegistryRef: "receiver_registry@v1",
+        gatewayRegistryRef: "gateway_registry@v1",
         generatedCodeOrSpecRefs: ["code:d1-recovery-follow-up"],
         declaredAssumptions: ["follow-up is narrowed by recovery recommendation"],
-        requiredEvidenceRefs: ["receiver_finality_evidence"],
+        requiredEvidenceRefs: ["gateway_finality_evidence"],
         candidate: {
           toolCapabilityId: fixture.tool.toolCapabilityId,
           actionTypeId: fixture.actionType.actionTypeId,
-          receiverRegistryEntryId: fixture.receiver.receiverRegistryEntryId,
+          gatewayRegistryEntryId: fixture.gateway.gatewayRegistryEntryId,
           actionClass: actionContract.actionClass,
-          receiverId: actionContract.receiverId,
+          gatewayId: actionContract.gatewayId,
           resourceRef: actionContract.resourceRef,
         },
       });
@@ -519,8 +519,8 @@ describe("D1-backed Hono protocol surface", () => {
         organizationId: actionContract.organizationId,
         intentCompilationId: followUpCompilation.intentCompilationId,
         envelopeId: fixture.envelope.envelopeId,
-        receiverRegistryEntryId: fixture.receiver.receiverRegistryEntryId,
-        receiverId: actionContract.receiverId,
+        gatewayRegistryEntryId: fixture.gateway.gatewayRegistryEntryId,
+        gatewayId: actionContract.gatewayId,
         principalId: actionContract.principalId,
         agentId: actionContract.agentId,
         runId: actionContract.runId,
@@ -532,7 +532,7 @@ describe("D1-backed Hono protocol surface", () => {
         nonSecretParamsSummary: { package: "hono", versionRange: "^4.12.19" },
         purposeCode: "dependency_add_recovery",
         expectedSideEffectCodes: ["package_json_change", "lockfile_change"],
-        evidenceRefs: ["receiver_finality_evidence"],
+        evidenceRefs: ["gateway_finality_evidence"],
         bounds: { maxPackages: 1 },
         idempotencyKey: "idem_d1_recovery_followup",
         rollbackHint: "remove package and restore lockfile",
@@ -598,12 +598,12 @@ describe("D1-backed Hono protocol surface", () => {
         harness,
         "code:codemode-package-install-recovery-expire",
       );
-      const gate = await client.receiverGate({
+      const gate = await client.gatewayCheck({
         actionContractId: actionContract.actionContractId,
         greenlightId: greenlight.greenlightId,
         observedParameters: { package: "hono", versionRange: "^4.12.19" },
         downstreamMode: "unknown",
-        receiverOperationRef: "receiver-op:d1-recovery-expire-unknown",
+        surfaceOperationRef: "surface-op:d1-recovery-expire-unknown",
       });
       const proofGapId = gate.proofGap?.proofGapId;
       if (!proofGapId) throw new Error("expected proof gap before recovery expiration");
@@ -613,10 +613,10 @@ describe("D1-backed Hono protocol surface", () => {
         sourceRefusalOrGapRef: proofGapId,
         recommendedPath: "narrower_action_contract_required",
         allowedNextActionClasses: [actionContract.actionClass],
-        requiredNewEvidence: ["receiver_finality_evidence"],
+        requiredNewEvidence: ["gateway_finality_evidence"],
         requiresHumanReview: true,
         reasonCode: "downstream_status_unknown",
-        reasonSummary: "Receiver did not produce downstream finality evidence.",
+        reasonSummary: "Gateway did not produce downstream finality evidence.",
         recoveryExpiresAt: new Date(Date.now() - 1_000).toISOString(),
       });
 
@@ -650,12 +650,12 @@ describe("D1-backed Hono protocol surface", () => {
         harness,
         "code:codemode-package-install-recovery-terminal-race",
       );
-      const gate = await client.receiverGate({
+      const gate = await client.gatewayCheck({
         actionContractId: actionContract.actionContractId,
         greenlightId: greenlight.greenlightId,
         observedParameters: { package: "hono", versionRange: "^4.12.19" },
         downstreamMode: "unknown",
-        receiverOperationRef: "receiver-op:d1-recovery-terminal-race",
+        surfaceOperationRef: "surface-op:d1-recovery-terminal-race",
       });
       const proofGapId = gate.proofGap?.proofGapId;
       if (!proofGapId) throw new Error("expected proof gap before recovery terminal race");
@@ -665,10 +665,10 @@ describe("D1-backed Hono protocol surface", () => {
         sourceRefusalOrGapRef: proofGapId,
         recommendedPath: "narrower_action_contract_required",
         allowedNextActionClasses: [actionContract.actionClass],
-        requiredNewEvidence: ["receiver_finality_evidence"],
+        requiredNewEvidence: ["gateway_finality_evidence"],
         requiresHumanReview: true,
         reasonCode: "downstream_status_unknown",
-        reasonSummary: "Receiver did not produce downstream finality evidence.",
+        reasonSummary: "Gateway did not produce downstream finality evidence.",
         recoveryExpiresAt: new Date(Date.now() - 1_000).toISOString(),
       });
       await harness.db
@@ -729,12 +729,12 @@ describe("D1-backed Hono protocol surface", () => {
         harness,
         "code:codemode-package-install-recovery-terminal-resolution",
       );
-      const gate = await client.receiverGate({
+      const gate = await client.gatewayCheck({
         actionContractId: actionContract.actionContractId,
         greenlightId: greenlight.greenlightId,
         observedParameters: { package: "hono", versionRange: "^4.12.19" },
         downstreamMode: "unknown",
-        receiverOperationRef: "receiver-op:d1-recovery-terminal-resolution",
+        surfaceOperationRef: "surface-op:d1-recovery-terminal-resolution",
       });
       const proofGapId = gate.proofGap?.proofGapId;
       if (!proofGapId) throw new Error("expected proof gap before recovery terminal resolution");
@@ -744,10 +744,10 @@ describe("D1-backed Hono protocol surface", () => {
         sourceRefusalOrGapRef: proofGapId,
         recommendedPath: "narrower_action_contract_required",
         allowedNextActionClasses: [actionContract.actionClass],
-        requiredNewEvidence: ["receiver_finality_evidence"],
+        requiredNewEvidence: ["gateway_finality_evidence"],
         requiresHumanReview: true,
         reasonCode: "downstream_status_unknown",
-        reasonSummary: "Receiver did not produce downstream finality evidence.",
+        reasonSummary: "Gateway did not produce downstream finality evidence.",
         recoveryExpiresAt: new Date(Date.now() - 1_000).toISOString(),
       });
 
@@ -874,14 +874,14 @@ describe("D1-backed Hono protocol surface", () => {
         targetScopeId: actionContract.agentId,
         agentId: actionContract.agentId,
         runId: actionContract.runId,
-        receiverId: actionContract.receiverId,
+        gatewayId: actionContract.gatewayId,
         resourceRef: actionContract.resourceRef,
         actionClass: actionContract.actionClass,
         matchedBreakerRuleIds: ["sequence_dependency_final_receipt"],
         supportingEventRefs: [actionTail.stream_event_id],
       });
 
-      const gate = await client.receiverGate({
+      const gate = await client.gatewayCheck({
         actionContractId: actionContract.actionContractId,
         greenlightId: greenlight.greenlightId,
         observedParameters: { package: "hono", versionRange: "^4.12.19" },
@@ -923,34 +923,34 @@ describe("D1-backed Hono protocol surface", () => {
         "code:codemode-package-install-http-proof-gap",
       );
 
-      const receiverGate = await client.receiverGate({
+      const gatewayCheck = await client.gatewayCheck({
         actionContractId: actionContract.actionContractId,
         greenlightId: greenlight.greenlightId,
         observedParameters: { package: "hono", versionRange: "^4.12.19" },
-        receiverOperationRef: "receiver-op:d1-http-package-install-proof-gap",
+        surfaceOperationRef: "surface-op:d1-http-package-install-proof-gap",
         downstreamMode: "pending",
       });
-      const verifiedGate = verifiedReceiverGateCheckFromResult(receiverGate);
-      if (!verifiedGate) throw new Error("expected passed receiver gate");
+      const verifiedGate = verifiedGatewayCheckFromResult(gatewayCheck);
+      if (!verifiedGate) throw new Error("expected passed gateway check");
 
       const mutationEvidence = await surface.applyPackageInstall({
         verifiedGate,
         packageName: "hono",
         versionRange: "^4.12.19",
       });
-      const reconciliationResult = await client.reconcileReceiverOperation({
+      const reconciliationResult = await client.reconcileSurfaceOperation({
         mutationAttemptId: verifiedGate.mutationAttemptId,
         idempotencyKey: verifiedGate.idempotencyKey,
-        observedReceiverOperationRef: mutationEvidence.receiverOperationRef,
+        observedSurfaceOperationRef: mutationEvidence.surfaceOperationRef,
         observedDownstreamStatus: "unknown",
         evidenceRefs: [],
       });
       const proofGapId = reconciliationResult.createdProofGap?.proofGapId;
       if (!proofGapId) throw new Error("expected reconciliation-created proof gap");
 
-      expect(receiverGate.gateAttempt.gateDecision).toBe("passed");
-      expect(receiverGate.receipt.finalityStatus).toBe("pending");
-      expect(receiverGate.receipt.proofGapIds).toEqual([]);
+      expect(gatewayCheck.gateAttempt.gateDecision).toBe("passed");
+      expect(gatewayCheck.receipt.finalityStatus).toBe("pending");
+      expect(gatewayCheck.receipt.proofGapIds).toEqual([]);
       expect(reconciliationResult.reconciliation.finalityStatus).toBe("unknown");
       expect(reconciliationResult.reconciliation.resolvedProofGapIds).toEqual([]);
       expect(reconciliationResult.createdProofGap?.mutationAttemptId).toBe(verifiedGate.mutationAttemptId);
@@ -977,10 +977,10 @@ describe("D1-backed Hono protocol surface", () => {
         "action_proposed",
         "policy_decision_recorded",
         "action_greenlit",
-        "receiver_gate_checked",
+        "gateway_checked",
         "mutation_attempted",
         "receipt_emitted",
-        "receiver_operation_reconciled",
+        "surface_operation_reconciled",
         "proof_gap_recorded",
       ]);
       expect(events.map((event) => event.offset)).toEqual([0, 1, 2, 3, 4, 5, 6, 7]);
@@ -998,7 +998,7 @@ describe("D1-backed Hono protocol surface", () => {
       );
       const reconciliationCounts = await harness.query<CountRow>(
         "SELECT COUNT(*) AS count FROM protocol_records WHERE object_type = ?",
-        "receiver_operation_reconciliation",
+        "surface_operation_reconciliation",
       );
       expect(mutationCounts[0]?.count).toBe(1);
       expect(proofGapCounts[0]?.count).toBe(1);

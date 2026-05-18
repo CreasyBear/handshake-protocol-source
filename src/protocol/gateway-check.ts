@@ -1,11 +1,11 @@
 import { createId } from "./ids";
-import type { ActionContract, GateDecision, Greenlight, IsolationState, ReceiverRegistryEntry } from "./schemas";
+import type { ActionContract, GateDecision, Greenlight, IsolationState, GatewayRegistryEntry } from "./schemas";
 
 export type DownstreamMode = "succeed" | "pending" | "refuse" | "fail" | "unknown";
 
-export type ReceiverPolicyDriftCheck = {
+export type GatewayPolicyDriftCheck = {
   status: "same_version" | "compatible_stricter" | "incompatible" | "unknown";
-  currentReceiverPolicyVersion: string | null;
+  currentGatewayPolicyVersion: string | null;
   reasonCode: string | null;
 };
 
@@ -15,14 +15,14 @@ export function gateRefusalReason(
   observedParamsDigest: string,
   isolationStates: IsolationState[],
   now: string,
-  receiverPolicyDriftReasonCode: string | null,
+  gatewayPolicyDriftReasonCode: string | null,
   sequenceDependencyReasonCode: string | null,
 ): string | null {
   if (greenlight.actionContractId !== contract.actionContractId) return "contract_mismatch";
-  if (greenlight.receiverRegistryEntryId !== contract.receiverRegistryEntryId) return "receiver_registry_mismatch";
-  if (greenlight.receiverRegistryVersion !== contract.receiverRegistryVersion) return "receiver_registry_version_mismatch";
-  if (greenlight.receiverId !== contract.receiverId) return "receiver_mismatch";
-  if (greenlight.receiverPolicyVersion !== contract.receiverPolicyVersion) return "greenlight_policy_mismatch";
+  if (greenlight.gatewayRegistryEntryId !== contract.gatewayRegistryEntryId) return "gateway_registry_mismatch";
+  if (greenlight.gatewayRegistryVersion !== contract.gatewayRegistryVersion) return "gateway_registry_version_mismatch";
+  if (greenlight.gatewayId !== contract.gatewayId) return "gateway_mismatch";
+  if (greenlight.gatewayPolicyVersion !== contract.gatewayPolicyVersion) return "greenlight_policy_mismatch";
   if (greenlight.actionClass !== contract.actionClass) return "action_class_mismatch";
   if (greenlight.resourceRef !== contract.resourceRef) return "resource_mismatch";
   if (greenlight.paramsDigest !== observedParamsDigest) return "params_mismatch";
@@ -30,7 +30,7 @@ export function gateRefusalReason(
   if (Date.parse(greenlight.notBefore) > Date.parse(now)) return "greenlight_not_active";
   if (Date.parse(greenlight.expiresAt) <= Date.parse(now)) return "greenlight_expired";
   if (greenlight.consumedAt !== null) return "already_consumed";
-  if (receiverPolicyDriftReasonCode) return receiverPolicyDriftReasonCode;
+  if (gatewayPolicyDriftReasonCode) return gatewayPolicyDriftReasonCode;
   const blockingIsolation = isolationStates.find((state) =>
     ["review_only", "quarantined", "halted", "revoked", "state_suspect"].includes(state.state),
   );
@@ -39,61 +39,61 @@ export function gateRefusalReason(
   return null;
 }
 
-export function checkReceiverPolicyDrift(
+export function checkGatewayPolicyDrift(
   contract: ActionContract,
   greenlight: Greenlight,
-  currentReceiver: ReceiverRegistryEntry | null,
-): ReceiverPolicyDriftCheck {
-  if (!currentReceiver) {
-    return { status: "unknown", currentReceiverPolicyVersion: null, reasonCode: "receiver_policy_unknown" };
+  currentGateway: GatewayRegistryEntry | null,
+): GatewayPolicyDriftCheck {
+  if (!currentGateway) {
+    return { status: "unknown", currentGatewayPolicyVersion: null, reasonCode: "gateway_policy_unknown" };
   }
 
   if (
-    currentReceiver.receiverId !== contract.receiverId ||
-    currentReceiver.receiverKind.length === 0 ||
-    currentReceiver.receiverPolicyContractId !== contract.receiverPolicyContractId ||
-    currentReceiver.canonicalizerVersion !== contract.canonicalizerVersion ||
-    currentReceiver.receiptCapabilityStatus !== "available" ||
-    currentReceiver.isolationCheckCapabilityStatus !== "available"
+    currentGateway.gatewayId !== contract.gatewayId ||
+    currentGateway.protectedSurfaceKind.length === 0 ||
+    currentGateway.gatewayPolicyContractId !== contract.gatewayPolicyContractId ||
+    currentGateway.canonicalizerVersion !== contract.canonicalizerVersion ||
+    currentGateway.receiptCapabilityStatus !== "available" ||
+    currentGateway.isolationCheckCapabilityStatus !== "available"
   ) {
     return {
       status: "incompatible",
-      currentReceiverPolicyVersion: currentReceiver.receiverPolicyVersion,
-      reasonCode: "receiver_policy_drift",
+      currentGatewayPolicyVersion: currentGateway.gatewayPolicyVersion,
+      reasonCode: "gateway_policy_drift",
     };
   }
 
-  if (greenlight.receiverPolicyVersion !== contract.receiverPolicyVersion) {
+  if (greenlight.gatewayPolicyVersion !== contract.gatewayPolicyVersion) {
     return {
       status: "incompatible",
-      currentReceiverPolicyVersion: currentReceiver.receiverPolicyVersion,
+      currentGatewayPolicyVersion: currentGateway.gatewayPolicyVersion,
       reasonCode: "greenlight_policy_mismatch",
     };
   }
 
-  if (currentReceiver.receiverPolicyVersion === contract.receiverPolicyVersion) {
+  if (currentGateway.gatewayPolicyVersion === contract.gatewayPolicyVersion) {
     return {
       status: "same_version",
-      currentReceiverPolicyVersion: currentReceiver.receiverPolicyVersion,
+      currentGatewayPolicyVersion: currentGateway.gatewayPolicyVersion,
       reasonCode: null,
     };
   }
 
   if (
-    currentReceiver.receiverPolicyDriftMode === "allow_compatible_stricter" &&
-    currentReceiver.compatiblePreviousReceiverPolicyVersions.includes(contract.receiverPolicyVersion)
+    currentGateway.gatewayPolicyDriftMode === "allow_compatible_stricter" &&
+    currentGateway.compatiblePreviousGatewayPolicyVersions.includes(contract.gatewayPolicyVersion)
   ) {
     return {
       status: "compatible_stricter",
-      currentReceiverPolicyVersion: currentReceiver.receiverPolicyVersion,
+      currentGatewayPolicyVersion: currentGateway.gatewayPolicyVersion,
       reasonCode: null,
     };
   }
 
   return {
     status: "incompatible",
-    currentReceiverPolicyVersion: currentReceiver.receiverPolicyVersion,
-    reasonCode: "receiver_policy_drift",
+    currentGatewayPolicyVersion: currentGateway.gatewayPolicyVersion,
+    reasonCode: "gateway_policy_drift",
   };
 }
 
@@ -105,9 +105,9 @@ export function mutationOutcomeFor(mode: DownstreamMode) {
   return "unknown";
 }
 
-export function receiverOperationRefFor(mode: DownstreamMode, providedRef: string | undefined): string | null {
+export function surfaceOperationRefFor(mode: DownstreamMode, providedRef: string | undefined): string | null {
   if (providedRef) return providedRef;
-  if (mode === "succeed" || mode === "pending") return createId("rop");
+  if (mode === "succeed" || mode === "pending") return createId("sop");
   return null;
 }
 

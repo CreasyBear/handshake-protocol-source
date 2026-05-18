@@ -8,9 +8,9 @@ import {
   CreateIsolationInputSchema,
   EvaluatePolicyInputSchema,
   ProposeActionContractInputSchema,
-  ReconcileReceiverOperationInputSchema,
+  ReconcileSurfaceOperationInputSchema,
   ResolveRecoveryTerminalConflictInputSchema,
-  ReceiverGateInputSchema,
+  GatewayCheckInputSchema,
   TransitionRecoveryRecommendationStatusInputSchema,
 } from "../protocol/inputs";
 import {
@@ -29,9 +29,9 @@ import {
   RecoveryRecommendationStatusTransitionSchema,
   ReceiptSchema,
   ReceiptExportSchema,
-  ReceiverGateAttemptSchema,
-  ReceiverRegistryEntrySchema,
-  ReceiverOperationReconciliationSchema,
+  GatewayCheckAttemptSchema,
+  GatewayRegistryEntrySchema,
+  SurfaceOperationReconciliationSchema,
   ReviewDecisionSchema,
   ToolCapabilitySchema,
 } from "../protocol/schemas";
@@ -39,7 +39,7 @@ import {
 const HealthResponseSchema = z.strictObject({
   ok: z.boolean(),
   protocol: z.literal("handshake"),
-  version: z.literal("0.2.0"),
+  version: z.literal("0.2.1"),
 });
 
 const ErrorResponseSchema = z.strictObject({
@@ -56,9 +56,9 @@ export const openApiDocument = {
   openapi: "3.1.0",
   info: {
     title: "Handshake Protocol Kernel",
-    version: "0.2.0",
+    version: "0.2.1",
     description:
-      "Contracted execution protocol for reducing agent-generated actions to exact policy-evaluated receiver-gated contracts.",
+      "Contracted execution protocol for reducing agent-generated actions to exact policy-evaluated gateway-checked contracts.",
   },
   paths: {
     "/health": {
@@ -78,11 +78,11 @@ export const openApiDocument = {
         responses: { "201": jsonResponse("Action type", ActionTypeSchema), "400": errorResponse },
       },
     },
-    "/v0.2/catalog/receivers": {
+    "/v0.2/catalog/gateways": {
       post: {
-        summary: "Register a durable receiver gate binding",
-        requestBody: jsonRequest(ReceiverRegistryEntrySchema),
-        responses: { "201": jsonResponse("Receiver registry entry", ReceiverRegistryEntrySchema), "400": errorResponse },
+        summary: "Register a durable gateway check binding",
+        requestBody: jsonRequest(GatewayRegistryEntrySchema),
+        responses: { "201": jsonResponse("Gateway registry entry", GatewayRegistryEntrySchema), "400": errorResponse },
       },
     },
     "/v0.2/envelopes": {
@@ -127,15 +127,15 @@ export const openApiDocument = {
         responses: { "201": jsonResponse("Review decision", ReviewDecisionSchema), "400": errorResponse, "404": errorResponse },
       },
     },
-    "/v0.2/receiver-gate-attempts": {
+    "/v0.2/gateway-check-attempts": {
       post: {
-        summary: "Receiver-side gate check before mutation",
-        requestBody: jsonRequest(ReceiverGateInputSchema),
+        summary: "Gateway-side check before mutation",
+        requestBody: jsonRequest(GatewayCheckInputSchema),
         responses: {
           "201": jsonResponse(
-            "Gate attempt, mutation outcome, receipt, and optional proof gap",
+            "Gateway check attempt, mutation outcome, receipt, and optional proof gap",
             z.strictObject({
-              gateAttempt: ReceiverGateAttemptSchema,
+              gateAttempt: GatewayCheckAttemptSchema,
               mutationAttempt: MutationAttemptSchema.nullable(),
               receipt: ReceiptSchema,
               proofGap: ProofGapSchema.nullable(),
@@ -146,15 +146,15 @@ export const openApiDocument = {
         },
       },
     },
-    "/v0.2/receiver-operation-reconciliations": {
+    "/v0.2/surface-operation-reconciliations": {
       post: {
-        summary: "Reconcile pending or unknown downstream status for the same receiver operation",
-        requestBody: jsonRequest(ReconcileReceiverOperationInputSchema),
+        summary: "Reconcile pending or unknown downstream status for the same surface operation",
+        requestBody: jsonRequest(ReconcileSurfaceOperationInputSchema),
         responses: {
           "201": jsonResponse(
-            "Receiver operation reconciliation and proof-gap changes",
+            "Surface operation reconciliation and proof-gap changes",
             z.strictObject({
-              reconciliation: ReceiverOperationReconciliationSchema,
+              reconciliation: SurfaceOperationReconciliationSchema,
               resolvedProofGaps: z.array(ProofGapSchema),
               createdProofGap: ProofGapSchema.nullable(),
             }),

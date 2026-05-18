@@ -92,7 +92,7 @@ export function assertRecoveryActionLinkage(
     input.principalId !== recommendation.principalId ||
     input.agentId !== recommendation.agentId ||
     input.runId !== recommendation.runId ||
-    input.receiverId !== recommendation.receiverId ||
+    input.gatewayId !== recommendation.gatewayId ||
     input.resourceRef !== recommendation.resourceRef
   ) {
     throw new HandshakeProtocolError(

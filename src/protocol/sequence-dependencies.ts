@@ -8,7 +8,7 @@ import type {
 import type { ProtocolStore } from "../storage/store";
 
 export type SequenceDependencyStatus = "greenlit" | "missing" | "refused" | "not_greenlit";
-export type ReceiverGateSequenceDependencyStatus =
+export type GatewayCheckSequenceDependencyStatus =
   | "ready"
   | "missing"
   | "refused"
@@ -25,10 +25,10 @@ export type SequenceDependencyState = {
   greenlightId: string | null;
 };
 
-export type ReceiverGateSequenceDependencyState = Omit<SequenceDependencyState, "status"> & {
-  status: ReceiverGateSequenceDependencyStatus;
+export type GatewayCheckSequenceDependencyState = Omit<SequenceDependencyState, "status"> & {
+  status: GatewayCheckSequenceDependencyStatus;
   receiptId: string | null;
-  receiverGateStatus: Receipt["receiverGateStatus"] | null;
+  gatewayCheckStatus: Receipt["gatewayCheckStatus"] | null;
   finalityStatus: Receipt["finalityStatus"] | null;
 };
 
@@ -93,10 +93,10 @@ export function evaluateSequenceDependencies(
   };
 }
 
-export async function loadReceiverGateSequenceDependencyStates(
+export async function loadGatewayCheckSequenceDependencyStates(
   store: ProtocolStore,
   contract: ActionContract,
-): Promise<ReceiverGateSequenceDependencyState[]> {
+): Promise<GatewayCheckSequenceDependencyState[]> {
   if (contract.requiredPriorActionContractIds.length === 0) return [];
   const [policyDecisionRecords, greenlightRecords, receiptRecords] = await Promise.all([
     store.listRecordsByType<PolicyDecision>("policy_decision", {
@@ -113,11 +113,11 @@ export async function loadReceiverGateSequenceDependencyStates(
     }),
   ]);
 
-  const states: ReceiverGateSequenceDependencyState[] = [];
+  const states: GatewayCheckSequenceDependencyState[] = [];
   for (const requiredPriorActionContractId of contract.requiredPriorActionContractIds) {
     const requiredContract = await store.getRecord<ActionContract>("action_contract", requiredPriorActionContractId);
     if (!requiredContract || !sameProtocolScope(contract, requiredContract.payload)) {
-      states.push(receiverGateSequenceState(requiredPriorActionContractId, "missing"));
+      states.push(gatewayCheckSequenceState(requiredPriorActionContractId, "missing"));
       continue;
     }
 
@@ -129,7 +129,7 @@ export async function loadReceiverGateSequenceDependencyStates(
       .find((candidate) => candidate.actionContractId === requiredPriorActionContractId);
     if (!greenlight) {
       states.push(
-        receiverGateSequenceState(
+        gatewayCheckSequenceState(
           requiredPriorActionContractId,
           policyDecision?.decision === "refuse" ? "refused" : "not_greenlit",
           policyDecision ?? null,
@@ -144,11 +144,11 @@ export async function loadReceiverGateSequenceDependencyStates(
       .map((record) => record.payload)
       .filter((receipt) => receipt.actionContractId === requiredPriorActionContractId);
     const finalPassedReceipt = receipts.find(
-      (receipt) => receipt.receiverGateStatus === "passed" && receipt.finalityStatus === "final",
+      (receipt) => receipt.gatewayCheckStatus === "passed" && receipt.finalityStatus === "final",
     );
     if (finalPassedReceipt) {
       states.push(
-        receiverGateSequenceState(
+        gatewayCheckSequenceState(
           requiredPriorActionContractId,
           "ready",
           policyDecision ?? null,
@@ -161,10 +161,10 @@ export async function loadReceiverGateSequenceDependencyStates(
 
     const latestReceipt = receipts.at(-1) ?? null;
     states.push(
-      receiverGateSequenceState(
+      gatewayCheckSequenceState(
         requiredPriorActionContractId,
         latestReceipt
-          ? latestReceipt.receiverGateStatus === "refused"
+          ? latestReceipt.gatewayCheckStatus === "refused"
             ? "gate_refused"
             : "not_final"
           : "not_receipted",
@@ -177,21 +177,21 @@ export async function loadReceiverGateSequenceDependencyStates(
   return states;
 }
 
-export function receiverGateSequenceDependencyRefusalReason(
-  states: ReceiverGateSequenceDependencyState[],
+export function gatewayCheckSequenceDependencyRefusalReason(
+  states: GatewayCheckSequenceDependencyState[],
 ): string | null {
   const failedState = states.find((state) => state.status !== "ready");
   if (!failedState) return null;
   return `prior_action_${failedState.status}`;
 }
 
-function receiverGateSequenceState(
+function gatewayCheckSequenceState(
   requiredPriorActionContractId: string,
-  status: ReceiverGateSequenceDependencyStatus,
+  status: GatewayCheckSequenceDependencyStatus,
   policyDecision: PolicyDecision | null = null,
   greenlight: Greenlight | null = null,
   receipt: Receipt | null = null,
-): ReceiverGateSequenceDependencyState {
+): GatewayCheckSequenceDependencyState {
   return {
     requiredPriorActionContractId,
     status,
@@ -199,7 +199,7 @@ function receiverGateSequenceState(
     policyDecisionValue: policyDecision?.decision ?? null,
     greenlightId: greenlight?.greenlightId ?? null,
     receiptId: receipt?.receiptId ?? null,
-    receiverGateStatus: receipt?.receiverGateStatus ?? null,
+    gatewayCheckStatus: receipt?.gatewayCheckStatus ?? null,
     finalityStatus: receipt?.finalityStatus ?? null,
   };
 }

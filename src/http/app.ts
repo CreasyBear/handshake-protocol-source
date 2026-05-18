@@ -3,7 +3,7 @@ import { z, type ZodType } from "zod";
 import {
   ActionTypeSchema,
   OperatingEnvelopeSchema,
-  ReceiverRegistryEntrySchema,
+  GatewayRegistryEntrySchema,
   ToolCapabilitySchema,
   type ProtocolObjectType,
 } from "../protocol/schemas";
@@ -16,9 +16,9 @@ import {
   CreateReceiptExportInputSchema,
   EvaluatePolicyInputSchema,
   ProposeActionContractInputSchema,
-  ReconcileReceiverOperationInputSchema,
+  ReconcileSurfaceOperationInputSchema,
   ResolveRecoveryTerminalConflictInputSchema,
-  ReceiverGateInputSchema,
+  GatewayCheckInputSchema,
   TransitionRecoveryRecommendationStatusInputSchema,
 } from "../protocol/inputs";
 import { HandshakeProtocolError } from "../protocol/errors";
@@ -52,7 +52,7 @@ export function createApp(options: AppOptions = {}) {
     return c.json({ error: { code: "internal_error", message: "Unexpected protocol error." } }, 500);
   });
 
-  app.get("/health", (c) => c.json({ ok: true, protocol: "handshake", version: "0.2.0" }));
+  app.get("/health", (c) => c.json({ ok: true, protocol: "handshake", version: "0.2.1" }));
   app.get("/openapi.json", (c) => c.json(openApiDocument));
 
   app.post("/v0.2/catalog/tool-capabilities", async (c) => {
@@ -67,9 +67,9 @@ export function createApp(options: AppOptions = {}) {
     return c.json(body, 201);
   });
 
-  app.post("/v0.2/catalog/receivers", async (c) => {
-    const body = await parseBody(c, ReceiverRegistryEntrySchema);
-    await kernelFor(c, fallbackStore).putCatalogObject({ objectType: "receiver_registry_entry", payload: body });
+  app.post("/v0.2/catalog/gateways", async (c) => {
+    const body = await parseBody(c, GatewayRegistryEntrySchema);
+    await kernelFor(c, fallbackStore).putCatalogObject({ objectType: "gateway_registry_entry", payload: body });
     return c.json(body, 201);
   });
 
@@ -103,15 +103,15 @@ export function createApp(options: AppOptions = {}) {
     return c.json(result, 201);
   });
 
-  app.post("/v0.2/receiver-gate-attempts", async (c) => {
-    const body = await parseBody(c, ReceiverGateInputSchema);
-    const result = await kernelFor(c, fallbackStore).receiverGate(body);
+  app.post("/v0.2/gateway-check-attempts", async (c) => {
+    const body = await parseBody(c, GatewayCheckInputSchema);
+    const result = await kernelFor(c, fallbackStore).gatewayCheck(body);
     return c.json(result, 201);
   });
 
-  app.post("/v0.2/receiver-operation-reconciliations", async (c) => {
-    const body = await parseBody(c, ReconcileReceiverOperationInputSchema);
-    const result = await kernelFor(c, fallbackStore).reconcileReceiverOperation(body);
+  app.post("/v0.2/surface-operation-reconciliations", async (c) => {
+    const body = await parseBody(c, ReconcileSurfaceOperationInputSchema);
+    const result = await kernelFor(c, fallbackStore).reconcileSurfaceOperation(body);
     return c.json(result, 201);
   });
 

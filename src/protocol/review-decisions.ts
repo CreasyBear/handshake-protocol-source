@@ -35,7 +35,7 @@ export async function createReviewDecision(
     actionContractId: contract.payload.actionContractId,
     actionContractDigest: contract.payload.actionContractDigest,
     policyInputDigest: policyDecision.payload.policyInputDigest,
-    receiverPolicyVersion: contract.payload.receiverPolicyVersion,
+    gatewayPolicyVersion: contract.payload.gatewayPolicyVersion,
     decision: input.decision,
     decisionReasonCode: input.decisionReasonCode,
     decisionExpiresAt: input.decisionExpiresAt,

@@ -5,7 +5,7 @@ import type {
   PackageInstallMutationCommand,
   PackageInstallMutationEvidence,
   PackageInstallMutationSurface,
-} from "../../src/adapters/package-install/receiver";
+} from "../../src/adapters/package-install/gateway";
 
 const PackageManifestSchema = z.strictObject({
   dependencies: z.record(z.string(), z.string()).default({}),
@@ -38,8 +38,8 @@ export class FilePackageManifestSurface implements PackageInstallMutationSurface
     await this.writeManifest({ dependencies });
     this.mutationCount += 1;
     return {
-      evidenceRef: `evidence:package-manifest:${command.verifiedGate.receiverOperationRef}:${this.mutationCount}`,
-      receiverOperationRef: command.verifiedGate.receiverOperationRef,
+      evidenceRef: `evidence:package-manifest:${command.verifiedGate.surfaceOperationRef}:${this.mutationCount}`,
+      surfaceOperationRef: command.verifiedGate.surfaceOperationRef,
       packageName: command.packageName,
       versionRange: command.versionRange,
     };

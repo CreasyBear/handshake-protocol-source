@@ -24,7 +24,7 @@ export function makeCodemodeMultiActionFixtureObjects(): CodemodeMultiActionFixt
     envelopeId: "env_codemode_multi_action",
     objectiveRef: "intent:install-package-and-write-file",
     allowedActionClasses: ["package.install", "repo.write"],
-    allowedReceivers: [packageBase.receiver.receiverId, repoWrite.receiver.receiverId],
+    allowedGateways: [packageBase.gateway.gatewayId, repoWrite.gateway.gatewayId],
     allowedResources: [
       "npm:hono",
       repoWrite.envelope.allowedResources[0] ?? repoWrite.repositoryRef,
@@ -35,7 +35,7 @@ export function makeCodemodeMultiActionFixtureObjects(): CodemodeMultiActionFixt
     packageInstall: {
       tool: packageBase.tool,
       actionType: packageBase.actionType,
-      receiver: packageBase.receiver,
+      gateway: packageBase.gateway,
       envelope,
     },
     repoWrite: {
@@ -51,10 +51,10 @@ export async function registerCodemodeMultiActionFixtureObjectsWithClient(
 ): Promise<void> {
   await client.registerToolCapability(fixture.packageInstall.tool);
   await client.registerActionType(fixture.packageInstall.actionType);
-  await client.registerReceiverRegistryEntry(fixture.packageInstall.receiver);
+  await client.registerGatewayRegistryEntry(fixture.packageInstall.gateway);
   await client.registerToolCapability(fixture.repoWrite.tool);
   await client.registerActionType(fixture.repoWrite.actionType);
-  await client.registerReceiverRegistryEntry(fixture.repoWrite.receiver);
+  await client.registerGatewayRegistryEntry(fixture.repoWrite.gateway);
   await client.registerOperatingEnvelope(fixture.packageInstall.envelope);
 }
 

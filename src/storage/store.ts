@@ -43,7 +43,7 @@ export type RecoveryTerminalClaim = {
   claimedAt: string;
 };
 
-export type ReceiverGateCommit = {
+export type GatewayCheckCommit = {
   consumption: GreenlightConsumption | null;
   records: StoredProtocolRecord[];
   events: ContractStreamEvent[];
@@ -61,7 +61,7 @@ export type ProtocolCommitResult =
   | "stream_conflict"
   | "recovery_terminal_conflict"
   | "greenlight_issuance_conflict";
-export type ReceiverGateCommitResult = "committed" | "already_consumed" | "stream_conflict";
+export type GatewayCheckCommitResult = "committed" | "already_consumed" | "stream_conflict";
 
 export type StreamTail = {
   offset: number;
@@ -77,7 +77,7 @@ export interface ProtocolStore {
   listIsolationStates(scopeIds: string[]): Promise<IsolationState[]>;
   consumeGreenlight(consumption: GreenlightConsumption): Promise<"consumed" | "already_consumed">;
   commitProtocolRecords(commit: ProtocolCommit): Promise<ProtocolCommitResult>;
-  commitReceiverGate(commit: ReceiverGateCommit): Promise<ReceiverGateCommitResult>;
+  commitGatewayCheck(commit: GatewayCheckCommit): Promise<GatewayCheckCommitResult>;
 }
 
 export function getObjectId(record: ProtocolRecord): string {
@@ -86,8 +86,8 @@ export function getObjectId(record: ProtocolRecord): string {
       return record.payload.toolCapabilityId;
     case "action_type":
       return record.payload.actionTypeId;
-    case "receiver_registry_entry":
-      return record.payload.receiverRegistryEntryId;
+    case "gateway_registry_entry":
+      return record.payload.gatewayRegistryEntryId;
     case "operating_envelope":
       return record.payload.envelopeId;
     case "intent_compilation":
@@ -104,11 +104,11 @@ export function getObjectId(record: ProtocolRecord): string {
       return record.payload.breakerDecisionId;
     case "isolation_state":
       return record.payload.isolationStateId;
-    case "receiver_gate_attempt":
+    case "gateway_check_attempt":
       return record.payload.gateAttemptId;
     case "mutation_attempt":
       return record.payload.mutationAttemptId;
-    case "receiver_operation_reconciliation":
+    case "surface_operation_reconciliation":
       return record.payload.reconciliationId;
     case "proof_gap":
       return record.payload.proofGapId;
@@ -133,7 +133,7 @@ export function scopeIdsForContract(contract: ActionContract): string[] {
     contract.runId,
     contract.envelopeId,
     contract.actionClass,
-    contract.receiverId,
+    contract.gatewayId,
     contract.resourceRef,
   ];
 }
@@ -142,7 +142,7 @@ export function scopeIdsForGreenlight(greenlight: Greenlight): string[] {
   return [
     greenlight.tenantId,
     greenlight.organizationId,
-    greenlight.receiverId,
+    greenlight.gatewayId,
     greenlight.actionClass,
     greenlight.resourceRef,
   ];

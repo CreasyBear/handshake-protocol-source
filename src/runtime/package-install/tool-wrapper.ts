@@ -28,11 +28,11 @@ export type PackageInstallRuntimeConfig = {
   operatingEnvelopeId: string;
   toolCatalogRef: string;
   actionCatalogRef: string;
-  receiverRegistryRef: string;
+  gatewayRegistryRef: string;
   toolCapabilityId: string;
   actionTypeId: string;
-  receiverRegistryEntryId: string;
-  receiverId: string;
+  gatewayRegistryEntryId: string;
+  gatewayId: string;
   contractExpiresAt: string;
   signingSecret?: string;
 };
@@ -72,16 +72,16 @@ export async function proposePackageInstallActionContract(
     operatingEnvelopeId: config.operatingEnvelopeId,
     toolCatalogRef: config.toolCatalogRef,
     actionCatalogRef: config.actionCatalogRef,
-    receiverRegistryRef: config.receiverRegistryRef,
+    gatewayRegistryRef: config.gatewayRegistryRef,
     generatedCodeOrSpecRefs: [toolCall.generatedCodeOrSpecRef],
     declaredAssumptions: ["package install tool call provided explicit package and version range"],
     requiredEvidenceRefs: ["evidence:package-manifest-diff"],
     candidate: {
       toolCapabilityId: config.toolCapabilityId,
       actionTypeId: config.actionTypeId,
-      receiverRegistryEntryId: config.receiverRegistryEntryId,
+      gatewayRegistryEntryId: config.gatewayRegistryEntryId,
       actionClass: "package.install",
-      receiverId: config.receiverId,
+      gatewayId: config.gatewayId,
       resourceRef: `npm:${toolCall.package}`,
     },
   });
@@ -99,8 +99,8 @@ export async function proposePackageInstallActionContract(
     organizationId: config.organizationId,
     intentCompilationId: intentCompilation.intentCompilationId,
     envelopeId: config.operatingEnvelopeId,
-    receiverRegistryEntryId: config.receiverRegistryEntryId,
-    receiverId: config.receiverId,
+    gatewayRegistryEntryId: config.gatewayRegistryEntryId,
+    gatewayId: config.gatewayId,
     principalId: config.principalId,
     agentId: config.agentId,
     runId: config.runId,

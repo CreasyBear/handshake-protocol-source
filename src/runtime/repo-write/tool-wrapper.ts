@@ -31,11 +31,11 @@ export type RepoWriteRuntimeConfig = {
   operatingEnvelopeId: string;
   toolCatalogRef: string;
   actionCatalogRef: string;
-  receiverRegistryRef: string;
+  gatewayRegistryRef: string;
   toolCapabilityId: string;
   actionTypeId: string;
-  receiverRegistryEntryId: string;
-  receiverId: string;
+  gatewayRegistryEntryId: string;
+  gatewayId: string;
   contractExpiresAt: string;
   signingSecret?: string;
 };
@@ -76,16 +76,16 @@ export async function proposeRepoWriteActionContract(
     operatingEnvelopeId: config.operatingEnvelopeId,
     toolCatalogRef: config.toolCatalogRef,
     actionCatalogRef: config.actionCatalogRef,
-    receiverRegistryRef: config.receiverRegistryRef,
+    gatewayRegistryRef: config.gatewayRegistryRef,
     generatedCodeOrSpecRefs: [toolCall.generatedCodeOrSpecRef],
     declaredAssumptions: ["repo write tool call provided explicit repository, file path, and content"],
     requiredEvidenceRefs: ["evidence:repo-file-diff"],
     candidate: {
       toolCapabilityId: config.toolCapabilityId,
       actionTypeId: config.actionTypeId,
-      receiverRegistryEntryId: config.receiverRegistryEntryId,
+      gatewayRegistryEntryId: config.gatewayRegistryEntryId,
       actionClass: "repo.write",
-      receiverId: config.receiverId,
+      gatewayId: config.gatewayId,
       resourceRef,
     },
   });
@@ -118,8 +118,8 @@ export async function proposeRepoWriteActionContract(
     organizationId: config.organizationId,
     intentCompilationId: intentCompilation.intentCompilationId,
     envelopeId: config.operatingEnvelopeId,
-    receiverRegistryEntryId: config.receiverRegistryEntryId,
-    receiverId: config.receiverId,
+    gatewayRegistryEntryId: config.gatewayRegistryEntryId,
+    gatewayId: config.gatewayId,
     principalId: config.principalId,
     agentId: config.agentId,
     runId: config.runId,

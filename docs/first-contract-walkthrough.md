@@ -1,17 +1,17 @@
 # First Contract Walkthrough
 
-Status: Canonical public alpha  
-Version: v0.2.0  
-Audience: Developers, runtime builders, receiver owners, platform engineering  
-Implementation status: Uses the v0.2 reference receiver harness; real preview deploy receiver remains target work  
-Canonical owner: Product owner  
+Status: Canonical public alpha
+Version: v0.2.1
+Audience: Developers, runtime builders, gateway owners, platform engineering
+Implementation status: Uses the v0.2 reference gateway harness; real preview deploy gateway remains target work
+Canonical owner: Product owner
 Last reviewed: 2026-05-17
 
 ## Moment Of Value
 
-A runtime-originated action attempts consequence. Handshake turns it into an exact contract, policy greenlights or refuses it, the receiver gate checks before mutation, and a receipt reconstructs the result.
+A runtime-originated action attempts consequence. Handshake turns it into an exact contract, policy greenlights or refuses it, the gateway check checks before mutation, and a receipt reconstructs the result.
 
-The product story can be preview deploy. The runnable v0.2 harness is the reference receiver. Do not confuse those.
+The product story can be preview deploy. The runnable v0.2 harness is the reference gateway. Do not confuse those.
 
 ## Scenario
 
@@ -35,10 +35,10 @@ Register durable objects for:
 
 - a `ToolCapability` for the runtime tool, marked consequential and wrapped;
 - an `ActionType` for `preview_deploy`;
-- a `ReceiverRegistryEntry` for the reference receiver gate;
-- an `OperatingEnvelope` allowing the principal, agent, receiver, action class, and resource.
+- a `GatewayRegistryEntry` for the reference gateway check;
+- an `OperatingEnvelope` allowing the principal, agent, gateway, action class, and resource.
 
-These records make the compiler catalog-bound. A caller cannot invent authority inline by posting a fake receiver or fake tool classification.
+These records make the compiler catalog-bound. A caller cannot invent authority inline by posting a fake gateway or fake tool classification.
 
 ## Step 2: Compile Intent
 
@@ -50,7 +50,7 @@ POST /v0.2/intent-compilations
 
 The output is an `IntentCompilationRecord`.
 
-Contract emission is allowed only if the compilation has no uncertainty markers and no overreach reason codes. If the compiler cannot prove the tool, action type, or receiver binding, it must stop before contract issuance.
+Contract emission is allowed only if the compilation has no uncertainty markers and no overreach reason codes. If the compiler cannot prove the tool, action type, or gateway binding, it must stop before contract issuance.
 
 ## Step 3: Propose The Exact Contract
 
@@ -64,9 +64,9 @@ The output is an `ActionContract`.
 
 The contract binds:
 
-- receiver ID;
-- receiver registry entry and version;
-- receiver policy version;
+- gateway ID;
+- gateway registry entry and version;
+- gateway policy version;
 - action class;
 - resource reference;
 - exact parameter digest;
@@ -75,7 +75,7 @@ The contract binds:
 - idempotency key;
 - canonical digest.
 
-The rendered contract view may make this readable. The digest and receiver binding are what matter.
+The rendered contract view may make this readable. The digest and gateway binding are what matter.
 
 ## Step 4: Evaluate Policy
 
@@ -87,24 +87,24 @@ POST /v0.2/policy-decisions
 
 The output is a `PolicyDecision` and, only on a greenlight decision, a `Greenlight`.
 
-Policy decides against the exact contract, operating envelope, and current isolation state. A greenlight authorizes one receiver-gated attempt. It does not prove execution.
+Policy decides against the exact contract, operating envelope, and current isolation state. A greenlight authorizes one gateway-checked attempt. It does not prove execution.
 
 Refusal is a valid product outcome. A refusal should record the exact contract and reason code so the agent or operator can recover without guessing.
 
-## Step 5: Receiver Gate Before Mutation
+## Step 5: Gateway Check Before Mutation
 
 Call:
 
 ```text
-POST /v0.2/receiver-gate-attempts
+POST /v0.2/gateway-check-attempts
 ```
 
-The receiver gate compares what it sees against the exact greenlight:
+The gateway check compares what it sees against the exact greenlight:
 
 - contract ID and contract digest;
-- receiver registry entry and version;
-- receiver ID;
-- pinned receiver policy version against current receiver policy drift semantics;
+- gateway registry entry and version;
+- gateway ID;
+- pinned gateway policy version against current gateway policy drift semantics;
 - action class;
 - resource reference;
 - parameter digest;
@@ -114,7 +114,7 @@ The receiver gate compares what it sees against the exact greenlight:
 
 If the check fails, no mutation attempt is recorded.
 
-If the check passes, the greenlight is consumed and the receiver records the mutation attempt outcome.
+If the check passes, the greenlight is consumed and the gateway records the mutation attempt outcome.
 
 ## Step 6: Receipt Or Proof Gap
 
@@ -128,13 +128,13 @@ The gate response returns:
 The receipt must distinguish:
 
 - policy decision status;
-- receiver gate status;
+- gateway check status;
 - greenlight consumption status;
 - mutation attempt status;
 - downstream execution status;
 - proof gap IDs;
 - finality status.
 
-A downstream pending status is not success. A downstream unknown is not success; it is a proof gap. The receiver may later reconcile the same operation by `mutationAttemptId`, idempotency key, and receiver operation reference. Reconciliation must not create a second mutation attempt.
+A downstream pending status is not success. A downstream unknown is not success; it is a proof gap. The gateway may later reconcile the same operation by `mutationAttemptId`, idempotency key, and surface operation reference. Reconciliation must not create a second mutation attempt.
 
-Active next product shipment: make this walkthrough runnable end-to-end with one fixture payload set backed by the implemented package-install or repo-write receiver proof.
+Active next product shipment: keep this as a reference kernel walkthrough and build the product walkthrough around the Handshake CLI/MCP protected action surface. The first adapter-backed path may use GitHub App-backed protected repo-write-to-PR, but the product path starts with installed CLI/MCP plus gateway adapter posture; fixture payloads may validate the reference loop but must not become the adoption artifact.

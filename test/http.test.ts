@@ -39,7 +39,7 @@ describe("Hono protocol surface", () => {
     const fixture = await createGreenlitContract();
     const app = createApp({ store: fixture.store });
 
-    const response = await app.request("/v0.2/receiver-gate-attempts", {
+    const response = await app.request("/v0.2/gateway-check-attempts", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
@@ -90,7 +90,7 @@ async function createRecoveryTerminalConflictState() {
   const base = makeKernelFixture();
   const store = new RecoveryTerminalConflictOnceStore();
   const fixture = await createGreenlitContract({ ...base, store, kernel: new HandshakeKernel(store) });
-  const gate = await fixture.kernel.receiverGate({
+  const gate = await fixture.kernel.gatewayCheck({
     actionContractId: fixture.contract.actionContractId,
     greenlightId: fixture.greenlight.greenlightId,
     observedParameters: { package: "hono", versionRange: "^4.12.19" },
@@ -103,10 +103,10 @@ async function createRecoveryTerminalConflictState() {
     sourceRefusalOrGapRef: sourceProofGapId,
     recommendedPath: "narrower_action_contract_required",
     allowedNextActionClasses: [fixture.contract.actionClass],
-    requiredNewEvidence: ["receiver_finality_evidence"],
+    requiredNewEvidence: ["gateway_finality_evidence"],
     requiresHumanReview: false,
     reasonCode: "downstream_status_unknown",
-    reasonSummary: "Receiver did not produce downstream finality evidence.",
+    reasonSummary: "Gateway did not produce downstream finality evidence.",
   });
   const compilation = await fixture.kernel.compileIntent({
     tenantId: "tenant_demo",
@@ -119,13 +119,13 @@ async function createRecoveryTerminalConflictState() {
     operatingEnvelopeId: fixture.envelope.envelopeId,
     toolCatalogRef: "tool_catalog_demo@v1",
     actionCatalogRef: "action_catalog_demo@v1",
-    receiverRegistryRef: "receiver_registry@v1",
+    gatewayRegistryRef: "gateway_registry@v1",
     candidate: {
       toolCapabilityId: fixture.tool.toolCapabilityId,
       actionTypeId: fixture.actionType.actionTypeId,
-      receiverRegistryEntryId: fixture.receiver.receiverRegistryEntryId,
+      gatewayRegistryEntryId: fixture.gateway.gatewayRegistryEntryId,
       actionClass: fixture.contract.actionClass,
-      receiverId: fixture.contract.receiverId,
+      gatewayId: fixture.contract.gatewayId,
       resourceRef: fixture.contract.resourceRef,
     },
   });
@@ -134,8 +134,8 @@ async function createRecoveryTerminalConflictState() {
     organizationId: "org_demo",
     intentCompilationId: compilation.intentCompilationId,
     envelopeId: fixture.envelope.envelopeId,
-    receiverRegistryEntryId: fixture.receiver.receiverRegistryEntryId,
-    receiverId: fixture.receiver.receiverId,
+    gatewayRegistryEntryId: fixture.gateway.gatewayRegistryEntryId,
+    gatewayId: fixture.gateway.gatewayId,
     principalId: "principal_demo",
     agentId: "agent_demo",
     runId: "run_demo",
@@ -147,7 +147,7 @@ async function createRecoveryTerminalConflictState() {
     nonSecretParamsSummary: { package: "hono", versionRange: "^4.12.19" },
     purposeCode: "dependency_add_recovery",
     expectedSideEffectCodes: ["package_json_change", "lockfile_change"],
-    evidenceRefs: ["receiver_finality_evidence"],
+    evidenceRefs: ["gateway_finality_evidence"],
     bounds: { maxPackages: 1 },
     idempotencyKey: "idem_http_recovery_terminal_loser",
     rollbackHint: "remove package and restore lockfile",

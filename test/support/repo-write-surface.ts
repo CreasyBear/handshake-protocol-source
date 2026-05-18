@@ -4,7 +4,7 @@ import type {
   RepoWriteMutationCommand,
   RepoWriteMutationEvidence,
   RepoWriteMutationSurface,
-} from "../../src/adapters/repo-write/receiver";
+} from "../../src/adapters/repo-write/gateway";
 
 export class FileRepoWriteSurface implements RepoWriteMutationSurface {
   mutationCount = 0;
@@ -26,8 +26,8 @@ export class FileRepoWriteSurface implements RepoWriteMutationSurface {
     await writeFile(targetPath, command.content);
     this.mutationCount += 1;
     return {
-      evidenceRef: `evidence:repo-file:${command.verifiedGate.receiverOperationRef}:${this.mutationCount}`,
-      receiverOperationRef: command.verifiedGate.receiverOperationRef,
+      evidenceRef: `evidence:repo-file:${command.verifiedGate.surfaceOperationRef}:${this.mutationCount}`,
+      surfaceOperationRef: command.verifiedGate.surfaceOperationRef,
       repositoryRef: command.repositoryRef,
       filePath: command.filePath,
       contentDigest: command.contentDigest,
