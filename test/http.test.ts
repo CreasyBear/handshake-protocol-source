@@ -19,6 +19,22 @@ describe("Hono protocol surface", () => {
     expect(await openapi.json()).toMatchObject({ openapi: "3.1.0" });
   });
 
+  it("fails closed for state-changing endpoints without durable storage", async () => {
+    const fixture = makeKernelFixture();
+    const app = createApp();
+
+    const response = await app.request("/v0.2/catalog/tool-capabilities", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(fixture.tool),
+    });
+
+    expect(response.status).toBe(503);
+    expect(await response.json()).toMatchObject({
+      error: { code: "durable_store_unavailable" },
+    });
+  });
+
   it("returns structured gate receipts through HTTP", async () => {
     const fixture = await createGreenlitContract();
     const app = createApp({ store: fixture.store });

@@ -7,15 +7,14 @@ import type {
   IsolationState,
   OperatingEnvelope,
   PolicyDecision,
-  ProofGap,
   RecoveryRecommendation,
   ReceiptExport,
   ReceiverRegistryEntry,
-  ReceiverOperationReconciliation,
   ReviewDecision,
   ToolCapability,
 } from "../protocol/schemas";
 import type { ReceiverGateResult } from "../protocol/receiver-gate-artifacts";
+import type { ReceiverOperationReconciliationResult } from "../protocol/receiver-operation-reconciliations";
 import type {
   CompileIntentInput,
   CreateBreakerDecisionInput,
@@ -111,10 +110,7 @@ export class HandshakeClient {
     return this.post("/v0.2/receiver-gate-attempts", input);
   }
 
-  reconcileReceiverOperation(input: ReconcileReceiverOperationInput): Promise<{
-    reconciliation: ReceiverOperationReconciliation;
-    resolvedProofGaps: ProofGap[];
-  }> {
+  reconcileReceiverOperation(input: ReconcileReceiverOperationInput): Promise<ReceiverOperationReconciliationResult> {
     return this.post("/v0.2/receiver-operation-reconciliations", input);
   }
 

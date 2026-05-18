@@ -9,10 +9,8 @@ import type {
   ReceiverGateInput,
   ReconcileReceiverOperationInput,
 } from "../../protocol/inputs";
-import type {
-  ProofGap,
-  ReceiverOperationReconciliation,
-} from "../../protocol/schemas";
+import type { ReceiverOperationReconciliationResult } from "../../protocol/receiver-operation-reconciliations";
+import type { ReceiverOperationReconciliation } from "../../protocol/schemas";
 
 export const RepoWriteParametersSchema = z.strictObject({
   repositoryRef: z.string().min(1),
@@ -46,10 +44,7 @@ export interface RepoWriteMutationSurface {
 
 export type RepoWriteProtocol = {
   receiverGate(input: ReceiverGateInput): Promise<ReceiverGateResult>;
-  reconcileReceiverOperation(input: ReconcileReceiverOperationInput): Promise<{
-    reconciliation: ReceiverOperationReconciliation;
-    resolvedProofGaps: ProofGap[];
-  }>;
+  reconcileReceiverOperation(input: ReconcileReceiverOperationInput): Promise<ReceiverOperationReconciliationResult>;
 };
 
 export type RepoWriteReceiverInput = {
@@ -61,12 +56,17 @@ export type RepoWriteReceiverInput = {
   filePath: string;
   content: string;
   receiverOperationRef?: string;
-  downstreamMode?: "pending" | "unknown";
 };
 
 export type RepoWriteReceiverResult =
   | {
       outcome: "receiver_gate_refused";
+      receiverGate: ReceiverGateResult;
+      reconciliation: null;
+      mutationEvidence: null;
+    }
+  | {
+      outcome: "receiver_gate_not_authoritative";
       receiverGate: ReceiverGateResult;
       reconciliation: null;
       mutationEvidence: null;
@@ -98,13 +98,15 @@ export async function runRepoWriteReceiver(input: RepoWriteReceiverInput): Promi
     actionContractId: input.actionContractId,
     greenlightId: input.greenlightId,
     observedParameters,
-    downstreamMode: input.downstreamMode ?? "pending",
+    downstreamMode: "pending",
     receiverOperationRef,
   });
 
   const verifiedGate = verifiedReceiverGateCheckFromResult(receiverGate);
   if (!verifiedGate) {
-    return { outcome: "receiver_gate_refused", receiverGate, reconciliation: null, mutationEvidence: null };
+    const outcome =
+      receiverGate.gateAttempt.gateDecision === "refused" ? "receiver_gate_refused" : "receiver_gate_not_authoritative";
+    return { outcome, receiverGate, reconciliation: null, mutationEvidence: null };
   }
 
   try {
@@ -122,7 +124,7 @@ export async function runRepoWriteReceiver(input: RepoWriteReceiverInput): Promi
       observedReceiverOperationRef: mutationEvidence.receiverOperationRef,
       observedDownstreamStatus: "succeeded",
       evidenceRefs: [mutationEvidence.evidenceRef],
-      resolvedProofGapIds: verifiedGate.proofGapId ? [verifiedGate.proofGapId] : [],
+      resolvedProofGapIds: [],
     });
     return { outcome: "mutation_reconciled", receiverGate, reconciliation, mutationEvidence };
   } catch {
@@ -132,7 +134,7 @@ export async function runRepoWriteReceiver(input: RepoWriteReceiverInput): Promi
       observedReceiverOperationRef: receiverOperationRef,
       observedDownstreamStatus: "failed",
       evidenceRefs: [`evidence:repo-write-failed:${receiverOperationRef}`],
-      resolvedProofGapIds: verifiedGate.proofGapId ? [verifiedGate.proofGapId] : [],
+      resolvedProofGapIds: [],
     });
     return { outcome: "mutation_failed", receiverGate, reconciliation, mutationEvidence: null };
   }

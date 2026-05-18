@@ -2,10 +2,20 @@ import { digestCanonical } from "./canonical";
 import { buildEventChain, type EventDescriptor } from "./events";
 import { HandshakeProtocolError } from "./errors";
 import type { ContractStreamEvent, JsonValue, ProtocolObjectType, ProtocolRecord } from "./schemas";
-import type { ProtocolStore, RecoveryTerminalClaim, StoredProtocolRecord } from "../storage/store";
+import type {
+  GreenlightIssuanceClaim,
+  ProtocolStore,
+  RecoveryTerminalClaim,
+  StoredProtocolRecord,
+} from "../storage/store";
 import { getObjectId } from "../storage/store";
 
 const MAX_STREAM_COMMIT_RETRIES = 3;
+
+export type CommitRecordsOptions = {
+  greenlightIssuanceClaims?: GreenlightIssuanceClaim[];
+  recoveryTerminalClaims?: RecoveryTerminalClaim[];
+};
 
 export class ProtocolRecorder {
   constructor(private readonly store: ProtocolStore) {}
@@ -41,13 +51,20 @@ export class ProtocolRecorder {
   async commitRecordsWithEvents(
     protocolRecords: ProtocolRecord[],
     eventDescriptors: EventDescriptor[],
-    recoveryTerminalClaims: RecoveryTerminalClaim[] = [],
+    options: CommitRecordsOptions = {},
   ): Promise<ContractStreamEvent[]> {
     const records = await Promise.all(protocolRecords.map((record) => this.buildRecord(record)));
     for (let attempt = 0; attempt <= MAX_STREAM_COMMIT_RETRIES; attempt += 1) {
       const events = await buildEventChain(this.store, eventDescriptors);
-      const commitResult = await this.store.commitProtocolRecords({ records, events, recoveryTerminalClaims });
+      const commitResult = await this.store.commitProtocolRecords({ records, events, ...options });
       if (commitResult === "committed") return events;
+      if (commitResult === "greenlight_issuance_conflict") {
+        throw new HandshakeProtocolError(
+          "invalid_transition_greenlight_already_issued",
+          "A new greenlight requires a new action contract; this action contract already has a greenlight.",
+          409,
+        );
+      }
       if (commitResult === "recovery_terminal_conflict") {
         throw new HandshakeProtocolError(
           "recovery_terminal_conflict",

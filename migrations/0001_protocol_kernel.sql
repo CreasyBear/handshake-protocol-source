@@ -3,7 +3,7 @@
 -- snapshots, but every consequential state transition must land here.
 
 CREATE TABLE IF NOT EXISTS protocol_records (
-  object_id TEXT PRIMARY KEY,
+  object_id TEXT NOT NULL,
   object_type TEXT NOT NULL,
   tenant_id TEXT NOT NULL,
   organization_id TEXT NOT NULL,
@@ -11,7 +11,8 @@ CREATE TABLE IF NOT EXISTS protocol_records (
   canonical_digest TEXT NOT NULL,
   payload_json TEXT NOT NULL,
   created_at TEXT NOT NULL,
-  source_event_id TEXT
+  source_event_id TEXT,
+  PRIMARY KEY (object_type, object_id)
 );
 
 CREATE INDEX IF NOT EXISTS idx_protocol_records_type
@@ -27,6 +28,18 @@ CREATE TABLE IF NOT EXISTS greenlight_consumptions (
 
 CREATE INDEX IF NOT EXISTS idx_greenlight_consumptions_contract
   ON greenlight_consumptions (action_contract_id, consumed_at);
+
+CREATE TABLE IF NOT EXISTS greenlight_issuances (
+  action_contract_id TEXT PRIMARY KEY,
+  greenlight_id TEXT NOT NULL,
+  policy_decision_id TEXT NOT NULL,
+  tenant_id TEXT NOT NULL,
+  organization_id TEXT NOT NULL,
+  claimed_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_greenlight_issuances_greenlight
+  ON greenlight_issuances (greenlight_id, claimed_at);
 
 CREATE TABLE IF NOT EXISTS recovery_terminal_claims (
   recovery_recommendation_id TEXT PRIMARY KEY,

@@ -49,6 +49,35 @@ describe("reference package install receiver adapter", () => {
     expect(fixture.store.countRecordsOfType("mutation_attempt")).toBe(0);
   });
 
+  it("does not mutate the manifest when the receiver gate records a proof gap", async () => {
+    const fixture = await createGreenlitContract();
+    const proofGapGate = await fixture.kernel.receiverGate({
+      actionContractId: fixture.contract.actionContractId,
+      greenlightId: fixture.greenlight.greenlightId,
+      observedParameters: { package: "hono", versionRange: "^4.12.19" },
+      downstreamMode: "unknown",
+    });
+    const surface = await createPackageManifestSurface("handshake-package-receiver-");
+
+    const result = await runPackageInstallReceiver({
+      protocol: {
+        receiverGate: async () => proofGapGate,
+        reconcileReceiverOperation: async () => {
+          throw new Error("proof-gap gate must not reconcile through the adapter");
+        },
+      },
+      surface,
+      actionContractId: fixture.contract.actionContractId,
+      greenlightId: fixture.greenlight.greenlightId,
+      observedParameters: { package: "hono", versionRange: "^4.12.19" },
+    });
+
+    expect(result.outcome).toBe("receiver_gate_not_authoritative");
+    expect(result.receiverGate.gateAttempt.gateDecision).toBe("proof_gap");
+    expect((await surface.readManifest()).dependencies).toEqual({});
+    expect(surface.mutationCount).toBe(0);
+  });
+
   it("does not mutate the manifest on a replayed greenlight", async () => {
     const fixture = await createGreenlitContract();
     const surface = await createPackageManifestSurface("handshake-package-receiver-");

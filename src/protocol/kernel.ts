@@ -28,7 +28,10 @@ import {
   resolveRecoveryTerminalConflictProofGap as resolveRecoveryTerminalConflictProofGapTransition,
   type RecoveryTerminalConflictResolution,
 } from "./recovery-terminal-conflict-resolutions";
-import { reconcileReceiverOperation as reconcileReceiverOperationTransition } from "./receiver-operation-reconciliations";
+import {
+  reconcileReceiverOperation as reconcileReceiverOperationTransition,
+  type ReceiverOperationReconciliationResult,
+} from "./receiver-operation-reconciliations";
 import { ProtocolRecorder } from "./records";
 import { receiverGate as receiverGateTransition, type ReceiverGateResult } from "./receiver-gate-attempts";
 import { createReviewDecision as createReviewDecisionTransition } from "./review-decisions";
@@ -38,9 +41,7 @@ import type {
   IntentCompilationRecord,
   IsolationState,
   PolicyDecision,
-  ProofGap,
   ProtocolRecord,
-  ReceiverOperationReconciliation,
   ReceiptExport,
   RecoveryRecommendation,
   ReviewDecision,
@@ -80,11 +81,8 @@ export class HandshakeKernel {
     return createReviewDecisionTransition(this.recorder, input);
   }
 
-  reconcileReceiverOperation(input: ReconcileReceiverOperationInput): Promise<{
-    reconciliation: ReceiverOperationReconciliation;
-    resolvedProofGaps: ProofGap[];
-  }> {
-    return reconcileReceiverOperationTransition(this.recorder, input);
+  reconcileReceiverOperation(input: ReconcileReceiverOperationInput): Promise<ReceiverOperationReconciliationResult> {
+    return reconcileReceiverOperationTransition(this.store, this.recorder, input);
   }
 
   createIsolationState(input: CreateIsolationInput): Promise<IsolationState> {

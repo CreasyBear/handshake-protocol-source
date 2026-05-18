@@ -2,7 +2,7 @@ import { HandshakeProtocolError } from "./errors";
 import { actionLifecycleStreamRefs } from "./events";
 import { createId, nowIso } from "./ids";
 import { ReconcileReceiverOperationInputSchema, type ReconcileReceiverOperationInput } from "./inputs";
-import { resolveProofGaps } from "./proof-gaps";
+import { buildProofGap, resolveProofGaps } from "./proof-gaps";
 import type { ProtocolRecorder } from "./records";
 import {
   reconciliationFinalityFor,
@@ -15,18 +15,31 @@ import {
   type MutationAttempt,
   type ProofGap,
   type ProtocolRecord,
+  type Receipt,
   type ReceiverOperationReconciliation,
 } from "./schemas";
 import { guardReceiverOperationReconciliation, type TransitionGuardResult } from "./transitions";
+import type { ProtocolStore } from "../storage/store";
 
-export async function reconcileReceiverOperation(
-  recorder: ProtocolRecorder,
-  inputValue: ReconcileReceiverOperationInput,
-): Promise<{
+export type ReceiverOperationReconciliationResult = {
   reconciliation: ReceiverOperationReconciliation;
   resolvedProofGaps: ProofGap[];
-}> {
+  createdProofGap: ProofGap | null;
+};
+
+export async function reconcileReceiverOperation(
+  store: ProtocolStore,
+  recorder: ProtocolRecorder,
+  inputValue: ReconcileReceiverOperationInput,
+): Promise<ReceiverOperationReconciliationResult> {
   const input = ReconcileReceiverOperationInputSchema.parse(inputValue);
+  if (input.observedDownstreamStatus === "unknown" && input.resolvedProofGapIds.length > 0) {
+    throw new HandshakeProtocolError(
+      "invalid_transition_unknown_reconciliation_cannot_resolve_proof_gap",
+      "An unknown downstream reconciliation records a new proof gap; it cannot resolve existing proof gaps.",
+      409,
+    );
+  }
   const mutationRecord = await recorder.requiredRecord<MutationAttempt>(
     "mutation_attempt",
     input.mutationAttemptId,
@@ -69,10 +82,19 @@ export async function reconcileReceiverOperation(
   });
 
   const resolvedProofGaps = await resolveProofGaps(recorder, input.resolvedProofGapIds, reconciliation, now);
+  const createdProofGap =
+    input.observedDownstreamStatus === "unknown"
+      ? buildProofGap(contractRecord.payload, "mutation", "downstream_finality", "downstream_status_unknown", {
+          gateAttemptId: mutationRecord.payload.gateAttemptId,
+          mutationAttemptId: mutationRecord.payload.mutationAttemptId,
+          receiptId: await receiptIdForMutation(store, mutationRecord.payload),
+        })
+      : null;
   await recorder.commitRecordsWithEvents(
     [
       { objectType: "receiver_operation_reconciliation", payload: reconciliation },
       ...resolvedProofGaps.map((proofGap): ProtocolRecord => ({ objectType: "proof_gap", payload: proofGap })),
+      ...(createdProofGap ? ([{ objectType: "proof_gap", payload: createdProofGap }] satisfies ProtocolRecord[]) : []),
     ],
     [
       {
@@ -87,9 +109,39 @@ export async function reconcileReceiverOperation(
           resolvedProofGapIds: reconciliation.resolvedProofGapIds,
         },
       },
+      ...(createdProofGap
+        ? [
+            {
+              source: createdProofGap,
+              eventType: "proof_gap_recorded" as const,
+              objectRefs: [
+                createdProofGap.proofGapId,
+                reconciliation.mutationAttemptId,
+                reconciliation.actionContractId,
+              ],
+              streamRefs: actionLifecycleStreamRefs(contractRecord.payload),
+              payload: {
+                reasonCode: createdProofGap.reasonCode,
+                finalityImpact: createdProofGap.finalityImpact,
+                reconciliationId: reconciliation.reconciliationId,
+              },
+            },
+          ]
+        : []),
     ],
   );
-  return { reconciliation, resolvedProofGaps };
+  return { reconciliation, resolvedProofGaps, createdProofGap };
+}
+
+async function receiptIdForMutation(store: ProtocolStore, mutationAttempt: MutationAttempt): Promise<string | null> {
+  const receipts = await store.listRecordsByType<Receipt>("receipt", {
+    tenantId: mutationAttempt.tenantId,
+    organizationId: mutationAttempt.organizationId,
+  });
+  return (
+    receipts.find((receipt) => receipt.payload.mutationAttemptId === mutationAttempt.mutationAttemptId)?.payload.receiptId ??
+    null
+  );
 }
 
 function assertTransition(result: TransitionGuardResult): void {

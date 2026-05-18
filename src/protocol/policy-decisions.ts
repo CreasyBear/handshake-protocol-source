@@ -122,6 +122,18 @@ export async function evaluatePolicy(
         payload: { receiverId: greenlight.receiverId, actionClass: greenlight.actionClass },
       },
     ],
+    {
+      greenlightIssuanceClaims: [
+        {
+          actionContractId: contract.payload.actionContractId,
+          greenlightId: greenlight.greenlightId,
+          policyDecisionId: decision.policyDecisionId,
+          tenantId: contract.payload.tenantId,
+          organizationId: contract.payload.organizationId,
+          claimedAt: now,
+        },
+      ],
+    },
   );
   return { decision, greenlight };
 }

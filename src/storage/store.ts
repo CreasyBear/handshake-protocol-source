@@ -27,6 +27,15 @@ export type GreenlightConsumption = {
   consumedAt: string;
 };
 
+export type GreenlightIssuanceClaim = {
+  actionContractId: string;
+  greenlightId: string;
+  policyDecisionId: string;
+  tenantId: string;
+  organizationId: string;
+  claimedAt: string;
+};
+
 export type RecoveryTerminalClaim = {
   recoveryRecommendationId: string;
   statusTransitionId: string;
@@ -41,12 +50,17 @@ export type ReceiverGateCommit = {
 };
 
 export type ProtocolCommit = {
+  greenlightIssuanceClaims?: GreenlightIssuanceClaim[];
   recoveryTerminalClaims?: RecoveryTerminalClaim[];
   records: StoredProtocolRecord[];
   events: ContractStreamEvent[];
 };
 
-export type ProtocolCommitResult = "committed" | "stream_conflict" | "recovery_terminal_conflict";
+export type ProtocolCommitResult =
+  | "committed"
+  | "stream_conflict"
+  | "recovery_terminal_conflict"
+  | "greenlight_issuance_conflict";
 export type ReceiverGateCommitResult = "committed" | "already_consumed" | "stream_conflict";
 
 export type StreamTail = {

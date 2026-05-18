@@ -79,7 +79,7 @@ export async function transitionRecoveryRecommendationStatus(
   await recorder.commitRecordsWithEvents(
     statusChangeRecords(statusChange),
     statusChangeEvents(statusChange, sourceContractRecord.payload),
-    [statusChange.terminalClaim],
+    { recoveryTerminalClaims: [statusChange.terminalClaim] },
   ).catch(async (error: unknown) => {
     if (isRecoveryTerminalConflict(error)) {
       await recordRecoveryTerminalConflictProofGap(recorder, {

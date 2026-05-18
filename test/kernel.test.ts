@@ -2,13 +2,19 @@ import { describe, expect, it } from "bun:test";
 import { HandshakeProtocolError } from "../src/protocol/errors";
 import { HandshakeKernel } from "../src/protocol/kernel";
 import { digestCanonical } from "../src/protocol/canonical";
-import type { ContractStreamEvent, ProofGap, RecoveryRecommendationStatusTransition } from "../src/protocol/schemas";
+import type {
+  ContractStreamEvent,
+  ProofGap,
+  ProtocolObjectType,
+  RecoveryRecommendationStatusTransition,
+} from "../src/protocol/schemas";
 import { InMemoryProtocolStore } from "../src/storage/memory";
 import type {
   ProtocolCommit,
   ProtocolCommitResult,
   ReceiverGateCommit,
   ReceiverGateCommitResult,
+  StoredProtocolRecord,
 } from "../src/storage/store";
 import { createGreenlitContract, makeKernelFixture, registerFixtureObjects } from "./fixtures";
 
@@ -183,6 +189,21 @@ describe("Handshake kernel invariants", () => {
     ).rejects.toThrow("already has a greenlight");
 
     expect(fixture.store.countRecordsOfType("greenlight")).toBe(1);
+  });
+
+  it("rejects duplicate greenlight issuance through the durable action-contract claim", async () => {
+    const base = makeKernelFixture();
+    const store = new GreenlightListBlindStore();
+    const fixture = await createGreenlitContract({ ...base, store, kernel: new HandshakeKernel(store) });
+
+    await expect(
+      fixture.kernel.evaluatePolicy({
+        actionContractId: fixture.contract.actionContractId,
+        envelopeId: fixture.envelope.envelopeId,
+      }),
+    ).rejects.toThrow("already has a greenlight");
+
+    expect(store.countRecordsOfType("greenlight")).toBe(1);
   });
 
   it("passes the receiver gate once and refuses replay", async () => {
@@ -1402,6 +1423,33 @@ describe("Handshake kernel invariants", () => {
     expect(fixture.store.countRecordsOfType("receiver_operation_reconciliation")).toBe(1);
   });
 
+  it("records a post-mutation proof gap when reconciliation cannot prove downstream finality", async () => {
+    const fixture = await createGreenlitContract();
+    const gate = await fixture.kernel.receiverGate({
+      actionContractId: fixture.contract.actionContractId,
+      greenlightId: fixture.greenlight.greenlightId,
+      observedParameters: { package: "hono", versionRange: "^4.12.19" },
+      downstreamMode: "pending",
+      receiverOperationRef: "receiver-op:pending-install",
+    });
+    if (!gate.mutationAttempt) throw new Error("expected mutation attempt");
+
+    const result = await fixture.kernel.reconcileReceiverOperation({
+      mutationAttemptId: gate.mutationAttempt.mutationAttemptId,
+      idempotencyKey: fixture.contract.idempotencyKey,
+      observedReceiverOperationRef: "receiver-op:pending-install",
+      observedDownstreamStatus: "unknown",
+      evidenceRefs: [],
+    });
+
+    expect(result.reconciliation.finalityStatus).toBe("unknown");
+    expect(result.createdProofGap?.mutationAttemptId).toBe(gate.mutationAttempt.mutationAttemptId);
+    expect(result.createdProofGap?.receiptId).toBe(gate.receipt.receiptId);
+    expect(result.resolvedProofGaps).toHaveLength(0);
+    expect(fixture.store.countRecordsOfType("proof_gap")).toBe(1);
+    expect(fixture.store.countRecordsOfType("mutation_attempt")).toBe(1);
+  });
+
   it("resolves a downstream unknown proof gap by reconciling the same mutation attempt", async () => {
     const fixture = await createGreenlitContract();
     const gate = await fixture.kernel.receiverGate({
@@ -1495,6 +1543,16 @@ class RecoveryTerminalConflictOnceStore extends InMemoryProtocolStore {
       return "recovery_terminal_conflict";
     }
     return super.commitProtocolRecords(commit);
+  }
+}
+
+class GreenlightListBlindStore extends InMemoryProtocolStore {
+  override async listRecordsByType<T>(
+    objectType: ProtocolObjectType,
+    scope: { tenantId?: string; organizationId?: string } = {},
+  ): Promise<StoredProtocolRecord<T>[]> {
+    if (objectType === "greenlight") return [];
+    return super.listRecordsByType<T>(objectType, scope);
   }
 }
 

@@ -35,10 +35,11 @@ export type WorkerBindings = {
 
 type AppOptions = {
   store?: ProtocolStore;
+  allowEphemeralStore?: boolean;
 };
 
 export function createApp(options: AppOptions = {}) {
-  const fallbackStore = options.store ?? new InMemoryProtocolStore();
+  const fallbackStore = options.store ?? (options.allowEphemeralStore ? new InMemoryProtocolStore() : null);
   const app = new Hono<{ Bindings: WorkerBindings }>();
 
   app.onError((error, c) => {
@@ -166,11 +167,16 @@ async function parseBody<T>(c: Context, schema: ZodType<T>): Promise<T> {
   return schema.parse(json);
 }
 
-function kernelFor(c: Context<{ Bindings: WorkerBindings }>, fallbackStore: ProtocolStore): HandshakeKernel {
+function kernelFor(c: Context<{ Bindings: WorkerBindings }>, fallbackStore: ProtocolStore | null): HandshakeKernel {
   return new HandshakeKernel(storeFor(c, fallbackStore));
 }
 
-function storeFor(c: Context<{ Bindings: WorkerBindings }>, fallbackStore: ProtocolStore): ProtocolStore {
+function storeFor(c: Context<{ Bindings: WorkerBindings }>, fallbackStore: ProtocolStore | null): ProtocolStore {
   if (c.env?.DB) return new D1ProtocolStore(c.env.DB);
-  return fallbackStore;
+  if (fallbackStore) return fallbackStore;
+  throw new HandshakeProtocolError(
+    "durable_store_unavailable",
+    "Protocol state endpoints require a durable D1 store or an explicitly injected ephemeral test store.",
+    503,
+  );
 }

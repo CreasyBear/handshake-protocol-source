@@ -1,6 +1,7 @@
 import type { ContractStreamEvent, IsolationState, ProtocolObjectType } from "../protocol/schemas";
 import type {
   GreenlightConsumption,
+  GreenlightIssuanceClaim,
   ProtocolCommit,
   ProtocolCommitResult,
   ProtocolStore,
@@ -160,9 +161,12 @@ export class D1ProtocolStore implements ProtocolStore {
 
   async commitProtocolRecords(commit: ProtocolCommit): Promise<ProtocolCommitResult> {
     try {
-      await this.db.batch(this.protocolCommitStatements(commit.records, commit.events, commit.recoveryTerminalClaims));
+      await this.db.batch(this.protocolCommitStatements(commit.records, commit.events, commit));
       return "committed";
     } catch (error) {
+      if (isGreenlightIssuanceConflict(error)) {
+        return "greenlight_issuance_conflict";
+      }
       if (isRecoveryTerminalConflict(error)) {
         return "recovery_terminal_conflict";
       }
@@ -178,7 +182,7 @@ export class D1ProtocolStore implements ProtocolStore {
     if (commit.consumption) {
       statements.push(this.greenlightConsumptionStatement(commit.consumption));
     }
-    statements.push(...this.protocolCommitStatements(commit.records, commit.events));
+    statements.push(...this.protocolCommitStatements(commit.records, commit.events, {}));
 
     try {
       await this.db.batch(statements);
@@ -197,10 +201,13 @@ export class D1ProtocolStore implements ProtocolStore {
   private protocolCommitStatements(
     records: StoredProtocolRecord[],
     events: ContractStreamEvent[],
-    recoveryTerminalClaims: RecoveryTerminalClaim[] = [],
+    options: Pick<ProtocolCommit, "greenlightIssuanceClaims" | "recoveryTerminalClaims"> = {},
   ): D1PreparedStatement[] {
     const statements: D1PreparedStatement[] = [];
-    for (const claim of recoveryTerminalClaims) {
+    for (const claim of options.greenlightIssuanceClaims ?? []) {
+      statements.push(this.greenlightIssuanceClaimStatement(claim));
+    }
+    for (const claim of options.recoveryTerminalClaims ?? []) {
       statements.push(this.recoveryTerminalClaimStatement(claim));
     }
     for (const record of records) {
@@ -283,6 +290,23 @@ export class D1ProtocolStore implements ProtocolStore {
       );
   }
 
+  private greenlightIssuanceClaimStatement(claim: GreenlightIssuanceClaim): D1PreparedStatement {
+    return this.db
+      .prepare(
+        `INSERT INTO greenlight_issuances
+          (action_contract_id, greenlight_id, policy_decision_id, tenant_id, organization_id, claimed_at)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+      )
+      .bind(
+        claim.actionContractId,
+        claim.greenlightId,
+        claim.policyDecisionId,
+        claim.tenantId,
+        claim.organizationId,
+        claim.claimedAt,
+      );
+  }
+
   private recoveryTerminalClaimStatement(claim: RecoveryTerminalClaim): D1PreparedStatement {
     return this.db
       .prepare(
@@ -331,6 +355,14 @@ function isRecoveryTerminalConflict(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error);
   return (
     message.includes("recovery_terminal_claims") &&
+    (message.includes("UNIQUE") || message.includes("unique") || message.includes("constraint"))
+  );
+}
+
+function isGreenlightIssuanceConflict(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return (
+    message.includes("greenlight_issuances") &&
     (message.includes("UNIQUE") || message.includes("unique") || message.includes("constraint"))
   );
 }

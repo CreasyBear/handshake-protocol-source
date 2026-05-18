@@ -14,6 +14,7 @@ import type {
 } from "../src/protocol/schemas";
 import { ProtocolRecorder } from "../src/protocol/records";
 import { recordRecoveryTerminalConflictProofGap } from "../src/protocol/recovery-terminal-conflicts";
+import { verifiedReceiverGateCheckFromResult } from "../src/protocol/receiver-gate-artifacts";
 import { HandshakeClient } from "../src/sdk/client";
 import { proposePackageInstallActionContract } from "../src/runtime/package-install/tool-wrapper";
 import { D1ProtocolStore } from "../src/storage/d1";
@@ -35,6 +36,7 @@ type ReceiverGateResponse = {
 };
 type ReconciliationResponse = {
   reconciliation: ReceiverOperationReconciliation;
+  createdProofGap: ProofGap | null;
 };
 type StreamEventRow = {
   offset: number;
@@ -58,6 +60,33 @@ type StreamEventTailRow = {
 };
 
 describe("D1-backed Hono protocol surface", () => {
+  it("preserves same object ids across different protocol object types", async () => {
+    const harness = await createD1HttpHarness();
+    try {
+      const fixture = makeKernelFixture();
+      const sharedId = "shared_protocol_object_id";
+
+      await harness.post("/v0.2/catalog/tool-capabilities", {
+        ...fixture.tool,
+        toolCapabilityId: sharedId,
+      });
+      await harness.post("/v0.2/catalog/action-types", {
+        ...fixture.actionType,
+        actionTypeId: sharedId,
+      });
+
+      const rows = await harness.query<{ object_type: string; payload_json: string }>(
+        "SELECT object_type, payload_json FROM protocol_records WHERE object_id = ? ORDER BY object_type",
+        sharedId,
+      );
+      expect(rows.map((row) => row.object_type)).toEqual(["action_type", "tool_capability"]);
+      expect(JSON.parse(rows[0]?.payload_json ?? "{}")).toMatchObject({ actionTypeId: sharedId });
+      expect(JSON.parse(rows[1]?.payload_json ?? "{}")).toMatchObject({ toolCapabilityId: sharedId });
+    } finally {
+      await harness.dispose();
+    }
+  });
+
   it("persists a contiguous contract stream through pending mutation reconciliation", async () => {
     const harness = await createD1HttpHarness();
     try {
@@ -894,27 +923,37 @@ describe("D1-backed Hono protocol surface", () => {
         "code:codemode-package-install-http-proof-gap",
       );
 
-      const receiverResult = await runPackageInstallReceiver({
-        protocol: client,
-        surface,
+      const receiverGate = await client.receiverGate({
         actionContractId: actionContract.actionContractId,
         greenlightId: greenlight.greenlightId,
         observedParameters: { package: "hono", versionRange: "^4.12.19" },
         receiverOperationRef: "receiver-op:d1-http-package-install-proof-gap",
-        downstreamMode: "unknown",
+        downstreamMode: "pending",
       });
+      const verifiedGate = verifiedReceiverGateCheckFromResult(receiverGate);
+      if (!verifiedGate) throw new Error("expected passed receiver gate");
 
-      const proofGapId = receiverResult.receiverGate.proofGap?.proofGapId;
-      if (!proofGapId || !receiverResult.reconciliation) {
-        throw new Error("expected proof gap and reconciliation");
-      }
+      const mutationEvidence = await surface.applyPackageInstall({
+        verifiedGate,
+        packageName: "hono",
+        versionRange: "^4.12.19",
+      });
+      const reconciliationResult = await client.reconcileReceiverOperation({
+        mutationAttemptId: verifiedGate.mutationAttemptId,
+        idempotencyKey: verifiedGate.idempotencyKey,
+        observedReceiverOperationRef: mutationEvidence.receiverOperationRef,
+        observedDownstreamStatus: "unknown",
+        evidenceRefs: [],
+      });
+      const proofGapId = reconciliationResult.createdProofGap?.proofGapId;
+      if (!proofGapId) throw new Error("expected reconciliation-created proof gap");
 
-      expect(receiverResult.outcome).toBe("mutation_reconciled");
-      expect(receiverResult.receiverGate.gateAttempt.gateDecision).toBe("proof_gap");
-      expect(receiverResult.receiverGate.receipt.finalityStatus).toBe("unknown");
-      expect(receiverResult.receiverGate.receipt.proofGapIds).toEqual([proofGapId]);
-      expect(receiverResult.reconciliation.finalityStatus).toBe("final");
-      expect(receiverResult.reconciliation.resolvedProofGapIds).toEqual([proofGapId]);
+      expect(receiverGate.gateAttempt.gateDecision).toBe("passed");
+      expect(receiverGate.receipt.finalityStatus).toBe("pending");
+      expect(receiverGate.receipt.proofGapIds).toEqual([]);
+      expect(reconciliationResult.reconciliation.finalityStatus).toBe("unknown");
+      expect(reconciliationResult.reconciliation.resolvedProofGapIds).toEqual([]);
+      expect(reconciliationResult.createdProofGap?.mutationAttemptId).toBe(verifiedGate.mutationAttemptId);
       expect((await surface.readManifest()).dependencies).toEqual({ hono: "^4.12.19" });
       expect(surface.mutationCount).toBe(1);
 
@@ -924,8 +963,8 @@ describe("D1-backed Hono protocol surface", () => {
         proofGapId,
       );
       const proofGap = JSON.parse(proofGapRows[0]?.payload_json ?? "null") as ProofGap | null;
-      expect(proofGap?.resolvedByRef).toBe(receiverResult.reconciliation.reconciliationId);
-      expect(proofGap?.resolvedAt).not.toBeNull();
+      expect(proofGap?.resolvedByRef).toBeNull();
+      expect(proofGap?.resolvedAt).toBeNull();
 
       const events = await harness.query<StreamEventRow>(
         `SELECT "offset" AS offset, event_type, previous_event_digest, event_digest
@@ -940,9 +979,9 @@ describe("D1-backed Hono protocol surface", () => {
         "action_greenlit",
         "receiver_gate_checked",
         "mutation_attempted",
-        "proof_gap_recorded",
         "receipt_emitted",
         "receiver_operation_reconciled",
+        "proof_gap_recorded",
       ]);
       expect(events.map((event) => event.offset)).toEqual([0, 1, 2, 3, 4, 5, 6, 7]);
       for (let index = 1; index < events.length; index += 1) {

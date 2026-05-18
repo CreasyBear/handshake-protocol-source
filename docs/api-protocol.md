@@ -40,7 +40,7 @@ proof gap -> success
 | `POST /v0.2/policy-decisions` | Evaluates the exact contract against envelope, isolation state, and declared sequence dependencies. |
 | `POST /v0.2/review-decisions` | Records review against exact contract digest and policy input digest. |
 | `POST /v0.2/receiver-gate-attempts` | Final enforcement check before mutation. |
-| `POST /v0.2/receiver-operation-reconciliations` | Reconciles pending or unknown downstream status for the same mutation attempt and idempotency key. |
+| `POST /v0.2/receiver-operation-reconciliations` | Reconciles the same mutation attempt by idempotency key; unknown downstream finality creates a proof gap instead of success. |
 | `POST /v0.2/isolation-states` | Writes durable interdict state checked by policy and gate, optionally bound to observed stream offset watermarks. |
 | `POST /v0.2/breaker-decisions` | Records a breaker listener decision, validates observed stream watermarks, and atomically creates the resulting isolation state. |
 | `POST /v0.2/receipt-exports` | Packages an existing receipt as a tamper-evident drop copy without creating execution proof. |
@@ -408,7 +408,7 @@ catalog registration
 
 The assertions are protocol assertions, not route smoke tests: one mutation attempt, one reconciliation record, contiguous action/run/receiver-resource stream offsets, and unbroken previous-event digest chains.
 
-The reference suite also runs the package-install runtime wrapper and receiver adapter through `HandshakeClient` against the same Hono/D1 surface. The green path mutates only after a verified receiver gate and reconciles the same mutation attempt. The parameter-mismatch path records a receiver-gate refusal and receipt, leaves the file-backed manifest unchanged, and creates no `MutationAttempt`. The unknown-finality path records `proof_gap_recorded`, keeps the receipt finality `unknown`, mutates only through `VerifiedReceiverGateCheck`, and then resolves that proof gap through `receiver_operation_reconciled` on the same mutation attempt.
+The reference suite also runs the package-install runtime wrapper and receiver adapter through `HandshakeClient` against the same Hono/D1 surface. The green path mutates only after a passed verified receiver gate and reconciles the same mutation attempt. The parameter-mismatch path records a receiver-gate refusal and receipt, leaves the file-backed manifest unchanged, and creates no `MutationAttempt`. The unknown-finality path passes the gate first, mutates through `VerifiedReceiverGateCheck`, records `receiver_operation_reconciled`, and then records a reconciliation-created `proof_gap_recorded` event for missing downstream finality evidence.
 
 A second Hono/D1 adapter path covers repository file writes. It proves a runtime can contract a repo mutation by content digest and byte length, not raw content, and that the receiver refuses a changed-content attempt before creating a `MutationAttempt`.
 

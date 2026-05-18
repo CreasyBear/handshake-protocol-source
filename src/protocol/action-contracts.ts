@@ -148,7 +148,7 @@ export async function proposeActionContract(
         },
         ...recoveryStatusEvents,
       ],
-      recoveryStatusChange ? [recoveryStatusChange.terminalClaim] : [],
+      { recoveryTerminalClaims: recoveryStatusChange ? [recoveryStatusChange.terminalClaim] : [] },
     );
   } catch (error) {
     if (isRecoveryTerminalConflict(error) && recoveryLinkage) {

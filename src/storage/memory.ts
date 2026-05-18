@@ -1,6 +1,7 @@
 import type { ContractStreamEvent, IsolationState, ProtocolObjectType } from "../protocol/schemas";
 import type {
   GreenlightConsumption,
+  GreenlightIssuanceClaim,
   ProtocolCommit,
   ProtocolCommitResult,
   ProtocolStore,
@@ -15,6 +16,7 @@ export class InMemoryProtocolStore implements ProtocolStore {
   private records = new Map<string, StoredProtocolRecord>();
   private events: ContractStreamEvent[] = [];
   private consumptions = new Map<string, GreenlightConsumption>();
+  private greenlightIssuanceClaims = new Map<string, GreenlightIssuanceClaim>();
   private recoveryTerminalClaims = new Map<string, RecoveryTerminalClaim>();
 
   async putRecord(record: StoredProtocolRecord): Promise<void> {
@@ -90,6 +92,9 @@ export class InMemoryProtocolStore implements ProtocolStore {
   }
 
   async commitProtocolRecords(commit: ProtocolCommit): Promise<ProtocolCommitResult> {
+    if (commit.greenlightIssuanceClaims?.some((claim) => this.greenlightIssuanceClaims.has(claim.actionContractId))) {
+      return "greenlight_issuance_conflict";
+    }
     if (commit.recoveryTerminalClaims?.some((claim) => this.recoveryTerminalClaims.has(claim.recoveryRecommendationId))) {
       return "recovery_terminal_conflict";
     }
@@ -99,13 +104,18 @@ export class InMemoryProtocolStore implements ProtocolStore {
 
     const nextRecords = new Map(this.records);
     const nextEvents = [...this.events];
+    const nextGreenlightIssuanceClaims = new Map(this.greenlightIssuanceClaims);
     const nextRecoveryTerminalClaims = new Map(this.recoveryTerminalClaims);
+    for (const claim of commit.greenlightIssuanceClaims ?? []) {
+      nextGreenlightIssuanceClaims.set(claim.actionContractId, structuredClone(claim));
+    }
     for (const claim of commit.recoveryTerminalClaims ?? []) {
       nextRecoveryTerminalClaims.set(claim.recoveryRecommendationId, structuredClone(claim));
     }
     this.stageRecordsAndEvents(nextRecords, nextEvents, commit.records, commit.events);
     this.records = nextRecords;
     this.events = nextEvents;
+    this.greenlightIssuanceClaims = nextGreenlightIssuanceClaims;
     this.recoveryTerminalClaims = nextRecoveryTerminalClaims;
     return "committed";
   }

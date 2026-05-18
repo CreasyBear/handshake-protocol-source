@@ -5,13 +5,11 @@ import {
   type VerifiedReceiverGateCheck,
 } from "../../protocol/receiver-gate-artifacts";
 import type {
-  ProofGap,
-  ReceiverOperationReconciliation,
-} from "../../protocol/schemas";
-import type {
   ReceiverGateInput,
   ReconcileReceiverOperationInput,
 } from "../../protocol/inputs";
+import type { ReceiverOperationReconciliationResult } from "../../protocol/receiver-operation-reconciliations";
+import type { ReceiverOperationReconciliation } from "../../protocol/schemas";
 
 export const PackageInstallParametersSchema = z.strictObject({
   package: z.string().min(1),
@@ -38,10 +36,7 @@ export interface PackageInstallMutationSurface {
 
 export type PackageInstallProtocol = {
   receiverGate(input: ReceiverGateInput): Promise<ReceiverGateResult>;
-  reconcileReceiverOperation(input: ReconcileReceiverOperationInput): Promise<{
-    reconciliation: ReceiverOperationReconciliation;
-    resolvedProofGaps: ProofGap[];
-  }>;
+  reconcileReceiverOperation(input: ReconcileReceiverOperationInput): Promise<ReceiverOperationReconciliationResult>;
 };
 
 export type PackageInstallReceiverInput = {
@@ -51,12 +46,17 @@ export type PackageInstallReceiverInput = {
   greenlightId: string;
   observedParameters: PackageInstallParameters;
   receiverOperationRef?: string;
-  downstreamMode?: "pending" | "unknown";
 };
 
 export type PackageInstallReceiverResult =
   | {
       outcome: "receiver_gate_refused";
+      receiverGate: ReceiverGateResult;
+      reconciliation: null;
+      mutationEvidence: null;
+    }
+  | {
+      outcome: "receiver_gate_not_authoritative";
       receiverGate: ReceiverGateResult;
       reconciliation: null;
       mutationEvidence: null;
@@ -79,18 +79,19 @@ export async function runPackageInstallReceiver(
 ): Promise<PackageInstallReceiverResult> {
   const observedParameters = PackageInstallParametersSchema.parse(input.observedParameters);
   const receiverOperationRef = input.receiverOperationRef ?? `receiver-op:${input.actionContractId}`;
-  const downstreamMode = input.downstreamMode ?? "pending";
   const receiverGate = await input.protocol.receiverGate({
     actionContractId: input.actionContractId,
     greenlightId: input.greenlightId,
     observedParameters,
-    downstreamMode,
+    downstreamMode: "pending",
     receiverOperationRef,
   });
 
   const verifiedGate = verifiedReceiverGateCheckFromResult(receiverGate);
   if (!verifiedGate) {
-    return { outcome: "receiver_gate_refused", receiverGate, reconciliation: null, mutationEvidence: null };
+    const outcome =
+      receiverGate.gateAttempt.gateDecision === "refused" ? "receiver_gate_refused" : "receiver_gate_not_authoritative";
+    return { outcome, receiverGate, reconciliation: null, mutationEvidence: null };
   }
 
   try {
@@ -105,7 +106,7 @@ export async function runPackageInstallReceiver(
       observedReceiverOperationRef: mutationEvidence.receiverOperationRef,
       observedDownstreamStatus: "succeeded",
       evidenceRefs: [mutationEvidence.evidenceRef],
-      resolvedProofGapIds: verifiedGate.proofGapId ? [verifiedGate.proofGapId] : [],
+      resolvedProofGapIds: [],
     });
     return { outcome: "mutation_reconciled", receiverGate, reconciliation, mutationEvidence };
   } catch {
@@ -115,7 +116,7 @@ export async function runPackageInstallReceiver(
       observedReceiverOperationRef: receiverOperationRef,
       observedDownstreamStatus: "failed",
       evidenceRefs: [`evidence:package-install-failed:${receiverOperationRef}`],
-      resolvedProofGapIds: verifiedGate.proofGapId ? [verifiedGate.proofGapId] : [],
+      resolvedProofGapIds: [],
     });
     return { outcome: "mutation_failed", receiverGate, reconciliation, mutationEvidence: null };
   }

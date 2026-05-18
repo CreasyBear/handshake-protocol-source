@@ -37,7 +37,7 @@ export type ReceiverGateResult = {
 };
 
 export type VerifiedReceiverGateCheck = {
-  receiverGateStatus: "passed" | "proof_gap";
+  receiverGateStatus: "passed";
   gateAttemptId: string;
   mutationAttemptId: string;
   actionContractId: string;
@@ -47,7 +47,6 @@ export type VerifiedReceiverGateCheck = {
   resourceRef: string;
   idempotencyKey: string;
   receiverOperationRef: string;
-  proofGapId: string | null;
 };
 
 export type ReceiverGateArtifactInput = {
@@ -64,7 +63,7 @@ export type ReceiverGateArtifactInput = {
 };
 
 export function verifiedReceiverGateCheckFromResult(result: ReceiverGateResult): VerifiedReceiverGateCheck | null {
-  if (result.gateAttempt.gateDecision === "refused" || !result.mutationAttempt?.receiverOperationRef) return null;
+  if (result.gateAttempt.gateDecision !== "passed" || !result.mutationAttempt?.receiverOperationRef) return null;
   return {
     receiverGateStatus: result.gateAttempt.gateDecision,
     gateAttemptId: result.gateAttempt.gateAttemptId,
@@ -76,7 +75,6 @@ export function verifiedReceiverGateCheckFromResult(result: ReceiverGateResult):
     resourceRef: result.mutationAttempt.resourceRef,
     idempotencyKey: result.mutationAttempt.idempotencyKey,
     receiverOperationRef: result.mutationAttempt.receiverOperationRef,
-    proofGapId: result.proofGap?.proofGapId ?? null,
   };
 }
 

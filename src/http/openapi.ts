@@ -152,10 +152,11 @@ export const openApiDocument = {
         requestBody: jsonRequest(ReconcileReceiverOperationInputSchema),
         responses: {
           "201": jsonResponse(
-            "Receiver operation reconciliation and resolved proof gaps",
+            "Receiver operation reconciliation and proof-gap changes",
             z.strictObject({
               reconciliation: ReceiverOperationReconciliationSchema,
               resolvedProofGaps: z.array(ProofGapSchema),
+              createdProofGap: ProofGapSchema.nullable(),
             }),
           ),
           "400": errorResponse,
