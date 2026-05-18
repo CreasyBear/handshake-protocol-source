@@ -1,7 +1,7 @@
 # Gateway Integration
 
 Status: Canonical public alpha
-Version: v0.2.1
+Version: v0.2.3
 Audience: Gateway owners, platform engineering, security engineering, protocol implementers
 Implementation status: Reference gateway check, verified gateway-check artifact, package-install and repo-write adapter harnesses, recovery terminal conflict proof gaps, and Hono/D1 end-to-end package-install flow exist in v0.2; production gateways are target integrations
 Canonical owner: Protocol owner
@@ -61,7 +61,13 @@ The gateway must record one of these outcomes:
 
 The receipt must not collapse these outcomes into a generic success message.
 
-Reconciliation must bind to the original mutation attempt and idempotency key. It is a status lookup for the same surface operation, not a second mutation attempt.
+Reconciliation must bind to the original mutation attempt and idempotency key. It is a status lookup for the same surface operation, not a second mutation attempt or a public operation polling API.
+
+Planned `02c` protocol lifecycle alignment will tighten this boundary with
+request-context evidence, protocol-version checks, orphan-mitigation reason
+codes, and internal protected-surface operation claims. Those claims are
+gateway-side concurrency control state. They must not be exposed as `/claims/*`,
+`/operations/*`, or `/last_operation` APIs.
 
 ## First Adapter Behind CLI/MCP
 

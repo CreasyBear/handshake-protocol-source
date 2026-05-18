@@ -14,10 +14,10 @@ The repo should make sloppy authority, vague naming, hidden mutation, accidental
 
 ```text
 Protocol clarity over clever abstraction.
-Receiver enforcement over runtime promises.
+Gateway enforcement over runtime promises.
 Receipts over logs.
 Proof gaps over fake certainty.
-One greenlight, one receiver-gated attempt.
+One greenlight, one gateway-checked attempt.
 No mutation without reconstructable evidence.
 ```
 
@@ -40,7 +40,7 @@ IntentCompilation
 ActionContract
 PolicyDecision
 Greenlight
-ReceiverGate
+GatewayCheck
 Receipt
 Refusal
 ProofGap
@@ -95,7 +95,7 @@ Good:
 ```ts
 await recordReceipt({
   contractId,
-  receiverGateResult,
+  gatewayCheckResult,
   executionAttemptResult,
   proofGap,
 });
@@ -132,7 +132,7 @@ handshake/
         evaluator/
         decisions/
         templates/
-    receiver/
+    gateway/
       src/
         gate/
         verification/
@@ -163,7 +163,7 @@ handshake/
     fixtures/
   docs/
     protocol/
-    receiver-gate/
+    gateway-check/
     runtime-wrapper/
     threat-model/
 ```
@@ -174,9 +174,9 @@ Package responsibilities:
 protocol = what the system means
 server = how the protocol is served
 policy = how decisions are made
-receiver = how mutation is enforced
+gateway = how mutation is enforced
 runtime = how agents propose contracts
-adapters = concrete receiver/runtime integrations
+adapters = concrete gateway/runtime integrations
 apps = product surfaces
 ```
 
@@ -185,8 +185,8 @@ Rules:
 - `@handshake/protocol` must not depend on Hono, D1, React, Workers, or app code.
 - `@handshake/policy` may evaluate exact contracts; it must not mutate receivers.
 - `@handshake/runtime` may propose contracts; it must not perform consequential mutations.
-- `@handshake/receiver` verifies gate checks; it must not invent policy semantics.
-- Adapters may mutate only after verified receiver-gate checks.
+- `@handshake/gateway` verifies gate checks; it must not invent policy semantics.
+- Adapters may mutate only after verified gateway-check checks.
 - Product UI must not redefine protocol semantics.
 
 ---
@@ -210,7 +210,7 @@ Good:
 ```ts
 evaluatePolicy();
 issueGreenlight();
-verifyReceiverGate();
+verifyGatewayCheck();
 recordRefusal();
 recordProofGap();
 ```
@@ -224,7 +224,7 @@ proposeActionContract
 canonicalizeActionContract
 evaluatePolicy
 issueGreenlight
-verifyReceiverGate
+verifyGatewayCheck
 recordReceipt
 recordRefusal
 recordProofGap
@@ -261,7 +261,7 @@ Use `PascalCase` for protocol types:
 ```ts
 type ActionContract = {};
 type PolicyDecision = {};
-type ReceiverGateCheck = {};
+type GatewayCheck = {};
 type ProofGap = {};
 ```
 
@@ -270,7 +270,7 @@ Use `camelCase` for runtime variables:
 ```ts
 const actionContract = ...;
 const policyDecision = ...;
-const receiverGateResult = ...;
+const gatewayCheckResult = ...;
 ```
 
 Use `snake_case` for persisted database columns:
@@ -279,7 +279,7 @@ Use `snake_case` for persisted database columns:
 contract_id
 principal_id
 greenlight_id
-receiver_id
+gateway_id
 created_at
 expires_at
 canonical_hash
@@ -396,7 +396,7 @@ writeReceipt(db, receipt);
 Rule:
 
 ```text
-Pure protocol logic should be easy to test without a database, network, Worker runtime, or receiver.
+Pure protocol logic should be easy to test without a database, network, Worker runtime, or gateway.
 ```
 
 ---
@@ -431,8 +431,8 @@ Maintain a single transition map per protocol lifecycle:
 export const ACTION_CONTRACT_TRANSITIONS = {
   proposed: ["policy_evaluating", "expired"],
   policy_evaluating: ["greenlit", "refused", "review_required", "halted", "quarantined"],
-  greenlit: ["receiver_checking", "expired"],
-  receiver_checking: ["mutation_attempted", "receiver_refused", "proof_gap_recorded"],
+  greenlit: ["gateway_checking", "expired"],
+  gateway_checking: ["mutation_attempted", "gateway_refused", "proof_gap_recorded"],
   mutation_attempted: ["receipt_recorded", "proof_gap_recorded"],
 } as const;
 ```
@@ -460,7 +460,7 @@ Acceptable repetition:
 ```ts
 recordActionContract();
 recordPolicyDecision();
-recordReceiverGateResult();
+recordGatewayCheckResult();
 recordReceipt();
 ```
 
@@ -502,13 +502,13 @@ Protocol objects deserve explicit names even if their code shapes are similar.
 
 ## 10. No hidden mutation
 
-No function should mutate external systems unless it passes through a receiver-gate path.
+No function should mutate external systems unless it passes through a gateway-check path.
 
-Allowed mutation functions should live only in receiver adapters:
+Allowed mutation functions should live only in gateway adapters:
 
 ```text
 packages/adapters/*/src/mutate*.ts
-packages/receiver/src/gate/*
+packages/gateway/src/gate/*
 ```
 
 Runtime packages propose contracts, not mutations:
@@ -533,7 +533,7 @@ Required adapter signature pattern:
 
 ```ts
 export async function deployPreview(input: {
-  verifiedGate: VerifiedReceiverGateCheck;
+  verifiedGate: VerifiedGatewayCheck;
   contract: PreviewDeployContract;
 }): Promise<PreviewDeployResult> {
   // mutation happens here
@@ -551,22 +551,22 @@ export async function deployPreview(branch: string) {
 Rule:
 
 ```text
-Only receiver adapters may call external mutation APIs.
-Every mutation adapter must require a VerifiedReceiverGateCheck.
+Only gateway adapters may call external mutation APIs.
+Every mutation adapter must require a VerifiedGatewayCheck.
 ```
 
 ---
 
-## 11. Receiver-gate checks must be structured
+## 11. Gateway-gate checks must be structured
 
-The receiver gate is the enforcement point before consequence. It must not be advisory.
+The gateway check is the enforcement point before consequence. It must not be advisory.
 
-A receiver gate should verify at least:
+A gateway check should verify at least:
 
 ```text
 contract hash matches
 greenlight binds to contract
-greenlight binds to receiver
+greenlight binds to gateway
 greenlight binds to action family
 greenlight binds to target resource
 greenlight is unexpired
@@ -574,7 +574,7 @@ greenlight is unused
 idempotency key matches
 isolation state allows execution
 policy decision is valid
-receiver version is acceptable
+gateway version is acceptable
 ```
 
 Return structured results. Do not return bare booleans.
@@ -582,14 +582,14 @@ Return structured results. Do not return bare booleans.
 Preferred shape:
 
 ```ts
-type ReceiverGateResult =
+type GatewayCheckResult =
   | {
       type: "passed";
-      verifiedGate: VerifiedReceiverGateCheck;
+      verifiedGate: VerifiedGatewayCheck;
     }
   | {
       type: "failed";
-      reason: ReceiverGateFailureReason;
+      reason: GatewayCheckFailureReason;
     }
   | {
       type: "proof_gap";
@@ -608,7 +608,7 @@ if (await checkGate(greenlight)) {
 Good:
 
 ```ts
-const gateResult = await verifyReceiverGateCheck(input);
+const gateResult = await verifyGatewayCheck(input);
 
 if (gateResult.type !== "passed") {
   await recordReceiverRefusalOrProofGap(gateResult);
@@ -620,7 +620,7 @@ await mutateWithVerifiedGate(gateResult.verifiedGate);
 
 ---
 
-## 12. Greenlights are one-time, exact, receiver-bound authority
+## 12. Greenlights are one-time, exact, gateway-bound authority
 
 A greenlight must not become reusable ambient permission.
 
@@ -628,7 +628,7 @@ Required checks:
 
 ```text
 one contract
-one receiver
+one gateway
 one action family
 one target
 one attempt
@@ -651,7 +651,7 @@ Good:
 const contract = await proposeActionContract(previewDeployInput);
 const decision = await evaluatePolicy(contract);
 const greenlight = await issueGreenlight(contract, decision);
-const gate = await verifyReceiverGateCheck({ contract, greenlight });
+const gate = await verifyGatewayCheck({ contract, greenlight });
 
 await deployPreview({ verifiedGate: gate.verifiedGate, contract });
 ```
@@ -682,7 +682,7 @@ if (!executionEvidence) {
     contractId,
     expectedEvidence: ["deployment_result"],
     knownFacts: gateResult,
-    uncertainty: "receiver_check_passed_but_downstream_execution_unknown",
+    uncertainty: "gateway_check_passed_but_downstream_execution_unknown",
   });
 }
 ```
@@ -715,9 +715,9 @@ Good:
 
 ```text
 GREENLIGHT_RECEIVER_MISMATCH:
-This greenlight was issued for receiver preview-deploy:vercel,
-but the receiver gate was checked by receiver repo-write:github.
-A greenlight authorizes exactly one receiver-bound mutation attempt.
+This greenlight was issued for gateway preview-deploy:vercel,
+but the gateway check was checked by gateway repo-write:github.
+A greenlight authorizes exactly one gateway-bound mutation attempt.
 ```
 
 Maintain stable error codes:
@@ -782,7 +782,7 @@ Good:
 ```text
 src/canonicalization/canonicalize-action-contract.ts
 src/greenlights/assert-greenlight-not-expired.ts
-src/receiver-gate/verify-receiver-binding.ts
+src/gateway-check/verify-gateway-binding.ts
 ```
 
 A file should be named after the thing it exports.
@@ -794,7 +794,7 @@ action-contract.schema.ts
 action-contract.types.ts
 canonicalize-action-contract.ts
 policy-decision.schema.ts
-verify-receiver-gate.ts
+verify-gateway-check.ts
 record-proof-gap.ts
 ```
 
@@ -859,7 +859,7 @@ app.post("/v0/contracts", async (c) => {
 Bad:
 
 ```ts
-app.post("/v0/receiver-gates/check", async (c) => {
+app.post("/v0/gateway-checks/check", async (c) => {
   // 200 lines of validation, policy, replay checks, mutation, receipt handling...
 });
 ```
@@ -867,7 +867,7 @@ app.post("/v0/receiver-gates/check", async (c) => {
 Preferred:
 
 ```ts
-const result = await checkReceiverGate({
+const result = await checkGatewayCheck({
   input,
   stores,
   now,
@@ -889,7 +889,7 @@ intent_compilations
 action_contracts
 policy_decisions
 greenlights
-receiver_gate_checks
+gateway_check_attempts
 receipts
 refusals
 proof_gaps
@@ -935,7 +935,7 @@ Example:
 0003_create_action_contracts.sql
 0004_create_policy_decisions.sql
 0005_create_greenlights.sql
-0006_create_receiver_gate_checks.sql
+0006_create_gateway_check_attempts.sql
 0007_create_receipts_refusals_and_proof_gaps.sql
 0008_create_isolation_states.sql
 ```
@@ -957,10 +957,10 @@ Minimum invariant tests:
 ```text
 cannot issue greenlight without action contract
 cannot issue greenlight for non-canonical contract
-cannot mutate without receiver gate check
+cannot mutate without gateway check check
 cannot reuse greenlight
 cannot use expired greenlight
-cannot use greenlight for wrong receiver
+cannot use greenlight for wrong gateway
 cannot use greenlight after isolation state is active
 cannot treat operating envelope as mutation permission
 cannot treat vague intent as mutation permission
@@ -972,9 +972,9 @@ must preserve audit reconstruction chain
 Test names should read like protocol rules:
 
 ```ts
-test("a greenlight cannot be reused for a second receiver-gated attempt", async () => {});
+test("a greenlight cannot be reused for a second gateway-checked attempt", async () => {});
 test("an operating envelope authorizes attempts but not mutation", async () => {});
-test("a receipt distinguishes receiver check from downstream execution", async () => {});
+test("a receipt distinguishes gateway check from downstream execution", async () => {});
 ```
 
 ---
@@ -986,8 +986,8 @@ Adapters should not invent policy or protocol semantics.
 Good adapter responsibilities:
 
 ```text
-map receiver-specific request into ActionContract
-perform receiver gate verification
+map gateway-specific request into ActionContract
+perform gateway check verification
 execute mutation only after verified gate
 return evidence for receipt
 ```
@@ -1021,7 +1021,7 @@ Good:
 
 ```ts
 // A greenlight is one-time, time-bounded execution authority.
-// Expired greenlights must fail at the receiver gate even if policy once allowed the contract.
+// Expired greenlights must fail at the gateway check even if policy once allowed the contract.
 if (greenlight.expiresAt < now) {
   ...
 }
@@ -1037,7 +1037,7 @@ If something bypasses a normal safety path for tests or local demos, mark it lou
 
 ```ts
 unsafeCreateGreenlightForTest();
-unsafeBypassReceiverGateForFixture();
+unsafeBypassGatewayCheckForFixture();
 unsafeSeedReceiptWithoutMutation();
 ```
 
@@ -1156,7 +1156,7 @@ secureApproval()
 Prefer exact names:
 
 ```text
-verifyReceiverGate()
+verifyGatewayCheck()
 recordExecutionAttempt()
 recordProofGap()
 issueGreenlight()
@@ -1169,12 +1169,12 @@ Product and code must preserve these distinctions:
 vague intent is not permission
 operating envelope is not mutation authority
 action contract is not execution authority
-greenlight is not receiver acceptance
+greenlight is not gateway acceptance
 receipt is not automatic downstream execution proof
-runtime enforcement is not receiver enforcement
+runtime enforcement is not gateway enforcement
 ```
 
-If the receiver does not enforce the receiver gate, the system is advisory, not Handshake.
+If the gateway does not enforce the gateway check, the system is advisory, not Handshake.
 
 ---
 
@@ -1222,7 +1222,7 @@ Which protocol object does this touch?
 - [ ] ActionContract
 - [ ] PolicyDecision
 - [ ] Greenlight
-- [ ] ReceiverGate
+- [ ] GatewayCheck
 - [ ] Receipt
 - [ ] Refusal
 - [ ] ProofGap
@@ -1238,7 +1238,7 @@ What invariant does this preserve or strengthen?
 Can this code cause or enable consequential mutation?
 
 - [ ] No
-- [ ] Yes, and it passes through receiver gate verification
+- [ ] Yes, and it passes through gateway check verification
 
 ## Evidence
 
@@ -1265,7 +1265,7 @@ Before merging, ask:
 ```text
 Does this preserve exact protocol language?
 Does this make mutation harder to perform accidentally?
-Does this keep receiver enforcement clear?
+Does this keep gateway enforcement clear?
 Does this improve reconstruction?
 Does this record refusal or proof gap honestly?
 Does this keep the first wedge sharper?
@@ -1313,7 +1313,7 @@ Which operating envelope applied?
 Which exact action contract was proposed?
 Which policy decision was made?
 Was a greenlight issued?
-Which receiver gate checked it?
+Which gateway check checked it?
 Did mutation occur?
 What receipt, refusal, or proof gap remains?
 Can this be reconstructed later?

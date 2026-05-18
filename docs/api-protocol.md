@@ -1,7 +1,7 @@
 # API Protocol Reference
 
 Status: Canonical public alpha reference
-Version: v0.2.1
+Version: v0.2.3
 Audience: Protocol implementers, SDK authors, runtime and gateway integrators
 Implementation status: Backed by current `/v0.2/*` routes, `GET /openapi.json`, SDK calls, and D1-backed adapter tests, including recovery terminal conflict proof gaps
 Canonical owner: Protocol owner
@@ -13,6 +13,7 @@ The API does not let callers jump from intent to mutation. Every consequential a
 
 ```text
 intent compilation
+  -> optional runtime execution evidence
   -> action contract
   -> policy decision
   -> greenlight
@@ -36,9 +37,12 @@ proof gap -> success
 | Route | Authority meaning |
 |---|---|
 | `POST /v0.2/intent-compilations` | Records what the compiler believed, rejected, and could not prove after loading durable tool/action/gateway records. |
+| `POST /v0.2/runtime-executions` | Records generated execution-block evidence: runtime posture, code/spec refs, observed calls, loop/retry/branch flags, dynamic tool construction, unobserved regions, uncertainty, and refusal codes. It creates no authority. |
+| `POST /v0.2/protected-path-postures` | Records append-only protected-path posture and atomically updates the current posture pointer for tenant/org/runtime/gateway/action/resource scope. |
 | `POST /v0.2/action-contracts` | Emits an exact gateway-bound contract only from a clean compilation and durable envelope/gateway records. |
-| `POST /v0.2/policy-decisions` | Evaluates the exact contract against envelope, isolation state, and declared sequence dependencies. |
-| `POST /v0.2/review-decisions` | Records review against exact contract digest and policy input digest. |
+| `POST /v0.2/policy-decisions` | Evaluates the exact contract against envelope, isolation state, declared sequence dependencies, and required current protected-path posture. |
+| `POST /v0.2/review-artifacts` | Records a rendered review artifact bound to the exact contract digest, policy input digest, uncertainty digest, and gateway policy version. |
+| `POST /v0.2/review-decisions` | Records review only through a matching review artifact ID and digest. |
 | `POST /v0.2/gateway-check-attempts` | Final enforcement check before mutation. |
 | `POST /v0.2/surface-operation-reconciliations` | Reconciles the same mutation attempt by idempotency key; unknown downstream finality creates a proof gap instead of success. |
 | `POST /v0.2/isolation-states` | Writes durable interdict state checked by policy and gate, optionally bound to observed stream offset watermarks. |
@@ -47,6 +51,63 @@ proof gap -> success
 | `POST /v0.2/recovery-recommendations` | Records a narrowed recovery path from refusal or proof-gap evidence without reusing a greenlight or mutating a gateway. |
 | `POST /v0.2/recovery-recommendation-status-transitions` | Moves an open recovery recommendation to expired or superseded with durable transition evidence; losing terminal-claim races record recovery-phase proof gaps. |
 | `POST /v0.2/recovery-terminal-conflict-resolutions` | Resolves a recovery terminal conflict proof gap only after loading the winning terminal transition. |
+
+## Transition Caller Custody
+
+Every `POST /v0.2/*` transition route requires an `Authorization: Bearer ...`
+token for the custody role that owns the transition. Missing route tokens fail
+closed before request bodies are parsed.
+
+| Custody role | Env binding | Transition routes |
+|---|---|---|
+| `control_plane` | `HANDSHAKE_CONTROL_PLANE_TOKEN` | catalog registration, envelopes, action contracts, policy decisions, isolation states, breaker decisions, receipt exports, recovery transitions |
+| `runtime_evidence` | `HANDSHAKE_RUNTIME_EVIDENCE_TOKEN` | intent compilations, runtime executions |
+| `gateway_custody` | `HANDSHAKE_GATEWAY_CUSTODY_TOKEN` | protected-path postures, gateway-check attempts, surface-operation reconciliations |
+| `review_custody` | `HANDSHAKE_REVIEW_CUSTODY_TOKEN` | review artifacts, review decisions |
+
+These checks are HTTP caller custody, not Handshake authority. A valid token can
+enter the transition code path, but it cannot create mutation authority without
+the exact action contract, policy decision, one-use greenlight, and gateway check.
+`HandshakeClient` accepts either one `transitionToken` for single-custody local
+fixtures or a `transitionTokens` map keyed by custody role.
+
+## Public Transition Surface
+
+The public alpha API is the transition surface, not the storage model.
+
+Public API contract:
+
+- transition route inputs and outputs;
+- documented HTTP headers, status codes, and refusal reason codes;
+- SDK methods that call transition routes with the correct custody token;
+- OpenAPI metadata for transition routes;
+- receipt, proof-gap, refusal, recovery, and redacted export evidence intended
+  for reconstruction.
+
+Internal implementation surface:
+
+- raw protocol store records and indexes;
+- current protected-path posture pointers;
+- future protected-surface operation-claim indexes;
+- raw request-context objects;
+- raw originating identity payloads;
+- caller-custody token configuration;
+- stream-tail conflict mechanics;
+- adapter-local provider payloads before they are reduced into receipt or
+  proof-gap evidence.
+
+`GET /v0.2/records/:objectType/:objectId`, when enabled, is an internal
+control-plane/debug read path only. It must not be described as a public evidence
+API until redaction, tenancy, retention, and consumer semantics are designed.
+
+Planned protocol-spec alignment is tracked in
+[`02c-plan-eng-review-protocol-spec-alignment.md`](./plans/02c-plan-eng-review-protocol-spec-alignment.md).
+That plan may add `X-Handshake-Protocol-Version`,
+`X-Handshake-Request-Identity`, request-context digests, orphan-mitigation
+reason codes, and protected-surface operation claims. Those are not current
+public API guarantees until implemented and verified. Even after implementation,
+operation claims and raw request context remain internal; only transition
+headers, refusal codes, receipts, proof gaps, and redacted exports are exposed.
 
 ## Caller-Supplied Objects Are Not Authority
 
@@ -68,8 +129,15 @@ gatewayId
 gatewayRegistryEntryId
 gatewayRegistryVersion
 gatewayPolicyVersion
+credentialCustodyStatus
+enforcementMode
+mutationCredentialHolderRef
+gatewayAuthorityHolderRef
 actionClass
 resourceRef
+requiredProtectedPathState
+runtimeExecutionId
+runtimeExecutionDigest
 paramsDigest
 bounds
 idempotencyKey
@@ -215,6 +283,12 @@ It does not persist the losing follow-up action contract or expiration transitio
 
 Reconciliation is not retry authority. It may inspect the gateway-side operation that was already attempted, but it must not create a second mutation attempt.
 
+Reconciliation is the current operation-observation transition. It is not a
+public `/last_operation` or `/operations/:id` polling surface. A caller must
+name the known `mutationAttemptId` and idempotency key from the original
+gateway-checked attempt. The transition can resolve or create proof-gap evidence;
+it cannot authorize cleanup, retry, or a second mutation.
+
 The reconciliation request must bind to:
 
 ```text
@@ -230,11 +304,27 @@ The kernel rejects reconciliation if the idempotency key does not match the orig
 
 ## Review Binding
 
-A review decision is not authority by itself. Policy may honor it only when it binds to the current exact contract and policy input:
+A review screen is not authority by itself. A review artifact must first bind what was rendered to exact digest material:
 
 ```text
 reviewArtifactRef
 reviewRenderSchemaVersion
+rendererRef
+actionContractDigest
+policyInputDigest
+gatewayPolicyVersion
+renderedContractDigest
+renderedPolicyInputDigest
+renderedUncertaintyDigest
+renderedArtifactDigest
+  -> ReviewArtifactRecord
+```
+
+A review decision may approve only by naming that artifact ID and digest:
+
+```text
+reviewArtifactId
+reviewArtifactDigest
 reviewerPrincipalId
 actionContractDigest
 policyInputDigest
@@ -244,7 +334,47 @@ decisionExpiresAt
   -> policy may convert review_required to greenlight
 ```
 
-If isolation state, gateway policy, or contract digest changes after review, the policy input digest no longer matches and the review is refused.
+If artifact, contract, policy input, gateway policy, or uncertainty digest differs, the review is refused. If isolation state, protected-path posture, sequence dependency state, gateway policy, or contract digest changes after review, the policy input digest no longer matches and the review is refused.
+
+## Runtime Execution Evidence
+
+`RuntimeExecutionRecord` exists because Code Mode-style generated programs can branch, loop, retry, and call multiple typed tools from one execution block. The record captures the block digest and observed execution shape, but it does not authorize anything:
+
+```text
+executionBlockDigest
+executionShape
+runtimePosture
+allowedToolCapabilityIds
+observedToolCallRefs
+observedConsequentialCallCount
+loop/retry/branch/dynamic-tool flags
+unobservedRegionRefs
+uncertaintyMarkers
+refusalReasonCodes
+  -> RuntimeExecutionRecord
+  -> optional runtimeExecutionId on CompileIntentInput
+```
+
+Dynamic tool construction or unobserved regions make the compilation rejected. Evidence may inform policy and audit; it never becomes permission.
+
+## Protected Path Posture
+
+An envelope may require `requiredProtectedPathState = gateway_checked`. That requires current posture evidence for the exact tenant/org/runtime/gateway/action/resource scope:
+
+```text
+postureScopeKey
+postureState
+credentialCustodyStatus
+rawSiblingToolStatus
+sourceAuthority
+observedAt
+expiresAt
+postureDigest
+  -> ProtectedPathPosture
+  -> current pointer
+```
+
+Policy refuses when current posture is missing, stale, not `gateway_checked`, has weak source authority, has unsafe credential custody, has protected-surface mismatch, or leaves raw sibling mutation tools present or unknown. Only `gateway_probe`, `conformance_fixture`, or `hosted_monitor` source authority can satisfy a `gateway_checked` requirement. The policy input digest includes posture record ID, posture digest, posture state, and freshness. The gateway check reloads current posture before mutation and refuses unsafe drift before consuming mutation authority.
 
 ## Lifecycle Commit Boundary
 

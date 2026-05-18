@@ -1,7 +1,7 @@
 # Receipt Timeline
 
 Status: Canonical public alpha
-Version: v0.2.1
+Version: v0.2.3
 Audience: Developers, platform engineering, security engineering, auditors
 Implementation status: Product surface definition; underlying receipt objects exist in the v0.2 kernel
 Canonical owner: Product owner
@@ -76,6 +76,8 @@ The timeline must distinguish:
 - pinned gateway policy from current gateway policy;
 - mutation attempt from downstream success;
 - reconciliation from new mutation authority;
+- operation observation from public polling API;
+- operation claim state from receipt evidence;
 - receipt from finality;
 - proof gap from failure;
 - refusal from error.

@@ -1,12 +1,13 @@
-# Plan Eng Review 02a: Direct v0.2 Protocol Vocabulary Migration
+# Plan Eng Review 01a: Direct v0.2 Protocol Vocabulary Migration
 
 Status: Implemented breaking vocabulary reset
 Version: v0.2.1
 Audience: Protocol implementers, SDK authors, runtime builders, gateway owners, platform engineering
 Implementation status: Direct code, route, object type, event, SDK, test, and docs migration in progress
 Canonical owner: Protocol owner
-Extends: [`01-plan-eng-review-primitive-fields-state.md`](./01-plan-eng-review-primitive-fields-state.md), [`02-plan-eng-review-agent-requirements.md`](./02-plan-eng-review-agent-requirements.md)
-Precedes: `03-plan-eng-review-agent`
+Extends: [`01-plan-eng-review-primitive-fields-state.md`](./01-plan-eng-review-primitive-fields-state.md)
+Archives input from: [`archive/02-plan-eng-review-agent-requirements.md`](./archive/02-plan-eng-review-agent-requirements.md)
+Precedes: [`02-plan-eng-review-authority-hardening.md`](./02-plan-eng-review-authority-hardening.md)
 Last reviewed: 2026-05-18
 
 ## Invariant At Stake
@@ -154,7 +155,7 @@ Verification commands:
 npm run typecheck -- --pretty false
 npm run build -- --pretty false
 bun test
-rg -n "REMOVED_VOCAB_PATTERN" src test migrations docs --glob '!docs/plans/01-plan-eng-review-primitive-fields-state.md' --glob '!docs/plans/02-plan-eng-review-agent-requirements.md'
+rg -n "REMOVED_VOCAB_PATTERN" src test migrations docs --glob '!docs/plans/01-plan-eng-review-primitive-fields-state.md' --glob '!docs/plans/archive/02-plan-eng-review-agent-requirements.md'
 rg -n "REMOVED_ROUTE_OR_SDK_PATTERN" src test docs
 ```
 
@@ -170,4 +171,4 @@ Keep the direct reset.
 
 Aliases would preserve ambiguity and force the next agent-runtime plan to explain two vocabularies. Since v0.2 is pre-production, the cheaper and more honest move is to rename the protocol surface now and make every test prove the new vocabulary still preserves the same authority boundary.
 
-Smallest next mechanism: finish the direct rename, run the full invariant suite, and use v0.2.1 gateway/surface vocabulary as the input to `03-plan-eng-review-agent`.
+Smallest next mechanism: use v0.2.1 gateway/surface vocabulary as the input to [`02-plan-eng-review-authority-hardening.md`](./02-plan-eng-review-authority-hardening.md).

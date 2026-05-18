@@ -153,6 +153,14 @@ It forces the product to model raw tool bypass, sequencing, idempotency, gateway
 
 Do not broaden the wedge until the primitive survives this domain.
 
+Product planning rule:
+
+Specs, plans, requirements, roadmap items, and product docs must start from agentic execution, not from human personas, dashboards, or public routes.
+
+A plan is not ready until it identifies the generated execution shape, protected action path, runtime posture, gateway authority holder, `CandidateAction`/refusal boundary, raw or sibling bypass posture, and surviving receipt/refusal/proof-gap/bypass evidence.
+
+Human/operator jobs, dashboards, review surfaces, and Cloud workflows are valid only when they support execution control, gateway enforcement, recovery, or reconstruction. For `03+` planning, use `docs/specs/00-product-requirements-spine.md` as the governing requirements spine.
+
 Your core invariants:
 
 - an operating envelope can authorize attempts, not mutations;

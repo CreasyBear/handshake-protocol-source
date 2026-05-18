@@ -246,9 +246,9 @@ stateDiagram-v2
   RecoveryRecommendation --> ActionContractProposed: fresh narrowed contract only
 ```
 
-## Runtime Conformance Direction For 02
+## Archived Runtime Conformance Input
 
-This diagram is where `02-plan-eng-review-agent-requirements.md` should go next: a conformance model for generated orchestration, not a second authority model.
+This diagram is historical input from `archive/02-plan-eng-review-agent-requirements.md`: a conformance model for generated orchestration, not a second authority model.
 
 ```mermaid
 flowchart TD
@@ -276,7 +276,7 @@ flowchart TD
   bypass -.->|"no control claim"| observed
 ```
 
-02 should add issuer-side conformance evidence, not weaken gateway-side enforcement.
+Future runtime work should add issuer-side conformance evidence, not weaken gateway-side enforcement.
 
 ## Brutal Verdict
 

@@ -613,7 +613,7 @@ The full agentic experience architecture is accepted when:
 - it names the customer and moment of value;
 - it maps the journey from principal intent to receipt, proof gap, isolation, and recovery;
 - every product surface maps to protocol objects from `01`;
-- every agent/runtime obligation maps to requirements from `02`;
+- every agent/runtime obligation maps to requirements from `02` or archived agent-requirements input when explicitly cited;
 - the gateway check is the only enforcement boundary for gateway-owned consequence;
 - generated code, loops, retries, branches, MCP writes, browser actions, scheduled jobs, package installs, repo writes, cloud mutations, and database operations are addressed;
 - Contract Viewer and Receipt Timeline are defined as activation surfaces, not dashboard features;
