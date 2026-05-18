@@ -195,16 +195,16 @@ The v0.2.4 kernel slice implements the first local graph boundary:
   digest, registry-binding-set digest, and node gateway-binding digest.
 - `proposeActionContract` reloads the graph and refuses graph, node, coverage,
   runtime, or node gateway-binding drift before creating an `ActionContract`.
-- Missing graph, unsupported graph, unsupported sibling, clean binding, issuer
-  mismatch, truncated graph, raw argv material, bypass posture, fail-open
-  classifier evidence, observer-only evidence, hidden triggers, and unknown node
-  kinds are covered by kernel tests.
+- Missing graph, unsupported graph, unsupported sibling, clean binding, durable
+  graph drift, catalog/gateway binding miss, issuer mismatch, truncated graph,
+  raw argv material, bypass posture, fail-open classifier evidence,
+  observer-only evidence, hidden triggers, and unknown node kinds are covered by
+  kernel tests.
+- The existing codemode multi-action wrapper refuses the whole generated program
+  before minting any `ActionContract` when one sibling candidate is refused.
 
 Still open before this ADR is fully implemented:
 
-- explicit durable graph drift fixture;
-- catalog or gateway registry miss fixture;
-- codemode multi-action whole-block partial-credit refusal;
 - runtime wrapper graph production beyond the local preview fixture;
 - public HTTP/SDK/OpenAPI graph surface, if still justified after the kernel
   behavior stabilizes.

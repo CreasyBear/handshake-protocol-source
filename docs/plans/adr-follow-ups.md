@@ -27,8 +27,10 @@ Priority follows enforcement sequence:
 ## Priority Order
 
 1. Finish Plan 03 graph hardening before adding public graph routes or runtime
-   helper surface. Remaining local blockers are explicit graph drift,
-   catalog/registry miss, and codemode whole-block tests.
+   helper surface. Local graph drift, catalog/registry miss, and codemode
+   whole-block tests are resolved; remaining blockers are runtime graph
+   production beyond the local preview fixture and any justified public graph
+   surface.
 2. `ADR-FU-0006-A`: after the first Tier 2 protected path exists, prove two
    surfaces for the same logical action bind to the same contract posture.
 3. `ADR-FU-0008-A` and `ADR-FU-0009-A`: before self-improvement, replay, setup,

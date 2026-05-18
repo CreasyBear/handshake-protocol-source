@@ -8,6 +8,9 @@ import type {
 export const PackageInstallToolCallSchema = z.strictObject({
   principalIntentRef: z.string().min(1),
   generatedCodeOrSpecRef: z.string().min(1),
+  runtimeExecutionId: z.string().min(1).nullable().default(null),
+  generatedExecutionGraphId: z.string().min(1).nullable().default(null),
+  generatedExecutionNodeId: z.string().min(1).nullable().default(null),
   package: z.string().min(1),
   versionRange: z.string().min(1),
   sequenceNumber: z.number().int().nonnegative().default(1),
@@ -57,9 +60,29 @@ export async function proposePackageInstallActionContract(
   config: PackageInstallRuntimeConfig,
   toolCallValue: PackageInstallToolCall,
 ): Promise<PackageInstallRuntimeResult> {
+  const intentCompilation = await compilePackageInstallIntent(protocol, config, toolCallValue);
+  const refusalReasonCodes = refusalReasonCodesForCompilation(intentCompilation);
+  if (refusalReasonCodes.length > 0) {
+    return { outcome: "intent_compilation_refused", intentCompilation, actionContract: null, refusalReasonCodes };
+  }
+
+  const actionContract = await protocol.proposeActionContract({
+    intentCompilationId: intentCompilation.intentCompilationId,
+    candidateActionId: intentCompilation.candidateAction.candidateActionId,
+    candidateDigest: requireCandidateDigest(intentCompilation.candidateAction.candidateDigest),
+    signingSecret: config.signingSecret,
+  });
+  return { outcome: "action_contract_proposed", intentCompilation, actionContract };
+}
+
+export async function compilePackageInstallIntent(
+  protocol: Pick<PackageInstallRuntimeProtocol, "compileIntent">,
+  config: PackageInstallRuntimeConfig,
+  toolCallValue: PackageInstallToolCall,
+): Promise<IntentCompilationRecord> {
   const toolCall = PackageInstallToolCallSchema.parse(toolCallValue);
   const parameters = { package: toolCall.package, versionRange: toolCall.versionRange };
-  const intentCompilation = await protocol.compileIntent({
+  return protocol.compileIntent({
     tenantId: config.tenantId,
     organizationId: config.organizationId,
     principalIntentRef: toolCall.principalIntentRef,
@@ -71,6 +94,9 @@ export async function proposePackageInstallActionContract(
     toolCatalogRef: config.toolCatalogRef,
     actionCatalogRef: config.actionCatalogRef,
     gatewayRegistryRef: config.gatewayRegistryRef,
+    runtimeExecutionId: toolCall.runtimeExecutionId,
+    generatedExecutionGraphId: toolCall.generatedExecutionGraphId,
+    generatedExecutionNodeId: toolCall.generatedExecutionNodeId,
     generatedCodeOrSpecRefs: [toolCall.generatedCodeOrSpecRef],
     declaredAssumptions: ["package install tool call provided explicit package and version range"],
     requiredEvidenceRefs: ["evidence:package-manifest-diff"],
@@ -96,22 +122,13 @@ export async function proposePackageInstallActionContract(
       expiresAt: config.contractExpiresAt,
     },
   });
+}
 
-  const refusalReasonCodes = [
+export function refusalReasonCodesForCompilation(intentCompilation: IntentCompilationRecord): string[] {
+  return [
     ...intentCompilation.uncertaintyMarkers,
     ...intentCompilation.overreachReasonCodes,
   ];
-  if (refusalReasonCodes.length > 0) {
-    return { outcome: "intent_compilation_refused", intentCompilation, actionContract: null, refusalReasonCodes };
-  }
-
-  const actionContract = await protocol.proposeActionContract({
-    intentCompilationId: intentCompilation.intentCompilationId,
-    candidateActionId: intentCompilation.candidateAction.candidateActionId,
-    candidateDigest: requireCandidateDigest(intentCompilation.candidateAction.candidateDigest),
-    signingSecret: config.signingSecret,
-  });
-  return { outcome: "action_contract_proposed", intentCompilation, actionContract };
 }
 
 function requireCandidateDigest(candidateDigest: string | null): string {

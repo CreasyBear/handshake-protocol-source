@@ -53,7 +53,7 @@ describe("codemode multi-action runtime wrapper", () => {
       if (!firstActionContractId) throw new Error("expected first action contract id");
       expect(result.proposals[1]?.actionContract?.requiredPriorActionContractIds).toEqual([firstActionContractId]);
       expect(JSON.stringify(result.proposals[1]?.actionContract?.parameters)).not.toContain("generatedValue");
-      expect(await recordCount(harness, "intent_compilation")).toBe(2);
+      expect(await recordCount(harness, "intent_compilation")).toBe(3);
       expect(await recordCount(harness, "action_contract")).toBe(2);
       expect(await recordCount(harness, "policy_decision")).toBe(0);
       expect(await recordCount(harness, "greenlight")).toBe(0);
@@ -64,7 +64,7 @@ describe("codemode multi-action runtime wrapper", () => {
     }
   });
 
-  it("records candidate refusal without granting authority to the rest of the generated program", async () => {
+  it("refuses the whole generated program when one sibling candidate is refused", async () => {
     const harness = await createD1HttpHarness();
     try {
       const client = new HandshakeClient("http://handshake.test", harness.fetch, {
@@ -88,14 +88,15 @@ describe("codemode multi-action runtime wrapper", () => {
         ],
       });
 
-      expect(result.outcome).toBe("one_or_more_candidates_refused");
+      expect(result.outcome).toBe("generated_execution_block_refused");
       expect(result.proposals.map((proposal) => proposal.outcome)).toEqual([
-        "action_contract_proposed",
+        "generated_execution_block_refused",
         "intent_compilation_refused",
       ]);
+      expect(result.proposals[0]?.refusalReasonCodes).toEqual(["generated_execution_block_sibling_refused"]);
       expect(result.proposals[1]?.refusalReasonCodes).toEqual(["unwrapped_consequential_tool"]);
       expect(await recordCount(harness, "intent_compilation")).toBe(2);
-      expect(await recordCount(harness, "action_contract")).toBe(1);
+      expect(await recordCount(harness, "action_contract")).toBe(0);
       expect(await recordCount(harness, "policy_decision")).toBe(0);
       expect(await recordCount(harness, "greenlight")).toBe(0);
       expect(await recordCount(harness, "gateway_check_attempt")).toBe(0);

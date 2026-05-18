@@ -55,9 +55,9 @@ proof gap -> success
 
 `GeneratedExecutionGraph` is intentionally not a public HTTP route in v0.2.4.
 It is a kernel/runtime-wrapper transition exposed through schemas and
-`HandshakeKernel.createGeneratedExecutionGraph(...)` while Plan 03 hardens graph
-drift, catalog/registry miss, and codemode whole-block tests. Public
-HTTP/SDK/OpenAPI exposure waits until that kernel contract is stable.
+`HandshakeKernel.createGeneratedExecutionGraph(...)`. Public HTTP/SDK/OpenAPI
+exposure waits until runtime graph production beyond the local preview fixture is
+designed and the public contract is justified.
 
 ## Transition Caller Custody
 

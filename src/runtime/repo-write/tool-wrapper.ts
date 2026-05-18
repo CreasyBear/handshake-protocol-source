@@ -10,6 +10,9 @@ import type {
 export const RepoWriteToolCallSchema = z.strictObject({
   principalIntentRef: z.string().min(1),
   generatedCodeOrSpecRef: z.string().min(1),
+  runtimeExecutionId: z.string().min(1).nullable().default(null),
+  generatedExecutionGraphId: z.string().min(1).nullable().default(null),
+  generatedExecutionNodeId: z.string().min(1).nullable().default(null),
   repositoryRef: z.string().min(1),
   filePath: z.string().min(1),
   content: z.string(),
@@ -60,6 +63,26 @@ export async function proposeRepoWriteActionContract(
   config: RepoWriteRuntimeConfig,
   toolCallValue: RepoWriteToolCall,
 ): Promise<RepoWriteRuntimeResult> {
+  const intentCompilation = await compileRepoWriteIntent(protocol, config, toolCallValue);
+  const refusalReasonCodes = refusalReasonCodesForCompilation(intentCompilation);
+  if (refusalReasonCodes.length > 0) {
+    return { outcome: "intent_compilation_refused", intentCompilation, actionContract: null, refusalReasonCodes };
+  }
+
+  const actionContract = await protocol.proposeActionContract({
+    intentCompilationId: intentCompilation.intentCompilationId,
+    candidateActionId: intentCompilation.candidateAction.candidateActionId,
+    candidateDigest: requireCandidateDigest(intentCompilation.candidateAction.candidateDigest),
+    signingSecret: config.signingSecret,
+  });
+  return { outcome: "action_contract_proposed", intentCompilation, actionContract };
+}
+
+export async function compileRepoWriteIntent(
+  protocol: Pick<RepoWriteRuntimeProtocol, "compileIntent">,
+  config: RepoWriteRuntimeConfig,
+  toolCallValue: RepoWriteToolCall,
+): Promise<IntentCompilationRecord> {
   const toolCall = RepoWriteToolCallSchema.parse(toolCallValue);
   const resourceRef = repoWriteResourceRef(toolCall.repositoryRef, toolCall.filePath);
   const contentDigest = await digestUtf8Content(toolCall.content);
@@ -77,7 +100,7 @@ export async function proposeRepoWriteActionContract(
     contentDigest,
     contentByteLength,
   };
-  const intentCompilation = await protocol.compileIntent({
+  return protocol.compileIntent({
     tenantId: config.tenantId,
     organizationId: config.organizationId,
     principalIntentRef: toolCall.principalIntentRef,
@@ -89,6 +112,9 @@ export async function proposeRepoWriteActionContract(
     toolCatalogRef: config.toolCatalogRef,
     actionCatalogRef: config.actionCatalogRef,
     gatewayRegistryRef: config.gatewayRegistryRef,
+    runtimeExecutionId: toolCall.runtimeExecutionId,
+    generatedExecutionGraphId: toolCall.generatedExecutionGraphId,
+    generatedExecutionNodeId: toolCall.generatedExecutionNodeId,
     generatedCodeOrSpecRefs: [toolCall.generatedCodeOrSpecRef],
     declaredAssumptions: ["repo write tool call provided explicit repository, file path, and content"],
     requiredEvidenceRefs: ["evidence:repo-file-diff"],
@@ -114,22 +140,13 @@ export async function proposeRepoWriteActionContract(
       expiresAt: config.contractExpiresAt,
     },
   });
+}
 
-  const refusalReasonCodes = [
+export function refusalReasonCodesForCompilation(intentCompilation: IntentCompilationRecord): string[] {
+  return [
     ...intentCompilation.uncertaintyMarkers,
     ...intentCompilation.overreachReasonCodes,
   ];
-  if (refusalReasonCodes.length > 0) {
-    return { outcome: "intent_compilation_refused", intentCompilation, actionContract: null, refusalReasonCodes };
-  }
-
-  const actionContract = await protocol.proposeActionContract({
-    intentCompilationId: intentCompilation.intentCompilationId,
-    candidateActionId: intentCompilation.candidateAction.candidateActionId,
-    candidateDigest: requireCandidateDigest(intentCompilation.candidateAction.candidateDigest),
-    signingSecret: config.signingSecret,
-  });
-  return { outcome: "action_contract_proposed", intentCompilation, actionContract };
 }
 
 export function repoWriteResourceRef(repositoryRef: string, filePath: string): string {

@@ -78,4 +78,4 @@ If the local preview-deploy fixture is described as Vercel, Cloudflare, GitHub D
 
 If raw request context, operation claims, or debug record reads are treated as public API, this is storage theatre.
 
-Active next mechanism: finish Plan 03 graph drift, catalog/registry miss, and codemode whole-block tests before adding a public graph route or runtime helper. The local preview-deploy adapter is fixture proof only. Proof packets, graph records, and fixture runners are evidence mechanisms only, not authority claims.
+Active next mechanism: design runtime graph production beyond the local preview fixture before adding a public graph route. The local preview-deploy adapter is fixture proof only. Proof packets, graph records, and fixture runners are evidence mechanisms only, not authority claims.

@@ -55,7 +55,7 @@ It does not own:
 | [`02c`](./02c-plan-eng-review-protocol-spec-alignment.md) | implemented local-alpha checkpoint | Tier 1/local alpha lifecycle | Request context, operation lifecycle, claims, reconciliation, proof-gap and adapter conformance. | Hosted caller identity, redacted public evidence, provider-side enforcement. |
 | [`02d`](./02d-plan-eng-review-protocol-module-architecture.md) | implemented architecture plan | Tier 1 maintainability | Primitive-owned modules and import posture for future work. | A new product surface. |
 | [`05`](./05-plan-eng-review-foundation-kernel.md) | implemented foundation gate | Tier 1 foundation practice | Executable transition matrix, failure simulation, budgets, typed errors, model-based invariants, and skill-use operating practice. | New product surface, hosted operation, provider-side enforcement. |
-| [`03`](./03-plan-eng-review-generated-execution-graph-coverage.md) | in progress; v0.2.4 kernel slice landed | Tier 1 -> Tier 2 prerequisite | Generated execution graph coverage before candidate extraction. | Arbitrary shell parsing, runtime plugin distribution, hosted operation, public graph API. |
+| [`03`](./03-plan-eng-review-generated-execution-graph-coverage.md) | local hardening implemented; runtime graph production follow-up remains | Tier 1 -> Tier 2 prerequisite | Generated execution graph coverage before candidate extraction. | Arbitrary shell parsing, runtime plugin distribution, hosted operation, public graph API. |
 | [`04`](./04-plan-eng-review-hosted-caller-identity.md) | proposed | Tier 3 prerequisite | Hosted transition caller identity for tenant/org scoped route admission. | Mutation authority, principal delegation, agent identity, SSO/RBAC product. |
 | [`adr-follow-ups`](./adr-follow-ups.md) | active register | cross-tier guardrail | Smallest unresolved ADR mechanisms with priority. | Broad roadmap authority. |
 
@@ -552,12 +552,14 @@ claim` is vague, it is not ready.
    - typed transition error envelope
    - model-based invariant tests
 
-2. Finish Plan 03
+2. Finish Plan 03 runtime graph production design
    - decides D1
    - landed: missing graph, unsupported graph, unsupported sibling, clean graph
      binding, issuer mismatch, truncation, raw material, bypass, fail-open
-     classifier, observer-only, hidden-trigger, and unknown-node coverage
-   - next: graph drift, catalog/registry miss, and codemode whole-block tests
+     classifier, observer-only, hidden-trigger, unknown-node coverage, graph
+     drift, catalog/registry miss, and codemode whole-block partial-credit refusal
+   - next: runtime graph production beyond the local preview fixture, before any
+     public graph API surface
 
 3. Write the first Tier 2 protected-path plan
    - decides D2 / D3 / D4 together

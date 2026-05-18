@@ -110,6 +110,88 @@ describe("generated execution graph coverage boundary", () => {
     expect(contract.generatedExecutionNodeDigest).toBe(graphNode!.nodeDigest);
   });
 
+  it("refuses contract proposal when durable graph evidence drifts after compilation", async () => {
+    const fixture = makeKernelFixture();
+    await registerFixtureObjects(fixture);
+    const runtimeExecution = await createShellRuntimeExecution(fixture);
+    const graph = await createGeneratedExecutionGraph(fixture, runtimeExecution, [
+      await eligiblePackageNode(fixture, "node_install"),
+    ]);
+    const compilation = await fixture.kernel.compileIntent({
+      ...compileInput(fixture),
+      runtimeExecutionId: runtimeExecution.runtimeExecutionId,
+      generatedExecutionGraphId: graph.generatedExecutionGraphId,
+      generatedExecutionNodeId: "node_install",
+    });
+    expect(compilation.candidateAction.candidateStatus).toBe("contractable");
+
+    await overwriteStoredGeneratedExecutionGraph(fixture, {
+      ...graph,
+      graphDigest: ZERO_DIGEST,
+    });
+
+    await expect(
+      fixture.kernel.proposeActionContract({
+        intentCompilationId: compilation.intentCompilationId,
+        candidateActionId: compilation.candidateAction.candidateActionId,
+        candidateDigest: requireDigest(compilation.candidateAction.candidateDigest),
+      }),
+    ).rejects.toThrow("generated_execution_graph");
+    expect(await fixture.store.listRecordsByType("action_contract")).toHaveLength(0);
+  });
+
+  it("refuses contractable-looking nodes when catalog or gateway registry binding is missing", async () => {
+    const bindingCases: Array<{
+      name: string;
+      nodeId: string;
+      mutate: (node: GeneratedExecutionNodeInput) => Promise<GeneratedExecutionNodeInput>;
+      expectedReason: string;
+    }> = [
+      {
+        name: "gateway registry entry mismatch",
+        nodeId: "node_registry_miss",
+        mutate: async (node) => ({
+          ...node,
+          gatewayRegistryEntryId: "gwreg_missing",
+          nodeGatewayBindingDigest: await digestCanonical({ gatewayRegistryEntryId: "gwreg_missing" }),
+        }),
+        expectedReason: "generated_execution_node_binding_mismatch",
+      },
+      {
+        name: "node gateway binding digest missing",
+        nodeId: "node_binding_missing",
+        mutate: async (node) => ({ ...node, nodeGatewayBindingDigest: null }),
+        expectedReason: "generated_execution_node_gateway_binding_missing",
+      },
+    ];
+
+    for (const testCase of bindingCases) {
+      const fixture = makeKernelFixture();
+      await registerFixtureObjects(fixture);
+      const runtimeExecution = await createShellRuntimeExecution(fixture);
+      const node = await testCase.mutate(await eligiblePackageNode(fixture, testCase.nodeId));
+      const graph = await createGeneratedExecutionGraph(fixture, runtimeExecution, [node]);
+
+      const compilation = await fixture.kernel.compileIntent({
+        ...compileInput(fixture),
+        runtimeExecutionId: runtimeExecution.runtimeExecutionId,
+        generatedExecutionGraphId: graph.generatedExecutionGraphId,
+        generatedExecutionNodeId: node.nodeId,
+      });
+
+      expect(compilation.candidateAction.candidateStatus, testCase.name).toBe("rejected");
+      expect(compilation.candidateAction.refusalReasonCodes, testCase.name).toContain(testCase.expectedReason);
+      await expect(
+        fixture.kernel.proposeActionContract({
+          intentCompilationId: compilation.intentCompilationId,
+          candidateActionId: compilation.candidateAction.candidateActionId,
+          candidateDigest: ZERO_DIGEST,
+        }),
+      ).rejects.toThrow("Candidate is rejected");
+      expect(await fixture.store.listRecordsByType("action_contract")).toHaveLength(0);
+    }
+  });
+
   it("refuses graph evidence from a caller that does not match runtime custody scope", async () => {
     const fixture = makeKernelFixture();
     await registerFixtureObjects(fixture);
@@ -257,6 +339,22 @@ async function createGeneratedExecutionGraph(
     { ...input, runtimeExecutionId: runtimeExecution.runtimeExecutionId },
     issuerContext(runtimeExecution),
   );
+}
+
+async function overwriteStoredGeneratedExecutionGraph(
+  fixture: ReturnType<typeof makeKernelFixture>,
+  graph: GeneratedExecutionGraph,
+): Promise<void> {
+  const existing = await fixture.store.getRecord<GeneratedExecutionGraph>(
+    "generated_execution_graph",
+    graph.generatedExecutionGraphId,
+  );
+  if (!existing) throw new Error("expected stored generated execution graph");
+  await fixture.store.putRecord({
+    ...existing,
+    canonicalDigest: await digestCanonical(graph as JsonValue),
+    payload: graph,
+  });
 }
 
 async function graphInput(

@@ -1,6 +1,6 @@
 # Plan 03: Generated Execution Graph Coverage Boundary
 
-Status: Proposed implementation plan
+Status: Implemented locally; runtime graph producer and public-surface follow-ups remain open
 Date: 2026-05-18
 Owner: Protocol owner
 References:
@@ -503,16 +503,15 @@ Implemented in the first v0.2.4 slice:
   without clean graph coverage and exact node binding.
 - `proposeActionContract` reloads the graph and refuses coverage, runtime,
   node digest, and node gateway-binding drift.
-- T1, T2, T3, T4, T7, T8, T9, T10, T11, and T12 are covered in
-  `test/generated-execution-graph.test.ts`.
+- T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, and T12 are
+  covered in `test/generated-execution-graph.test.ts`.
 - The local preview-deploy fixture now records a clean codemode graph node before
   proposing its preview contract, so it does not bypass the new boundary.
+- T13 is covered in `test/codemode-multi-action-runtime.test.ts`: one refused
+  sibling blocks every `ActionContract` from that generated program.
 
 Still open before Plan 03 closes:
 
-- T5 explicit durable graph drift fixture.
-- T6 catalog or gateway registry miss at node binding.
-- T13 codemode multi-action whole-block partial-credit refusal.
 - Runtime wrapper graph production beyond the local preview fixture and any
   public HTTP/SDK/OpenAPI surface.
 
