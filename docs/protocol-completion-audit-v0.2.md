@@ -50,15 +50,15 @@ This is not a claim that production receiver integrations, product UI, multi-ten
 
 ## Plan Obligations
 
-The plan's current audit obligations are all proven by current tests and modules.
+The plan's current audit obligations are proven by current tests and modules after the authority-hardening pass: proof-gap gates no longer yield adapter mutation authority, greenlight issuance is claimed durably per action contract, and D1 protocol record identity is type-scoped.
 
 | Plan obligation | Status | Evidence |
 |---|---:|---|
 | no action contract without pinned tool/action/receiver catalog bindings | Pass | `src/protocol/intent-compilation.ts`, `src/protocol/action-contracts.ts`, `test/kernel.test.ts` catalog and receiver mismatch cases, `test/package-install-runtime.test.ts` unknown catalog refusal |
 | no compiler overreach hidden as an exact contract | Pass | `IntentCompilationRecord` uncertainty and rejected overreach fields, `test/kernel.test.ts` unwrapped consequential tool refusal, `test/codemode-multi-action-runtime.test.ts` candidate refusal |
-| no mutation without receiver gate | Pass | `VerifiedReceiverGateCheck` adapter signatures, `test/package-install-receiver.test.ts`, `test/repo-write-d1-http.test.ts`, `test/package-install-end-to-end.test.ts` |
+| no mutation without receiver gate | Pass | passed-only `VerifiedReceiverGateCheck`, `test/package-install-receiver.test.ts`, `test/repo-write-receiver.test.ts`, `test/repo-write-d1-http.test.ts`, `test/package-install-end-to-end.test.ts` |
 | no receiver gate without exact one-use greenlight | Pass | `src/protocol/receiver-gate-attempts.ts`, `greenlight_consumptions`, replay tests in `test/kernel.test.ts`, `test/package-install-receiver.test.ts` |
-| no greenlight without action contract | Pass | `src/protocol/policy-decisions.ts`, direct lifecycle write guard in `src/protocol/transitions.ts`, `test/kernel.test.ts` |
+| no greenlight without action contract | Pass | `src/protocol/policy-decisions.ts`, `greenlight_issuances`, direct lifecycle write guard in `src/protocol/transitions.ts`, `test/kernel.test.ts` |
 | no greenlight or gate pass while isolated | Pass | `src/protocol/policy.ts`, `src/protocol/receiver-gate-attempts.ts`, isolation and breaker tests in `test/kernel.test.ts` and `test/d1-http.test.ts` |
 | no human review without exact contract and policy digest binding | Pass | `src/protocol/review-decisions.ts`, review-required path in `src/protocol/policy-decisions.ts`, `test/kernel.test.ts` |
 | no receipt that blurs gate check and downstream execution | Pass | `Receipt` split statuses, `src/protocol/receiver-gate-artifacts.ts`, pending/unknown reconciliation tests |
@@ -72,10 +72,11 @@ The v0.2 state model is explicit enough for the first closed loop:
 
 - Catalog records are durable setup objects: `ToolCapability`, `ActionType`, `ReceiverRegistryEntry`, `OperatingEnvelope`.
 - Lifecycle records are not directly writable by callers: `IntentCompilationRecord`, `ActionContract`, `PolicyDecision`, `Greenlight`, `ReceiverGateAttempt`, `MutationAttempt`, `Receipt`, `ProofGap`, `RecoveryRecommendation`, `RecoveryRecommendationStatusTransition`, `IsolationState`, `BreakerDecision`.
-- One-use authority is enforced through `greenlight_consumptions`.
+- One-greenlight-per-contract issuance is enforced through `greenlight_issuances`.
+- One-use receiver-gate consumption is enforced through `greenlight_consumptions`.
 - One-terminal recovery status is enforced through `recovery_terminal_claims`.
 - Replayable reconstruction is enforced through digest-linked `ContractStreamEvent` partitions.
-- Missing, unknown, stale, or conflicting evidence is represented as `ProofGap`, not receipt prose.
+- Missing, unknown, stale, or conflicting evidence is represented as `ProofGap`, not receipt prose or mutation authority.
 
 ## Runtime And Receiver Evidence
 
@@ -125,4 +126,4 @@ Keep. The v0.2 kernel now proves the primitive without product theatre.
 
 Further object-model expansion should require an ADR or a new plan. The next practical wave should package the kernel for integration or choose one production receiver adapter, but that is outside this completion audit.
 
-Smallest next mechanism: cut a v0.2 protocol-kernel checkpoint, then require an ADR before changing the control object model.
+Protocol next mechanism: cut a v0.2 protocol-kernel checkpoint, then require an ADR before changing the control object model. This is separate from the product proof-packet shipment.

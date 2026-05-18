@@ -80,15 +80,16 @@ The adapter sequence is deliberately narrow:
 ```text
 receiverGate(actionContractId, greenlightId, observedParameters, pending operation ref)
   -> if gate refused: return without mutating the manifest
-  -> if gate passed or records downstream proof gap: derive VerifiedReceiverGateCheck
+  -> if gate records a proof gap: return without mutating the manifest
+  -> if gate passed: derive VerifiedReceiverGateCheck
   -> mutate manifest surface with VerifiedReceiverGateCheck
   -> reconcile the same mutationAttemptId + idempotencyKey
   -> return evidence ref from the manifest mutation
 ```
 
-The invariant test uses a file-backed manifest surface, not the protocol store, so the no-mutation paths are checked against an external consequence target. Parameter mismatch and greenlight replay both leave the manifest unchanged. The mutation surface accepts a `VerifiedReceiverGateCheck`, not loose contract or greenlight IDs. A proof-gap gate is not a refusal: it means the exact greenlight was consumed and the receiver operation exists, but downstream finality was not yet proven.
+The invariant test uses a file-backed manifest surface, not the protocol store, so the no-mutation paths are checked against an external consequence target. Parameter mismatch, greenlight replay, and proof-gap gates leave the manifest unchanged. The mutation surface accepts a passed-only `VerifiedReceiverGateCheck`, not loose contract or greenlight IDs. Unknown downstream finality is recorded after a passed gate and mutation through reconciliation-created proof-gap evidence.
 
-The end-to-end reference tests start at a generated package-install tool call, propose an exact contract, evaluate policy, pass the receiver gate, mutate the file-backed manifest, and reconcile the same mutation attempt. The Hono/D1 path uses `HandshakeClient` and proves three outcomes: green path, parameter-mismatch refusal with no mutation, and unknown downstream finality with a resolved `ProofGap`. The adapter never receives raw policy authority; it receives only an action contract ID, one-use greenlight ID, and observed parameters to verify.
+The end-to-end reference tests start at a generated package-install tool call, propose an exact contract, evaluate policy, pass the receiver gate, mutate the file-backed manifest, and reconcile the same mutation attempt. The Hono/D1 path uses `HandshakeClient` and proves three outcomes: green path, parameter-mismatch refusal with no mutation, and unknown downstream finality recorded as a post-mutation `ProofGap`. The adapter never receives raw policy authority; it receives only an action contract ID, one-use greenlight ID, and observed parameters to verify.
 
 ## Reference Repo-Write Adapter
 
@@ -111,4 +112,4 @@ The reference gate now records `pinnedReceiverPolicyVersion`, `currentReceiverPo
 
 Recovery is not a receiver retry hook. A `RecoveryRecommendation` can reference the source receipt, gate attempt, mutation attempt, or proof gap and recommend narrower future action classes or human review. A follow-up `ActionContract` can link to the recommendation only after matching scope, timing, sequence, action class, and required new evidence. It supersedes the recommendation with a durable status transition and terminal claim, but it cannot call the receiver, cannot reuse the consumed greenlight, and cannot create a mutation attempt. A terminal-claim loser records a recovery-phase `ProofGap`, not a receiver action. Resolving that proof gap requires the observed winning terminal transition and still does not create receiver authority.
 
-Smallest next mechanism: cut a v0.2 protocol-kernel checkpoint, then require an ADR before changing the control object model.
+Active next mechanism: package the existing package-install and repo-write receiver adapters behind one fixture runner that proves pass, mismatch refusal, replay refusal, proof gap, and same-operation reconciliation without adding a new receiver type.

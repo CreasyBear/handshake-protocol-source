@@ -1947,4 +1947,6 @@ no recovery path that reuses a greenlight or mutates a receiver
 no terminal recovery race without a proof gap or resolution evidence
 ```
 
-Smallest next mechanism: cut a v0.2 protocol-kernel checkpoint, then require an ADR before changing the control object model.
+Post-review authority hardening is now part of this checkpoint: proof-gap gates cannot derive `VerifiedReceiverGateCheck`, reference adapters return without mutation on non-passed gates, reconciliation can create a post-mutation proof gap for unknown downstream finality, D1 record identity is `(object_type, object_id)`, and greenlight issuance is durably claimed per action contract before a greenlight record is committed.
+
+Protocol next mechanism: cut a v0.2 protocol-kernel checkpoint, then require an ADR before changing the control object model.
