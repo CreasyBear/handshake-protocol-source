@@ -254,4 +254,4 @@ Disqualify when:
 5. Receipt timeline sample.
 6. Technical scoping checklist for runtime and receiver owners.
 
-Smallest next product shipment: create the one-page pilot brief and use this scorecard on the first 10 design-partner conversations.
+Active next product shipment: create the one-page pilot brief for the implemented receiver proof and use this scorecard on the first 10 design-partner conversations.

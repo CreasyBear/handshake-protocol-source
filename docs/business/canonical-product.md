@@ -3,7 +3,7 @@
 Status: Canonical business alpha  
 Version: v0.2.0  
 Audience: Founder, product, engineering, GTM, design partners  
-Implementation status: Product direction; depends on the v0.2 protocol kernel and post-`01`/`02` runtime proof  
+Implementation status: Product direction; depends on the v0.2 protocol kernel completion audit and current package-install/repo-write receiver proofs
 Canonical owner: Product owner  
 Last reviewed: 2026-05-17
 
@@ -180,4 +180,4 @@ engineering-agent proof
 
 Move to the next step only when the previous step proves that receiver enforcement mattered to the buyer.
 
-Smallest next product shipment: a design-partner proof where one coding-agent action reaches a real receiver gate, refuses bypass/replay/mismatch, and renders the receipt timeline.
+Active next product shipment: a design-partner proof where one coding-agent action reaches a real receiver gate, refuses bypass/replay/mismatch, and renders the receipt timeline. Use the implemented package-install or repo-write proof until a production preview-deploy receiver exists.

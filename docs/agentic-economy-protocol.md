@@ -50,4 +50,4 @@ v0.2 does not claim that installing a runtime plugin is enough. It does not clai
 
 v0.2 is intentionally narrow because the primitive has to survive adversarial generated code, retries, stale policy, receiver drift, missing evidence, and replay attempts.
 
-Smallest next product shipment: one end-to-end action contract that reaches a receiver gate and produces a receipt.
+Active next product shipment: one design-partner proof packet that turns the implemented end-to-end receiver-gated action loop into a runnable adoption artifact.

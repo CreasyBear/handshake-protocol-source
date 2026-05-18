@@ -3,3 +3,6 @@ node_modules/
 dist/
 .wrangler/
 .dev.vars
+
+# Local agent planning and technical working state.
+.planning/

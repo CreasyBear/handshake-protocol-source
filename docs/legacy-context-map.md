@@ -51,4 +51,4 @@ Do not import old broad category claims before the v0.2 receiver-gated loop is l
 
 Do not use old terminology if it lets an operating envelope, runtime plugin, or review screen masquerade as mutation authority.
 
-Smallest next mechanism: require every new canonical page to state which v0.2 protocol objects it depends on.
+Ongoing guardrail: require every new canonical page to state which v0.2 protocol objects it depends on.

@@ -38,22 +38,30 @@ Read these in order:
 
 1. [Agentic Economy Protocol](./agentic-economy-protocol.md)
 2. [Full Agentic Experience Architecture](./full-agentic-experience-architecture.md)
-3. [Protocol Kernel](./protocol-kernel.md)
-4. [First Contract Walkthrough](./first-contract-walkthrough.md)
-5. [Runtime Integration](./runtime-integration.md)
-6. [Receiver Integration](./receiver-integration.md)
-7. [Receipt Timeline](./receipt-timeline.md)
-8. [Non-Claims And Theatre](./non-claims-and-theatre.md)
-9. [Legacy Context Map](./legacy-context-map.md)
+3. [Product And Protocol Diagrams](./product-and-protocol-diagrams.md)
+4. [Protocol Kernel](./protocol-kernel.md)
+5. [First Contract Walkthrough](./first-contract-walkthrough.md)
+6. [Runtime Integration](./runtime-integration.md)
+7. [Receiver Integration](./receiver-integration.md)
+8. [Receipt Timeline](./receipt-timeline.md)
+9. [Non-Claims And Theatre](./non-claims-and-theatre.md)
+10. [Legacy Context Map](./legacy-context-map.md)
 
 Reference material:
 
 - [API Protocol Reference](./api-protocol.md)
 - [Protocol Completion Audit v0.2](./protocol-completion-audit-v0.2.md)
-- [Protocol Kernel Implementation Plan](./protocol-kernel-v0.2-plan.md)
-- [Agent Requirements Plan-Eng Review Extension](./plans/02-plan-eng-review-agent-requirements.md)
+- [Planning And Technical Data Store Framework](./planning-technical-data-store.md)
 - [Business Spine](./business/index.md)
 - Runtime OpenAPI metadata is available from `GET /openapi.json`.
+
+Historical planning inputs:
+
+- [Protocol Kernel Implementation Plan](./protocol-kernel-v0.2-plan.md)
+- [Primitive Fields And State Plan](./plans/01-plan-eng-review-primitive-fields-state.md)
+- [Agent Requirements Plan-Eng Review Extension](./plans/02-plan-eng-review-agent-requirements.md)
+
+These planning inputs are not live implementation status. When they conflict with `Protocol Kernel`, `API Protocol Reference`, or `Protocol Completion Audit v0.2`, the current canonical docs win.
 
 ## Legacy Context
 
@@ -69,4 +77,4 @@ The product moment is narrower:
 
 An agent runtime attempts a consequential action. Handshake reduces it to an exact action contract. Policy decides. The receiver gate checks the exact greenlight before mutation. The receipt timeline reconstructs what happened.
 
-Smallest next product shipment: make that loop obvious, runnable, and hard to misread.
+Active next product shipment: package the proven v0.2 loop into one design-partner proof packet: one command or fixture run, one contract view, one receiver-gated mutation/refusal, one receipt timeline, and one buyer scorecard.

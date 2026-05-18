@@ -53,4 +53,4 @@ If the compiler turns vague intent into excessive scope, the compiler overreache
 
 If the chain cannot be reconstructed later, this is not auditable.
 
-Smallest next mechanism: block every claim in docs and UI that cannot point to an exact protocol object or receiver gate check.
+Active next mechanism: block every claim in docs and UI that cannot point to an exact protocol object or receiver gate check, and treat the design-partner proof packet as the first claim audit.

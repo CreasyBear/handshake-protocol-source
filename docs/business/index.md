@@ -3,7 +3,7 @@
 Status: Canonical business alpha  
 Version: v0.2.0  
 Audience: Founder, product, GTM, design partners, platform/security buyers  
-Implementation status: Depends on `docs/plans/01-plan-eng-review-primitive-fields-state.md` and `docs/plans/02-plan-eng-review-agent-requirements.md`; not yet validated by paid pilots  
+Implementation status: Depends on the v0.2 protocol kernel completion audit and current reference receiver proofs; not yet validated by paid pilots
 Canonical owner: Product owner  
 Last reviewed: 2026-05-17
 
@@ -47,7 +47,7 @@ Protocol dependencies:
 
 - [Protocol Kernel](../protocol-kernel.md)
 - [First Contract Walkthrough](../first-contract-walkthrough.md)
-- [Agent Requirements Plan](../plans/02-plan-eng-review-agent-requirements.md)
+- [Protocol Completion Audit v0.2](../protocol-completion-audit-v0.2.md)
 
 ## Non-Canonical Research Inputs
 
@@ -70,4 +70,4 @@ Reject:
 - audit-only product;
 - marketplace before receiver enforcement.
 
-Smallest next product shipment: one design-partner-ready proof packet for a receiver-gated engineering-agent action.
+Active next product shipment: one design-partner-ready proof packet for a receiver-gated engineering-agent action, using the implemented package-install or repo-write receiver proof until a production preview-deploy receiver exists.

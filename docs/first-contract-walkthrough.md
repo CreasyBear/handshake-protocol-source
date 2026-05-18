@@ -137,4 +137,4 @@ The receipt must distinguish:
 
 A downstream pending status is not success. A downstream unknown is not success; it is a proof gap. The receiver may later reconcile the same operation by `mutationAttemptId`, idempotency key, and receiver operation reference. Reconciliation must not create a second mutation attempt.
 
-Smallest next product shipment: make this walkthrough runnable end-to-end with one fixture payload set.
+Active next product shipment: make this walkthrough runnable end-to-end with one fixture payload set backed by the implemented package-install or repo-write receiver proof.

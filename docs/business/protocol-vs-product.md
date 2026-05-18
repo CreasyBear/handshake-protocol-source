@@ -482,7 +482,7 @@ So the agent can move fast, but it never gets ambient authority.
 
 Show the demo. Do not start with the protocol unless the buyer asks how it works.
 
-## Smallest Next Product Shipment
+## Active Next Product Shipment
 
 Create one proof packet:
 

@@ -3,9 +3,9 @@
 Status: Canonical public alpha  
 Version: v0.2.0  
 Audience: Product, protocol implementers, agent-runtime builders, receiver owners, platform engineering, security engineering, design partners  
-Implementation status: Product architecture; depends on `docs/plans/01-plan-eng-review-primitive-fields-state.md` and `docs/plans/02-plan-eng-review-agent-requirements.md`; first external receiver proof remains target work  
+Implementation status: Product architecture; depends on the v0.2 protocol kernel, completion audit, and reference package-install/repo-write receiver proofs; production receiver integrations remain target work
 Canonical owner: Product owner  
-Extends: [`01-plan-eng-review-primitive-fields-state.md`](./plans/01-plan-eng-review-primitive-fields-state.md), [`02-plan-eng-review-agent-requirements.md`](./plans/02-plan-eng-review-agent-requirements.md)  
+Extends: [`protocol-kernel.md`](./protocol-kernel.md), [`protocol-completion-audit-v0.2.md`](./protocol-completion-audit-v0.2.md), [`runtime-integration.md`](./runtime-integration.md), [`receiver-integration.md`](./receiver-integration.md)
 Last reviewed: 2026-05-17
 
 ## Customer And Moment Of Value

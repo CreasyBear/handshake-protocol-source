@@ -1,9 +1,9 @@
 # Plan Eng Review Extension: Agent Requirements
 
-Status: Canonical planning extension  
+Status: Historical planning extension; superseded for live implementation status by `../protocol-completion-audit-v0.2.md`
 Version: v0.2.0  
 Audience: Agent-runtime builders, receiver endpoint owners, platform engineering, security engineering, protocol implementers  
-Implementation status: Extends the primitive/state architecture review; depends on `01` landing first; not yet implemented as runtime or receiver SDKs  
+Implementation status: Historical agent-requirements input; current runtime wrappers, receiver adapters, and codemode proof are documented in `../runtime-integration.md`, `../receiver-integration.md`, and `../protocol-completion-audit-v0.2.md`
 Canonical owner: Product owner  
 Extends: [`01-plan-eng-review-primitive-fields-state.md`](./01-plan-eng-review-primitive-fields-state.md)  
 Last reviewed: 2026-05-17

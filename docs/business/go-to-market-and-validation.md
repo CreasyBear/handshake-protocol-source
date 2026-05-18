@@ -203,4 +203,4 @@ Strongest signal:
 We will pay for one guarded action family now, and we know the second action family we want next.
 ```
 
-Smallest next product shipment: build the proof packet, use it in 10 buyer calls, and score each call against blocked action, receiver-enforcement value, pilot path, and budget owner.
+Active next product shipment: build the proof packet from the implemented receiver proof, use it in 10 buyer calls, and score each call against blocked action, receiver-enforcement value, pilot path, and budget owner.

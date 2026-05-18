@@ -149,4 +149,4 @@ Recovery after a refusal or proof gap is a separate protocol record, not a runti
 - No raw secrets in contracts, receipts, or runtime inspection.
 - No treating standing, identity, or local operator preference as mutation authority.
 
-Smallest next mechanism: cut a v0.2 protocol-kernel checkpoint, then require an ADR before changing the control object model.
+Active next mechanism: package the existing package-install, repo-write, and codemode wrapper proofs into one developer-facing fixture runner that prints the contract, policy decision, receiver gate outcome, refusal/proof-gap state, and receipt timeline reference.

@@ -86,4 +86,4 @@ Do not define org management, policy editing, fleet views, marketplace, incident
 
 Those may become useful later. Right now, they would outrun activation.
 
-Smallest next product shipment: render one receipt timeline from one reference receiver run.
+Active next product shipment: render one receipt timeline from the existing package-install or repo-write receiver run before designing any broader product dashboard.
