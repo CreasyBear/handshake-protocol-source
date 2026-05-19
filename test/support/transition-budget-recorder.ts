@@ -1,8 +1,9 @@
-import type { ContractStreamEvent } from "../../src/protocol/event-schemas";
+import type { ContractStreamEvent } from "../../src/protocol/events/schemas";
 import type {
   GatewayCheckCommit,
   GatewayCheckCommitResult,
   GreenlightConsumption,
+  IsolationScopeRef,
   IsolationState,
   ProtocolCommit,
   ProtocolCommitResult,
@@ -13,7 +14,7 @@ import type {
   Receipt,
   StoredProtocolRecord,
   StreamTail,
-} from "../../src/protocol/store-port";
+} from "../../src/protocol/store/port";
 
 export type TransitionBudgetSnapshot = {
   reads: number;
@@ -155,9 +156,9 @@ export class TransitionBudgetRecorder implements ProtocolStore {
     return this.delegate.getReceiptByMutationAttemptId(mutationAttemptId);
   }
 
-  async listIsolationStates(scopeIds: string[]): Promise<IsolationState[]> {
+  async listIsolationStates(scopeRefs: IsolationScopeRef[]): Promise<IsolationState[]> {
     this.countRead("listIsolationStates");
-    return this.delegate.listIsolationStates(scopeIds);
+    return this.delegate.listIsolationStates(scopeRefs);
   }
 
   async consumeGreenlight(consumption: GreenlightConsumption): Promise<"consumed" | "already_consumed"> {

@@ -4,12 +4,12 @@ import {
   type GatewayCheckInput,
   type GatewayCheckResult,
   type VerifiedGatewayCheck,
-} from "../../protocol/gateway-gate";
+} from "../../protocol/areas/gateway-gate";
 import type {
   ReconcileSurfaceOperationInput,
   SurfaceOperationReconciliation,
   SurfaceOperationReconciliationResult,
-} from "../../protocol/operation-lifecycle";
+} from "../../protocol/areas/operation-lifecycle";
 
 export const PreviewDeployParametersSchema = z.strictObject({
   provider: z.string().min(1),

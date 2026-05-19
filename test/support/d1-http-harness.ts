@@ -2,8 +2,8 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { Database, type SQLQueryBindings } from "bun:sqlite";
 import { createApp, type WorkerBindings } from "../../src/http/app";
-import type { CallerAuthTokens } from "../../src/http/caller-auth";
-import { PROTOCOL_VERSION } from "../../src/protocol/schemas";
+import type { CallerAuthTokens } from "../../src/http/admission/caller-auth";
+import { PROTOCOL_VERSION } from "../../src/protocol/public/schemas";
 import type { HandshakeFetch } from "../../src/sdk/client";
 
 type QueryBinding = string | number | boolean | null;
@@ -52,7 +52,10 @@ export async function createD1HttpHarness(): Promise<D1HttpHarness> {
       return requestJson<T>(app.request(path, undefined, env));
     },
     async query<T>(sql: string, ...bindings: QueryBinding[]): Promise<T[]> {
-      const result = await db.prepare(sql).bind(...bindings).all<T>();
+      const result = await db
+        .prepare(sql)
+        .bind(...bindings)
+        .all<T>();
       return result.results;
     },
     async dispose(): Promise<void> {
@@ -81,9 +84,7 @@ class LocalD1Database {
 
   async batch<T = unknown>(statements: D1PreparedStatement[]): Promise<D1Result<T>[]> {
     const runBatch = this.sqlite.transaction((batchStatements: D1PreparedStatement[]) =>
-      batchStatements.map((statement) =>
-        (statement as unknown as LocalD1PreparedStatement).runSync<T>(),
-      ),
+      batchStatements.map((statement) => (statement as unknown as LocalD1PreparedStatement).runSync<T>()),
     );
     return runBatch(statements);
   }

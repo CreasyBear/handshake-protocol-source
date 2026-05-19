@@ -11,13 +11,14 @@ import type {
   RecoveryRecommendation,
   ReceiptExport,
   GatewayRegistryEntry,
+  GeneratedGraphEvidenceProjection,
   ReviewArtifactRecord,
   ReviewDecision,
   RuntimeExecutionRecord,
   ToolCapability,
-} from "../protocol/schemas";
-import type { GatewayCheckResult } from "../protocol/gateway-gate";
-import type { SurfaceOperationReconciliationResult } from "../protocol/operation-lifecycle";
+} from "../protocol/public/schemas";
+import type { GatewayCheckResult } from "../protocol/areas/gateway-gate";
+import type { SurfaceOperationReconciliationResult } from "../protocol/areas/operation-lifecycle";
 import type {
   CompileIntentInput,
   CreateBreakerDecisionInput,
@@ -34,19 +35,19 @@ import type {
   ResolveRecoveryTerminalConflictInput,
   GatewayCheckInput,
   TransitionRecoveryRecommendationStatusInput,
-} from "../protocol/inputs";
-import type { RecoveryRecommendationStatusChange, RecoveryTerminalConflictResolution } from "../protocol/recovery";
-import { PROTOCOL_VERSION } from "../protocol/schemas";
-import type { CallerAuthTokens, TransitionCallerRole } from "../http/caller-auth";
-import {
-  TransitionErrorResponseSchema,
-  type TransitionErrorEnvelope,
-} from "../http/transition-error-envelope";
+} from "../protocol/public/inputs";
+import type {
+  RecoveryRecommendationStatusChange,
+  RecoveryTerminalConflictResolution,
+} from "../protocol/areas/recovery";
+import { PROTOCOL_VERSION } from "../protocol/public/schemas";
+import type { CallerAuthTokens, TransitionCallerRole } from "../http/admission/caller-auth";
+import { TransitionErrorResponseSchema, type TransitionErrorEnvelope } from "../http/errors/transition-error-envelope";
 import {
   HANDSHAKE_ORIGINATING_IDENTITY_HEADER,
   HANDSHAKE_PROTOCOL_VERSION_HEADER,
   HANDSHAKE_REQUEST_IDENTITY_HEADER,
-} from "../http/transition-request-context";
+} from "../http/admission/request-context";
 
 export type HandshakeFetch = (
   input: Parameters<typeof fetch>[0],
@@ -178,21 +179,41 @@ export class HandshakeClient {
     return this.post("/v0.2/surface-operation-reconciliations", input, "gateway_custody");
   }
 
+  getGeneratedGraphEvidenceProjection(generatedExecutionGraphId: string): Promise<GeneratedGraphEvidenceProjection> {
+    return this.get(
+      `/v0.2/evidence/generated-execution-graphs/${encodeURIComponent(generatedExecutionGraphId)}`,
+      "control_plane",
+    );
+  }
+
   private async post<T>(path: string, body: unknown, role: TransitionCallerRole): Promise<T> {
+    return this.request("POST", path, role, body);
+  }
+
+  private async get<T>(path: string, role: TransitionCallerRole): Promise<T> {
+    return this.request("GET", path, role);
+  }
+
+  private async request<T>(
+    method: "GET" | "POST",
+    path: string,
+    role: TransitionCallerRole,
+    body?: unknown,
+  ): Promise<T> {
     const headers: Record<string, string> = {
-      "content-type": "application/json",
       [HANDSHAKE_PROTOCOL_VERSION_HEADER]: this.options.protocolVersion ?? PROTOCOL_VERSION,
       [HANDSHAKE_REQUEST_IDENTITY_HEADER]: this.nextRequestIdentity(),
     };
+    if (method === "POST") headers["content-type"] = "application/json";
     if (this.options.originatingIdentity) {
       headers[HANDSHAKE_ORIGINATING_IDENTITY_HEADER] = this.options.originatingIdentity;
     }
     const token = this.options.transitionTokens?.[role] ?? this.options.transitionToken;
     if (token) headers.authorization = `Bearer ${token}`;
     const response = await this.fetchImpl(new URL(path, this.baseUrl), {
-      method: "POST",
+      method,
       headers,
-      body: JSON.stringify(body),
+      ...(method === "POST" ? { body: JSON.stringify(body) } : {}),
     });
     if (!response.ok) {
       throw new HandshakeClientError(response.status, await this.errorEnvelopeForResponse(response));

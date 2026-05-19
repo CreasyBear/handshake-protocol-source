@@ -1,20 +1,17 @@
 import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { nowIso } from "../../src/protocol/ids";
-import { PROTOCOL_VERSION } from "../../src/protocol/schemas";
+import { nowIso } from "../../src/protocol/foundation/ids";
+import { PROTOCOL_VERSION } from "../../src/protocol/public/schemas";
 import type {
   ActionType,
   OperatingEnvelope,
   GatewayRegistryEntry,
   ToolCapability,
-} from "../../src/protocol/schemas";
+} from "../../src/protocol/public/schemas";
 import type { HandshakeClient } from "../../src/sdk/client";
-import {
-  repoWriteResourceRef,
-  type RepoWriteRuntimeConfig,
-} from "../../src/runtime/repo-write/tool-wrapper";
-import { futureIso } from "../fixtures";
+import { repoWriteResourceRef, type RepoWriteRuntimeConfig } from "../../src/runtime/repo-write/action-proposal";
+import { futureIso } from "./fixtures";
 import { FileRepoWriteSurface } from "./repo-write-surface";
 
 export type RepoWriteFixtureObjects = {

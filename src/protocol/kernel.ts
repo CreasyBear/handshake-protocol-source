@@ -1,59 +1,64 @@
-import { proposeActionContract as proposeActionContractTransition } from "./action-contract";
-import type { ActionContract, ProposeActionContractInput } from "./action-contract";
-import { guardCatalogRegistration } from "./catalog-envelope";
-import { HandshakeProtocolError } from "./errors";
-import { gatewayCheck as gatewayCheckTransition, type GatewayCheckResult } from "./gateway-gate";
-import type { GatewayCheckInput } from "./gateway-gate";
-import { createGeneratedExecutionGraph as createGeneratedExecutionGraphTransition } from "./generated-execution-graph";
+import { proposeActionContract as proposeActionContractTransition } from "./areas/action-contract";
+import type { ActionContract, ProposeActionContractInput } from "./areas/action-contract";
+import { guardCatalogRegistration } from "./areas/catalog-envelope";
+import { HandshakeProtocolError } from "./foundation/errors";
+import { gatewayCheck as gatewayCheckTransition, type GatewayCheckResult } from "./areas/gateway-gate";
+import type { GatewayCheckInput } from "./areas/gateway-gate";
+import { createGeneratedExecutionGraph as createGeneratedExecutionGraphTransition } from "./areas/generated-execution-graph";
 import type {
   CreateGeneratedExecutionGraphInput,
   GeneratedExecutionGraph,
   GraphEvidenceIssuerContext,
-} from "./generated-execution-graph";
-import { compileIntent as compileIntentTransition } from "./intent-compilation";
-import type { CompileIntentInput, IntentCompilationRecord } from "./intent-compilation";
+} from "./areas/generated-execution-graph";
+import { compileIntent as compileIntentTransition } from "./areas/intent-compilation";
+import type { CompileIntentInput, IntentCompilationRecord } from "./areas/intent-compilation";
 import {
   createBreakerDecision as createBreakerDecisionTransition,
   createIsolationState as createIsolationStateTransition,
   type BreakerDecisionResult,
-} from "./isolation-breaker";
-import type { CreateBreakerDecisionInput, CreateIsolationInput, IsolationState } from "./isolation-breaker";
-import type { ProtocolRecord } from "./object-registry/schemas";
-import { evaluatePolicy as evaluatePolicyTransition } from "./policy-greenlight";
-import type { EvaluatePolicyInput, Greenlight, PolicyDecision } from "./policy-greenlight";
-import { createProtectedPathPosture as createProtectedPathPostureTransition } from "./protected-path-posture";
-import type { CreateProtectedPathPostureInput, ProtectedPathPosture } from "./protected-path-posture";
-import { createReceiptExport as createReceiptExportTransition } from "./receipt-export";
-import type { CreateReceiptExportInput, ReceiptExport } from "./receipt-export";
+} from "./areas/isolation-breaker";
+import type { CreateBreakerDecisionInput, CreateIsolationInput, IsolationState } from "./areas/isolation-breaker";
+import type { ProtocolRecord } from "./areas/object-registry";
+import { evaluatePolicy as evaluatePolicyTransition } from "./areas/policy-greenlight";
+import type { EvaluatePolicyInput, Greenlight, PolicyDecision } from "./areas/policy-greenlight";
+import { createProtectedPathPosture as createProtectedPathPostureTransition } from "./areas/protected-path-posture";
+import type { CreateProtectedPathPostureInput, ProtectedPathPosture } from "./areas/protected-path-posture";
+import { createReceiptExport as createReceiptExportTransition } from "./areas/receipt-export";
+import type { CreateReceiptExportInput, ReceiptExport } from "./areas/receipt-export";
 import {
   createRecoveryRecommendation as createRecoveryRecommendationTransition,
   resolveRecoveryTerminalConflictProofGap as resolveRecoveryTerminalConflictProofGapTransition,
   type RecoveryTerminalConflictResolution,
   transitionRecoveryRecommendationStatus as transitionRecoveryRecommendationStatusTransition,
   type RecoveryRecommendationStatusChange,
-} from "./recovery";
+} from "./areas/recovery";
 import type {
   CreateRecoveryRecommendationInput,
   RecoveryRecommendation,
   ResolveRecoveryTerminalConflictInput,
   TransitionRecoveryRecommendationStatusInput,
-} from "./recovery";
+} from "./areas/recovery";
 import {
   createReviewArtifact as createReviewArtifactTransition,
   createReviewDecision as createReviewDecisionTransition,
-} from "./review-binding";
-import type { CreateReviewArtifactInput, CreateReviewDecisionInput, ReviewArtifactRecord, ReviewDecision } from "./review-binding";
-import { createRuntimeExecution as createRuntimeExecutionTransition } from "./runtime-evidence";
-import type { CreateRuntimeExecutionInput, RuntimeExecutionRecord } from "./runtime-evidence";
+} from "./areas/review-binding";
+import type {
+  CreateReviewArtifactInput,
+  CreateReviewDecisionInput,
+  ReviewArtifactRecord,
+  ReviewDecision,
+} from "./areas/review-binding";
+import { createRuntimeExecution as createRuntimeExecutionTransition } from "./areas/runtime-evidence";
+import type { CreateRuntimeExecutionInput, RuntimeExecutionRecord } from "./areas/runtime-evidence";
 import {
   reconcileSurfaceOperation as reconcileSurfaceOperationTransition,
   type SurfaceOperationReconciliationResult,
-} from "./operation-lifecycle/index";
-import type { ReconcileSurfaceOperationInput } from "./operation-lifecycle";
-import { ProtocolRecorder } from "./records";
-import type { TransitionGuardResult } from "./transition-guards";
-import type { TransitionRequestContextDraft } from "./transition-request-contexts";
-import type { ProtocolStore } from "./store-port";
+} from "./areas/operation-lifecycle";
+import type { ReconcileSurfaceOperationInput } from "./areas/operation-lifecycle";
+import { ProtocolRecorder } from "./events/records";
+import type { TransitionGuardResult } from "./foundation/transition-guards";
+import type { TransitionRequestContextDraft } from "./context/request-contexts";
+import type { ProtocolStore } from "./store/port";
 
 export class HandshakeKernel {
   private readonly recorder: ProtocolRecorder;

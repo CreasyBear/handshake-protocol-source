@@ -1,10 +1,11 @@
-import { digestCanonical } from "../../src/protocol/canonical";
-import { HandshakeAmbiguousCommitError } from "../../src/protocol/errors";
-import type { ContractStreamEvent } from "../../src/protocol/event-schemas";
+import { digestCanonical } from "../../src/protocol/foundation/canonical";
+import { HandshakeAmbiguousCommitError } from "../../src/protocol/foundation/errors";
+import type { ContractStreamEvent } from "../../src/protocol/events/schemas";
 import type {
   GatewayCheckCommit,
   GatewayCheckCommitResult,
   GreenlightConsumption,
+  IsolationScopeRef,
   IsolationState,
   ProtocolCommit,
   ProtocolCommitResult,
@@ -15,7 +16,7 @@ import type {
   Receipt,
   StoredProtocolRecord,
   StreamTail,
-} from "../../src/protocol/store-port";
+} from "../../src/protocol/store/port";
 
 type ProtocolCommitFault = {
   result: ProtocolCommitResult | "applied_then_ambiguous";
@@ -139,8 +140,9 @@ export class FaultInjectingProtocolStore implements ProtocolStore {
   }
 
   async getRecord<T>(objectType: ProtocolObjectType, objectId: string): Promise<StoredProtocolRecord<T> | null> {
-    const fault = takeFirst(this.recordReadFaults, (candidate) =>
-      candidate.objectType === objectType && (!candidate.objectId || candidate.objectId === objectId),
+    const fault = takeFirst(
+      this.recordReadFaults,
+      (candidate) => candidate.objectType === objectType && (!candidate.objectId || candidate.objectId === objectId),
     );
     if (fault) return (fault.replacement as StoredProtocolRecord<T> | null | undefined) ?? null;
     return this.delegate.getRecord<T>(objectType, objectId);
@@ -184,8 +186,8 @@ export class FaultInjectingProtocolStore implements ProtocolStore {
     return this.delegate.getReceiptByMutationAttemptId(mutationAttemptId);
   }
 
-  async listIsolationStates(scopeIds: string[]): Promise<IsolationState[]> {
-    return this.delegate.listIsolationStates(scopeIds);
+  async listIsolationStates(scopeRefs: IsolationScopeRef[]): Promise<IsolationState[]> {
+    return this.delegate.listIsolationStates(scopeRefs);
   }
 
   async consumeGreenlight(consumption: GreenlightConsumption): Promise<"consumed" | "already_consumed"> {
@@ -241,7 +243,9 @@ export class FaultInjectingProtocolStore implements ProtocolStore {
   }
 }
 
-function ambiguousCommitError(operation: "commitProtocolRecords" | "commitGatewayCheck"): HandshakeAmbiguousCommitError {
+function ambiguousCommitError(
+  operation: "commitProtocolRecords" | "commitGatewayCheck",
+): HandshakeAmbiguousCommitError {
   return new HandshakeAmbiguousCommitError(
     `${operation} committed in the delegate store, then returned an ambiguous result.`,
   );

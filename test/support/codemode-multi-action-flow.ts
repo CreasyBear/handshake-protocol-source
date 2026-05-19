@@ -1,16 +1,9 @@
 import type { HandshakeClient } from "../../src/sdk/client";
 import type { HandshakeKernel } from "../../src/protocol/kernel";
-import type { CodemodeMultiActionRuntimeConfig } from "../../src/runtime/codemode-multi-action/wrapper";
-import { makeKernelFixture } from "../fixtures";
-import {
-  makeRepoWriteFixtureObjects,
-  repoWriteRuntimeConfig,
-  type RepoWriteFixtureObjects,
-} from "./repo-write-flow";
-import {
-  packageInstallRuntimeConfig,
-  type PackageInstallFixtureObjects,
-} from "./package-install-flow";
+import type { CodemodeMultiActionRuntimeConfig } from "../../src/runtime/codemode-multi-action/generated-program-runner";
+import { makeKernelFixture } from "./fixtures";
+import { makeRepoWriteFixtureObjects, repoWriteRuntimeConfig, type RepoWriteFixtureObjects } from "./repo-write-flow";
+import { packageInstallRuntimeConfig, type PackageInstallFixtureObjects } from "./package-install-flow";
 
 export type CodemodeMultiActionFixtureObjects = {
   packageInstall: PackageInstallFixtureObjects;
@@ -26,10 +19,7 @@ export function makeCodemodeMultiActionFixtureObjects(): CodemodeMultiActionFixt
     objectiveRef: "intent:install-package-and-write-file",
     allowedActionClasses: ["package.install", "repo.write"],
     allowedGateways: [packageBase.gateway.gatewayId, repoWrite.gateway.gatewayId],
-    allowedResources: [
-      "npm:hono",
-      repoWrite.envelope.allowedResources[0] ?? repoWrite.repositoryRef,
-    ],
+    allowedResources: ["npm:hono", repoWrite.envelope.allowedResources[0] ?? repoWrite.repositoryRef],
     evidenceRequirements: ["package_lock_diff", "repo_file_diff"],
   };
   return {

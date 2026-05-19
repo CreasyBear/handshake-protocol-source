@@ -2,14 +2,14 @@ import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { HandshakeClient } from "../../src/sdk/client";
-import type { PackageInstallRuntimeConfig } from "../../src/runtime/package-install/tool-wrapper";
+import type { PackageInstallRuntimeConfig } from "../../src/runtime/package-install/action-proposal";
 import type {
   ActionType,
   OperatingEnvelope,
   GatewayRegistryEntry,
   ToolCapability,
-} from "../../src/protocol/schemas";
-import { futureIso } from "../fixtures";
+} from "../../src/protocol/public/schemas";
+import { futureIso } from "./fixtures";
 import { FilePackageManifestSurface } from "./package-manifest-surface";
 
 export type PackageInstallFixtureObjects = {

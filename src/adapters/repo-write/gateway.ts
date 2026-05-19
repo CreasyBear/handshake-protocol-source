@@ -4,13 +4,13 @@ import {
   type GatewayCheckInput,
   type GatewayCheckResult,
   type VerifiedGatewayCheck,
-} from "../../protocol/gateway-gate";
-import { digestUtf8Content, utf8ByteLength } from "../../protocol/content-digests";
+} from "../../protocol/areas/gateway-gate";
+import { digestUtf8Content, utf8ByteLength } from "../../protocol/foundation/content-digests";
 import type {
   ReconcileSurfaceOperationInput,
   SurfaceOperationReconciliation,
   SurfaceOperationReconciliationResult,
-} from "../../protocol/operation-lifecycle";
+} from "../../protocol/areas/operation-lifecycle";
 
 export const RepoWriteParametersSchema = z.strictObject({
   repositoryRef: z.string().min(1),

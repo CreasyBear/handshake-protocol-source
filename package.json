@@ -3,11 +3,52 @@
   "version": "0.2.4",
   "private": true,
   "type": "module",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./conformance": {
+      "types": "./dist/conformance/index.d.ts",
+      "import": "./src/conformance/index.ts",
+      "default": "./src/conformance/index.ts"
+    },
+    "./experimental": {
+      "types": "./dist/experimental.d.ts",
+      "import": "./src/experimental.ts",
+      "default": "./src/experimental.ts"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "src",
+    "dist",
+    "README.md",
+    "QUALITY.md",
+    "STRUCTURE.md",
+    "docs/internal/decisions.md",
+    "docs/internal/protocol-definition.md",
+    "docs/internal/protocol-kernel-architecture.md",
+    "docs/internal/protocol-layman.md",
+    "docs/internal/protocol-notes.md"
+  ],
+  "packageManager": "bun@1.3.9",
   "scripts": {
     "dev": "wrangler dev",
     "typecheck": "tsc --noEmit",
     "test": "bun test",
-    "build": "tsc --noEmit"
+    "build": "tsc -p tsconfig.build.json",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "lint": "eslint src test --max-warnings=0",
+    "check:types": "tsc --noEmit --pretty false",
+    "pack:check": "npm run build && node scripts/check-package-surface.mjs",
+    "check:repo": "npm run check:types && npm run lint && npm run format:check && npm run test && npm run pack:check && git diff --check",
+    "quality:architecture": "npm run test -- test/architecture/import-posture.test.ts test/architecture/naming-posture.test.ts test/architecture/package-surface.test.ts test/architecture/root-exports.test.ts test/conformance/protected-mutation-adapter-conformance.test.ts",
+    "quality:claims": "npm run test -- test/architecture/active-vocabulary.test.ts",
+    "quality:storage": "npm run test -- test/http/d1-http.test.ts test/protocol/kernel-*.test.ts test/protocol/transition-matrix.test.ts test/protocol/model-based-invariants.test.ts"
   },
   "dependencies": {
     "hono": "^4.12.19",
@@ -16,7 +57,10 @@
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20260517.1",
     "@types/bun": "^1.3.14",
+    "eslint": "^10.4.0",
+    "prettier": "^3.8.3",
     "typescript": "^6.0.3",
+    "typescript-eslint": "^8.59.4",
     "wrangler": "^4.92.0"
   }
 }

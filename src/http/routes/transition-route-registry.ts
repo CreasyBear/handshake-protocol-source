@@ -1,0 +1,265 @@
+import type { ZodType } from "zod";
+import {
+  CompileIntentInputSchema,
+  CreateBreakerDecisionInputSchema,
+  CreateIsolationInputSchema,
+  CreateProtectedPathPostureInputSchema,
+  CreateReceiptExportInputSchema,
+  CreateRecoveryRecommendationInputSchema,
+  CreateReviewArtifactInputSchema,
+  CreateReviewDecisionInputSchema,
+  CreateRuntimeExecutionInputSchema,
+  EvaluatePolicyInputSchema,
+  GatewayCheckInputSchema,
+  ProposeActionContractInputSchema,
+  ReconcileSurfaceOperationInputSchema,
+  ResolveRecoveryTerminalConflictInputSchema,
+  TransitionRecoveryRecommendationStatusInputSchema,
+} from "../../protocol/public/inputs";
+import {
+  ActionContractSchema,
+  ActionTypeSchema,
+  GatewayRegistryEntrySchema,
+  IntentCompilationRecordSchema,
+  IsolationStateSchema,
+  OperatingEnvelopeSchema,
+  ProtectedPathPostureSchema,
+  RecoveryRecommendationSchema,
+  ReceiptExportSchema,
+  ReviewArtifactRecordSchema,
+  ReviewDecisionSchema,
+  RuntimeExecutionRecordSchema,
+  ToolCapabilitySchema,
+} from "../../protocol/public/schemas";
+import type { TransitionCallerRole } from "../admission/caller-auth";
+import { directBodyScope, recordScope, type TransitionScopeResolver } from "./transition-scope-resolvers";
+import type { TransitionRouteId } from "./transition-invokers";
+import {
+  BreakerDecisionResponseSchema,
+  GatewayCheckResponseSchema,
+  PolicyEvaluationResponseSchema,
+  RecoveryRecommendationStatusResponseSchema,
+  RecoveryTerminalConflictResolutionResponseSchema,
+  SurfaceOperationReconciliationResponseSchema,
+} from "./transition-response-schemas";
+
+export { transitionInvokers, type TransitionInvoker } from "./transition-invokers";
+
+export type TransitionRouteDefinition = {
+  routeId: TransitionRouteId;
+  path: `/v0.2/${string}`;
+  role: TransitionCallerRole;
+  scopeResolver: TransitionScopeResolver;
+  summary: string;
+  requestSchema: ZodType;
+  responseDescription: string;
+  responseSchema: ZodType;
+};
+
+export type { TransitionScope, TransitionScopeResolver } from "./transition-scope-resolvers";
+
+export const transitionRouteDefinitions = [
+  route(
+    "registerToolCapability",
+    "/v0.2/catalog/tool-capabilities",
+    "control_plane",
+    directBodyScope,
+    "Register a durable runtime tool capability",
+    ToolCapabilitySchema,
+    "Tool capability",
+    ToolCapabilitySchema,
+  ),
+  route(
+    "registerActionType",
+    "/v0.2/catalog/action-types",
+    "control_plane",
+    directBodyScope,
+    "Register a durable consequential action type",
+    ActionTypeSchema,
+    "Action type",
+    ActionTypeSchema,
+  ),
+  route(
+    "registerGatewayRegistryEntry",
+    "/v0.2/catalog/gateways",
+    "control_plane",
+    directBodyScope,
+    "Register a durable gateway check binding",
+    GatewayRegistryEntrySchema,
+    "Gateway registry entry",
+    GatewayRegistryEntrySchema,
+  ),
+  route(
+    "registerOperatingEnvelope",
+    "/v0.2/envelopes",
+    "control_plane",
+    directBodyScope,
+    "Register an operating envelope that authorizes attempts, not mutation",
+    OperatingEnvelopeSchema,
+    "Operating envelope",
+    OperatingEnvelopeSchema,
+  ),
+  route(
+    "compileIntent",
+    "/v0.2/intent-compilations",
+    "runtime_evidence",
+    directBodyScope,
+    "Record catalog-bound compilation from vague intent to candidate action",
+    CompileIntentInputSchema,
+    "Intent compilation record",
+    IntentCompilationRecordSchema,
+  ),
+  route(
+    "createRuntimeExecution",
+    "/v0.2/runtime-executions",
+    "runtime_evidence",
+    directBodyScope,
+    "Record generated execution-block evidence without minting authority",
+    CreateRuntimeExecutionInputSchema,
+    "Runtime execution record",
+    RuntimeExecutionRecordSchema,
+  ),
+  route(
+    "createProtectedPathPosture",
+    "/v0.2/protected-path-postures",
+    "gateway_custody",
+    directBodyScope,
+    "Record current protected-path posture and atomically update the current pointer",
+    CreateProtectedPathPostureInputSchema,
+    "Protected path posture",
+    ProtectedPathPostureSchema,
+  ),
+  route(
+    "proposeActionContract",
+    "/v0.2/action-contracts",
+    "control_plane",
+    recordScope("intent_compilation", "intentCompilationId", "intent_compilation_missing"),
+    "Propose exact action contract from a clean compilation record",
+    ProposeActionContractInputSchema,
+    "Action contract",
+    ActionContractSchema,
+  ),
+  route(
+    "evaluatePolicy",
+    "/v0.2/policy-decisions",
+    "control_plane",
+    recordScope("action_contract", "actionContractId", "contract_missing"),
+    "Evaluate an exact action contract against envelope and isolation state",
+    EvaluatePolicyInputSchema,
+    "Policy decision and optional one-use greenlight",
+    PolicyEvaluationResponseSchema,
+  ),
+  route(
+    "createReviewArtifact",
+    "/v0.2/review-artifacts",
+    "review_custody",
+    recordScope("action_contract", "actionContractId", "contract_missing"),
+    "Record a rendered review artifact bound to exact contract and policy input digests",
+    CreateReviewArtifactInputSchema,
+    "Review artifact record",
+    ReviewArtifactRecordSchema,
+  ),
+  route(
+    "createReviewDecision",
+    "/v0.2/review-decisions",
+    "review_custody",
+    recordScope("action_contract", "actionContractId", "contract_missing"),
+    "Record a review decision bound to an exact contract and policy input",
+    CreateReviewDecisionInputSchema,
+    "Review decision",
+    ReviewDecisionSchema,
+  ),
+  route(
+    "gatewayCheck",
+    "/v0.2/gateway-check-attempts",
+    "gateway_custody",
+    recordScope("action_contract", "actionContractId", "contract_missing"),
+    "Gateway-side check before mutation",
+    GatewayCheckInputSchema,
+    "Gateway check attempt, mutation outcome, receipt, and optional proof gap",
+    GatewayCheckResponseSchema,
+  ),
+  route(
+    "reconcileSurfaceOperation",
+    "/v0.2/surface-operation-reconciliations",
+    "gateway_custody",
+    recordScope("mutation_attempt", "mutationAttemptId", "mutation_attempt_missing"),
+    "Observe downstream protected-surface operation state without minting retry authority",
+    ReconcileSurfaceOperationInputSchema,
+    "Surface operation reconciliation and proof-gap changes",
+    SurfaceOperationReconciliationResponseSchema,
+  ),
+  route(
+    "createIsolationState",
+    "/v0.2/isolation-states",
+    "control_plane",
+    directBodyScope,
+    "Write durable isolation state checked by policy and gate",
+    CreateIsolationInputSchema,
+    "Isolation state",
+    IsolationStateSchema,
+  ),
+  route(
+    "createBreakerDecision",
+    "/v0.2/breaker-decisions",
+    "control_plane",
+    directBodyScope,
+    "Record a breaker decision and atomically create its isolation state",
+    CreateBreakerDecisionInputSchema,
+    "Breaker decision and resulting isolation state",
+    BreakerDecisionResponseSchema,
+  ),
+  route(
+    "createReceiptExport",
+    "/v0.2/receipt-exports",
+    "control_plane",
+    recordScope("receipt", "receiptId", "receipt_missing"),
+    "Export a tamper-evident receipt drop copy without creating execution proof",
+    CreateReceiptExportInputSchema,
+    "Receipt export",
+    ReceiptExportSchema,
+  ),
+  route(
+    "createRecoveryRecommendation",
+    "/v0.2/recovery-recommendations",
+    "control_plane",
+    recordScope("receipt", "sourceReceiptId", "receipt_missing"),
+    "Recommend a recovery path from refusal or proof-gap evidence without authorizing mutation",
+    CreateRecoveryRecommendationInputSchema,
+    "Recovery recommendation",
+    RecoveryRecommendationSchema,
+  ),
+  route(
+    "transitionRecoveryRecommendationStatus",
+    "/v0.2/recovery-recommendation-status-transitions",
+    "control_plane",
+    recordScope("recovery_recommendation", "recoveryRecommendationId", "recovery_recommendation_missing"),
+    "Record an explicit expired or superseded status transition for a recovery recommendation",
+    TransitionRecoveryRecommendationStatusInputSchema,
+    "Recovery recommendation status change",
+    RecoveryRecommendationStatusResponseSchema,
+  ),
+  route(
+    "resolveRecoveryTerminalConflictProofGap",
+    "/v0.2/recovery-terminal-conflict-resolutions",
+    "control_plane",
+    recordScope("proof_gap", "proofGapId", "proof_gap_missing"),
+    "Resolve a recovery terminal conflict proof gap against the winning terminal transition",
+    ResolveRecoveryTerminalConflictInputSchema,
+    "Resolved recovery terminal conflict proof gap",
+    RecoveryTerminalConflictResolutionResponseSchema,
+  ),
+] as const satisfies readonly TransitionRouteDefinition[];
+
+function route(
+  routeId: TransitionRouteId,
+  path: `/v0.2/${string}`,
+  role: TransitionCallerRole,
+  scopeResolver: TransitionScopeResolver,
+  summary: string,
+  requestSchema: ZodType,
+  responseDescription: string,
+  responseSchema: ZodType,
+): TransitionRouteDefinition {
+  return { routeId, path, role, scopeResolver, summary, requestSchema, responseDescription, responseSchema };
+}

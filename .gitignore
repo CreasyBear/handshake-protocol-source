@@ -6,3 +6,5 @@ dist/
 
 # Local agent planning and technical working state.
 .planning/
+.agents/
+skills-lock.json

@@ -1,4 +1,8 @@
-export { getObjectId, scopeIdsForContract, scopeIdsForGreenlight } from "../protocol/object-registry";
+export {
+  getObjectId,
+  isolationScopeRefsForContract,
+  isolationScopeRefsForGreenlight,
+} from "../protocol/areas/object-registry";
 export type {
   GatewayCheckCommit,
   GatewayCheckCommitResult,
@@ -13,4 +17,4 @@ export type {
   RecoveryTerminalClaim,
   StoredProtocolRecord,
   StreamTail,
-} from "../protocol/store-port";
+} from "../protocol/store/port";
