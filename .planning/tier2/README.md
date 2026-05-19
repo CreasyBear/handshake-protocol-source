@@ -1,66 +1,70 @@
-# Tier 2 X402 System Design Packet
+# Tier 2 Canon-Aligned X402 Design Packet
 
-Status: planning scratch, created 2026-05-19.
+Status: planning scratch, revised 2026-05-19.
 
-This directory is intentionally under `.planning/`. It is not active repo canon.
-It is a design packet for deciding what Tier 2 should become before any source
-implementation begins.
+This packet replaces the first draft. The earlier draft was too centered on a
+local x402 adapter shape. That was misaligned. Tier 2 has to be the first
+bought-product proof of Handshake Protected Actions, with x402 used as one crisp
+example of consequential authority.
+
+Files under `.planning/` are scratch. They are not active repo canon.
 
 ## Invariant at stake
 
-Tier 2 must prove that a generated agent payment attempt cannot become wallet
-authority merely because an x402 buyer library can automatically retry a request
-with a signed payment payload.
+Tier 2 must prove the same authority chain that future hosted and
+provider-integrated Handshake must preserve:
 
-## Goal
+```text
+generated execution evidence
+-> exact action contract
+-> policy decision
+-> one-use gateway-bound greenlight
+-> gateway check before mutation
+-> receipt, refusal, proof gap, isolation, or recovery evidence
+```
 
-Move from Tier 2 concept to feasibility/basic design for a self-hosted protected
-action loop built on the Tier 1 protocol kernel, using one x402 transaction as
-the first proof lens.
-
-The design must answer:
-
-- what exact protected action is being controlled;
-- what generated execution shape produces the candidate;
-- which gateway owns the mutation authority;
-- what policy can greenlight or refuse;
-- how the gateway checks the exact one-use greenlight before mutation;
-- what receipt, refusal, proof-gap, or bypass evidence survives.
+If Tier 2 only proves a local wrapper, it does not create a credible path to
+Tier 3 or Tier 4.
 
 ## Packet
 
-- `01-x402-source-study.md`: primary-source x402 facts, current constraints,
-  and threat pressure.
-- `02-system-design.md`: proposed Tier 2 architecture, flows, components, data
-  contracts, and non-claims.
-- `03-spec.md`: spec-driven implementation target for the first feasible build.
-- `04-doubt-and-review.md`: doubt-driven review plus CEO, engineering, design,
-  and DevEx pressure tests.
+- `00-canon-alignment.md`: what `/docs/internal` requires and what the revised
+  design must not violate.
+- `01-source-study.md`: repo canon plus current x402 facts from primary sources.
+- `02-users-and-tier-pathway.md`: user types and the Tier 2 -> Tier 3 -> Tier 4
+  ladder.
+- `03-x402-architecture.md`: x402 transaction architecture mapped to the kernel.
+- `04-spec-and-doubt-review.md`: spec, adversarial review, and next mechanism.
 
-## Repo anchors
+## Design decision
 
-Current Tier 1 canon says:
+Tier 2 should be:
 
-- `docs/internal/protocol-definition.md`: authority exists only after an exact
-  `ActionContract`, exact policy greenlight, one-use unconsumed `Greenlight`,
-  no blocking isolation, and a gateway check before mutation.
-- `docs/internal/protocol-kernel-architecture.md`: the gateway is the
-  enforcement point; the store is durable reconstruction truth; runtime evidence
-  and review artifacts are not authority.
-- `STRUCTURE.md`: `src/runtime` may propose, `src/adapters` may hold reference
-  gateway fixtures, and `src/conformance` proves posture without creating
-  authority.
+```text
+Handshake Protected Actions, self-hosted mode:
+one coding-agent workflow
+one protected x402 spend
+one customer-owned wallet gateway
+one versioned policy
+one reconstructable receipt/refusal/proof-gap chain
+```
+
+Tier 3 should not replace this loop. It should host operations around it:
+policy management, distribution, retention, search, rollout, audit, and recovery.
+
+Tier 4 should not mean "more integrations." It should mean a provider or
+customer gateway boundary that can actually block mutation and emit compatible
+evidence.
 
 ## Smallest next mechanism
 
-Define the x402 protected action family as:
+Define the Tier 2 x402 proof as a migration-ready protected action family:
 
 ```text
-agent attempts paid request
--> x402 402 offer is captured
--> X402PaymentContract is canonicalized
--> policy greenlights/refuses exact terms
--> WalletGatewayCheck verifies one-use greenlight
--> wallet signs once or refuses
--> receipt/refusal/proof gap is reconstructable
+x402_payment.exact
+ActionContract parameters pinned to x402 V2 evidence
+GatewayRegistryEntry for a customer-owned wallet gateway
+Greenlight with maxUses: 1
+GatewayCheckAttempt that creates PAYMENT-SIGNATURE only after exact verification
+Receipt that can later be retained, searched, and reconciled by hosted operation
 ```
