@@ -207,7 +207,7 @@ APS should expose four safe surfaces over the current kernel.
 | `ProtectedActionMetadata` | Tell an automated client what it may propose and what evidence/policy shape applies. | Must include `authorityCreated: false`, no greenlight, no gateway check, no mutation. |
 | `ProtectedActionRequest` | External proposal envelope that compiles into runtime evidence and candidate action. | Must not bypass intent compilation or canonicalization. |
 | `ProtectedActionChallenge` | Structured refusal/proof-gap navigation. | Must not negotiate authority or hide mutation ambiguity. |
-| `ProtectedActionEvidenceProjection` / transaction envelope | Redacted reconstruction of graph, contract, receipt, idempotency, posture, and proof gaps. | Must never include raw internal records, mutation commands, secrets, or fresh authority. |
+| `ProtectedActionEvidenceProjection` / agent transaction envelope | Redacted reconstruction of graph, contract, receipt, idempotency, posture, and proof gaps. | Must never include raw internal records, mutation commands, secrets, or fresh authority. |
 
 `AuthorityCertificate` can be shown as an optional terminal evidence export once
 there is a terminal receipt/refusal/proof-gap/isolation/recovery state. It must
@@ -429,6 +429,7 @@ compose the source-owned tests into one product story.
 | x402 D1/HTTP | `test/integration/x402-d1-http.test.ts` | Product-level proof that wallet signature appears only after gateway check. |
 | Representation | `test/protocol/representation-contract.test.ts` | Product-level proof that metadata/request/challenge/projection never mint authority. |
 | Authority certificate | `test/protocol/authority-certificate.test.ts` | Product-level proof that terminal evidence can be verified offline without hosted claims. |
+| Adapter-backed APS | `test/product/agent-proof-slice.test.ts` | Product-level proof that x402 plus one non-x402 adapter share the same generic authority/evidence spine. |
 | Claim boundary | `test/architecture/claim-boundary.test.ts` | Product-level proof that runtime ingress stays curated, not root-exported as broad protocol. |
 
 ## Evidence requirements
@@ -483,17 +484,33 @@ Only after the product-level APS proof is green:
 - Hosted evidence navigation in Tier 3.
 - Cross-org verification and clearing-house trust in Tier 4.
 
-## Smallest next mechanism
+## Current product proof
 
-Add one `test/product/agent-proof-slice.test.ts` that uses the current x402
-runtime ingress and D1/HTTP proof profile to assert:
+`test/product/agent-proof-slice.test.ts` now proves the adapter-backed APS spine:
 
 ```text
-runtime can propose and read redacted evidence
-runtime cannot install, evaluate policy, mint greenlight, gateway-check, or sign
-gateway signature appears only after exact gateway admission
-replay, mismatch, raw sibling dispatch, and missing downstream proof become refusal/challenge/proof-gap evidence
-terminal evidence can be locally verified without hosted trust claims
+generated runtime dispatch
+-> adapter-specific proposal helper
+-> generic kernel authority chain
+-> adapter-owned gateway check
+-> receipt / refusal / proof gap
+-> redacted agent transaction envelope projection
+-> terminal AuthorityCertificate
+```
+
+The test keeps x402 as the worked proof profile, verifies raw bypass,
+parameter-mismatch, replay, and proof-gap branches, and includes package-install
+parity to prevent the product proof from becoming payment-specific.
+
+## Smallest next mechanism
+
+Add a first-protected-action walkthrough that wraps the product proof without
+creating new authority surface:
+
+```text
+run the APS product proof
+inspect the generated dispatch, contract, gateway check, envelope, and certificate refs
+show that runtime custody could propose/read evidence but could not install, policy, gateway, sign, mutate, or export
 ```
 
 Do that before building any APS CLI, MCP surface, dashboard, hosted verifier, or

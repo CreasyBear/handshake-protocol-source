@@ -982,6 +982,7 @@ describe("Hono protocol surface", () => {
 
     await client.getGeneratedGraphEvidenceProjection("geg_demo");
     await client.getContractEvidenceProjection("act_demo");
+    await client.getAgentTransactionEnvelopeProjection("act_demo", "runtime_evidence");
     await client.getIdempotencyRecoveryProjection("act_demo");
     await client.getReceiptTimelineProjection("rcp_demo", "runtime_evidence");
     await client.getProtectedPathInstallHealthProjection("act_demo", "runtime_evidence");
@@ -989,7 +990,8 @@ describe("Hono protocol surface", () => {
     expect(calls[0]?.path).toBe("/v0.2/evidence/generated-execution-graphs/geg_demo");
     expect(calls[0]?.method).toBe("GET");
     expect(calls[0]?.headers.get("authorization")).toBe("Bearer review-token");
-    expect(calls[3]?.headers.get("authorization")).toBe("Bearer runtime-token");
+    expect(calls[2]?.headers.get("authorization")).toBe("Bearer runtime-token");
+    expect(calls[4]?.headers.get("authorization")).toBe("Bearer runtime-token");
     expect(calls[0]?.headers.get("x-handshake-protocol-version")).toBe(PROTOCOL_VERSION);
     expect(calls[0]?.headers.get("x-handshake-request-identity")).toBe("sdk-read-request-id");
     expect(calls[0]?.headers.get("content-type")).toBeNull();
@@ -997,6 +999,7 @@ describe("Hono protocol surface", () => {
     expect(calls.map((call) => call.path)).toEqual([
       "/v0.2/evidence/generated-execution-graphs/geg_demo",
       "/v0.2/evidence/contracts/act_demo",
+      "/v0.2/evidence/agent-transactions/act_demo",
       "/v0.2/evidence/idempotency-recovery/act_demo",
       "/v0.2/evidence/receipts/rcp_demo/timeline",
       "/v0.2/evidence/protected-path-install-health/act_demo",

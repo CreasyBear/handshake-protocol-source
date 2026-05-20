@@ -113,20 +113,27 @@ usability layer that preserves the existing primitive:
 - Cross-org verification, conformance marks, external verifier signatures, and
   ecosystem clearing only in Tier 4.
 
-## Smallest next mechanism
+## Current APS proof
 
-Define the minimal local `AgentTransactionEnvelope` projection over existing
-receipt/evidence projection records:
+`test/product/agent-proof-slice.test.ts` now proves that Tier 2 activation can
+sit on the existing adapter framework without adding a protocol primitive:
 
 ```text
-participants
-authority refs
-protected action refs
-gateway check refs
-outcome refs
-proof-gap/recovery refs
-receipt/export digest
+generated runtime dispatch
+-> adapter-specific proposal helper
+-> generic kernel authority chain
+-> adapter-owned gateway check
+-> receipt, refusal, or proof gap
+-> redacted agent transaction envelope
+-> terminal AuthorityCertificate
 ```
 
-It must be read-only, redacted, and unable to mint policy decisions,
-greenlights, gateway checks, receipts, or mutations.
+x402 is the worked proof profile; package install is the non-x402 parity check.
+The envelope is read-only, redacted, and unable to mint policy decisions,
+greenlights, gateway checks, receipts, exports, certificates, or mutations.
+
+## Smallest next mechanism
+
+Wrap the product proof in a first-protected-action walkthrough that shows the
+same evidence refs without introducing CLI/MCP/hosted clearing-house surface
+area.

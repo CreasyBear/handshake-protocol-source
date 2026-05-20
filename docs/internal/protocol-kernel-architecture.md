@@ -383,9 +383,10 @@ mutation-attempted flag.
 ## Redacted Evidence Projections
 
 HTTP and SDK evidence reads expose redacted diagnostic projections for generated
-graphs, action contracts, receipt timelines, and package-install protected-path
-health. These projections are read-only and diagnostic. They do not create
-transition request context records, issue authority, or expose raw
+graphs, action contracts, agent transaction envelopes, idempotency recovery,
+receipt timelines, and protected-path health. These projections are read-only
+and diagnostic. They do not create transition request context records, issue
+authority, export receipts, prove downstream business success, or expose raw
 `internal_only` protocol records.
 
 The generic raw record route enforces `rawReadPosture`. Internal records such

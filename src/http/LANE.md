@@ -10,7 +10,7 @@ Reference transport proof for local and D1-shaped protocol routes. Hosted caller
 
 ## Use cases
 
-Expose protocol transitions and read-only diagnostic evidence over HTTP while preserving custody checks, request context, route metadata, typed errors, and OpenAPI projection.
+Expose protocol transitions and read-only diagnostic evidence, including redacted agent transaction envelopes, over HTTP while preserving custody checks, request context, route metadata, typed errors, and OpenAPI projection.
 
 ## Constraints and assumptions
 

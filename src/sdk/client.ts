@@ -1,5 +1,6 @@
 import type {
   ActionContract,
+  AgentTransactionEnvelopeProjection,
   ActionType,
   BreakerDecision,
   BypassProbe,
@@ -214,6 +215,13 @@ export class HandshakeClient {
     role: EvidenceReadCallerRole = "review_custody",
   ): Promise<ContractEvidenceProjection> {
     return this.get(`/v0.2/evidence/contracts/${encodeURIComponent(actionContractId)}`, role);
+  }
+
+  getAgentTransactionEnvelopeProjection(
+    actionContractId: string,
+    role: EvidenceReadCallerRole = "review_custody",
+  ): Promise<AgentTransactionEnvelopeProjection> {
+    return this.get(`/v0.2/evidence/agent-transactions/${encodeURIComponent(actionContractId)}`, role);
   }
 
   getIdempotencyRecoveryProjection(

@@ -10,7 +10,7 @@ Client ergonomics for invoking the reference HTTP surface. The SDK does not prov
 
 ## Use cases
 
-Let callers invoke public transition routes, route role-scoped tokens, parse typed success/error responses, and read redacted generated-graph evidence projections.
+Let callers invoke public transition routes, route role-scoped tokens, parse typed success/error responses, and read redacted diagnostic evidence projections.
 
 ## Constraints and assumptions
 
@@ -42,7 +42,7 @@ Protocol primitive internals, storage implementations, Hono app internals, runti
 
 ## Public surface
 
-`HandshakeClient`, `HandshakeClientError`, client options, fetch adapter types, transition methods, and redacted generated-graph evidence projection read.
+`HandshakeClient`, `HandshakeClientError`, client options, fetch adapter types, transition methods, and redacted diagnostic evidence projection reads.
 
 ## Extraction trigger
 

@@ -194,16 +194,17 @@ Outside that installed path, Handshake may collect evidence, but it does not
 have enforcement.
 
 The current implementation proves this boundary locally with `x402_payment.exact`
-as one proof profile, reference gateways, memory/D1 stores, redacted projections,
-local payment D1/HTTP harness coverage, hostile local payment bypass/custody
-probes, package-install supply-chain regression binding, internal non-authority
-representation contracts, and public runtime ingress surfaces for local x402
-payment and package-install dispatch boundaries. It enforces x402 per-call spend
-only. It does not prove live provider custody, broad MCP/CLI/browser/shell/network
-runtime interception, hosted operation, external package-material verification,
-x402 spend-window ledger enforcement, cross-org AuthorityCertificate trust,
-live JWKS/revocation, or hosted verifier operation. The local source foundation
-does include AuthorityCertificate minting and offline pinned-key verification.
+as one proof profile, reference gateways, memory/D1 stores, redacted projections
+including agent transaction envelopes, local payment D1/HTTP harness coverage,
+hostile local payment bypass/custody probes, package-install supply-chain
+regression binding, internal non-authority representation contracts, and public
+runtime ingress surfaces for local x402 payment and package-install dispatch
+boundaries. It enforces x402 per-call spend only. It does not prove live provider
+custody, broad MCP/CLI/browser/shell/network runtime interception, hosted
+operation, external package-material verification, x402 spend-window ledger
+enforcement, cross-org AuthorityCertificate trust, live JWKS/revocation, or
+hosted verifier operation. The local source foundation does include
+AuthorityCertificate minting and offline pinned-key verification.
 
 ## Extension Boundary
 

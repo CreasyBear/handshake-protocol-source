@@ -1,5 +1,6 @@
 import type { ZodType } from "zod";
 import {
+  AgentTransactionEnvelopeProjectionSchema,
   ContractEvidenceProjectionSchema,
   GeneratedGraphEvidenceProjectionSchema,
   IdempotencyRecoveryProjectionSchema,
@@ -11,6 +12,7 @@ import type { TransitionCallerRole } from "../admission/caller-auth";
 export type EvidenceReadRouteId =
   | "getGeneratedGraphEvidenceProjection"
   | "getContractEvidenceProjection"
+  | "getAgentTransactionEnvelopeProjection"
   | "getIdempotencyRecoveryProjection"
   | "getReceiptTimelineProjection"
   | "getProtectedPathInstallHealthProjection";
@@ -63,6 +65,22 @@ export const evidenceReadRouteDefinitions = [
       {
         name: "actionContractId",
         description: "Action contract identifier.",
+      },
+    ],
+  },
+  {
+    routeId: "getAgentTransactionEnvelopeProjection",
+    honoPath: "/v0.2/evidence/agent-transactions/:actionContractId",
+    openApiPath: "/v0.2/evidence/agent-transactions/{actionContractId}",
+    roles: evidenceReadRoles,
+    summary: "Read a redacted agent transaction envelope for diagnostics only",
+    responseDescription:
+      "Redacted agent transaction envelope projection. Inspection evidence only; not authority, not receipt export, and not downstream business proof.",
+    responseSchema: AgentTransactionEnvelopeProjectionSchema,
+    pathParameters: [
+      {
+        name: "actionContractId",
+        description: "Action contract identifier used to assemble the redacted transaction envelope.",
       },
     ],
   },

@@ -38,6 +38,7 @@ export const httpTransitionErrorCodes = [
   code("transition_scope_reference_invalid", "scope_resolution", "terminal", "not_started", true),
   code("intent_compilation_missing", "scope_resolution", "terminal", "not_started", true),
   code("contract_missing", "scope_resolution", "terminal", "not_started", true),
+  code("policy_decision_missing", "scope_resolution", "terminal", "not_started", true),
   code("mutation_attempt_missing", "scope_resolution", "terminal", "not_started", true),
   code("receipt_missing", "scope_resolution", "terminal", "not_started", true),
   code("recovery_recommendation_missing", "scope_resolution", "terminal", "not_started", true),
