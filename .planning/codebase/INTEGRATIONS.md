@@ -1,275 +1,170 @@
 # External Integrations
 
 **Analysis Date:** 2026-05-20
+**Current HEAD:** `88e6f16`
+**Scope:** Current tracked docs, source, tests, package/config files, plus visible untracked Tier 1 AuthorityCertificate/kernel work in this checkout. `.planning/` is scratch.
 
 ## APIs & External Services
 
+**HTTP Protocol API:**
+- Hono app - exposes local/Worker HTTP routes for protocol transitions and evidence reads.
+  - SDK/Client: `hono` in `src/http/app.ts`; typed client in `src/sdk/client.ts`.
+  - Auth: role-scoped bearer tokens from `HANDSHAKE_CONTROL_PLANE_TOKEN`, `HANDSHAKE_RUNTIME_EVIDENCE_TOKEN`, `HANDSHAKE_GATEWAY_CUSTODY_TOKEN`, and `HANDSHAKE_REVIEW_CUSTODY_TOKEN`.
+  - Routes: transition definitions in `src/http/routes/transition-route-registry.ts`; evidence-read definitions in `src/http/routes/evidence-read-route-registry.ts`.
+  - OpenAPI: generated from Zod schemas in `src/http/openapi/index.ts` and served at `/openapi.json` by `src/http/app.ts`.
+
 **Cloudflare Runtime:**
-- Cloudflare Workers - Worker HTTP runtime configured by `wrangler.toml` and entered through `src/worker.ts`.
-  - SDK/Client: `wrangler`, `@cloudflare/workers-types`, Hono app from `src/http/app.ts`
-  - Auth: Worker token bindings named in `src/http/admission/caller-auth.ts`
-  - Boundary: This is deployment/runtime wiring, not proof of hosted org auth or provider-side enforcement.
-- Cloudflare D1 - Durable protocol reconstruction store configured as `DB` in `wrangler.toml`.
-  - SDK/Client: Worker `D1Database` binding consumed by `src/storage/d1/index.ts`
-  - Auth: Cloudflare Worker binding, not an application-level token in repo
-  - Boundary: D1 stores protocol evidence and authority state; it does not decide protocol meaning.
-- Cloudflare KV - Non-authoritative isolation cache configured as `CACHE` in `wrangler.toml`.
-  - SDK/Client: Worker `KVNamespace` binding consumed by `src/storage/kv/index.ts`
-  - Auth: Cloudflare Worker binding, not an application-level token in repo
-  - Boundary: KV may cache isolation state; D1 remains durable reconstruction truth.
+- Cloudflare Workers - reference Worker hosting target for the Hono app.
+  - SDK/Client: `wrangler` dev tooling and `@cloudflare/workers-types`.
+  - Auth: Worker binding tokens consumed by `src/http/admission/caller-auth.ts`.
+  - Config: `wrangler.toml` sets `main = "src/worker.ts"`, D1 binding `DB`, KV binding `CACHE`, and compatibility date `2026-05-17`.
 
-**HTTP Transport:**
-- Hono app - Public transition, evidence-read, health, OpenAPI, and internal raw-record routes in `src/http/app.ts`.
-  - SDK/Client: `hono`
-  - Auth: Role-scoped local bearer tokens or hosted caller verifier seam
-  - Boundary: HTTP admission can reject or contextualize requests, but protocol authority and gateway mutation discipline are not decided by Hono.
-- OpenAPI projection - Generated in `src/http/openapi/index.ts` from transition route registries and Zod schemas.
-  - SDK/Client: `zod` JSON schema projection
-  - Auth: OpenAPI marks role bearer schemes from `transitionCallerSecuritySchemeName` in `src/http/admission/caller-auth.ts`
-  - Boundary: OpenAPI is route documentation and schema projection, not execution authority.
-- Typed SDK client - Fetch-based client in `src/sdk/client.ts` for HTTP transitions and redacted evidence reads.
-  - SDK/Client: global `fetch` or injected `HandshakeFetch`
-  - Auth: `transitionToken` or role-scoped `transitionTokens`
-  - Boundary: The client submits requests and parses responses; it cannot infer authority or mutate protected surfaces.
+**x402 Payment Proof Profile:**
+- x402 payment - local protected-action proof profile and gateway fixture, not a live provider SDK integration.
+  - SDK/Client: no external x402 package detected; source-local adapter code lives in `src/adapters/x402-payment/`.
+  - Auth: gateway custody is represented by `X402WalletGatewayProfile.signerCustodyStatus`, `signerRef`, and `authorityHolderRef` in `src/adapters/x402-payment/install-proposal.ts`; HTTP custody still uses `HANDSHAKE_GATEWAY_CUSTODY_TOKEN`.
+  - Runtime proposal: `src/adapters/x402-payment/action-proposal.ts` builds exact `x402_payment.exact` contracts from endpoint/payee/network/token/amount evidence.
+  - Gateway mutation seam: `X402WalletSigningSurface` in `src/adapters/x402-payment/wallet-gateway.ts` signs only after a verified gateway check.
+  - Bypass/conformance: hostile probes live in `src/adapters/x402-payment/bypass-probes.ts`; local conformance exports live through `src/conformance/index.ts`.
+  - Limits: `README.md`, `docs/internal/decisions.md`, and `docs/internal/protocol-notes.md` state that x402 is local foundation evidence only; no live provider custody, hosted verifier, cross-org trust, or spend-window ledger is established.
 
-**Generated Execution And Runtime Evidence:**
-- Package install runtime helper - Converts explicit package-install tool calls into intent compilation and action contract proposal inputs in `src/runtime/package-install/action-proposal.ts`.
-  - SDK/Client: local protocol facade supplied by caller
-  - Auth: none inside helper; caller must route through kernel/HTTP custody
-  - Boundary: Emits proposal evidence only; no greenlight, gateway check, receipt, or mutation.
-- Repo write runtime helper - Converts explicit repo-write attempts into protocol proposal inputs in `src/runtime/repo-write/action-proposal.ts`.
-  - SDK/Client: local protocol facade supplied by caller
-  - Auth: none inside helper
-  - Boundary: Proposal helper only; direct repo mutation is outside this lane.
-- Preview deploy runtime helper - Converts explicit preview deploy attempts into protocol proposal inputs in `src/runtime/preview-deploy/action-proposal.ts`.
-  - SDK/Client: local protocol facade supplied by caller
-  - Auth: none inside helper
-  - Boundary: Proposal helper only; direct deploy provider calls are outside this lane.
-- Codemode multi-action runtime helper - Parses constrained generated programs and preflights package install, repo write, and preview deploy actions in `src/runtime/codemode-multi-action/generated-program-runner.ts`.
-  - SDK/Client: local protocol facade supplied by caller
-  - Auth: none inside helper
-  - Boundary: Records runtime/generated-graph/tool-call evidence and proposes contracts; it refuses sibling leakage before earlier actions receive authority.
+**Package Install Proof Profile:**
+- Package install - protected package-manager action fixture and runtime proposal path.
+  - SDK/Client: no npm registry client package detected; package manager/registry are explicit contract parameters in `src/runtime/package-install/action-proposal.ts`.
+  - Auth: gateway custody via HTTP role token and verified gateway check.
+  - Gateway mutation seam: `PackageInstallMutationSurface` in `src/adapters/package-install/gateway.ts`.
+  - Default registry/package manager posture: `registryRef` defaults to `registry:npmjs` and `packageManager` defaults to `bun` in `src/runtime/package-install/action-proposal.ts`.
+  - Limits: package material evidence is caller-supplied fields (`resolvedMaterialDigest`, `resolvedMaterialEvidenceRefs`); docs state no independent external package-material attestation.
 
-**Reference Gateway Adapters:**
-- Package install reference gateway - `src/adapters/package-install/gateway.ts` checks an exact greenlight before calling caller-supplied `PackageInstallMutationSurface`.
-  - SDK/Client: caller-supplied surface interface, not a hardcoded package manager client
-  - Auth: `VerifiedGatewayCheck`
-  - Boundary: Local reference fixture. It binds observed package manager, registry, manifest, lockfile, install flags, lifecycle-script policy, resolved material digest, and evidence refs, but it does not prove external package-material attestation.
-- Repo write reference gateway - `src/adapters/repo-write/gateway.ts` checks an exact greenlight before calling caller-supplied `RepoWriteMutationSurface`.
-  - SDK/Client: caller-supplied surface interface, not a hardcoded GitHub/Git client
-  - Auth: `VerifiedGatewayCheck`
-  - Boundary: Local reference fixture. It binds repository ref, file path, content digest, and content byte length.
-- Preview deploy reference gateway - `src/adapters/preview-deploy/gateway.ts` checks an exact greenlight before calling caller-supplied `PreviewDeploySurface`.
-  - SDK/Client: caller-supplied surface interface, not a hardcoded Vercel/Cloudflare Pages client
-  - Auth: `VerifiedGatewayCheck`
-  - Boundary: Local reference fixture. It does not prove provider-side deploy custody.
-- x402 payment reference gateway - `src/adapters/x402-payment/wallet-gateway.ts` checks an exact greenlight before calling caller-supplied `X402WalletSigningSurface`.
-  - SDK/Client: caller-supplied signing surface, not a live wallet/provider SDK
-  - Auth: `VerifiedGatewayCheck`
-  - Boundary: Local/reference payment signing path. It records proof gaps when downstream payment status is unknown and does not prove live provider custody.
+**Repository Write / Preview Deploy Fixtures:**
+- Repository write - abstract protected mutation surface for writing repo content after a gateway check.
+  - SDK/Client: no GitHub/Git provider SDK detected; `RepoWriteMutationSurface` is an interface in `src/adapters/repo-write/gateway.ts`.
+  - Auth: gateway custody via HTTP role token and verified gateway check.
+- Preview deploy - abstract protected mutation surface for provider preview deploys.
+  - SDK/Client: no Vercel/Cloudflare Pages/provider SDK detected; `PreviewDeploySurface` is an interface in `src/adapters/preview-deploy/gateway.ts`.
+  - Auth: gateway custody via HTTP role token and verified gateway check.
 
-**Install And Adapter-Pack Contracts:**
-- Generic install proposal compiler contracts - `src/install/install-proposal/index.ts` define `InstallProposal`, `InstallProposalCompiledKernelRecords`, and bypass probe plans.
-  - SDK/Client: Zod schemas
-  - Auth: none; install proposals compile catalog/gateway/envelope records, not policy decisions or greenlights
-- Protected action adapter-pack metadata - `src/install/protected-action-adapter-pack/index.ts` defines adapter-pack shape for action family, parameter schema, endpoint evidence, gateway validator, receipt mapper, probe kinds, and hostile fixtures.
-  - SDK/Client: Zod schemas
-  - Auth: none
-- x402 exact payment adapter pack - `src/adapters/x402-payment/install-proposal.ts` compiles x402 endpoint evidence, wallet gateway profile, and spend bounds into kernel records or refusal reasons.
-  - SDK/Client: local install compiler and Zod schemas
-  - Auth: none; produced records still require policy/gateway transitions
-
-**Conformance:**
-- Protected mutation adapter conformance - `src/conformance/index.ts` checks that a caller-supplied adapter probe does not mutate without a verified gate.
-  - SDK/Client: local probe interface
-  - Auth: none; conformance is a check, not authority
-  - Boundary: Passing means the provided probe did not mutate during that check; it is not standards certification.
-- x402 install conformance - `src/adapters/x402-payment/conformance.ts` checks local posture for signer custody, raw private-key env absence, sibling wrapper blocking, MCP direct payment blocking, token passthrough blocking, wrapper drift absence, and failure-closed behavior.
-  - SDK/Client: local posture object
-  - Auth: none
-  - Boundary: Local posture check only; it does not prove live wallet custody.
-- Bypass probe executors - `src/adapters/protected-path-probes/executor.ts` and `src/adapters/x402-payment/bypass-probes.ts` record local bypass/custody/drift/failure-closed probe evidence.
-  - SDK/Client: caller-supplied probe surfaces
-  - Auth: probe records are gateway custody evidence, not greenlights
-
-**Package And Build Ecosystem:**
-- npm registry dry-run - `scripts/check-package-surface.mjs` runs `npm pack --dry-run --json` to verify package contents.
-  - SDK/Client: local `npm` command through `node:child_process`
-  - Auth: not applicable
-  - Boundary: Packaging check only; no package publish command is configured.
-- Bun package registry - `bun.lock` resolves npm packages for Bun install.
-  - SDK/Client: `bun install --frozen-lockfile`
-  - Auth: not detected in repo; `.npmrc` not detected by the scan
-- GitHub Actions - `.github/workflows/check.yml` runs the repository gate on push and pull request.
-  - SDK/Client: GitHub Actions hosted runner with `oven-sh/setup-bun@v2`
-  - Auth: GitHub Actions runtime credentials are platform-managed and not configured in repo files
+**Runtime Ingress:**
+- Runtime dispatch observer - source-local runtime ingress for package-install and x402 dispatch blocks.
+  - SDK/Client: `./runtime` package subpath exports `proposeRuntimeIngressActionContracts` from `src/runtime/index.ts`.
+  - Auth: runtime evidence role when using HTTP/SDK transitions.
+  - Scope: `src/runtime/ingress/index.ts` records runtime execution, generated execution graph, tool-call drafts, compilation, and contracts/refusals. It does not issue policy decisions, greenlights, gateway checks, receipts, or mutations.
 
 ## Data Storage
 
 **Databases:**
 - Cloudflare D1
-  - Connection: Worker binding `DB` in `wrangler.toml`
-  - Client: `D1ProtocolStore` in `src/storage/d1/index.ts`
-  - Schema: `migrations/0001_protocol_kernel.sql`
-  - Stores: protocol records, stream events, greenlight consumptions, greenlight issuances, idempotency ledger current state, recovery terminal claims, protected path posture current state, isolation state current state, protected surface operation claims, and receipt lookup by mutation attempt.
-  - Boundary: D1 is durable reconstruction truth for the reference implementation.
+  - Connection: Worker binding `DB` in `wrangler.toml` and `WorkerBindings` in `src/http/app-options.ts`.
+  - Client: `D1ProtocolStore` in `src/storage/d1/index.ts` implements `ProtocolStore` from `src/protocol/store/port.ts`.
+  - Schema: `migrations/0001_protocol_kernel.sql` creates `protocol_records`, `stream_events`, `greenlight_consumptions`, `greenlight_issuances`, `idempotency_ledger_current`, `recovery_terminal_claims`, `protected_path_posture_current`, `isolation_state_current`, `protected_surface_operation_claim_current`, and `receipt_by_mutation_attempt`.
+  - Test harness: `test/support/d1-http-harness.ts` uses `bun:sqlite` to emulate D1 for HTTP/D1 integration tests.
 - In-memory store
-  - Connection: none
-  - Client: `InMemoryProtocolStore` in `src/storage/memory/index.ts`
-  - Purpose: Tests, fixtures, and explicitly allowed ephemeral local app stores.
-  - Boundary: It is not a production durability claim.
-- Bun SQLite D1 harness
-  - Connection: local `bun:sqlite` in `test/support/d1-http-harness.ts`
-  - Client: local `LocalD1Database` test harness
-  - Purpose: D1-shaped HTTP tests and integration tests.
-  - Boundary: Test harness only.
+  - Connection: none; constructed directly as `InMemoryProtocolStore` in `src/storage/memory/index.ts`.
+  - Client: used for tests and explicit ephemeral app configuration through `createApp({ allowEphemeralStore: true })` or injected `AppOptions.store`.
 
 **File Storage:**
-- No external file storage service detected.
-- Reference repo write tests use filesystem fixtures under `test/support/repo-write-surface.ts`; reference package manifest tests use filesystem fixtures under `test/support/package-manifest-surface.ts`.
+- No production file storage integration detected.
+- Local filesystem appears in tests and tooling only, such as `test/support/d1-http-harness.ts`, `test/support/repo-write-surface.ts`, and `scripts/check-package-surface.mjs`.
 
 **Caching:**
 - Cloudflare KV
-  - Connection: Worker binding `CACHE` in `wrangler.toml`
-  - Client: `KvIsolationCache` in `src/storage/kv/index.ts`
-  - Purpose: Cache isolation snapshots by `tenantId`, `organizationId`, `scopeType`, and `scopeId`.
-  - Boundary: Cache only; it cannot become policy authority, durable evidence, or greenlight state.
+  - Connection: Worker binding `CACHE` in `wrangler.toml` and `WorkerBindings` in `src/http/app-options.ts`.
+  - Client: `KvIsolationCache` in `src/storage/kv/index.ts`.
+  - Authority posture: `docs/internal/protocol-notes.md` states KV is cache posture only and cannot become authority; D1 is durable reconstruction truth.
 - Noop cache
-  - Client: `NoopIsolationCache` in `src/storage/kv/index.ts`
-  - Purpose: Local fallback where KV cache is not used.
+  - `NoopIsolationCache` in `src/storage/kv/index.ts` provides a non-authoritative fallback cache seam.
 
 ## Authentication & Identity
 
 **Auth Provider:**
-- Local role bearer custody
-  - Implementation: `authorizeTransitionCaller` in `src/http/admission/caller-auth.ts`
-  - Roles: `control_plane`, `runtime_evidence`, `gateway_custody`, `review_custody`
-  - Env vars: `HANDSHAKE_CONTROL_PLANE_TOKEN`, `HANDSHAKE_RUNTIME_EVIDENCE_TOKEN`, `HANDSHAKE_GATEWAY_CUSTODY_TOKEN`, `HANDSHAKE_REVIEW_CUSTODY_TOKEN`
-  - Boundary: Local bearer tokens are fixture/deployment custody, not hosted org auth.
+- Local bearer-token admission
+  - Implementation: `authorizeTransitionCaller` and `authorizeTransitionCallerForAny` in `src/http/admission/caller-auth.ts`.
+  - Custody roles: `control_plane`, `runtime_evidence`, `gateway_custody`, and `review_custody`.
+  - Token source: Worker bindings or injected `AppOptions.callerAuthTokens`.
+  - Security scheme projection: `transitionCallerSecuritySchemeName` in `src/http/admission/caller-auth.ts`; OpenAPI security schemes in `src/http/openapi/index.ts`.
 - Hosted caller verifier seam
-  - Implementation: `HostedCallerVerifier` and `TransitionCallerIdentitySchema` in `src/http/admission/hosted-caller-identity.ts`
-  - Admission: `authorizeHosted` in `src/http/admission/index.ts`
-  - Boundary: Provider-agnostic verifier interface only. No concrete hosted identity provider is configured in the repo.
-
-**Request Identity:**
-- Required transition headers are defined in `src/http/admission/request-context.ts`: `X-Handshake-Protocol-Version`, `X-Handshake-Request-Identity`, and optional `X-Handshake-Originating-Identity`.
-- The SDK sets these headers in `src/sdk/client.ts`; request identity defaults to `crypto.randomUUID()`.
-- Originating identity is accepted only as a `sha256:` digest or opaque `ref:` value by `src/http/admission/request-context.ts`.
+  - Implementation: `HostedCallerVerifier`, `TransitionCallerIdentitySchema`, and scope/freshness checks in `src/http/admission/hosted-caller-identity.ts`.
+  - Configuration: `createApp({ authMode: "hosted", hostedCallerVerifier })` via `src/http/app-options.ts`.
+  - Provider status: no concrete hosted auth provider integration detected; this is an interface seam.
+- Request identity headers
+  - Implementation: `src/http/admission/request-context.ts`.
+  - SDK usage: `src/sdk/client.ts` sends protocol version, request identity, optional originating identity, and bearer tokens.
 
 ## Monitoring & Observability
 
 **Error Tracking:**
-- No external error tracking service detected.
+- None detected. No Sentry, Datadog, Honeycomb, OpenTelemetry, or similar dependency appears in `package.json` or source imports.
 
 **Logs:**
-- No logging framework detected.
-- ESLint in `eslint.config.js` forbids `console` except `console.warn` and `console.error`.
-- HTTP errors are structured as transition error envelopes in `src/http/errors/transition-error-envelope.ts`.
-
-**Protocol Evidence:**
-- Redacted diagnostic evidence reads are implemented in `src/http/handlers/evidence-read.ts` and registered by `src/http/routes/evidence-read-route-registry.ts`.
-- Evidence projections include generated graph evidence, action contract views, idempotency recovery, receipt timelines, and protected path install health.
-- Internal raw records are guarded by object registry raw-read posture through `src/http/handlers/internal-record-read.ts`.
-- Boundary: Evidence reads are diagnostic; they do not create authority or prove downstream business success.
+- Structured HTTP error envelopes are the primary observable failure surface via `src/http/errors/transition-error-envelope.ts` and `HandshakeClientError` in `src/sdk/client.ts`.
+- Evidence reads expose redacted diagnostic projections through `src/http/routes/evidence-read-route-registry.ts` and `src/protocol/evidence-projections/`.
+- Console logging is not an observability strategy; `eslint.config.js` bans `console` except `warn` and `error`.
 
 ## CI/CD & Deployment
 
 **Hosting:**
-- Configured host target: Cloudflare Workers through `wrangler.toml`.
-- Worker entrypoint: `src/worker.ts`.
-- Development command: `npm run dev` executes `wrangler dev`.
+- Cloudflare Workers is the configured runtime target through `wrangler.toml` and `src/worker.ts`.
+- No production deployment workflow is detected in `.github/workflows/check.yml`; local dev command is `npm run dev` -> `wrangler dev`.
 
 **CI Pipeline:**
-- GitHub Actions workflow: `.github/workflows/check.yml`.
-- Trigger: `push` and `pull_request`.
-- Runner: `ubuntu-latest`.
-- Steps: `actions/checkout@v4`, `oven-sh/setup-bun@v2` with Bun `1.3.9`, `bun install --frozen-lockfile`, and `npm run check:repo`.
-
-**Release/Publishing:**
-- No publish command detected.
-- `package.json` is `private: true`.
-- `npm run pack:check` validates the dry-run package surface and generated declarations without publishing.
+- GitHub Actions
+  - Config: `.github/workflows/check.yml`.
+  - Runner: `ubuntu-latest`.
+  - Setup: `oven-sh/setup-bun@v2` with Bun `1.3.9`.
+  - Gate: `bun install --frozen-lockfile` then `npm run check:repo`.
+- Package surface gate
+  - Config: `scripts/check-package-surface.mjs`.
+  - Command: `npm run pack:check` from `package.json`.
+  - Purpose: declaration build plus dry-run package contents guard.
 
 ## Environment Configuration
 
-**Required env vars / bindings:**
-- `DB` - Cloudflare D1 binding in `wrangler.toml`; required for durable Worker protocol state unless an explicit ephemeral test store is injected.
-- `CACHE` - Cloudflare KV binding in `wrangler.toml`; optional/non-authoritative cache wiring.
-- `HANDSHAKE_CONTROL_PLANE_TOKEN` - Local bearer custody for control-plane transition routes.
-- `HANDSHAKE_RUNTIME_EVIDENCE_TOKEN` - Local bearer custody for runtime evidence transition routes.
-- `HANDSHAKE_GATEWAY_CUSTODY_TOKEN` - Local bearer custody for gateway custody transition routes.
-- `HANDSHAKE_REVIEW_CUSTODY_TOKEN` - Local bearer custody for review custody transition routes.
+**Required env vars:**
+- `HANDSHAKE_CONTROL_PLANE_TOKEN` - required for control-plane transition routes in local bearer-token mode.
+- `HANDSHAKE_RUNTIME_EVIDENCE_TOKEN` - required for runtime-evidence transition routes and evidence reads in local bearer-token mode.
+- `HANDSHAKE_GATEWAY_CUSTODY_TOKEN` - required for gateway-custody transition routes in local bearer-token mode.
+- `HANDSHAKE_REVIEW_CUSTODY_TOKEN` - required for review-custody transition routes and evidence reads in local bearer-token mode.
+- `DB` - Cloudflare D1 binding required for durable HTTP endpoints when no explicit `AppOptions.store` fallback is provided.
+- `CACHE` - optional Cloudflare KV binding for isolation cache posture; not durable authority.
 
 **Secrets location:**
-- Expected secret location is Cloudflare Worker binding configuration or explicit local `AppOptions.callerAuthTokens` for tests and local harnesses.
-- No `.env*`, `.npmrc`, credential, or secret files were detected by the scan.
-- Do not commit bearer token values, wallet keys, cloud credentials, or registry tokens.
+- Runtime secrets should be Cloudflare Worker bindings/secrets or injected `AppOptions.callerAuthTokens`; no checked-in secret file was read or found.
+- No repo-root `.env` or `.dev.vars` file is present during this scan. `.gitignore` excludes `.dev.vars`.
+- Test-only tokens appear in `test/support/d1-http-harness.ts` and are fixture values for local tests, not production secrets.
+- AuthorityCertificate signing inputs accept HMAC dev secrets and Ed25519 key material through typed inputs in `src/protocol/areas/authority-certificate/inputs.ts` and signing helpers in `src/protocol/areas/authority-certificate/signing.ts`; source docs state HMAC is dev-only and production verification requires pinned trust material.
 
 ## Webhooks & Callbacks
 
 **Incoming:**
-- Health route: `GET /health` in `src/http/app.ts`.
-- OpenAPI route: `GET /openapi.json` in `src/http/app.ts`.
-- Catalog/control-plane routes:
-  - `POST /v0.2/catalog/tool-capabilities`
-  - `POST /v0.2/catalog/action-types`
-  - `POST /v0.2/catalog/gateways`
-  - `POST /v0.2/envelopes`
-- Runtime evidence routes:
-  - `POST /v0.2/intent-compilations`
-  - `POST /v0.2/runtime-executions`
-  - `POST /v0.2/tool-call-drafts`
-  - `POST /v0.2/tool-call-draft-transitions`
-- Gateway custody routes:
-  - `POST /v0.2/bypass-probes`
-  - `POST /v0.2/protected-path-postures`
-  - `POST /v0.2/gateway-check-attempts`
-  - `POST /v0.2/surface-operation-reconciliations`
-- Control/recovery routes:
-  - `POST /v0.2/action-contracts`
-  - `POST /v0.2/policy-decisions`
-  - `POST /v0.2/isolation-states`
-  - `POST /v0.2/breaker-decisions`
-  - `POST /v0.2/receipt-exports`
-  - `POST /v0.2/recovery-recommendations`
-  - `POST /v0.2/recovery-recommendation-status-transitions`
-  - `POST /v0.2/recovery-terminal-conflict-resolutions`
-- Review custody routes:
-  - `POST /v0.2/review-artifacts`
-  - `POST /v0.2/review-decisions`
-- Redacted evidence read routes:
-  - `GET /v0.2/evidence/generated-execution-graphs/:generatedExecutionGraphId`
-  - `GET /v0.2/evidence/contracts/:actionContractId`
-  - `GET /v0.2/evidence/idempotency-recovery/:actionContractId`
-  - `GET /v0.2/evidence/receipts/:receiptId/timeline`
-  - `GET /v0.2/evidence/protected-path-install-health/:actionContractId`
-- Internal raw record route:
-  - `GET /v0.2/records/:objectType/:objectId`
-  - Boundary: `src/http/handlers/internal-record-read.ts` enforces object registry raw-read posture; internal-only records are not generic HTTP read surfaces.
+- `/health` - health check from `src/http/app.ts`.
+- `/openapi.json` - OpenAPI projection from `src/http/openapi/index.ts`.
+- `/v0.2/catalog/tool-capabilities` - register durable tool capability.
+- `/v0.2/catalog/action-types` - register durable action type.
+- `/v0.2/catalog/gateways` - register gateway binding.
+- `/v0.2/envelopes` - register operating envelope.
+- `/v0.2/runtime-executions` - record runtime execution evidence.
+- `/v0.2/bypass-probes` - record bypass probe evidence.
+- `/v0.2/tool-call-drafts` and `/v0.2/tool-call-draft-transitions` - record generated tool-call input state.
+- `/v0.2/intent-compilations` - compile intent to candidate/refusal evidence.
+- `/v0.2/action-contracts` - propose exact action contract.
+- `/v0.2/policy-decisions` - evaluate policy and optionally issue one-use greenlight.
+- `/v0.2/review-artifacts` and `/v0.2/review-decisions` - record exact-bound review evidence.
+- `/v0.2/gateway-check-attempts` - gateway-side pre-mutation check.
+- `/v0.2/surface-operation-reconciliations` - downstream operation observation without retry authority.
+- `/v0.2/isolation-states` and `/v0.2/breaker-decisions` - durable isolation posture.
+- `/v0.2/receipt-exports`, `/v0.2/recovery-recommendations`, `/v0.2/recovery-recommendation-status-transitions`, and `/v0.2/recovery-terminal-conflict-resolutions` - evidence export and recovery transitions.
+- Evidence reads under `/v0.2/evidence/...` are defined in `src/http/routes/evidence-read-route-registry.ts`.
+- Raw internal record reads under `/v0.2/records/:objectType/:objectId` are handled by `src/http/handlers/internal-record-read.ts` and constrained by object registry read posture.
 
 **Outgoing:**
-- No hardcoded external HTTP API clients detected in `src/`.
-- Reference gateway adapters call caller-supplied mutation surfaces:
-  - `PackageInstallMutationSurface` in `src/adapters/package-install/gateway.ts`
-  - `RepoWriteMutationSurface` in `src/adapters/repo-write/gateway.ts`
-  - `PreviewDeploySurface` in `src/adapters/preview-deploy/gateway.ts`
-  - `X402WalletSigningSurface` in `src/adapters/x402-payment/wallet-gateway.ts`
-- Outgoing package, repository, deploy, or wallet/provider calls are deliberately outside the kernel and must be owned by installed gateways or test fixtures.
-
-## Local vs External Boundary
-
-**Local Kernel Foundation:**
-- `src/protocol/`, `src/storage/`, `src/http/`, `src/runtime/`, `src/adapters/`, `src/install/`, `src/conformance/`, and `src/sdk/` establish local source/test proof of the protected-action kernel chain.
-- Tests under `test/http`, `test/integration`, `test/runtime`, `test/adapters`, `test/conformance`, and `test/protocol` exercise local D1/HTTP flows, runtime proposals, adapter gateways, conformance probes, and protocol invariants.
-
-**External Claims Not Established:**
-- No live hosted org auth provider is configured.
-- No live Cloudflare deployment or production D1/KV instance is proven by repo files alone.
-- No direct public MCP/runtime/browser interception surface is implemented.
-- No external package-manager material attestation client is implemented.
-- No live wallet custody or payment provider integration is implemented.
-- No provider-side deploy enforcement client is implemented.
-- No generic GitHub/Git provider mutation client is implemented.
+- No direct outgoing webhooks detected.
+- `HandshakeClient` in `src/sdk/client.ts` performs outgoing HTTP requests to a configured Handshake base URL.
+- Adapter mutation surfaces are caller-provided interfaces rather than provider SDK calls:
+  - `X402WalletSigningSurface` in `src/adapters/x402-payment/wallet-gateway.ts`.
+  - `PackageInstallMutationSurface` in `src/adapters/package-install/gateway.ts`.
+  - `RepoWriteMutationSurface` in `src/adapters/repo-write/gateway.ts`.
+  - `PreviewDeploySurface` in `src/adapters/preview-deploy/gateway.ts`.
+- The source does not directly call external payment, package registry, Git hosting, preview deploy, telemetry, or auth provider APIs.
 
 ---
 
