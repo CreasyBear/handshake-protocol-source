@@ -2,7 +2,7 @@
 
 Handshake is contracted execution infrastructure for engineering agents.
 
-Last canonical audit: 2026-05-19.
+Last canonical audit: 2026-05-20.
 
 This checkout is the TypeScript protocol kernel for protected action control:
 
@@ -17,9 +17,12 @@ vague principal intent
 -> one-use greenlight or refusal
 -> gateway check before mutation
 -> receipt, refusal, or proof gap
+-> optional terminal AuthorityCertificate
 ```
 
 The kernel does not claim hosted operation, provider-side enforcement, broad agent governance, or downstream business success. A path is protected only when the gateway owns the mutation credential and verifies the exact greenlight before mutation.
+
+Current local foundation status: source and tests cover the protected-action kernel chain, derived lifecycle evidence, idempotency ledger, redacted evidence projections, terminal AuthorityCertificate minting and offline pinned-key verification, package-install supply-chain gate binding, the local x402 payment D1/HTTP durable path, local hostile x402 bypass/custody probes, and public runtime ingress for local x402 payment and package-install dispatch boundaries. x402 is a local proof profile; package install remains a regression fixture. No adapter family defines the protocol. This is local kernel foundation, not live provider custody, hosted operation, generic MCP/runtime control, external package-material attestation, cross-org AuthorityCertificate trust, live JWKS/revocation, hosted verifier operation, or spend-window ledger enforcement. Runtime ingress is observer/compiler evidence and current x402 spend enforcement is per-call only; session/day/review spend windows are metadata until a ledger exists.
 
 ## Repo Truth
 
@@ -64,8 +67,11 @@ src/
     events/          stream events, chains, and record commits
     context/         transition request context records
     navigation/      protocol transition metadata
+    evidence-projections/
+                     redacted diagnostic projections
     store/           protocol store port
     areas/           owned protocol primitives
+  install/           protected-action install proposal compiler
   http/
     app.ts
     app-options.ts

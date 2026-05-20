@@ -1,6 +1,6 @@
 # Protocol Kernel Architecture And Schema
 
-Last protocol architecture audit: 2026-05-19.
+Last protocol architecture audit: 2026-05-20.
 
 This document is the canonical architecture and schema map for the Handshake
 protocol kernel. It expands `docs/internal/protocol-definition.md` without
@@ -32,24 +32,45 @@ The gateway, not the runtime, is the enforcement point. The store is durable
 reconstruction truth. Runtime evidence and review artifacts are inputs, not
 authority.
 
+## Local Establishment Boundary
+
+The current foundation is locally established for source and test
+purposes. It covers the protocol state machine, memory and D1 persistence,
+reference gateways, `x402_payment.exact` as one proof profile, local x402 payment
+D1/HTTP establishment, local hostile x402 bypass/custody probe records,
+package-install supply-chain regression binding,
+idempotency recovery projection, non-authority representation schemas, and
+public runtime ingress surfaces for local x402 payment and package-install
+dispatch boundaries.
+
+It is not an external establishment claim. Live provider custody, hosted
+operation, broad MCP/CLI/browser/shell/network runtime ingestion, independent
+package-material attestation, x402 spend-window ledger enforcement, cross-org
+AuthorityCertificate trust, live JWKS/revocation, and hosted verifier operation
+remain outside this kernel. Local AuthorityCertificate minting and offline
+pinned-key verification are part of the source foundation. Current x402
+spend enforcement is per-call only; session/day/review windows are metadata
+until a ledger exists.
+
 ## Source Ownership
 
-| Path                      | Owns                                                                                      |
-| ------------------------- | ----------------------------------------------------------------------------------------- |
-| `src/protocol/kernel.ts`  | Transition facade over protocol areas.                                                    |
-| `src/protocol/public`     | Public schema and input aggregation.                                                      |
-| `src/protocol/foundation` | Canonicalization, IDs, reason codes, errors, base schemas, transition guards.             |
-| `src/protocol/events`     | Stream event schemas, digest chains, and record commit helpers.                           |
-| `src/protocol/context`    | Transition request context records.                                                       |
-| `src/protocol/navigation` | Transition metadata, phase, records written, authority boundary, and evidence obligation. |
-| `src/protocol/store`      | Store port and atomic commit contracts.                                                   |
-| `src/protocol/areas`      | Owned protocol primitives and state transitions.                                          |
-| `src/http`                | Hono/Worker transport and route dispatch.                                                 |
-| `src/runtime`             | Runtime proposal helpers and generated-execution adapters.                                |
-| `src/adapters`            | Reference gateway fixtures that mutate only after verified gateway checks.                |
-| `src/conformance`         | Reference conformance probes, not standards certification.                                |
-| `src/storage`             | D1, memory, KV, and store plumbing.                                                       |
-| `src/sdk`                 | Typed HTTP client ergonomics.                                                             |
+| Path                                | Owns                                                                                      |
+| ----------------------------------- | ----------------------------------------------------------------------------------------- |
+| `src/protocol/kernel.ts`            | Transition facade over protocol areas.                                                    |
+| `src/protocol/public`               | Public schema and input aggregation.                                                      |
+| `src/protocol/foundation`           | Canonicalization, IDs, reason codes, errors, base schemas, transition guards.             |
+| `src/protocol/events`               | Stream event schemas, digest chains, and record commit helpers.                           |
+| `src/protocol/context`              | Transition request context records.                                                       |
+| `src/protocol/navigation`           | Transition metadata, phase, records written, authority boundary, and evidence obligation. |
+| `src/protocol/evidence-projections` | Redacted diagnostic projections derived from protocol records.                            |
+| `src/protocol/store`                | Store port and atomic commit contracts.                                                   |
+| `src/protocol/areas`                | Owned protocol primitives and state transitions.                                          |
+| `src/http`                          | Hono/Worker transport and route dispatch.                                                 |
+| `src/runtime`                       | Runtime ingress and proposal helpers; observer/compiler evidence, not authority.          |
+| `src/adapters`                      | Reference gateway fixtures that mutate only after verified gateway checks.                |
+| `src/conformance`                   | Reference conformance probes, not standards certification.                                |
+| `src/storage`                       | D1, memory, KV, and store plumbing.                                                       |
+| `src/sdk`                           | Typed HTTP client ergonomics.                                                             |
 
 ## Kernel Transition Surface
 
@@ -61,9 +82,12 @@ surface:
 | `putCatalogObject`                        | catalog                   | Registers immutable catalog/envelope records; catalog presence is not authorization.                  |
 | `createRuntimeExecution`                  | runtime evidence          | Records execution-block shape without authority.                                                      |
 | `createGeneratedExecutionGraph`           | generated execution graph | Records generated-code/spec graph evidence and coverage posture.                                      |
-| `createProtectedPathPosture`              | protected path posture    | Records current installation, bypass, and drift posture.                                              |
+| `createBypassProbe`                       | bypass probe              | Records protected-path bypass evidence without creating posture or authority.                         |
+| `createToolCallDraft`                     | tool-call draft           | Records streamed/generated tool-call input state before candidate construction.                       |
+| `createProtectedPathPosture`              | protected path posture    | Records probe-backed current installation, bypass, and drift posture.                                 |
 | `compileIntent`                           | intent compilation        | Emits a candidate action or compiler refusal.                                                         |
 | `proposeActionContract`                   | action contract           | Canonicalizes a contractable candidate into exact proposed commitment.                                |
+| `createAuthorityCertificate`              | authority certificate     | Signs existing terminal evidence; creates no policy, greenlight, gateway check, or mutation proof.    |
 | `evaluatePolicy`                          | policy                    | Records greenlight, refusal, review requirement, halt, or quarantine.                                 |
 | `createReviewArtifact`                    | review                    | Records a rendered review artifact bound to exact digests.                                            |
 | `createReviewDecision`                    | review                    | Records a reviewer decision bound to the artifact and contract.                                       |
@@ -81,34 +105,39 @@ surface:
 Every durable object is stored as a `ProtocolRecord` discriminated by
 `objectType`.
 
-| Object type                                 | Schema owner                | Role                                                                       |
-| ------------------------------------------- | --------------------------- | -------------------------------------------------------------------------- |
-| `tool_capability`                           | `catalog-envelope`          | Callable runtime capability and bypass posture.                            |
-| `action_type`                               | `catalog-envelope`          | Declared consequential action type.                                        |
-| `gateway_registry_entry`                    | `catalog-envelope`          | Gateway adapter, policy version, credential custody, and enforcement mode. |
-| `operating_envelope`                        | `catalog-envelope`          | Attempt bounds for principal, agent, resources, gateways, and policy pack. |
-| `transition_request_context`                | `context`                   | Caller and request context evidence.                                       |
-| `runtime_execution`                         | `runtime-evidence`          | Runtime execution-block evidence.                                          |
-| `generated_execution_graph`                 | `generated-execution-graph` | Generated-code/spec evidence and coverage posture.                         |
-| `protected_path_posture`                    | `protected-path-posture`    | Installed, bypass, drift, or unknown posture for a protected path.         |
-| `intent_compilation`                        | `intent-compilation`        | Candidate action, assumptions, uncertainty, and compiler refusal posture.  |
-| `action_contract`                           | `action-contract`           | Exact proposed protected action.                                           |
-| `policy_decision`                           | `policy-greenlight`         | Decision against one exact contract.                                       |
-| `greenlight`                                | `policy-greenlight`         | One-use gateway-bound pass.                                                |
-| `review_artifact`                           | `review-binding`            | Rendered review artifact bound to exact digests.                           |
-| `review_decision`                           | `review-binding`            | Reviewer decision bound to artifact and contract.                          |
-| `breaker_decision`                          | `isolation-breaker`         | Control decision that changes future authority posture.                    |
-| `isolation_state`                           | `isolation-breaker`         | Persistent block or reduction for future policy/gateway checks.            |
-| `gateway_check_attempt`                     | `gateway-gate`              | Pre-mutation gateway verification result.                                  |
-| `mutation_attempt`                          | `gateway-gate`              | Protected mutation attempt evidence.                                       |
-| `protected_surface_operation_claim`         | `operation-lifecycle`       | Claim over downstream protected-surface operation state.                   |
-| `surface_operation_reconciliation`          | `operation-lifecycle`       | Downstream finality observation.                                           |
-| `proof_gap`                                 | `proof-gap`                 | Missing, ambiguous, expired, unavailable, or contradictory evidence.       |
-| `receipt`                                   | `receipt-export`            | Reconstructable action chain evidence.                                     |
-| `receipt_export`                            | `receipt-export`            | Export package of existing receipt evidence.                               |
-| `recovery_recommendation`                   | `recovery`                  | Follow-up recommendation after refusal, gap, or ambiguous outcome.         |
-| `recovery_recommendation_status_transition` | `recovery`                  | Recovery lifecycle state change.                                           |
-| `contract_stream_event`                     | `events`                    | Ordered event evidence for reconstruction.                                 |
+| Object type                                 | Schema owner                | Role                                                                        |
+| ------------------------------------------- | --------------------------- | --------------------------------------------------------------------------- |
+| `tool_capability`                           | `catalog-envelope`          | Callable runtime capability and bypass posture.                             |
+| `action_type`                               | `catalog-envelope`          | Declared consequential action type.                                         |
+| `gateway_registry_entry`                    | `catalog-envelope`          | Gateway adapter, policy version, credential custody, and enforcement mode.  |
+| `operating_envelope`                        | `catalog-envelope`          | Attempt bounds for principal, agent, resources, gateways, and policy pack.  |
+| `transition_request_context`                | `context`                   | Caller and request context evidence.                                        |
+| `runtime_execution`                         | `runtime-evidence`          | Runtime execution-block evidence.                                           |
+| `generated_execution_graph`                 | `generated-execution-graph` | Generated-code/spec evidence and coverage posture.                          |
+| `bypass_probe`                              | `bypass-probe`              | Named bypass/custody/drift/failure-closed probe evidence.                   |
+| `tool_call_draft`                           | `tool-call-draft`           | Generated tool-call input state before candidate finalization.              |
+| `protected_path_posture`                    | `protected-path-posture`    | Installed, bypass, drift, or unknown posture for a protected path.          |
+| `intent_compilation`                        | `intent-compilation`        | Candidate action, assumptions, uncertainty, and compiler refusal posture.   |
+| `action_contract`                           | `action-contract`           | Exact proposed protected action.                                            |
+| `authority_certificate`                     | `authority-certificate`     | Terminal signed evidence for receipt, refusal, proof gap, or replay.        |
+| `policy_decision`                           | `policy-greenlight`         | Decision against one exact contract.                                        |
+| `greenlight`                                | `policy-greenlight`         | One-use gateway-bound pass.                                                 |
+| `idempotency_ledger_entry`                  | `idempotency-ledger`        | Duplicate-authority ledger entry for one protected idempotency scope.       |
+| `review_artifact`                           | `review-binding`            | Rendered review artifact bound to exact digests.                            |
+| `review_decision`                           | `review-binding`            | Reviewer decision bound to artifact and contract.                           |
+| `breaker_decision`                          | `isolation-breaker`         | Control decision that changes future authority posture.                     |
+| `isolation_state`                           | `isolation-breaker`         | Persistent block or reduction for future policy/gateway checks.             |
+| `gateway_check_attempt`                     | `gateway-gate`              | Pre-mutation gateway verification result.                                   |
+| `mutation_attempt`                          | `gateway-gate`              | Protected mutation attempt evidence.                                        |
+| `protected_surface_operation_claim`         | `operation-lifecycle`       | Claim over downstream protected-surface operation state.                    |
+| `surface_operation_reconciliation`          | `operation-lifecycle`       | Downstream finality observation.                                            |
+| `proof_gap`                                 | `proof-gap`                 | Missing, ambiguous, expired, unavailable, or contradictory evidence.        |
+| `refusal`                                   | `refusal`                   | Durable denial evidence that creates no authority and attempts no mutation. |
+| `receipt`                                   | `receipt-export`            | Reconstructable action chain evidence.                                      |
+| `receipt_export`                            | `receipt-export`            | Export package of existing receipt evidence.                                |
+| `recovery_recommendation`                   | `recovery`                  | Follow-up recommendation after refusal, gap, or ambiguous outcome.          |
+| `recovery_recommendation_status_transition` | `recovery`                  | Recovery lifecycle state change.                                            |
+| `contract_stream_event`                     | `events`                    | Ordered event evidence for reconstruction.                                  |
 
 ## Schema Backbone
 
@@ -134,9 +163,15 @@ Catalogs define what can be proposed. They do not authorize mutation.
 
 ### Runtime And Compilation
 
-- `RuntimeExecution` records runtime execution shape.
+- `RuntimeExecution` records runtime execution shape. `tool_dispatch_chain`
+  means observed local tool-dispatch evidence; it does not claim MCP, browser,
+  shell, network, or provider interception.
 - `GeneratedExecutionGraph` records generated-code/spec graph evidence and
   coverage posture.
+- `ToolCallDraft` records opened, streaming, finalized, invalid, or abandoned
+  generated tool-call input. Generated execution candidates require a fresh
+  finalized draft whose params digest and graph-node binding match the
+  candidate.
 - `IntentCompilationRecord` ties principal intent, agent, runtime adapter,
   envelope, catalogs, gateway registry, assumptions, uncertainty markers,
   required evidence, compiler version, and one `CandidateAction`.
@@ -176,17 +211,20 @@ The contract is exact proposed commitment. It is not execution authority.
 
 - `PolicyDecision` binds one contract to a policy pack/version, evaluator
   version, policy input digest, decision, reason code, matched rules, required
-  receipt level, isolation snapshot, expiry, and optional signature.
+  receipt level, isolation snapshot, expiry, signature posture, key identity,
+  verification policy, and optional local signature.
 - `ReviewArtifactRecord` binds a rendered artifact to the exact contract digest,
-  policy input digest, rendered uncertainty digest, artifact digest, and gateway
-  policy version.
+  policy input digest, rendered uncertainty digest, artifact digest, catalog
+  digest, renderer digest, action-binding digest, hidden-action posture,
+  secondary-action posture, and gateway policy version.
 - `ReviewDecision` binds the reviewer, review artifact digest, contract digest,
   policy input digest, gateway policy version, decision, reason, expiry, and
   attestation.
 - `Greenlight` binds one contract, one policy decision, one gateway registry
   entry/version, one gateway, one action class, one resource, required protected
   path state, params digest, contract digest, `maxUses: 1`, validity window,
-  isolation snapshot, required receipt level, and consumption state.
+  isolation snapshot, required receipt level, signature posture, key identity,
+  verification policy, and consumption state.
 
 Review may inform policy. Review is not authority by itself.
 
@@ -209,11 +247,34 @@ Review may inform policy. Review is not authority by itself.
 The gateway check is the enforcement point. The receipt is reconstruction
 evidence, not business success.
 
+### Idempotency Ledger
+
+`IdempotencyLedgerEntry` binds tenant, organization, gateway, action class,
+protected surface, resource, idempotency key, and params digest. Policy reserves
+that scope before greenlight issuance. Same-key/same-params duplicate attempts
+record refusal/reuse evidence instead of minting fresh authority. Same-key with
+different params refuses. Gateway and reconciliation transitions advance the
+ledger through mutation-started and terminal states.
+
+The ledger closes duplicate authority across newly proposed contracts. It does
+not make ambiguous downstream finality safe to retry without a new explicit
+path.
+
+### Protected Path Probes
+
+`BypassProbe` records named evidence for credential custody, raw sibling
+blocking, MCP direct-call blocking, token-passthrough blocking, wrapper drift,
+and failure-closed behavior. A caller-reported `gateway_checked` posture is not
+enough. Policy and gateway checks accept `gateway_checked` only when current
+probe coverage is fresh, scope-bound, and passing.
+
 ### Refusal, Proof Gap, Isolation, Recovery
 
 - `Refusal` records phase, relevant object refs, reason code, reason, evidence
   refs, refusal time, and hard flags that authority was not created and mutation
   was not attempted.
+- Refusal is stored as a protocol object. Transitions that deny authority must
+  write it explicitly; it is not a generic log side effect.
 - `ProofGap` records missing, ambiguous, expired, unavailable, or contradictory
   evidence tied to the affected objects.
 - `IsolationState` records a future policy/gateway block or authority
@@ -228,6 +289,8 @@ stateDiagram-v2
   [*] --> CatalogRegistered
   CatalogRegistered --> RuntimeEvidenceRecorded
   RuntimeEvidenceRecorded --> GeneratedExecutionGraphRecorded
+  RuntimeEvidenceRecorded --> ToolCallDraftRecorded
+  ToolCallDraftRecorded --> IntentCompilationRecorded
   RuntimeEvidenceRecorded --> IntentCompilationRecorded
   GeneratedExecutionGraphRecorded --> IntentCompilationRecorded
   IntentCompilationRecorded --> CandidateRejected
@@ -259,7 +322,7 @@ stateDiagram-v2
 ## Store And Atomicity
 
 `ProtocolStore` owns durable records, stream tails, stream events, current
-protected path posture, protected-surface operation claims, receipt lookup by
+protected path posture, idempotency ledger entries, protected-surface operation claims, receipt lookup by
 mutation attempt, isolation state lookup, greenlight consumption, protocol
 commits, and gateway-check commits.
 
@@ -268,6 +331,7 @@ Authority-bearing commits must preserve:
 - immutable record identity by canonical digest;
 - ordered stream events;
 - one greenlight issuance per contract;
+- one idempotency ledger reservation per protected idempotency scope;
 - one greenlight consumption per gateway attempt;
 - protected-surface operation claim conflict detection;
 - recovery terminal conflict detection;
@@ -305,6 +369,7 @@ Conflicts narrow authority:
 - review rejection or expiry: review refusal or policy refusal;
 - active isolation: policy or gateway refusal;
 - replayed greenlight: gateway replay refusal;
+- duplicate idempotency scope: policy refusal without a second greenlight;
 - params/resource/idempotency drift: gateway refusal;
 - incompatible gateway policy drift: gateway refusal;
 - operation claim conflict: refusal or proof gap;
@@ -314,6 +379,18 @@ Conflicts narrow authority:
 Deny events are durable evidence. They should be queryable by phase, reason
 code, object refs, policy version, gateway version, authority-created flag, and
 mutation-attempted flag.
+
+## Redacted Evidence Projections
+
+HTTP and SDK evidence reads expose redacted diagnostic projections for generated
+graphs, action contracts, receipt timelines, and package-install protected-path
+health. These projections are read-only and diagnostic. They do not create
+transition request context records, issue authority, or expose raw
+`internal_only` protocol records.
+
+The generic raw record route enforces `rawReadPosture`. Internal records such
+as stream events, idempotency ledger entries, bypass probes, and tool-call
+drafts remain inaccessible through raw HTTP reads.
 
 ## Extension Boundary
 

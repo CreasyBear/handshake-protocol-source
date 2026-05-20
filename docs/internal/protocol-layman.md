@@ -1,6 +1,6 @@
 # Plain-English Protocol Guide
 
-Last plain-language protocol audit: 2026-05-19.
+Last plain-language protocol audit: 2026-05-20.
 
 This document translates `docs/internal/protocol-definition.md` and
 `docs/internal/protocol-kernel-architecture.md` into plain language. If this
@@ -35,13 +35,14 @@ Ship the preview.
 Handshake forces the agent to produce the exact work order:
 
 ```text
-action: package_install
-package: hono
-version: ^4.12.19
-manifest: apps/api/package.json
-package manager: bun
-expected side effect: edit dependency manifest
-gateway: package-install-gateway
+action: x402_payment.exact
+endpoint: https://api.example.test/report
+payee: 0x1234...abcd
+network: base-sepolia
+token: USDC
+amount: 2500 atomic units
+expected side effect: wallet payment signature for one paid request
+gateway: x402-wallet-gateway
 ```
 
 That exact work order is the action contract.
@@ -96,6 +97,20 @@ That record is a receipt.
 
 A receipt proves the Handshake chain. It does not prove the action was useful,
 safe, profitable, or successful everywhere downstream.
+
+## What This Repo Proves Today
+
+This repo proves the local kernel mechanics: exact work orders, one-use passes,
+gateway checks, refusals, proof gaps, idempotency duplicate handling, local D1
+reconstruction, x402 payment runtime ingress, local payment gateway fixture
+coverage, package-install regression binding, and representation shapes that
+cannot create permission.
+
+It does not prove a live hosted service, a real external payment provider gateway,
+generic MCP/runtime control, x402 spend-window ledger enforcement, or independent
+package-material verification. It does include local AuthorityCertificate
+minting and offline pinned-key verification, but not cross-org trust, live key
+revocation, hosted verify APIs, marketplace certification, or provider custody.
 
 ## The Whole Flow
 

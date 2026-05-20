@@ -1,6 +1,6 @@
 # Decisions
 
-Last canonical audit: 2026-05-19.
+Last canonical audit: 2026-05-20.
 
 ## Canonical Source Set
 
@@ -45,7 +45,76 @@ exact action contract
 -> receipt, refusal, or proof gap
 ```
 
-The first credible wedge remains engineering-agent actions: preview deploys, package installs, CI/release changes, repository writes with downstream consequence, cloud configuration mutations, and database/data-plane operations.
+The first credible domain remains engineering-agent actions: x402 payments,
+preview deploys, package installs, CI/release changes, repository writes with
+downstream consequence, cloud configuration mutations, and database/data-plane
+operations. Current adapter families are proof profiles and regression lanes.
+No adapter family defines the protocol shape.
+
+## Foundation Status
+
+Accepted: the current source foundation is locally established for the
+protocol kernel boundary, not for external provider operation.
+
+The local foundation includes:
+
+- exact contract -> policy decision -> one-use greenlight -> gateway check ->
+  receipt/refusal/proof-gap;
+- derived `ActionAttemptLifecycle` evidence over source-owned transitions, with
+  no stored lifecycle object and no lifecycle authority;
+- idempotency ledger reservation before greenlight issuance, duplicate refusal,
+  and read-only prior-evidence projection;
+- probe-backed protected-path posture, with local hostile bypass/custody probes;
+- package-install observed supply-chain parameters bound at the gateway before
+  mutation;
+- local x402 payment D1/HTTP establishment path through install, runtime
+  proposal, policy, gateway check, wallet fixture execution, proof gap, and
+  replay refusal;
+- public runtime ingress for local x402 payment and package-install dispatch
+  boundaries, including wrapped dispatch, dynamic/late-bound refusal, loop/retry
+  sequencing, raw sibling bypass refusal, and truncated graph refusal;
+- redacted diagnostic evidence projections for contracts, generated graphs,
+  receipt timelines, idempotency recovery, transaction envelopes, and install
+  health;
+- internal representation contracts proving Metadata, Challenge, Request, and
+  EvidenceProjection shapes cannot create authority.
+
+### AuthorityCertificate
+
+`AuthorityCertificate` and `verifyAuthorityCertificate()` are landed local
+foundation kernel/protocol primitives. The certificate is a terminal signed evidence object
+for receipt, durable refusal, proof gap, or replay refusal outcomes. It is Layer
+8 authority evidence only: it does not create greenlights, gateway checks,
+mutation proof, identity, settlement, marketplace status, or hosted trust.
+
+Source anchors:
+
+- `src/protocol/areas/authority-certificate/`
+- `test/protocol/authority-certificate.test.ts`
+- `src/protocol/navigation/index.ts`
+- `src/protocol/areas/object-registry/`
+
+Planning lineage:
+
+- `.planning/strategy/authority-certificate-foundation.md`
+- `.planning/strategy/autoreason/foundation/pass_02/synthesis.md`
+- kernel establishment delta planning scratch, K-D9-K-D12
+
+The verifier recomputes canonical `signingInput`, checks envelope digest
+binding, verifies pinned Ed25519 signer material, rejects production
+HMAC/propose-time `contractSignature` as portable trust, fails tamper,
+missing-signer, replay/terminal-binding mismatches, and verifies exported cert
+JSON without the protocol store.
+
+The local foundation does not prove:
+
+- live/provider payment custody;
+- hosted org auth, policy operation, RBAC, retention, or search;
+- external package-manager material attestation;
+- broad MCP, CLI, browser, shell, network, package-manager, or generated-tool-stream
+  interception beyond the local x402 payment and package-install dispatch boundaries;
+- portable cross-org verification, live JWKS, revocation, marketplace
+  certification, or provider custody from local fixture keys.
 
 ## Current Bought Product
 
@@ -57,6 +126,7 @@ The first pilot shape is intentionally small:
 one repo
 one agent runtime
 one consequential action class
+one adapter proof profile
 one gateway check
 one policy file
 one receipt timeline
@@ -72,6 +142,8 @@ Handshake must not claim:
 - generic agent safety;
 - provider-side enforcement without a provider or customer gateway check;
 - downstream business success from a receipt;
+- portable verification from local HMAC fields;
+- cross-org verifier trust from local fixture keys;
 - control over raw sibling tools, browser paths, shell paths, or credentials outside the installed gateway.
 
 ## Repo Boundary
@@ -123,6 +195,18 @@ Rejected: flat protocol files, compatibility shims, and generic helper buckets. 
 Accepted: HTTP admission, caller custody, OpenAPI projection, and route-scope resolution are protocol transport seams. They may model deployment-mode custody and caller roles, but they do not prove hosted operation, production org auth, provider enforcement, or customer gateway installation.
 
 A hosted claim requires a real deployment boundary, credential custody model, customer or provider gateway check, and receipts that distinguish gateway check evidence from downstream execution evidence.
+
+## Evidence Read Boundary
+
+Accepted: local HTTP and SDK evidence reads are redacted diagnostic projections,
+not hosted audit/search product surfaces. The active projections are generated
+graph evidence, contract view, receipt timeline, and package-install
+protected-path health.
+
+The generic raw record route must enforce protocol-object `rawReadPosture`.
+`internal_only` objects remain unavailable through raw HTTP reads even to
+control-plane bearer custody. Any future audit surface must use purpose-built
+redacted projections and a real reader authorization model.
 
 ## Tooling Decision
 

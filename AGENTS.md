@@ -164,6 +164,45 @@ A plan is not ready until it identifies the generated execution shape, protected
 
 Human/operator jobs, dashboards, review surfaces, and Cloud workflows are valid only when they support execution control, gateway enforcement, recovery, or reconstruction.
 
+Strategy reasoning discipline:
+
+When evaluating product strategy, first-market wedges, monetization,
+distribution, ecosystem shape, or category claims, do not jump from protocol
+elegance to market conclusion.
+
+Before making a definitive strategic claim, separate:
+
+- protocol merit: does the mechanism preserve exact contract, one-use
+  greenlight, gateway check, receipt/refusal/proof-gap, isolation, and bypass
+  posture?
+- market merit: is the pain urgent, budgeted, frequent, and expensive enough to
+  buy?
+- distribution merit: can this spread through a real channel without bespoke
+  sales every time?
+- adoption merit: can a team reach value without boiling the ocean?
+- expansion merit: does this wedge expand concentrically into adjacent protected
+  actions?
+
+Always keep multiple candidate wedges alive until they have been scored against
+disconfirming evidence. Treat the first clean proof surface as a demo candidate,
+not a first market.
+
+Forbidden strategy shortcut:
+
+```text
+clean proof surface -> first market
+```
+
+Required strategy test:
+
+```text
+first market = enforcement merit × market merit × distribution merit × adoption merit
+```
+
+When corrected, do not simply adopt the user's correction as the new answer.
+Identify the reasoning bias that produced the weak conclusion, state how the
+belief system changes, then re-run the framework with competing hypotheses.
+
 This checkout is intentionally no longer a planning-doc-heavy repo. Canonical repo truth lives in:
 
 - `AGENTS.md` for doctrine and invariants;
