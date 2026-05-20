@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { GeneratedExecutionCoverageStatusSchema } from "../generated-execution-graph/schemas";
 import {
+  ClearingEvidenceRefsSchema,
   DigestSchema,
   IdSchema,
   IsoDateSchema,
@@ -42,6 +43,7 @@ export const CandidateActionSchema = z.strictObject({
   purposeCode: z.string().min(1),
   expectedSideEffectCodes: z.array(z.string().min(1)),
   evidenceRefs: z.array(z.string()).default([]),
+  clearingEvidenceRefs: ClearingEvidenceRefsSchema,
   bounds: z.record(z.string(), JsonValueSchema).default({}),
   idempotencyKey: IdSchema,
   rollbackHint: z.string().max(500).nullable(),
@@ -58,6 +60,9 @@ export const CandidateActionSchema = z.strictObject({
   generatedExecutionGatewayRegistrySnapshotDigest: DigestSchema.nullable().default(null),
   generatedExecutionRegistryBindingSetDigest: DigestSchema.nullable().default(null),
   generatedExecutionNodeGatewayBindingDigest: DigestSchema.nullable().default(null),
+  toolCallDraftId: IdSchema.nullable().default(null),
+  toolCallDraftDigest: DigestSchema.nullable().default(null),
+  toolCallDraftState: z.enum(["opened", "streaming", "finalized", "invalid", "abandoned"]).nullable().default(null),
 });
 export type CandidateAction = z.infer<typeof CandidateActionSchema>;
 

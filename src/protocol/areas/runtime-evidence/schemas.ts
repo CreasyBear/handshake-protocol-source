@@ -3,6 +3,7 @@ import { DigestSchema, IdSchema, ProtocolBaseSchema, ReasonCodeSchema } from "..
 
 export const RuntimeExecutionShapeSchema = z.enum([
   "single_tool_call",
+  "tool_dispatch_chain",
   "generated_mcp_tool_chain",
   "codemode_block",
   "shell_exec_block",

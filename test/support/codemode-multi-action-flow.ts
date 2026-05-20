@@ -4,23 +4,34 @@ import type { CodemodeMultiActionRuntimeConfig } from "../../src/runtime/codemod
 import { makeKernelFixture } from "./fixtures";
 import { makeRepoWriteFixtureObjects, repoWriteRuntimeConfig, type RepoWriteFixtureObjects } from "./repo-write-flow";
 import { packageInstallRuntimeConfig, type PackageInstallFixtureObjects } from "./package-install-flow";
+import {
+  makePreviewDeployFixtureObjects,
+  previewDeployRuntimeConfig,
+  type PreviewDeployFixtureObjects,
+} from "./preview-deploy-flow";
 
 export type CodemodeMultiActionFixtureObjects = {
   packageInstall: PackageInstallFixtureObjects;
   repoWrite: RepoWriteFixtureObjects;
+  previewDeploy: PreviewDeployFixtureObjects;
 };
 
 export function makeCodemodeMultiActionFixtureObjects(): CodemodeMultiActionFixtureObjects {
   const packageBase = makeKernelFixture();
   const repoWrite = makeRepoWriteFixtureObjects();
+  const previewDeploy = makePreviewDeployFixtureObjects();
   const envelope = {
     ...packageBase.envelope,
     envelopeId: "env_codemode_multi_action",
-    objectiveRef: "intent:install-package-and-write-file",
-    allowedActionClasses: ["package.install", "repo.write"],
-    allowedGateways: [packageBase.gateway.gatewayId, repoWrite.gateway.gatewayId],
-    allowedResources: ["npm:hono", repoWrite.envelope.allowedResources[0] ?? repoWrite.repositoryRef],
-    evidenceRequirements: ["package_lock_diff", "repo_file_diff"],
+    objectiveRef: "intent:install-package-write-file-and-preview",
+    allowedActionClasses: ["package.install", "repo.write", "preview_deploy.create"],
+    allowedGateways: [packageBase.gateway.gatewayId, repoWrite.gateway.gatewayId, previewDeploy.gateway.gatewayId],
+    allowedResources: [
+      "npm:hono",
+      repoWrite.envelope.allowedResources[0] ?? repoWrite.repositoryRef,
+      previewDeploy.resourceRef,
+    ],
+    evidenceRequirements: ["package_lock_diff", "repo_file_diff", "local_preview_artifact"],
   };
   return {
     packageInstall: {
@@ -31,6 +42,10 @@ export function makeCodemodeMultiActionFixtureObjects(): CodemodeMultiActionFixt
     },
     repoWrite: {
       ...repoWrite,
+      envelope,
+    },
+    previewDeploy: {
+      ...previewDeploy,
       envelope,
     },
   };
@@ -46,6 +61,9 @@ export async function registerCodemodeMultiActionFixtureObjectsWithClient(
   await client.registerToolCapability(fixture.repoWrite.tool);
   await client.registerActionType(fixture.repoWrite.actionType);
   await client.registerGatewayRegistryEntry(fixture.repoWrite.gateway);
+  await client.registerToolCapability(fixture.previewDeploy.tool);
+  await client.registerActionType(fixture.previewDeploy.actionType);
+  await client.registerGatewayRegistryEntry(fixture.previewDeploy.gateway);
   await client.registerOperatingEnvelope(fixture.packageInstall.envelope);
 }
 
@@ -59,14 +77,24 @@ export async function registerCodemodeMultiActionFixtureObjectsWithKernel(
   await kernel.putCatalogObject({ objectType: "tool_capability", payload: fixture.repoWrite.tool });
   await kernel.putCatalogObject({ objectType: "action_type", payload: fixture.repoWrite.actionType });
   await kernel.putCatalogObject({ objectType: "gateway_registry_entry", payload: fixture.repoWrite.gateway });
+  await kernel.putCatalogObject({ objectType: "tool_capability", payload: fixture.previewDeploy.tool });
+  await kernel.putCatalogObject({ objectType: "action_type", payload: fixture.previewDeploy.actionType });
+  await kernel.putCatalogObject({ objectType: "gateway_registry_entry", payload: fixture.previewDeploy.gateway });
   await kernel.putCatalogObject({ objectType: "operating_envelope", payload: fixture.packageInstall.envelope });
 }
 
 export function codemodeMultiActionRuntimeConfig(
   fixture: CodemodeMultiActionFixtureObjects,
 ): CodemodeMultiActionRuntimeConfig {
+  const previewDeploy = previewDeployRuntimeConfig(fixture.previewDeploy);
   return {
     packageInstall: packageInstallRuntimeConfig(fixture.packageInstall),
     repoWrite: repoWriteRuntimeConfig(fixture.repoWrite),
+    previewDeploy: {
+      ...previewDeploy,
+      toolCatalogRef: "tool_catalog_demo@v1",
+      actionCatalogRef: "action_catalog_demo@v1",
+      gatewayRegistryRef: "gateway_registry@v1",
+    },
   };
 }

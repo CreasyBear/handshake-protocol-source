@@ -1,11 +1,13 @@
 import { z } from "zod";
 import {
+  ClearingEvidenceRefsSchema,
   DigestSchema,
   IdSchema,
   IsoDateSchema,
   JsonValueSchema,
   ProtocolBaseSchema,
   ResourceRefSchema,
+  SignaturePostureSchema,
   SignatureSchema,
 } from "../../foundation/schema-core";
 import {
@@ -69,11 +71,15 @@ export const ActionContractSchema = ProtocolBaseSchema.extend({
   purposeCode: z.string().min(1),
   expectedSideEffectCodes: z.array(z.string().min(1)),
   evidenceRefs: z.array(z.string()).default([]),
+  clearingEvidenceRefs: ClearingEvidenceRefsSchema,
   bounds: z.record(z.string(), JsonValueSchema).default({}),
   idempotencyKey: IdSchema,
   rollbackHint: z.string().max(500).nullable(),
   canonicalizerVersion: z.string().min(1),
   actionContractDigest: DigestSchema,
   contractSignature: SignatureSchema.nullable(),
+  signaturePosture: SignaturePostureSchema,
+  keyIdentityRef: z.string().min(1).nullable(),
+  verificationPolicyRef: z.string().min(1).nullable(),
 });
 export type ActionContract = z.infer<typeof ActionContractSchema>;

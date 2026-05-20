@@ -2,6 +2,9 @@ import type {
   ContractStreamEvent,
   GreenlightConsumption,
   GreenlightIssuanceClaim,
+  IdempotencyLedgerEntry,
+  IdempotencyLedgerIndexEntry,
+  IsolationStateIndexEntry,
   IsolationScopeRef,
   IsolationState,
   ProtocolCommit,
@@ -26,7 +29,9 @@ export class InMemoryProtocolStore implements ProtocolStore {
   private events: ContractStreamEvent[] = [];
   private consumptions = new Map<string, GreenlightConsumption>();
   private greenlightIssuanceClaims = new Map<string, GreenlightIssuanceClaim>();
+  private currentIdempotencyLedgerEntries = new Map<string, IdempotencyLedgerIndexEntry>();
   private recoveryTerminalClaims = new Map<string, RecoveryTerminalClaim>();
+  private currentIsolationStates = new Map<string, IsolationStateIndexEntry>();
   private currentProtectedPathPostures = new Map<string, ProtectedPathPostureIndexEntry>();
   private currentProtectedSurfaceOperationClaims = new Map<string, ProtectedSurfaceOperationClaimIndexEntry>();
   private receiptsByMutationAttempt = new Map<string, ReceiptMutationAttemptIndexEntry>();
@@ -88,6 +93,14 @@ export class InMemoryProtocolStore implements ProtocolStore {
     return this.getRecord<ProtectedPathPosture>("protected_path_posture", entry.protectedPathPostureId);
   }
 
+  async getCurrentIdempotencyLedgerEntry(
+    ledgerKeyDigest: string,
+  ): Promise<StoredProtocolRecord<IdempotencyLedgerEntry> | null> {
+    const entry = this.currentIdempotencyLedgerEntries.get(ledgerKeyDigest);
+    if (!entry) return null;
+    return this.getRecord<IdempotencyLedgerEntry>("idempotency_ledger_entry", entry.idempotencyLedgerEntryId);
+  }
+
   async getCurrentProtectedSurfaceOperationClaim(
     claimKeyDigest: string,
   ): Promise<StoredProtocolRecord<ProtectedSurfaceOperationClaim> | null> {
@@ -123,10 +136,10 @@ export class InMemoryProtocolStore implements ProtocolStore {
   async listIsolationStates(scopeRefs: IsolationScopeRef[]): Promise<IsolationState[]> {
     const scopeSet = new Set(scopeRefs.map(isolationScopeKey));
     const states: IsolationState[] = [];
-    for (const record of this.records.values()) {
-      if (record.objectType !== "isolation_state") continue;
-      const state = record.payload as IsolationState;
-      if (scopeSet.has(isolationScopeKey(state)) && state.clearedAt === null) states.push(structuredClone(state));
+    for (const entry of this.currentIsolationStates.values()) {
+      if (!scopeSet.has(entry.isolationScopeKey)) continue;
+      const record = await this.getRecord<IsolationState>("isolation_state", entry.isolationStateId);
+      if (record?.payload.clearedAt === null) states.push(record.payload);
     }
     return states;
   }
@@ -142,6 +155,13 @@ export class InMemoryProtocolStore implements ProtocolStore {
       return "greenlight_issuance_conflict";
     }
     if (
+      commit.idempotencyLedgerReservationEntries?.some((entry) =>
+        this.currentIdempotencyLedgerEntries.has(entry.ledgerKeyDigest),
+      )
+    ) {
+      return "idempotency_ledger_conflict";
+    }
+    if (
       commit.recoveryTerminalClaims?.some((claim) => this.recoveryTerminalClaims.has(claim.recoveryRecommendationId))
     ) {
       return "recovery_terminal_conflict";
@@ -153,15 +173,26 @@ export class InMemoryProtocolStore implements ProtocolStore {
     const nextRecords = new Map(this.records);
     const nextEvents = [...this.events];
     const nextGreenlightIssuanceClaims = new Map(this.greenlightIssuanceClaims);
+    const nextCurrentIdempotencyLedgerEntries = new Map(this.currentIdempotencyLedgerEntries);
     const nextRecoveryTerminalClaims = new Map(this.recoveryTerminalClaims);
+    const nextCurrentIsolationStates = new Map(this.currentIsolationStates);
     const nextCurrentProtectedPathPostures = new Map(this.currentProtectedPathPostures);
     const nextCurrentProtectedSurfaceOperationClaims = new Map(this.currentProtectedSurfaceOperationClaims);
     const nextReceiptsByMutationAttempt = new Map(this.receiptsByMutationAttempt);
     for (const claim of commit.greenlightIssuanceClaims ?? []) {
       nextGreenlightIssuanceClaims.set(claim.actionContractId, structuredClone(claim));
     }
+    for (const entry of commit.idempotencyLedgerReservationEntries ?? []) {
+      nextCurrentIdempotencyLedgerEntries.set(entry.ledgerKeyDigest, structuredClone(entry));
+    }
+    for (const entry of commit.idempotencyLedgerIndexEntries ?? []) {
+      nextCurrentIdempotencyLedgerEntries.set(entry.ledgerKeyDigest, structuredClone(entry));
+    }
     for (const claim of commit.recoveryTerminalClaims ?? []) {
       nextRecoveryTerminalClaims.set(claim.recoveryRecommendationId, structuredClone(claim));
+    }
+    for (const entry of commit.isolationStateIndexEntries ?? []) {
+      nextCurrentIsolationStates.set(entry.isolationScopeKey, structuredClone(entry));
     }
     for (const entry of commit.protectedPathPostureIndexEntries ?? []) {
       nextCurrentProtectedPathPostures.set(entry.postureScopeKey, structuredClone(entry));
@@ -179,7 +210,9 @@ export class InMemoryProtocolStore implements ProtocolStore {
     this.records = nextRecords;
     this.events = nextEvents;
     this.greenlightIssuanceClaims = nextGreenlightIssuanceClaims;
+    this.currentIdempotencyLedgerEntries = nextCurrentIdempotencyLedgerEntries;
     this.recoveryTerminalClaims = nextRecoveryTerminalClaims;
+    this.currentIsolationStates = nextCurrentIsolationStates;
     this.currentProtectedPathPostures = nextCurrentProtectedPathPostures;
     this.currentProtectedSurfaceOperationClaims = nextCurrentProtectedSurfaceOperationClaims;
     this.receiptsByMutationAttempt = nextReceiptsByMutationAttempt;
@@ -197,6 +230,13 @@ export class InMemoryProtocolStore implements ProtocolStore {
     ) {
       return "operation_claim_conflict";
     }
+    if (
+      commit.receiptMutationAttemptIndexEntries?.some((entry) =>
+        this.receiptsByMutationAttempt.has(entry.mutationAttemptId),
+      )
+    ) {
+      return "receipt_index_conflict";
+    }
     if (commit.events.some((event) => this.hasStreamOffset(event))) {
       return "stream_conflict";
     }
@@ -204,6 +244,7 @@ export class InMemoryProtocolStore implements ProtocolStore {
     const nextRecords = new Map(this.records);
     const nextEvents = [...this.events];
     const nextConsumptions = new Map(this.consumptions);
+    const nextCurrentIdempotencyLedgerEntries = new Map(this.currentIdempotencyLedgerEntries);
     const nextCurrentProtectedSurfaceOperationClaims = new Map(this.currentProtectedSurfaceOperationClaims);
     const nextReceiptsByMutationAttempt = new Map(this.receiptsByMutationAttempt);
 
@@ -212,6 +253,9 @@ export class InMemoryProtocolStore implements ProtocolStore {
     }
     for (const entry of commit.protectedSurfaceOperationClaimIndexEntries ?? []) {
       nextCurrentProtectedSurfaceOperationClaims.set(entry.claimKeyDigest, structuredClone(entry));
+    }
+    for (const entry of commit.idempotencyLedgerIndexEntries ?? []) {
+      nextCurrentIdempotencyLedgerEntries.set(entry.ledgerKeyDigest, structuredClone(entry));
     }
     for (const entry of commit.receiptMutationAttemptIndexEntries ?? []) {
       nextReceiptsByMutationAttempt.set(entry.mutationAttemptId, structuredClone(entry));
@@ -222,6 +266,7 @@ export class InMemoryProtocolStore implements ProtocolStore {
     this.records = nextRecords;
     this.events = nextEvents;
     this.consumptions = nextConsumptions;
+    this.currentIdempotencyLedgerEntries = nextCurrentIdempotencyLedgerEntries;
     this.currentProtectedSurfaceOperationClaims = nextCurrentProtectedSurfaceOperationClaims;
     this.receiptsByMutationAttempt = nextReceiptsByMutationAttempt;
     return "committed";

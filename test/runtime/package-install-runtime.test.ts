@@ -20,6 +20,19 @@ describe("package install runtime wrapper", () => {
     expect(result.intentCompilation.uncertaintyMarkers).toEqual([]);
     expect(result.intentCompilation.overreachReasonCodes).toEqual([]);
     expect(result.actionContract.resourceRef).toBe("npm:hono");
+    expect(result.actionContract.parameters).toMatchObject({
+      package: "hono",
+      versionRange: "^4.12.19",
+      packageManager: "bun",
+      registryRef: "registry:npmjs",
+      workspaceRef: null,
+      manifestRef: "manifest:package.json",
+      lockfileRef: "lockfile:bun.lock",
+      installFlags: [],
+      lifecycleScriptPolicy: "blocked",
+      resolvedMaterialDigest: null,
+      resolvedMaterialEvidenceRefs: [],
+    });
     expect(result.actionContract.paramsDigest).toMatch(/^sha256:/);
     expect(result.actionContract.idempotencyKey).toBe("package-install:run_demo:1:hono");
     expect(fixture.store.countRecordsOfType("intent_compilation")).toBe(1);

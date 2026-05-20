@@ -25,6 +25,22 @@ export const PostureSourceAuthoritySchema = z.enum([
 ]);
 export type PostureSourceAuthority = z.infer<typeof PostureSourceAuthoritySchema>;
 
+export const ProtectedPathBypassProbeCoverageSchema = z.strictObject({
+  bypassProbeId: IdSchema,
+  probeKind: z.enum([
+    "credential_custody",
+    "raw_sibling_blocking",
+    "mcp_direct_call_blocking",
+    "token_passthrough_blocking",
+    "wrapper_drift",
+    "failure_closed",
+  ]),
+  probeOutcome: z.enum(["passed", "failed", "inconclusive"]),
+  sourceAuthority: PostureSourceAuthoritySchema,
+  probeDigest: DigestSchema,
+});
+export type ProtectedPathBypassProbeCoverage = z.infer<typeof ProtectedPathBypassProbeCoverageSchema>;
+
 export const ProtectedPathPostureSchema = ProtocolBaseSchema.extend({
   protectedPathPostureId: IdSchema,
   postureScopeKey: z.string().min(1),
@@ -39,6 +55,9 @@ export const ProtectedPathPostureSchema = ProtocolBaseSchema.extend({
   sourceAuthority: PostureSourceAuthoritySchema,
   reasonCodes: z.array(ReasonCodeSchema).default([]),
   evidenceRefs: z.array(z.string().min(1)).default([]),
+  bypassProbeIds: z.array(IdSchema).default([]),
+  bypassProbeDigests: z.array(DigestSchema).default([]),
+  bypassProbeCoverage: z.array(ProtectedPathBypassProbeCoverageSchema).default([]),
   observedAt: IsoDateSchema,
   expiresAt: IsoDateSchema,
   postureDigest: DigestSchema,

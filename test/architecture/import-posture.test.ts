@@ -2,24 +2,10 @@ import { describe, expect, it } from "bun:test";
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 
-const protocolAreas = [
-  "action-contract",
-  "catalog-envelope",
-  "gateway-gate",
-  "generated-execution-graph",
-  "intent-compilation",
-  "isolation-breaker",
-  "object-registry",
-  "operation-lifecycle",
-  "policy-greenlight",
-  "proof-gap",
-  "protected-path-posture",
-  "refusal",
-  "receipt-export",
-  "recovery",
-  "review-binding",
-  "runtime-evidence",
-] as const;
+const protocolAreasRoot = "src/protocol/areas";
+const protocolAreas = readdirSync(protocolAreasRoot)
+  .filter((entry) => statSync(join(protocolAreasRoot, entry)).isDirectory())
+  .sort();
 
 const removedCompatibilityShims = [
   "src/protocol/action-contracts.ts",
@@ -284,9 +270,12 @@ describe("protocol module import posture", () => {
       "../../context/request-context-schemas",
       "../../events/schemas",
       "../action-contract/schemas",
+      "../authority-certificate/schemas",
+      "../bypass-probe/schemas",
       "../catalog-envelope/schemas",
       "../gateway-gate/schemas",
       "../generated-execution-graph/schemas",
+      "../idempotency-ledger/schemas",
       "../intent-compilation/schemas",
       "../isolation-breaker/schemas",
       "../operation-lifecycle/schemas",
@@ -295,8 +284,10 @@ describe("protocol module import posture", () => {
       "../protected-path-posture/schemas",
       "../receipt-export/schemas",
       "../recovery/schemas",
+      "../refusal/schemas",
       "../review-binding/schemas",
       "../runtime-evidence/schemas",
+      "../tool-call-draft/schemas",
       "./schemas",
       "zod",
     ];

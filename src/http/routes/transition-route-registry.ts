@@ -1,6 +1,7 @@
 import type { ZodType } from "zod";
 import {
   CompileIntentInputSchema,
+  CreateBypassProbeInputSchema,
   CreateBreakerDecisionInputSchema,
   CreateIsolationInputSchema,
   CreateProtectedPathPostureInputSchema,
@@ -9,16 +10,19 @@ import {
   CreateReviewArtifactInputSchema,
   CreateReviewDecisionInputSchema,
   CreateRuntimeExecutionInputSchema,
+  CreateToolCallDraftInputSchema,
   EvaluatePolicyInputSchema,
   GatewayCheckInputSchema,
   ProposeActionContractInputSchema,
   ReconcileSurfaceOperationInputSchema,
   ResolveRecoveryTerminalConflictInputSchema,
+  TransitionToolCallDraftInputSchema,
   TransitionRecoveryRecommendationStatusInputSchema,
 } from "../../protocol/public/inputs";
 import {
   ActionContractSchema,
   ActionTypeSchema,
+  BypassProbeSchema,
   GatewayRegistryEntrySchema,
   IntentCompilationRecordSchema,
   IsolationStateSchema,
@@ -29,6 +33,7 @@ import {
   ReviewArtifactRecordSchema,
   ReviewDecisionSchema,
   RuntimeExecutionRecordSchema,
+  ToolCallDraftSchema,
   ToolCapabilitySchema,
 } from "../../protocol/public/schemas";
 import type { TransitionCallerRole } from "../admission/caller-auth";
@@ -120,6 +125,36 @@ export const transitionRouteDefinitions = [
     RuntimeExecutionRecordSchema,
   ),
   route(
+    "createBypassProbe",
+    "/v0.2/bypass-probes",
+    "gateway_custody",
+    directBodyScope,
+    "Record protected-path bypass probe evidence without minting authority",
+    CreateBypassProbeInputSchema,
+    "Bypass probe",
+    BypassProbeSchema,
+  ),
+  route(
+    "createToolCallDraft",
+    "/v0.2/tool-call-drafts",
+    "runtime_evidence",
+    directBodyScope,
+    "Record generated tool-call draft state without minting candidate authority",
+    CreateToolCallDraftInputSchema,
+    "Tool call draft",
+    ToolCallDraftSchema,
+  ),
+  route(
+    "transitionToolCallDraft",
+    "/v0.2/tool-call-draft-transitions",
+    "runtime_evidence",
+    recordScope("tool_call_draft", "toolCallDraftId", "tool_call_draft_missing"),
+    "Transition a generated tool-call draft through a monotonic input state",
+    TransitionToolCallDraftInputSchema,
+    "Tool call draft",
+    ToolCallDraftSchema,
+  ),
+  route(
     "createProtectedPathPosture",
     "/v0.2/protected-path-postures",
     "gateway_custody",
@@ -132,7 +167,7 @@ export const transitionRouteDefinitions = [
   route(
     "proposeActionContract",
     "/v0.2/action-contracts",
-    "control_plane",
+    "runtime_evidence",
     recordScope("intent_compilation", "intentCompilationId", "intent_compilation_missing"),
     "Propose exact action contract from a clean compilation record",
     ProposeActionContractInputSchema,

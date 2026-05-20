@@ -6,6 +6,10 @@ import type { CompileIntentInput, IntentCompilationRecord } from "../../protocol
 export const PreviewDeployToolCallSchema = z.strictObject({
   principalIntentRef: z.string().min(1),
   generatedCodeOrSpecRef: z.string().min(1),
+  runtimeExecutionId: z.string().min(1).nullable().default(null),
+  generatedExecutionGraphId: z.string().min(1).nullable().default(null),
+  generatedExecutionNodeId: z.string().min(1).nullable().default(null),
+  toolCallDraftId: z.string().min(1).nullable().default(null),
   provider: z.string().min(1),
   projectRef: z.string().min(1),
   branchRef: z.string().min(1),
@@ -32,9 +36,6 @@ export type PreviewDeployRuntimeConfig = {
   gatewayRegistryEntryId: string;
   gatewayId: string;
   contractExpiresAt: string;
-  runtimeExecutionId?: string | null;
-  generatedExecutionGraphId?: string | null;
-  generatedExecutionNodeId?: string | null;
   signingSecret?: string;
 };
 
@@ -61,6 +62,33 @@ export async function proposePreviewDeployActionContract(
   config: PreviewDeployRuntimeConfig,
   toolCallValue: PreviewDeployToolCall,
 ): Promise<PreviewDeployRuntimeResult> {
+  const intentCompilation = await compilePreviewDeployIntent(protocol, config, toolCallValue);
+  const refusalReasonCodes = refusalReasonCodesForCompilation(intentCompilation);
+  if (refusalReasonCodes.length > 0) {
+    return { outcome: "intent_compilation_refused", intentCompilation, actionContract: null, refusalReasonCodes };
+  }
+
+  const actionContract = await protocol.proposeActionContract({
+    intentCompilationId: intentCompilation.intentCompilationId,
+    candidateActionId: intentCompilation.candidateAction.candidateActionId,
+    candidateDigest: requireCandidateDigest(intentCompilation.candidateAction.candidateDigest),
+    signingSecret: config.signingSecret,
+  });
+  return { outcome: "action_contract_proposed", intentCompilation, actionContract };
+}
+
+export async function compilePreviewDeployIntent(
+  protocol: Pick<PreviewDeployRuntimeProtocol, "compileIntent">,
+  config: PreviewDeployRuntimeConfig,
+  toolCallValue: PreviewDeployToolCall,
+): Promise<IntentCompilationRecord> {
+  return protocol.compileIntent(await buildPreviewDeployCompileIntentInput(config, toolCallValue));
+}
+
+export async function buildPreviewDeployCompileIntentInput(
+  config: PreviewDeployRuntimeConfig,
+  toolCallValue: PreviewDeployToolCall,
+): Promise<CompileIntentInput> {
   const toolCall = PreviewDeployToolCallSchema.parse(toolCallValue);
   const resourceRef = previewDeployResourceRef(toolCall.provider, toolCall.projectRef, toolCall.branchRef);
   const parameters = {
@@ -78,7 +106,7 @@ export async function proposePreviewDeployActionContract(
     commitRef: toolCall.commitRef,
     sequenceNumber: toolCall.sequenceNumber,
   });
-  const intentCompilation = await protocol.compileIntent({
+  return {
     tenantId: config.tenantId,
     organizationId: config.organizationId,
     principalIntentRef: toolCall.principalIntentRef,
@@ -90,9 +118,10 @@ export async function proposePreviewDeployActionContract(
     toolCatalogRef: config.toolCatalogRef,
     actionCatalogRef: config.actionCatalogRef,
     gatewayRegistryRef: config.gatewayRegistryRef,
-    runtimeExecutionId: config.runtimeExecutionId ?? null,
-    generatedExecutionGraphId: config.generatedExecutionGraphId ?? null,
-    generatedExecutionNodeId: config.generatedExecutionNodeId ?? null,
+    runtimeExecutionId: toolCall.runtimeExecutionId,
+    generatedExecutionGraphId: toolCall.generatedExecutionGraphId,
+    generatedExecutionNodeId: toolCall.generatedExecutionNodeId,
+    toolCallDraftId: toolCall.toolCallDraftId,
     generatedCodeOrSpecRefs: [toolCall.generatedCodeOrSpecRef],
     declaredAssumptions: ["preview deploy tool call provided explicit provider, project, branch, and commit"],
     requiredEvidenceRefs: ["evidence:local-preview-artifact"],
@@ -117,20 +146,11 @@ export async function proposePreviewDeployActionContract(
       rollbackHint: "delete the local preview artifact directory",
       expiresAt: config.contractExpiresAt,
     },
-  });
+  };
+}
 
-  const refusalReasonCodes = [...intentCompilation.uncertaintyMarkers, ...intentCompilation.overreachReasonCodes];
-  if (refusalReasonCodes.length > 0) {
-    return { outcome: "intent_compilation_refused", intentCompilation, actionContract: null, refusalReasonCodes };
-  }
-
-  const actionContract = await protocol.proposeActionContract({
-    intentCompilationId: intentCompilation.intentCompilationId,
-    candidateActionId: intentCompilation.candidateAction.candidateActionId,
-    candidateDigest: requireCandidateDigest(intentCompilation.candidateAction.candidateDigest),
-    signingSecret: config.signingSecret,
-  });
-  return { outcome: "action_contract_proposed", intentCompilation, actionContract };
+export function refusalReasonCodesForCompilation(intentCompilation: IntentCompilationRecord): string[] {
+  return [...intentCompilation.uncertaintyMarkers, ...intentCompilation.overreachReasonCodes];
 }
 
 export function previewDeployResourceRef(provider: string, projectRef: string, branchRef: string): string {

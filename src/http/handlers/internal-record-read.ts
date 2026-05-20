@@ -1,4 +1,5 @@
 import type { Context } from "hono";
+import { protocolObjectRegistry } from "../../protocol/areas/object-registry";
 import { HandshakeProtocolError } from "../../protocol/foundation/errors";
 import { ProtocolObjectTypeSchema } from "../../protocol/public/schemas";
 import type { ProtocolStore } from "../../protocol/store/port";
@@ -34,6 +35,9 @@ export async function handleInternalRecordRead(
   }
   const objectId = c.req.param("objectId");
   if (!objectId) return recordNotFound(c, errorContext);
+  if (protocolObjectRegistry[objectTypeResult.data].rawReadPosture === "internal_only") {
+    return recordNotFound(c, errorContext);
+  }
   const record = await storeFor(c, fallbackStore).getRecord(objectTypeResult.data, objectId);
   if (!record) {
     return recordNotFound(c, errorContext);

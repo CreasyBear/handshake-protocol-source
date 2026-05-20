@@ -1,7 +1,22 @@
 import type { Context } from "hono";
 import { HandshakeProtocolError } from "../../protocol/foundation/errors";
 import { projectGeneratedGraphEvidence } from "../../protocol/areas/generated-execution-graph";
-import type { GeneratedExecutionGraph } from "../../protocol/public/schemas";
+import type {
+  ActionContract,
+  ContractStreamEvent,
+  GatewayRegistryEntry,
+  GeneratedExecutionGraph,
+  Receipt,
+  SurfaceOperationReconciliation,
+} from "../../protocol/public/schemas";
+import {
+  projectContractEvidence,
+  projectIdempotencyRecovery,
+  projectProtectedPathInstallHealth,
+  projectReceiptTimeline,
+} from "../../protocol/evidence-projections";
+import { idempotencyLedgerKey, idempotencyLedgerKeyDigest } from "../../protocol/areas/idempotency-ledger";
+import { protectedPathPostureScopeKeyForContract } from "../../protocol/areas/protected-path-posture";
 import type { ProtocolStore } from "../../protocol/store/port";
 import { authorizeEvidenceReadAdmission } from "../admission";
 import type { AppOptions, WorkerBindings } from "../app-options";
@@ -17,31 +32,130 @@ export async function handleEvidenceRead(
 ): Promise<Response> {
   const errorContext: TransitionErrorContext = {
     transitionName: route.routeId,
-    callerCustodyRole: route.role,
+    callerCustodyRole: route.roles[0] ?? null,
     requestIdentity: null,
   };
   try {
     const admission = await authorizeEvidenceReadAdmission(c, options, route, errorContext);
     if (admission.failure) return admission.failure;
-    const graphId = c.req.param("generatedExecutionGraphId");
-    if (!graphId) return recordNotFound(c, errorContext);
-    const graphRecord = await storeFor(c, fallbackStore).getRecord<GeneratedExecutionGraph>(
-      "generated_execution_graph",
-      graphId,
-    );
-    if (!graphRecord) return recordNotFound(c, errorContext);
-    if (
-      admission.hostedIdentity &&
-      (graphRecord.tenantId !== admission.hostedIdentity.tenantId ||
-        graphRecord.organizationId !== admission.hostedIdentity.organizationId)
-    ) {
-      return recordNotFound(c, errorContext);
+    const store = storeFor(c, fallbackStore);
+    switch (route.routeId) {
+      case "getGeneratedGraphEvidenceProjection": {
+        const graphId = c.req.param("generatedExecutionGraphId");
+        if (!graphId) return recordNotFound(c, errorContext);
+        const graphRecord = await store.getRecord<GeneratedExecutionGraph>("generated_execution_graph", graphId);
+        if (!graphRecord || !callerCanReadRecord(admission.hostedIdentity, graphRecord)) {
+          return recordNotFound(c, errorContext);
+        }
+        return c.json(projectGeneratedGraphEvidence(graphRecord.payload));
+      }
+      case "getContractEvidenceProjection": {
+        const actionContractId = c.req.param("actionContractId");
+        if (!actionContractId) return recordNotFound(c, errorContext);
+        const contractRecord = await store.getRecord<ActionContract>("action_contract", actionContractId);
+        if (!contractRecord || !callerCanReadRecord(admission.hostedIdentity, contractRecord)) {
+          return recordNotFound(c, errorContext);
+        }
+        return c.json(projectContractEvidence(contractRecord.payload));
+      }
+      case "getIdempotencyRecoveryProjection": {
+        const actionContractId = c.req.param("actionContractId");
+        if (!actionContractId) return recordNotFound(c, errorContext);
+        const contractRecord = await store.getRecord<ActionContract>("action_contract", actionContractId);
+        if (!contractRecord || !callerCanReadRecord(admission.hostedIdentity, contractRecord)) {
+          return recordNotFound(c, errorContext);
+        }
+        const ledger = await store.getCurrentIdempotencyLedgerEntry(
+          await idempotencyLedgerKeyDigest(idempotencyLedgerKey(contractRecord.payload)),
+        );
+        return c.json(
+          await projectIdempotencyRecovery({
+            contract: contractRecord.payload,
+            ledger: ledger?.payload ?? null,
+          }),
+        );
+      }
+      case "getReceiptTimelineProjection": {
+        const receiptId = c.req.param("receiptId");
+        if (!receiptId) return recordNotFound(c, errorContext);
+        const receiptRecord = await store.getRecord<Receipt>("receipt", receiptId);
+        if (!receiptRecord || !callerCanReadRecord(admission.hostedIdentity, receiptRecord)) {
+          return recordNotFound(c, errorContext);
+        }
+        const events = await loadReceiptTimelineEvents(store, receiptRecord.payload);
+        const reconciliations = await store.listRecordsByType<SurfaceOperationReconciliation>(
+          "surface_operation_reconciliation",
+          {
+            tenantId: receiptRecord.tenantId,
+            organizationId: receiptRecord.organizationId,
+          },
+        );
+        return c.json(
+          projectReceiptTimeline({
+            receipt: receiptRecord.payload,
+            events: events.events,
+            missingEventCount: events.missingEventCount,
+            reconciliations: reconciliations.map((record) => record.payload),
+          }),
+        );
+      }
+      case "getProtectedPathInstallHealthProjection": {
+        const actionContractId = c.req.param("actionContractId");
+        if (!actionContractId) return recordNotFound(c, errorContext);
+        const contractRecord = await store.getRecord<ActionContract>("action_contract", actionContractId);
+        if (!contractRecord || !callerCanReadRecord(admission.hostedIdentity, contractRecord)) {
+          return recordNotFound(c, errorContext);
+        }
+        const gatewayRecord = await store.getRecord<GatewayRegistryEntry>(
+          "gateway_registry_entry",
+          contractRecord.payload.gatewayRegistryEntryId,
+        );
+        const postureRecord = await store.getCurrentProtectedPathPosture(
+          protectedPathPostureScopeKeyForContract(contractRecord.payload),
+        );
+        return c.json(
+          projectProtectedPathInstallHealth({
+            contract: contractRecord.payload,
+            gateway: gatewayRecord?.payload ?? null,
+            posture: postureRecord,
+            now: new Date().toISOString(),
+          }),
+        );
+      }
     }
-    return c.json(projectGeneratedGraphEvidence(graphRecord.payload));
   } catch (error) {
     const result = transitionErrorResult(error, errorContext);
     return c.json(result.body, result.status as 400);
   }
+}
+
+function callerCanReadRecord(
+  hostedIdentity: { tenantId: string; organizationId: string } | null,
+  record: { tenantId: string; organizationId: string },
+): boolean {
+  return (
+    !hostedIdentity ||
+    (record.tenantId === hostedIdentity.tenantId && record.organizationId === hostedIdentity.organizationId)
+  );
+}
+
+async function loadReceiptTimelineEvents(
+  store: ProtocolStore,
+  receipt: Receipt,
+): Promise<{ events: ContractStreamEvent[]; missingEventCount: number }> {
+  const events: ContractStreamEvent[] = [];
+  let missingEventCount = 0;
+  for (const reference of receipt.streamOffsets) {
+    for (let offset = reference.offsetStart; offset <= reference.offsetEnd; offset += 1) {
+      const event = await store.getStreamEvent(reference.streamId, reference.partitionKey, offset);
+      if (event) {
+        events.push(event);
+      } else {
+        missingEventCount += 1;
+      }
+    }
+  }
+  return { events, missingEventCount };
 }
 
 function recordNotFound(c: Context, context: TransitionErrorContext): Response {

@@ -16,6 +16,7 @@ import {
   type StreamWatermark,
 } from "./types";
 import type { ProtocolStore } from "../../store/port";
+import { isolationStateIndexEntry } from "./isolation-states";
 
 export type BreakerDecisionResult = {
   breakerDecision: BreakerDecision;
@@ -121,7 +122,9 @@ function buildBreakerDecisionResult(context: BreakerDecisionContext): BreakerDec
 }
 
 async function commitBreakerDecision(recorder: ProtocolRecorder, result: BreakerDecisionResult): Promise<void> {
-  await recorder.commitRecordsWithEvents(breakerDecisionRecords(result), breakerDecisionEvents(result));
+  await recorder.commitRecordsWithEvents(breakerDecisionRecords(result), breakerDecisionEvents(result), {
+    isolationStateIndexEntries: [isolationStateIndexEntry(result.isolationState)],
+  });
 }
 
 function breakerDecisionRecords(result: BreakerDecisionResult): ProtocolRecord[] {

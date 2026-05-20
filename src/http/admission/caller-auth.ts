@@ -69,6 +69,63 @@ export function authorizeTransitionCaller(
   return null;
 }
 
+export function authorizeTransitionCallerForAny(
+  c: Context<{ Bindings: CallerAuthWorkerBindings }>,
+  configuredTokens: CallerAuthTokens | undefined,
+  roles: readonly TransitionCallerRole[],
+  context: TransitionErrorContext = {},
+): Response | null {
+  const expectedTokens = roles
+    .map((role) => ({ role, token: configuredTokenForRole(c.env, configuredTokens, role) }))
+    .filter((entry): entry is { role: TransitionCallerRole; token: string } => Boolean(entry.token));
+  const roleLabel = roles.join(" or ");
+  if (expectedTokens.length === 0) {
+    return errorResponse(
+      c,
+      new HandshakeProtocolError(
+        "caller_auth_not_configured",
+        `${roleLabel} evidence read routes require an explicit bearer token binding.`,
+        503,
+        { retryability: "terminal", commitState: "not_started" },
+      ),
+      context,
+    );
+  }
+
+  const providedToken = parseBearerToken(c.req.header("authorization"));
+  if (!providedToken) {
+    c.header("WWW-Authenticate", 'Bearer realm="handshake"');
+    return errorResponse(
+      c,
+      new HandshakeProtocolError(
+        "caller_auth_required",
+        `${roleLabel} evidence read routes require a bearer token.`,
+        401,
+        {
+          retryability: "terminal",
+          commitState: "not_started",
+        },
+      ),
+      context,
+    );
+  }
+
+  if (expectedTokens.some(({ token }) => constantTimeTokenEquals(providedToken, token))) {
+    return null;
+  }
+
+  return errorResponse(
+    c,
+    new HandshakeProtocolError(
+      "caller_auth_forbidden",
+      `Bearer token does not satisfy ${roleLabel} evidence read custody.`,
+      403,
+      { retryability: "terminal", commitState: "not_started" },
+    ),
+    context,
+  );
+}
+
 export function transitionCallerSecuritySchemeName(role: TransitionCallerRole): string {
   switch (role) {
     case "control_plane":

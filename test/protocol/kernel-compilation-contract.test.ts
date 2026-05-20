@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import { HandshakeProtocolError } from "../../src/protocol/foundation/errors";
 import { digestCanonical } from "../../src/protocol/foundation/canonical";
+import type { Refusal } from "../../src/protocol/public/schemas";
 import {
   makeKernelFixture,
   makePackageInstallCandidate,
@@ -76,6 +77,52 @@ describe("Handshake kernel invariants: compilation and contracts", () => {
     expect(fixture.store.countRecordsOfType("policy_decision")).toBe(0);
     expect(fixture.store.countRecordsOfType("greenlight")).toBe(0);
     expect(fixture.store.countRecordsOfType("gateway_check_attempt")).toBe(0);
+  });
+
+  it("requires graph evidence before compiling observed tool-dispatch chains", async () => {
+    const fixture = makeKernelFixture();
+    await registerFixtureObjects(fixture);
+    const runtimeExecution = await fixture.kernel.createRuntimeExecution({
+      tenantId: "tenant_demo",
+      organizationId: "org_demo",
+      principalIntentRef: "intent:install hono through observed dispatch chain",
+      principalId: "principal_demo",
+      agentId: "agent_demo",
+      runId: "run_demo",
+      runtimeAdapterId: "runtime_codex",
+      executionShape: "tool_dispatch_chain",
+      runtimePosture: "hook_assisted",
+      executionBlockRef: "dispatch-boundary:package-install",
+      executionBlockDigest: await digestCanonical({ dispatches: ["package.install", "package.install"] }),
+      observedToolCallRefs: ["dispatch:package-install:1", "dispatch:package-install:2"],
+      observedConsequentialCallCount: 2,
+      loopDetected: true,
+      retryDetected: true,
+      branchDetected: false,
+      dynamicToolConstructionDetected: false,
+      unobservedRegionRefs: [],
+      accessPosture: "controlled_outbound",
+    });
+
+    const compilation = await fixture.kernel.compileIntent({
+      tenantId: "tenant_demo",
+      organizationId: "org_demo",
+      principalIntentRef: "intent:install hono through observed dispatch chain",
+      principalId: "principal_demo",
+      agentId: "agent_demo",
+      runId: "run_demo",
+      runtimeAdapterId: "runtime_codex",
+      operatingEnvelopeId: fixture.envelope.envelopeId,
+      toolCatalogRef: "tool_catalog_demo@v1",
+      actionCatalogRef: "action_catalog_demo@v1",
+      gatewayRegistryRef: "gateway_registry@v1",
+      runtimeExecutionId: runtimeExecution.runtimeExecutionId,
+      candidate: makePackageInstallCandidate(fixture, { idempotencyKey: "idem_dispatch_chain" }),
+    });
+
+    expect(compilation.candidateAction.candidateStatus).toBe("rejected");
+    expect(compilation.overreachReasonCodes).toContain("generated_execution_graph_missing");
+    expect(fixture.store.countRecordsOfType("action_contract")).toBe(0);
   });
 
   it("links multiple compilations to one runtime block and refuses dynamic tool construction", async () => {
@@ -208,6 +255,21 @@ describe("Handshake kernel invariants: compilation and contracts", () => {
         signingSecret: "test-secret",
       }),
     ).rejects.toThrow(HandshakeProtocolError);
+
+    const refusals = await fixture.store.listRecordsByType<Refusal>("refusal");
+    expect(refusals).toHaveLength(1);
+    expect(refusals[0]?.payload).toMatchObject({
+      phase: "compilation",
+      actionContractId: null,
+      policyDecisionId: null,
+      greenlightId: null,
+      gateAttemptId: null,
+      refusedObjectRef: `intent_compilation:${compilation.intentCompilationId}`,
+      reasonCode: "unwrapped_consequential_tool",
+      mutationAttempted: false,
+      authorityCreated: false,
+    });
+    expect(fixture.store.countRecordsOfType("action_contract")).toBe(0);
   });
 
   it("refuses contracts whose gateway does not match the durable registry entry", async () => {

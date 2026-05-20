@@ -5,9 +5,21 @@ import type { EventDescriptor } from "../../events/chains";
 import { createId, nowIso } from "../../foundation/ids";
 import { CreateProtectedPathPostureInputSchema, type CreateProtectedPathPostureInput } from "./types";
 import type { ProtocolRecorder } from "../../events/records";
+import { HandshakeProtocolError } from "../../foundation/errors";
 import type { ProtocolRecord } from "../object-registry";
 import { PROTOCOL_VERSION, ProtectedPathPostureSchema, type JsonValue, type ProtectedPathPosture } from "./types";
 import type { ProtocolStore, StoredProtocolRecord } from "../../store/port";
+import { protectedPathPostureScopeKey, protectedPathPostureScopeKeyForContract } from "./scope";
+import type { BypassProbe, BypassProbeKind } from "../bypass-probe";
+
+const requiredGatewayCheckedBypassProbeKinds: BypassProbeKind[] = [
+  "credential_custody",
+  "raw_sibling_blocking",
+  "mcp_direct_call_blocking",
+  "token_passthrough_blocking",
+  "wrapper_drift",
+  "failure_closed",
+];
 
 export type ProtectedPathPostureEvaluation =
   | { ok: true; posture: StoredProtocolRecord<ProtectedPathPosture> | null }
@@ -29,7 +41,8 @@ export async function createProtectedPathPosture(
 ): Promise<ProtectedPathPosture> {
   const input = CreateProtectedPathPostureInputSchema.parse(inputValue);
   const context = buildProtectedPathPostureContext(input);
-  const record = await buildProtectedPathPosture(context);
+  const bypassProbes = await loadBypassProbes(recorder, context);
+  const record = await buildProtectedPathPosture(context, bypassProbes);
   await commitProtectedPathPosture(recorder, context, record);
   return record;
 }
@@ -55,9 +68,23 @@ function buildProtectedPathPostureContext(input: ParsedCreateProtectedPathPostur
   };
 }
 
-async function buildProtectedPathPosture(context: ProtectedPathPostureContext): Promise<ProtectedPathPosture> {
+async function buildProtectedPathPosture(
+  context: ProtectedPathPostureContext,
+  bypassProbes: BypassProbe[],
+): Promise<ProtectedPathPosture> {
   const { input, createdAt, observedAt, protectedPathPostureId, postureScopeKey } = context;
-  const postureDigest = await digestCanonical(protectedPathPostureDigestMaterial(context));
+  const bypassProbeCoverage = bypassProbes.map((probe) => ({
+    bypassProbeId: probe.bypassProbeId,
+    probeKind: probe.probeKind,
+    probeOutcome: probe.probeOutcome,
+    sourceAuthority: probe.sourceAuthority,
+    probeDigest: probe.probeDigest,
+  }));
+  const bypassProbeIds = bypassProbeCoverage.map((probe) => probe.bypassProbeId);
+  const bypassProbeDigests = bypassProbeCoverage.map((probe) => probe.probeDigest);
+  const postureDigest = await digestCanonical(
+    protectedPathPostureDigestMaterial(context, bypassProbeIds, bypassProbeDigests),
+  );
   return ProtectedPathPostureSchema.parse({
     schemaVersion: PROTOCOL_VERSION,
     tenantId: input.tenantId,
@@ -76,13 +103,47 @@ async function buildProtectedPathPosture(context: ProtectedPathPostureContext): 
     sourceAuthority: input.sourceAuthority,
     reasonCodes: input.reasonCodes,
     evidenceRefs: input.evidenceRefs,
+    bypassProbeIds,
+    bypassProbeDigests,
+    bypassProbeCoverage,
     observedAt,
     expiresAt: input.expiresAt,
     postureDigest,
   });
 }
 
-function protectedPathPostureDigestMaterial(context: ProtectedPathPostureContext): JsonValue {
+async function loadBypassProbes(
+  recorder: ProtocolRecorder,
+  context: ProtectedPathPostureContext,
+): Promise<BypassProbe[]> {
+  const probes: BypassProbe[] = [];
+  for (const bypassProbeId of context.input.bypassProbeIds) {
+    const record = await recorder.requiredRecord<BypassProbe>(
+      "bypass_probe",
+      bypassProbeId,
+      "protected_path_probe_missing",
+    );
+    const probe = record.payload;
+    if (probe.postureScopeKey !== context.postureScopeKey) {
+      throw new HandshakeProtocolError(
+        "protected_path_probe_scope_mismatch",
+        "Bypass probe scope does not match the protected path posture scope.",
+        409,
+      );
+    }
+    if (Date.parse(probe.expiresAt) <= Date.parse(context.createdAt)) {
+      throw new HandshakeProtocolError("protected_path_probe_stale", "Bypass probe is stale.", 409);
+    }
+    probes.push(probe);
+  }
+  return probes;
+}
+
+function protectedPathPostureDigestMaterial(
+  context: ProtectedPathPostureContext,
+  bypassProbeIds: string[],
+  bypassProbeDigests: string[],
+): JsonValue {
   const { input, observedAt, postureScopeKey } = context;
   const digestMaterial = {
     postureScopeKey,
@@ -97,6 +158,8 @@ function protectedPathPostureDigestMaterial(context: ProtectedPathPostureContext
     sourceAuthority: input.sourceAuthority,
     reasonCodes: input.reasonCodes,
     evidenceRefs: input.evidenceRefs,
+    bypassProbeIds,
+    bypassProbeDigests,
     observedAt,
     expiresAt: input.expiresAt,
   } satisfies JsonValue;
@@ -148,34 +211,7 @@ export async function loadCurrentPostureForContract(
   return store.getCurrentProtectedPathPosture(protectedPathPostureScopeKeyForContract(contract));
 }
 
-export function protectedPathPostureScopeKeyForContract(contract: ActionContract): string {
-  return protectedPathPostureScopeKey({
-    tenantId: contract.tenantId,
-    organizationId: contract.organizationId,
-    runtimeAdapterId: contract.runtimeAdapterId,
-    gatewayId: contract.gatewayId,
-    actionClass: contract.actionClass,
-    resourceRef: contract.resourceRef,
-  });
-}
-
-export function protectedPathPostureScopeKey(input: {
-  tenantId: string;
-  organizationId: string;
-  runtimeAdapterId: string;
-  gatewayId: string;
-  actionClass: string;
-  resourceRef: string;
-}): string {
-  return [
-    `tenant:${input.tenantId}`,
-    `org:${input.organizationId}`,
-    `runtime:${input.runtimeAdapterId}`,
-    `gateway:${input.gatewayId}`,
-    `action:${input.actionClass}`,
-    `resource:${input.resourceRef}`,
-  ].join("|");
-}
+export { protectedPathPostureScopeKey, protectedPathPostureScopeKeyForContract } from "./scope";
 
 export function evaluateRequiredProtectedPathPosture(input: {
   contract: ActionContract;
@@ -264,6 +300,9 @@ export function evaluateRequiredProtectedPathPosture(input: {
       reason: "Current protected path posture leaves a raw sibling mutation tool present or unknown.",
     };
   }
+  const probeCoverage = evaluateGatewayCheckedProbeCoverage(current);
+  if (!probeCoverage.ok)
+    return { ok: false, posture, reasonCode: probeCoverage.reasonCode, reason: probeCoverage.reason };
   return { ok: true, posture };
 }
 
@@ -278,8 +317,41 @@ export function protectedPathPolicyInput(
     protectedPathPostureId: posture.payload.protectedPathPostureId,
     protectedPathPostureDigest: posture.payload.postureDigest,
     postureState: posture.payload.postureState,
+    bypassProbeIds: posture.payload.bypassProbeIds,
+    bypassProbeDigests: posture.payload.bypassProbeDigests,
     freshness,
   };
+}
+
+function evaluateGatewayCheckedProbeCoverage(
+  posture: ProtectedPathPosture,
+): { ok: true } | { ok: false; reasonCode: string; reason: string } {
+  const coverageByKind = new Map(posture.bypassProbeCoverage.map((probe) => [probe.probeKind, probe]));
+  for (const probeKind of requiredGatewayCheckedBypassProbeKinds) {
+    const coverage = coverageByKind.get(probeKind);
+    if (!coverage) {
+      return {
+        ok: false,
+        reasonCode: "protected_path_probe_missing",
+        reason: `Current gateway_checked posture is missing required ${probeKind} bypass probe evidence.`,
+      };
+    }
+    if (coverage.probeOutcome !== "passed") {
+      return {
+        ok: false,
+        reasonCode: "protected_path_probe_failed",
+        reason: `Current gateway_checked posture has non-passing ${probeKind} bypass probe evidence.`,
+      };
+    }
+    if (!sourceAuthorityCanSatisfyGatewayChecked(coverage.sourceAuthority)) {
+      return {
+        ok: false,
+        reasonCode: "protected_path_probe_source_authority_weak",
+        reason: `Current gateway_checked posture has ${probeKind} bypass probe evidence from a weak source authority.`,
+      };
+    }
+  }
+  return { ok: true };
 }
 
 function gatewayCanSatisfyGatewayChecked(
@@ -298,5 +370,5 @@ function credentialCustodyCanSatisfyGatewayChecked(
 }
 
 function sourceAuthorityCanSatisfyGatewayChecked(sourceAuthority: ProtectedPathPosture["sourceAuthority"]): boolean {
-  return ["gateway_probe", "conformance_fixture", "hosted_monitor"].includes(sourceAuthority);
+  return ["gateway_probe", "hosted_monitor"].includes(sourceAuthority);
 }

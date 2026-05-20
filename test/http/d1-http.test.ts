@@ -18,15 +18,17 @@ import { recordRecoveryTerminalConflictProofGap } from "../../src/protocol/areas
 import { HandshakeClient } from "../../src/sdk/client";
 import { proposePackageInstallActionContract } from "../../src/runtime/package-install/action-proposal";
 import { D1ProtocolStore } from "../../src/storage/d1";
+import { InMemoryProtocolStore } from "../../src/storage/memory";
 import {
   futureIso,
   makeKernelFixture,
   makePackageInstallCandidate,
   proposalInputForCompilation,
 } from "../support/fixtures";
-import { createD1HttpHarness, D1_HARNESS_TRANSITION_TOKEN, type D1HttpHarness } from "../support/d1-http-harness";
+import { createD1HttpHarness, D1_HARNESS_CALLER_AUTH_TOKENS, type D1HttpHarness } from "../support/d1-http-harness";
 import {
   createPackageManifestSurface,
+  packageInstallObservedParameters,
   packageInstallRuntimeConfig,
   registerFixtureObjectsWithClient,
 } from "../support/package-install-flow";
@@ -69,8 +71,42 @@ type ProtectedPathPostureCurrentRow = {
   tenant_id: string;
   organization_id: string;
 };
+type IsolationStateCurrentRow = {
+  isolation_scope_key: string;
+  isolation_state_id: string;
+  tenant_id: string;
+  organization_id: string;
+  scope_type: string;
+  scope_id: string;
+  state: string;
+};
 
 describe("D1-backed Hono protocol surface", () => {
+  it("matches memory semantics for absent-or-same protocol record writes", async () => {
+    const harness = await createD1HttpHarness();
+    try {
+      const fixture = makeKernelFixture();
+      const memory = new InMemoryProtocolStore();
+      const d1 = new D1ProtocolStore(harness.db);
+      const memoryRecorder = new ProtocolRecorder(memory);
+
+      const record = await memoryRecorder.buildRecord({ objectType: "tool_capability", payload: fixture.tool });
+      const conflictingRecord = await memoryRecorder.buildRecord({
+        objectType: "tool_capability",
+        payload: { ...fixture.tool, toolName: "bun add --conflict" },
+      });
+
+      expect(await memory.putRecordIfAbsentOrSame(record)).toBe("inserted");
+      expect(await d1.putRecordIfAbsentOrSame(record)).toBe("inserted");
+      expect(await memory.putRecordIfAbsentOrSame(record)).toBe("unchanged");
+      expect(await d1.putRecordIfAbsentOrSame(record)).toBe("unchanged");
+      expect(await memory.putRecordIfAbsentOrSame(conflictingRecord)).toBe("conflict");
+      expect(await d1.putRecordIfAbsentOrSame(conflictingRecord)).toBe("conflict");
+    } finally {
+      await harness.dispose();
+    }
+  });
+
   it("preserves same object ids across different protocol object types", async () => {
     const harness = await createD1HttpHarness();
     try {
@@ -142,6 +178,42 @@ describe("D1-backed Hono protocol surface", () => {
       );
       expect(events).toHaveLength(1);
       expect(JSON.parse(events[0]?.payload_json ?? "{}").objectRefs).toContain(posture.protectedPathPostureId);
+    } finally {
+      await harness.dispose();
+    }
+  });
+
+  it("commits isolation state record, stream event, and current pointer together", async () => {
+    const harness = await createD1HttpHarness();
+    try {
+      const state = await harness.post<{ isolationStateId: string }>("/v0.2/isolation-states", {
+        tenantId: "tenant_demo",
+        organizationId: "org_demo",
+        scopeType: "agent",
+        scopeId: "agent_demo",
+        state: "quarantined",
+        reasonCode: "breaker_trip",
+        reasonSummary: "Agent exceeded retry budget.",
+        sourceDecisionRef: "breaker:test",
+      });
+
+      const currentRows = await harness.query<IsolationStateCurrentRow>(
+        `SELECT isolation_scope_key, isolation_state_id, tenant_id, organization_id, scope_type, scope_id, state
+         FROM isolation_state_current
+         WHERE isolation_scope_key = ?`,
+        "tenant_demo:org_demo:agent:agent_demo",
+      );
+      expect(currentRows).toEqual([
+        {
+          isolation_scope_key: "tenant_demo:org_demo:agent:agent_demo",
+          isolation_state_id: state.isolationStateId,
+          tenant_id: "tenant_demo",
+          organization_id: "org_demo",
+          scope_type: "agent",
+          scope_id: "agent_demo",
+          state: "quarantined",
+        },
+      ]);
     } finally {
       await harness.dispose();
     }
@@ -219,6 +291,7 @@ describe("D1-backed Hono protocol surface", () => {
         "action_proposed",
         "policy_decision_recorded",
         "action_greenlit",
+        "idempotency_ledger_recorded",
         "gateway_checked",
         "mutation_attempted",
         "protected_surface_operation_claimed",
@@ -226,7 +299,7 @@ describe("D1-backed Hono protocol surface", () => {
         "surface_operation_reconciled",
         "protected_surface_operation_released",
       ]);
-      expect(events.map((event) => event.offset)).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8]);
+      expect(events.map((event) => event.offset)).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
       expect(events[0]?.previous_event_digest).toBeNull();
       for (let index = 1; index < events.length; index += 1) {
         expect(events[index]?.previous_event_digest).toBe(events[index - 1]?.event_digest);
@@ -241,7 +314,7 @@ describe("D1-backed Hono protocol surface", () => {
         `run:${contract.runId}`,
       );
       expect(runEvents.map((event) => event.event_type)).toEqual(events.map((event) => event.event_type));
-      expect(runEvents.map((event) => event.offset)).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8]);
+      expect(runEvents.map((event) => event.offset)).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
       expect(runEvents.every((event) => event.stream_scope === "run")).toBe(true);
       for (let index = 1; index < runEvents.length; index += 1) {
         expect(runEvents[index]?.previous_event_digest).toBe(runEvents[index - 1]?.event_digest);
@@ -256,15 +329,15 @@ describe("D1-backed Hono protocol surface", () => {
         `protected_surface_resource:${contract.gatewayId}:${contract.resourceRef}`,
       );
       expect(resourceEvents.map((event) => event.event_type)).toEqual(events.map((event) => event.event_type));
-      expect(resourceEvents.map((event) => event.offset)).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8]);
+      expect(resourceEvents.map((event) => event.offset)).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
       expect(resourceEvents.every((event) => event.stream_scope === "protected_surface_resource")).toBe(true);
       for (let index = 1; index < resourceEvents.length; index += 1) {
         expect(resourceEvents[index]?.previous_event_digest).toBe(resourceEvents[index - 1]?.event_digest);
       }
 
-      const actionReceiptEvent = events[6];
-      const runReceiptEvent = runEvents[6];
-      const resourceReceiptEvent = resourceEvents[6];
+      const actionReceiptEvent = events[7];
+      const runReceiptEvent = runEvents[7];
+      const resourceReceiptEvent = resourceEvents[7];
       if (!actionReceiptEvent || !runReceiptEvent || !resourceReceiptEvent) {
         throw new Error("expected receipt events for action, run, and gateway resource partitions");
       }
@@ -277,7 +350,7 @@ describe("D1-backed Hono protocol surface", () => {
           streamScope: "organization",
           partitionKey: `action:${contract.actionContractId}`,
           offsetStart: 0,
-          offsetEnd: 6,
+          offsetEnd: 7,
           terminalEventDigest: actionReceiptEvent.event_digest,
         },
         {
@@ -285,7 +358,7 @@ describe("D1-backed Hono protocol surface", () => {
           streamScope: "run",
           partitionKey: `run:${contract.runId}`,
           offsetStart: 0,
-          offsetEnd: 6,
+          offsetEnd: 7,
           terminalEventDigest: runReceiptEvent.event_digest,
         },
         {
@@ -293,7 +366,7 @@ describe("D1-backed Hono protocol surface", () => {
           streamScope: "protected_surface_resource",
           partitionKey: `protected_surface_resource:${contract.gatewayId}:${contract.resourceRef}`,
           offsetStart: 0,
-          offsetEnd: 6,
+          offsetEnd: 7,
           terminalEventDigest: resourceReceiptEvent.event_digest,
         },
       ]);
@@ -322,6 +395,70 @@ describe("D1-backed Hono protocol surface", () => {
     }
   });
 
+  it("enforces D1 idempotency ledger before duplicate greenlight issuance", async () => {
+    const harness = await createD1HttpHarness();
+    try {
+      const { actionContract, client, fixture, greenlight } = await createHttpPackageInstallContract(
+        harness,
+        "code:d1-idempotency-first",
+      );
+
+      const duplicateCompilation = await client.compileIntent({
+        tenantId: "tenant_demo",
+        organizationId: "org_demo",
+        principalIntentRef: "intent:duplicate d1 idempotency",
+        principalId: "principal_demo",
+        agentId: "agent_demo",
+        runId: "run_demo",
+        runtimeAdapterId: "runtime_codex",
+        operatingEnvelopeId: fixture.envelope.envelopeId,
+        toolCatalogRef: "tool_catalog_demo@v1",
+        actionCatalogRef: "action_catalog_demo@v1",
+        gatewayRegistryRef: "gateway_registry@v1",
+        generatedCodeOrSpecRefs: ["code:d1-idempotency-duplicate"],
+        declaredAssumptions: ["idempotency duplicate is explicit"],
+        requiredEvidenceRefs: ["evidence:package-lock-diff"],
+        candidate: makePackageInstallCandidate(fixture, {
+          parameters: packageInstallObservedParameters(),
+          nonSecretParamsSummary: packageInstallObservedParameters(),
+          sequenceNumber: 2,
+          idempotencyKey: actionContract.idempotencyKey,
+        }),
+      });
+      const duplicateContract = await client.proposeActionContract(
+        proposalInputForCompilation(duplicateCompilation, "test-secret"),
+      );
+      const duplicatePolicy = await client.evaluatePolicy({
+        actionContractId: duplicateContract.actionContractId,
+        envelopeId: fixture.envelope.envelopeId,
+        signingSecret: "test-secret",
+      });
+
+      expect(duplicatePolicy.greenlight).toBeNull();
+      expect(duplicatePolicy.decision.decision).toBe("refuse");
+      expect(duplicatePolicy.decision.decisionReasonCode).toBe("idempotency_duplicate_authority");
+      expect(await recordCount(harness, "greenlight")).toBe(1);
+      expect(await recordCount(harness, "mutation_attempt")).toBe(0);
+      expect(await recordCount(harness, "idempotency_ledger_entry")).toBe(1);
+      expect(await recordCount(harness, "refusal")).toBe(1);
+
+      const recoveryProjection = await client.getIdempotencyRecoveryProjection(actionContract.actionContractId);
+      expect(recoveryProjection).toMatchObject({
+        actionContractRef: actionContract.actionContractId,
+        currentLedgerState: "authority_reserved",
+        paramsDigestMatch: true,
+        greenlightRef: greenlight.greenlightId,
+        recoveryDisposition: "same_params_duplicate_refused",
+        reasonCodes: ["idempotency_duplicate_authority"],
+      });
+
+      const rows = await harness.query<CountRow>("SELECT COUNT(*) AS count FROM idempotency_ledger_current");
+      expect(rows[0]?.count).toBe(1);
+    } finally {
+      await harness.dispose();
+    }
+  });
+
   it("atomically refuses same-surface D1 operation claim races before a second mutation", async () => {
     const harness = await createD1HttpHarness();
     try {
@@ -335,7 +472,7 @@ describe("D1-backed Hono protocol surface", () => {
         state.client.gatewayCheck({
           actionContractId: state.actionContract.actionContractId,
           greenlightId: state.greenlight.greenlightId,
-          observedParameters: { package: "hono", versionRange: "^4.12.19" },
+          observedParameters: packageInstallObservedParameters(),
         }),
         state.client.gatewayCheck({
           actionContractId: second.actionContract.actionContractId,
@@ -371,7 +508,7 @@ describe("D1-backed Hono protocol surface", () => {
         surface,
         actionContractId: actionContract.actionContractId,
         greenlightId: greenlight.greenlightId,
-        observedParameters: { package: "hono", versionRange: "^4.12.19" },
+        observedParameters: packageInstallObservedParameters(),
         surfaceOperationRef: "surface-op:d1-http-package-install-hono",
       });
 
@@ -393,6 +530,7 @@ describe("D1-backed Hono protocol surface", () => {
         "action_proposed",
         "policy_decision_recorded",
         "action_greenlit",
+        "idempotency_ledger_recorded",
         "gateway_checked",
         "mutation_attempted",
         "protected_surface_operation_claimed",
@@ -400,7 +538,7 @@ describe("D1-backed Hono protocol surface", () => {
         "surface_operation_reconciled",
         "protected_surface_operation_released",
       ]);
-      expect(events.map((event) => event.offset)).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8]);
+      expect(events.map((event) => event.offset)).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
       expect(events[0]?.previous_event_digest).toBeNull();
       for (let index = 1; index < events.length; index += 1) {
         expect(events[index]?.previous_event_digest).toBe(events[index - 1]?.event_digest);
@@ -434,7 +572,7 @@ describe("D1-backed Hono protocol surface", () => {
         surface,
         actionContractId: actionContract.actionContractId,
         greenlightId: greenlight.greenlightId,
-        observedParameters: { package: "hono", versionRange: "^5.0.0" },
+        observedParameters: packageInstallObservedParameters({ versionRange: "^5.0.0" }),
         surfaceOperationRef: "surface-op:d1-http-package-install-mismatch",
       });
 
@@ -456,10 +594,12 @@ describe("D1-backed Hono protocol surface", () => {
         "action_proposed",
         "policy_decision_recorded",
         "action_greenlit",
+        "idempotency_ledger_recorded",
         "gateway_checked",
+        "gateway_refused",
         "receipt_emitted",
       ]);
-      expect(events.map((event) => event.offset)).toEqual([0, 1, 2, 3, 4]);
+      expect(events.map((event) => event.offset)).toEqual([0, 1, 2, 3, 4, 5, 6]);
 
       const mutationCounts = await harness.query<CountRow>(
         "SELECT COUNT(*) AS count FROM protocol_records WHERE object_type = ?",
@@ -469,12 +609,17 @@ describe("D1-backed Hono protocol surface", () => {
         "SELECT COUNT(*) AS count FROM protocol_records WHERE object_type = ?",
         "gateway_check_attempt",
       );
+      const refusalCounts = await harness.query<CountRow>(
+        "SELECT COUNT(*) AS count FROM protocol_records WHERE object_type = ?",
+        "refusal",
+      );
       const receiptCounts = await harness.query<CountRow>(
         "SELECT COUNT(*) AS count FROM protocol_records WHERE object_type = ?",
         "receipt",
       );
       expect(mutationCounts[0]?.count).toBe(0);
       expect(gateCounts[0]?.count).toBe(1);
+      expect(refusalCounts[0]?.count).toBe(1);
       expect(receiptCounts[0]?.count).toBe(1);
     } finally {
       await harness.dispose();
@@ -491,7 +636,7 @@ describe("D1-backed Hono protocol surface", () => {
       const gate = await client.gatewayCheck({
         actionContractId: actionContract.actionContractId,
         greenlightId: greenlight.greenlightId,
-        observedParameters: { package: "hono", versionRange: "^4.12.19" },
+        observedParameters: packageInstallObservedParameters(),
         surfaceOperationRef: "surface-op:d1-receipt-export-install",
       });
       const receiptExport = await client.createReceiptExport({
@@ -536,7 +681,7 @@ describe("D1-backed Hono protocol surface", () => {
       const gate = await client.gatewayCheck({
         actionContractId: actionContract.actionContractId,
         greenlightId: greenlight.greenlightId,
-        observedParameters: { package: "hono", versionRange: "^4.12.19" },
+        observedParameters: packageInstallObservedParameters(),
         surfaceOperationRef: "surface-op:d1-recovery-unknown",
       });
       const proofGapId = await recordUnknownProofGapThroughClient(client, actionContract, gate);
@@ -647,7 +792,7 @@ describe("D1-backed Hono protocol surface", () => {
       const gate = await client.gatewayCheck({
         actionContractId: actionContract.actionContractId,
         greenlightId: greenlight.greenlightId,
-        observedParameters: { package: "hono", versionRange: "^4.12.19" },
+        observedParameters: packageInstallObservedParameters(),
         surfaceOperationRef: "surface-op:d1-recovery-expire-unknown",
       });
       const proofGapId = await recordUnknownProofGapThroughClient(client, actionContract, gate);
@@ -697,7 +842,7 @@ describe("D1-backed Hono protocol surface", () => {
       const gate = await client.gatewayCheck({
         actionContractId: actionContract.actionContractId,
         greenlightId: greenlight.greenlightId,
-        observedParameters: { package: "hono", versionRange: "^4.12.19" },
+        observedParameters: packageInstallObservedParameters(),
         surfaceOperationRef: "surface-op:d1-recovery-terminal-race",
       });
       const proofGapId = await recordUnknownProofGapThroughClient(client, actionContract, gate);
@@ -774,7 +919,7 @@ describe("D1-backed Hono protocol surface", () => {
       const gate = await client.gatewayCheck({
         actionContractId: actionContract.actionContractId,
         greenlightId: greenlight.greenlightId,
-        observedParameters: { package: "hono", versionRange: "^4.12.19" },
+        observedParameters: packageInstallObservedParameters(),
         surfaceOperationRef: "surface-op:d1-recovery-terminal-resolution",
       });
       const proofGapId = await recordUnknownProofGapThroughClient(client, actionContract, gate);
@@ -924,7 +1069,7 @@ describe("D1-backed Hono protocol surface", () => {
       const gate = await client.gatewayCheck({
         actionContractId: actionContract.actionContractId,
         greenlightId: greenlight.greenlightId,
-        observedParameters: { package: "hono", versionRange: "^4.12.19" },
+        observedParameters: packageInstallObservedParameters(),
       });
 
       expect(breaker.isolationState.sourceDecisionRef).toBe(breaker.breakerDecision.breakerDecisionId);
@@ -958,7 +1103,7 @@ describe("D1-backed Hono protocol surface", () => {
     const harness = await createD1HttpHarness();
     try {
       const client = new HandshakeClient("http://handshake.test", harness.fetch, {
-        transitionToken: D1_HARNESS_TRANSITION_TOKEN,
+        transitionTokens: D1_HARNESS_CALLER_AUTH_TOKENS,
       });
       const fixture = makeKernelFixture();
       await registerFixtureObjectsWithClient(client, fixture);
@@ -1016,7 +1161,7 @@ describe("D1-backed Hono protocol surface", () => {
       const gate = await client.gatewayCheck({
         actionContractId: actionContract.actionContractId,
         greenlightId: greenlight.greenlightId,
-        observedParameters: { package: "hono", versionRange: "^4.12.19" },
+        observedParameters: packageInstallObservedParameters(),
       });
 
       expect(gate.gateAttempt.gateDecision).toBe("passed");
@@ -1031,7 +1176,7 @@ describe("D1-backed Hono protocol surface", () => {
     const harness = await createD1HttpHarness();
     try {
       const client = new HandshakeClient("http://handshake.test", harness.fetch, {
-        transitionToken: D1_HARNESS_TRANSITION_TOKEN,
+        transitionTokens: D1_HARNESS_CALLER_AUTH_TOKENS,
       });
       const base = makeKernelFixture();
       const fixture = {
@@ -1107,7 +1252,7 @@ describe("D1-backed Hono protocol surface", () => {
       const gatewayCheck = await client.gatewayCheck({
         actionContractId: actionContract.actionContractId,
         greenlightId: greenlight.greenlightId,
-        observedParameters: { package: "hono", versionRange: "^4.12.19" },
+        observedParameters: packageInstallObservedParameters(),
         surfaceOperationRef: "surface-op:d1-http-package-install-proof-gap",
       });
       const verifiedGate = verifiedGatewayCheckFromResult(gatewayCheck);
@@ -1115,8 +1260,18 @@ describe("D1-backed Hono protocol surface", () => {
 
       const mutationEvidence = await surface.applyPackageInstall({
         verifiedGate,
+        parameters: packageInstallObservedParameters(),
         packageName: "hono",
         versionRange: "^4.12.19",
+        packageManager: "bun",
+        registryRef: "registry:npmjs",
+        workspaceRef: null,
+        manifestRef: "manifest:package.json",
+        lockfileRef: "lockfile:bun.lock",
+        installFlags: [],
+        lifecycleScriptPolicy: "blocked",
+        resolvedMaterialDigest: null,
+        resolvedMaterialEvidenceRefs: [],
       });
       const reconciliationResult = await client.reconcileSurfaceOperation({
         mutationAttemptId: verifiedGate.mutationAttemptId,
@@ -1157,6 +1312,7 @@ describe("D1-backed Hono protocol surface", () => {
         "action_proposed",
         "policy_decision_recorded",
         "action_greenlit",
+        "idempotency_ledger_recorded",
         "gateway_checked",
         "mutation_attempted",
         "protected_surface_operation_claimed",
@@ -1165,7 +1321,7 @@ describe("D1-backed Hono protocol surface", () => {
         "proof_gap_recorded",
         "protected_surface_operation_released",
       ]);
-      expect(events.map((event) => event.offset)).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
+      expect(events.map((event) => event.offset)).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
       for (let index = 1; index < events.length; index += 1) {
         expect(events[index]?.previous_event_digest).toBe(events[index - 1]?.event_digest);
       }
@@ -1193,7 +1349,7 @@ describe("D1-backed Hono protocol surface", () => {
 
 async function createHttpPackageInstallContract(harness: D1HttpHarness, generatedCodeOrSpecRef: string) {
   const client = new HandshakeClient("http://handshake.test", harness.fetch, {
-    transitionToken: D1_HARNESS_TRANSITION_TOKEN,
+    transitionTokens: D1_HARNESS_CALLER_AUTH_TOKENS,
   });
   const fixture = makeKernelFixture();
   await registerFixtureObjectsWithClient(client, fixture);

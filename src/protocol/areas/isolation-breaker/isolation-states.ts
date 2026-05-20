@@ -4,6 +4,7 @@ import { CreateIsolationInputSchema, type CreateIsolationInput } from "./types";
 import type { ProtocolRecorder } from "../../events/records";
 import type { ProtocolRecord } from "../object-registry";
 import { IsolationStateSchema, PROTOCOL_VERSION, type IsolationState } from "./types";
+import type { IsolationScopeRef, IsolationStateIndexEntry } from "../../store/port";
 
 type ParsedCreateIsolationInput = ReturnType<typeof CreateIsolationInputSchema.parse>;
 
@@ -55,7 +56,9 @@ function buildIsolationState(context: IsolationStateContext): IsolationState {
 }
 
 async function commitIsolationState(recorder: ProtocolRecorder, state: IsolationState): Promise<void> {
-  await recorder.commitRecordsWithEvents(isolationStateRecords(state), isolationStateEvents(state));
+  await recorder.commitRecordsWithEvents(isolationStateRecords(state), isolationStateEvents(state), {
+    isolationStateIndexEntries: [isolationStateIndexEntry(state)],
+  });
 }
 
 function isolationStateRecords(state: IsolationState): ProtocolRecord[] {
@@ -75,4 +78,21 @@ function isolationStateEvents(state: IsolationState): EventDescriptor[] {
       },
     },
   ];
+}
+
+export function isolationStateIndexEntry(state: IsolationState): IsolationStateIndexEntry {
+  return {
+    isolationScopeKey: isolationScopeKey(state),
+    isolationStateId: state.isolationStateId,
+    tenantId: state.tenantId,
+    organizationId: state.organizationId,
+    scopeType: state.scopeType,
+    scopeId: state.scopeId,
+    state: state.state,
+    updatedAt: state.createdAt,
+  };
+}
+
+export function isolationScopeKey(scopeRef: IsolationScopeRef): string {
+  return `${scopeRef.tenantId}:${scopeRef.organizationId}:${scopeRef.scopeType}:${scopeRef.scopeId}`;
 }

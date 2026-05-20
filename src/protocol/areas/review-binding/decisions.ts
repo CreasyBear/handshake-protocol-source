@@ -4,6 +4,7 @@ import { actionLifecycleStreamRefs, type EventDescriptor } from "../../events/ch
 import { createId, nowIso } from "../../foundation/ids";
 import type { ProtocolRecord } from "../object-registry";
 import type { PolicyDecision } from "../policy-greenlight";
+import { buildRefusal, protocolObjectRef } from "../refusal";
 import { CreateReviewDecisionInputSchema, type CreateReviewDecisionInput } from "./types";
 import type { ProtocolRecorder } from "../../events/records";
 import { PROTOCOL_VERSION, ReviewDecisionSchema, type ReviewArtifactRecord, type ReviewDecision } from "./types";
@@ -85,18 +86,48 @@ async function commitReviewDecision(
   context: ReviewDecisionContext,
   reviewDecision: ReviewDecision,
 ): Promise<void> {
+  const refusal =
+    reviewDecision.decision === "approve"
+      ? null
+      : await buildRefusal({
+          tenantId: reviewDecision.tenantId,
+          organizationId: reviewDecision.organizationId,
+          createdAt: reviewDecision.createdAt,
+          phase: "review",
+          actionContractId: reviewDecision.actionContractId,
+          policyDecisionId: context.policyDecision.policyDecisionId,
+          refusedObjectRef: protocolObjectRef("review_decision", reviewDecision.reviewDecisionId),
+          reasonCode: reviewDecision.decisionReasonCode,
+          reason: `Review decision ${reviewDecision.decision} refused authority for the exact action contract.`,
+          evidenceRefs: [
+            protocolObjectRef("review_decision", reviewDecision.reviewDecisionId),
+            protocolObjectRef("review_artifact", reviewDecision.reviewArtifactId),
+            protocolObjectRef("action_contract", reviewDecision.actionContractId),
+            reviewDecision.reviewArtifactDigest,
+          ],
+          refusedAt: reviewDecision.createdAt,
+        });
   await recorder.commitRecordsWithEvents(
-    reviewDecisionRecords(reviewDecision),
-    reviewDecisionEvents(context, reviewDecision),
+    reviewDecisionRecords(reviewDecision, refusal),
+    reviewDecisionEvents(context, reviewDecision, refusal),
   );
 }
 
-function reviewDecisionRecords(reviewDecision: ReviewDecision): ProtocolRecord[] {
-  return [{ objectType: "review_decision", payload: reviewDecision }];
+function reviewDecisionRecords(
+  reviewDecision: ReviewDecision,
+  refusal: Awaited<ReturnType<typeof buildRefusal>> | null,
+): ProtocolRecord[] {
+  const records: ProtocolRecord[] = [{ objectType: "review_decision", payload: reviewDecision }];
+  if (refusal) records.push({ objectType: "refusal", payload: refusal });
+  return records;
 }
 
-function reviewDecisionEvents(context: ReviewDecisionContext, reviewDecision: ReviewDecision): EventDescriptor[] {
-  return [
+function reviewDecisionEvents(
+  context: ReviewDecisionContext,
+  reviewDecision: ReviewDecision,
+  refusal: Awaited<ReturnType<typeof buildRefusal>> | null,
+): EventDescriptor[] {
+  const events: EventDescriptor[] = [
     {
       source: reviewDecision,
       eventType: "review_decision_recorded",
@@ -113,6 +144,16 @@ function reviewDecisionEvents(context: ReviewDecisionContext, reviewDecision: Re
       },
     },
   ];
+  if (refusal) {
+    events.push({
+      source: refusal,
+      eventType: "action_refused",
+      objectRefs: [refusal.refusalId, reviewDecision.reviewDecisionId, reviewDecision.actionContractId],
+      streamRefs: actionLifecycleStreamRefs(context.contract),
+      payload: { reasonCode: refusal.reasonCode, reviewDecision: reviewDecision.decision },
+    });
+  }
+  return events;
 }
 
 function assertReviewArtifactBinding(
@@ -154,6 +195,19 @@ function assertReviewArtifactBinding(
     throw new HandshakeProtocolError(
       "review_artifact_gateway_policy_mismatch",
       "Review artifact gateway policy version does not match the exact action contract.",
+      409,
+    );
+  }
+  if (
+    reviewArtifact.hiddenActionPosture !== "no_hidden_actions_detected" ||
+    reviewArtifact.secondaryActionPosture !== "no_secondary_actions_detected" ||
+    !reviewArtifact.catalogDigest ||
+    !reviewArtifact.rendererDigest ||
+    !reviewArtifact.actionBindingDigest
+  ) {
+    throw new HandshakeProtocolError(
+      "review_artifact_action_posture_unsafe",
+      "Review artifact cannot satisfy review policy without safe hidden-action, secondary-action, catalog, renderer, and action-binding posture.",
       409,
     );
   }

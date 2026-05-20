@@ -4,7 +4,9 @@ import type { GeneratedExecutionGraph } from "../generated-execution-graph";
 import { createId, nowIso } from "../../foundation/ids";
 import { CompileIntentInputSchema, type CompileIntentInput } from "./types";
 import type { ProtocolRecorder } from "../../events/records";
+import { buildRefusal, protocolObjectRef } from "../refusal";
 import type { RuntimeExecutionRecord } from "../runtime-evidence";
+import type { ToolCallDraft } from "../tool-call-draft";
 import {
   CandidateActionSchema,
   IntentCompilationRecordSchema,
@@ -28,12 +30,14 @@ type IntentCompilationContext = {
   envelopeRecord: StoredProtocolRecord<OperatingEnvelope> | null;
   runtimeExecutionRecord: StoredProtocolRecord<RuntimeExecutionRecord> | null;
   generatedExecutionGraphRecord: StoredProtocolRecord<GeneratedExecutionGraph> | null;
+  toolCallDraftRecord: StoredProtocolRecord<ToolCallDraft> | null;
   tool: ToolCapability | null;
   actionType: ActionType | null;
   gateway: GatewayRegistryEntry | null;
   envelope: OperatingEnvelope | null;
   runtimeExecution: RuntimeExecutionRecord | null;
   generatedExecutionGraph: GeneratedExecutionGraph | null;
+  toolCallDraft: ToolCallDraft | null;
 };
 
 export async function compileIntent(
@@ -62,6 +66,7 @@ async function getIntentCompilationContext(
     envelopeRecord,
     runtimeExecutionRecord,
     generatedExecutionGraphRecord,
+    toolCallDraftRecord,
   ] = await Promise.all([
     store.getRecord<ToolCapability>("tool_capability", input.candidate.toolCapabilityId),
     store.getRecord<ActionType>("action_type", input.candidate.actionTypeId),
@@ -73,6 +78,9 @@ async function getIntentCompilationContext(
     input.generatedExecutionGraphId
       ? store.getRecord<GeneratedExecutionGraph>("generated_execution_graph", input.generatedExecutionGraphId)
       : Promise.resolve(null),
+    input.toolCallDraftId
+      ? store.getRecord<ToolCallDraft>("tool_call_draft", input.toolCallDraftId)
+      : Promise.resolve(null),
   ]);
 
   const tool = toolRecord?.payload ?? null;
@@ -81,6 +89,7 @@ async function getIntentCompilationContext(
   const envelope = envelopeRecord?.payload ?? null;
   const runtimeExecution = runtimeExecutionRecord?.payload ?? null;
   const generatedExecutionGraph = generatedExecutionGraphRecord?.payload ?? null;
+  const toolCallDraft = toolCallDraftRecord?.payload ?? null;
   const paramsDigest = await digestCanonical({
     parameters: input.candidate.parameters,
     secretRefs: input.candidate.secretRefs,
@@ -95,12 +104,14 @@ async function getIntentCompilationContext(
     envelopeRecord,
     runtimeExecutionRecord,
     generatedExecutionGraphRecord,
+    toolCallDraftRecord,
     tool,
     actionType,
     gateway,
     envelope,
     runtimeExecution,
     generatedExecutionGraph,
+    toolCallDraft,
   };
 }
 
@@ -110,6 +121,7 @@ async function buildCandidateAction(
 ): Promise<CandidateAction> {
   const { input, paramsDigest, toolRecord, actionTypeRecord, gatewayRecord, envelopeRecord } = context;
   const { tool, actionType, gateway, runtimeExecution, generatedExecutionGraph } = context;
+  const { toolCallDraft } = context;
   const { generatedExecutionNode } = decision;
   const candidateActionId = createId("cand");
   const candidateBase = {
@@ -141,6 +153,7 @@ async function buildCandidateAction(
     purposeCode: input.candidate.purposeCode,
     expectedSideEffectCodes: input.candidate.expectedSideEffectCodes,
     evidenceRefs: input.candidate.evidenceRefs,
+    clearingEvidenceRefs: input.candidate.clearingEvidenceRefs,
     bounds: input.candidate.bounds,
     idempotencyKey: input.candidate.idempotencyKey,
     rollbackHint: input.candidate.rollbackHint,
@@ -157,6 +170,9 @@ async function buildCandidateAction(
     generatedExecutionGatewayRegistrySnapshotDigest: generatedExecutionGraph?.gatewayRegistrySnapshotDigest ?? null,
     generatedExecutionRegistryBindingSetDigest: generatedExecutionGraph?.registryBindingSetDigest ?? null,
     generatedExecutionNodeGatewayBindingDigest: generatedExecutionNode?.nodeGatewayBindingDigest ?? null,
+    toolCallDraftId: toolCallDraft?.toolCallDraftId ?? null,
+    toolCallDraftDigest: toolCallDraft?.draftDigest ?? null,
+    toolCallDraftState: toolCallDraft?.draftState ?? null,
   } satisfies CandidateAction;
   const candidateDigest =
     decision.candidateStatus === "contractable"
@@ -205,8 +221,29 @@ async function commitIntentCompilation(
   context: IntentCompilationContext,
   record: IntentCompilationRecord,
 ): Promise<void> {
+  const refusal =
+    record.candidateAction.candidateStatus === "rejected"
+      ? await buildRefusal({
+          tenantId: record.tenantId,
+          organizationId: record.organizationId,
+          createdAt: record.createdAt,
+          phase: "compilation",
+          refusedObjectRef: protocolObjectRef("intent_compilation", record.intentCompilationId),
+          reasonCode: record.candidateAction.refusalReasonCodes[0] ?? "unwrapped_consequential_tool",
+          reason: "Intent compilation refused to produce an action contract for this candidate action.",
+          evidenceRefs: [
+            protocolObjectRef("intent_compilation", record.intentCompilationId),
+            ...record.candidateAction.refusalReasonCodes,
+            ...record.requiredEvidenceRefs,
+          ],
+          refusedAt: record.createdAt,
+        })
+      : null;
   await recorder.commitRecordsWithEvents(
-    [{ objectType: "intent_compilation", payload: record }],
+    [
+      { objectType: "intent_compilation", payload: record },
+      ...(refusal ? ([{ objectType: "refusal", payload: refusal }] as const) : []),
+    ],
     [
       {
         source: record,
@@ -223,6 +260,19 @@ async function commitIntentCompilation(
           overreachReasonCodes: record.overreachReasonCodes,
         },
       },
+      ...(refusal
+        ? [
+            {
+              source: refusal,
+              eventType: "action_refused" as const,
+              objectRefs: [refusal.refusalId, record.intentCompilationId, record.candidateAction.candidateActionId],
+              payload: {
+                reasonCode: refusal.reasonCode,
+                refusalReasonCodes: record.candidateAction.refusalReasonCodes,
+              },
+            },
+          ]
+        : []),
     ],
   );
 }
@@ -239,6 +289,24 @@ function candidateDigestMaterial(input: ParsedCompileIntentInput, candidate: Can
     compilerVersion: input.compilerVersion,
     runtimeExecutionId: input.runtimeExecutionId,
     runtimeExecutionDigest: candidate.runtimeExecutionDigest,
-    candidateAction: { ...candidate, candidateDigest: null },
+    toolCallDraftId: input.toolCallDraftId,
+    toolCallDraftDigest: candidate.toolCallDraftDigest,
+    candidateAction: {
+      ...candidate,
+      clearingEvidenceRefs: clearingEvidenceRefsJson(candidate.clearingEvidenceRefs),
+      candidateDigest: null,
+    },
   };
+}
+
+function clearingEvidenceRefsJson(refs: {
+  correlationRef?: string | undefined;
+  obligationRef?: string | undefined;
+  counterpartyRef?: string | undefined;
+}): { [key: string]: JsonValue } {
+  const json: { [key: string]: JsonValue } = {};
+  if (refs.correlationRef !== undefined) json.correlationRef = refs.correlationRef;
+  if (refs.obligationRef !== undefined) json.obligationRef = refs.obligationRef;
+  if (refs.counterpartyRef !== undefined) json.counterpartyRef = refs.counterpartyRef;
+  return json;
 }

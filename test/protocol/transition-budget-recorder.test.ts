@@ -10,16 +10,16 @@ import {
 import { TransitionBudgetRecorder, type TransitionBudgetLimit } from "../support/transition-budget-recorder";
 
 const policyBudget = budget({
-  maxReads: 8,
+  maxReads: 9,
   maxWrites: 1,
-  maxCommittedRecords: 2,
-  maxEmittedEvents: 6,
+  maxCommittedRecords: 3,
+  maxEmittedEvents: 9,
   maxStreamPartitionsTouched: 3,
 });
 const gatewayBudget = budget({
-  maxReads: 9,
+  maxReads: 10,
   maxWrites: 1,
-  maxCommittedRecords: 5,
+  maxCommittedRecords: 6,
   maxEmittedEvents: 12,
   maxStreamPartitionsTouched: 3,
 });
@@ -31,9 +31,9 @@ const receiptExportBudget = budget({
   maxStreamPartitionsTouched: 3,
 });
 const reconciliationBudget = budget({
-  maxReads: 7,
+  maxReads: 8,
   maxWrites: 1,
-  maxCommittedRecords: 3,
+  maxCommittedRecords: 4,
   maxEmittedEvents: 9,
   maxStreamPartitionsTouched: 3,
 });
@@ -60,6 +60,7 @@ describe("transition budget recorder", () => {
     expect(fixture.store.snapshot().eventWritesByType).toMatchObject({
       policy_decision_recorded: 3,
       action_greenlit: 3,
+      idempotency_ledger_recorded: 3,
     });
 
     fixture.store.reset();
@@ -76,6 +77,7 @@ describe("transition budget recorder", () => {
       mutation_attempt: 1,
       receipt: 1,
       protected_surface_operation_claim: 1,
+      idempotency_ledger_entry: 1,
     });
 
     fixture.store.reset();

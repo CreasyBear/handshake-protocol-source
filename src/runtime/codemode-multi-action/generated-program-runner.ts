@@ -1,16 +1,22 @@
 import { z } from "zod";
 import {
-  compilePackageInstallIntent,
+  buildPackageInstallCompileIntentInput,
   refusalReasonCodesForCompilation as packageInstallRefusalReasonCodesForCompilation,
   type PackageInstallRuntimeConfig,
   type PackageInstallRuntimeProtocol,
 } from "../package-install/action-proposal";
 import {
-  compileRepoWriteIntent,
+  buildRepoWriteCompileIntentInput,
   type RepoWriteRuntimeConfig,
   type RepoWriteRuntimeProtocol,
   refusalReasonCodesForCompilation as repoWriteRefusalReasonCodesForCompilation,
 } from "../repo-write/action-proposal";
+import {
+  buildPreviewDeployCompileIntentInput,
+  refusalReasonCodesForCompilation as previewDeployRefusalReasonCodesForCompilation,
+  type PreviewDeployRuntimeConfig,
+  type PreviewDeployRuntimeProtocol,
+} from "../preview-deploy/action-proposal";
 import type { ActionContract } from "../../protocol/areas/action-contract";
 import type {
   CreateGeneratedExecutionGraphInput,
@@ -19,6 +25,11 @@ import type {
 } from "../../protocol/areas/generated-execution-graph";
 import type { IntentCompilationRecord } from "../../protocol/areas/intent-compilation";
 import type { CreateRuntimeExecutionInput, RuntimeExecutionRecord } from "../../protocol/areas/runtime-evidence";
+import type {
+  CreateToolCallDraftInput,
+  ToolCallDraft,
+  TransitionToolCallDraftInput,
+} from "../../protocol/areas/tool-call-draft";
 import {
   actionGeneratedCodeOrSpecRef,
   actionNodeId,
@@ -41,33 +52,54 @@ const CodemodeRepoWriteActionSchema = z.strictObject({
   content: z.string(),
 });
 
+const CodemodePreviewDeployActionSchema = z.strictObject({
+  actionClass: z.literal("preview_deploy.create"),
+  provider: z.string().min(1),
+  projectRef: z.string().min(1),
+  branchRef: z.string().min(1),
+  commitRef: z.string().min(1),
+  previewUrlHint: z.string().min(1).nullable().default(null),
+});
+
 export const CodemodeMultiActionProgramSchema = z.strictObject({
   principalIntentRef: z.string().min(1),
   generatedCodeOrSpecRef: z.string().min(1),
   actions: z
-    .array(z.discriminatedUnion("actionClass", [CodemodePackageInstallActionSchema, CodemodeRepoWriteActionSchema]))
+    .array(
+      z.discriminatedUnion("actionClass", [
+        CodemodePackageInstallActionSchema,
+        CodemodeRepoWriteActionSchema,
+        CodemodePreviewDeployActionSchema,
+      ]),
+    )
     .min(1),
 });
 export type CodemodeMultiActionProgram = z.input<typeof CodemodeMultiActionProgramSchema>;
 
+type CodemodeActionClass = "package.install" | "repo.write" | "preview_deploy.create";
+
 export type CodemodeMultiActionRuntimeConfig = {
   packageInstall: PackageInstallRuntimeConfig;
   repoWrite: RepoWriteRuntimeConfig;
+  previewDeploy: PreviewDeployRuntimeConfig;
 };
 
 export type CodemodeMultiActionProtocol = PackageInstallRuntimeProtocol &
-  RepoWriteRuntimeProtocol & {
+  RepoWriteRuntimeProtocol &
+  PreviewDeployRuntimeProtocol & {
     createRuntimeExecution(input: CreateRuntimeExecutionInput): Promise<RuntimeExecutionRecord>;
     createGeneratedExecutionGraph(
       input: CreateGeneratedExecutionGraphInput,
       issuerContext: GraphEvidenceIssuerContext,
     ): Promise<GeneratedExecutionGraph>;
+    createToolCallDraft(input: CreateToolCallDraftInput): Promise<ToolCallDraft>;
+    transitionToolCallDraft(input: TransitionToolCallDraftInput): Promise<ToolCallDraft>;
   };
 
 export type CodemodeActionContractProposal =
   | {
       outcome: "action_contract_proposed";
-      actionClass: "package.install" | "repo.write";
+      actionClass: CodemodeActionClass;
       sequenceNumber: number;
       intentCompilation: IntentCompilationRecord;
       actionContract: ActionContract;
@@ -75,7 +107,7 @@ export type CodemodeActionContractProposal =
     }
   | {
       outcome: "intent_compilation_refused";
-      actionClass: "package.install" | "repo.write";
+      actionClass: CodemodeActionClass;
       sequenceNumber: number;
       intentCompilation: IntentCompilationRecord;
       actionContract: null;
@@ -83,7 +115,7 @@ export type CodemodeActionContractProposal =
     }
   | {
       outcome: "generated_execution_block_refused";
-      actionClass: "package.install" | "repo.write";
+      actionClass: CodemodeActionClass;
       sequenceNumber: number;
       intentCompilation: IntentCompilationRecord;
       actionContract: null;
@@ -190,7 +222,7 @@ export type ParsedCodemodeMultiActionProgram = z.infer<typeof CodemodeMultiActio
 export type CodemodeAction = ParsedCodemodeMultiActionProgram["actions"][number];
 
 type CompiledCodemodeAction = {
-  actionClass: "package.install" | "repo.write";
+  actionClass: CodemodeActionClass;
   sequenceNumber: number;
   intentCompilation: IntentCompilationRecord;
   refusalReasonCodes: string[];
@@ -206,7 +238,7 @@ async function compileCodemodeAction(
   graphRefs: GeneratedExecutionGraphRefs,
 ): Promise<CompiledCodemodeAction> {
   if (action.actionClass === "package.install") {
-    const intentCompilation = await compilePackageInstallIntent(protocol, config.packageInstall, {
+    const compileInput = buildPackageInstallCompileIntentInput(config.packageInstall, {
       principalIntentRef: program.principalIntentRef,
       generatedCodeOrSpecRef: actionGeneratedCodeOrSpecRef(program.generatedCodeOrSpecRef, sequenceNumber),
       runtimeExecutionId: graphRefs.runtimeExecutionId,
@@ -217,6 +249,8 @@ async function compileCodemodeAction(
       sequenceNumber,
       requiredPriorActionContractIds,
     });
+    const draft = await createFinalizedToolCallDraft(protocol, compileInput);
+    const intentCompilation = await protocol.compileIntent({ ...compileInput, toolCallDraftId: draft.toolCallDraftId });
     return {
       actionClass: action.actionClass,
       sequenceNumber,
@@ -225,7 +259,32 @@ async function compileCodemodeAction(
     };
   }
 
-  const intentCompilation = await compileRepoWriteIntent(protocol, config.repoWrite, {
+  if (action.actionClass === "preview_deploy.create") {
+    const compileInput = await buildPreviewDeployCompileIntentInput(config.previewDeploy, {
+      principalIntentRef: program.principalIntentRef,
+      generatedCodeOrSpecRef: actionGeneratedCodeOrSpecRef(program.generatedCodeOrSpecRef, sequenceNumber),
+      runtimeExecutionId: graphRefs.runtimeExecutionId,
+      generatedExecutionGraphId: graphRefs.generatedExecutionGraphId,
+      generatedExecutionNodeId: actionNodeId(sequenceNumber),
+      provider: action.provider,
+      projectRef: action.projectRef,
+      branchRef: action.branchRef,
+      commitRef: action.commitRef,
+      previewUrlHint: action.previewUrlHint,
+      sequenceNumber,
+      requiredPriorActionContractIds,
+    });
+    const draft = await createFinalizedToolCallDraft(protocol, compileInput);
+    const intentCompilation = await protocol.compileIntent({ ...compileInput, toolCallDraftId: draft.toolCallDraftId });
+    return {
+      actionClass: action.actionClass,
+      sequenceNumber,
+      intentCompilation,
+      refusalReasonCodes: previewDeployRefusalReasonCodesForCompilation(intentCompilation),
+    };
+  }
+
+  const compileInput = await buildRepoWriteCompileIntentInput(config.repoWrite, {
     principalIntentRef: program.principalIntentRef,
     generatedCodeOrSpecRef: actionGeneratedCodeOrSpecRef(program.generatedCodeOrSpecRef, sequenceNumber),
     runtimeExecutionId: graphRefs.runtimeExecutionId,
@@ -237,6 +296,8 @@ async function compileCodemodeAction(
     sequenceNumber,
     requiredPriorActionContractIds,
   });
+  const draft = await createFinalizedToolCallDraft(protocol, compileInput);
+  const intentCompilation = await protocol.compileIntent({ ...compileInput, toolCallDraftId: draft.toolCallDraftId });
   return {
     actionClass: action.actionClass,
     sequenceNumber,
@@ -245,9 +306,44 @@ async function compileCodemodeAction(
   };
 }
 
+async function createFinalizedToolCallDraft(
+  protocol: Pick<CodemodeMultiActionProtocol, "createToolCallDraft" | "transitionToolCallDraft">,
+  compileInput:
+    | Awaited<ReturnType<typeof buildRepoWriteCompileIntentInput>>
+    | Awaited<ReturnType<typeof buildPreviewDeployCompileIntentInput>>
+    | ReturnType<typeof buildPackageInstallCompileIntentInput>,
+): Promise<ToolCallDraft> {
+  const opened = await protocol.createToolCallDraft({
+    tenantId: compileInput.tenantId,
+    organizationId: compileInput.organizationId,
+    runtimeExecutionId: compileInput.runtimeExecutionId,
+    generatedExecutionGraphId: compileInput.generatedExecutionGraphId,
+    generatedExecutionNodeId: compileInput.generatedExecutionNodeId,
+    toolCapabilityId: compileInput.candidate.toolCapabilityId,
+    actionTypeId: compileInput.candidate.actionTypeId,
+    gatewayRegistryEntryId: compileInput.candidate.gatewayRegistryEntryId,
+    actionClass: compileInput.candidate.actionClass,
+    gatewayId: compileInput.candidate.gatewayId,
+    resourceRef: compileInput.candidate.resourceRef,
+    expiresAt: compileInput.candidate.expiresAt,
+    evidenceRefs: compileInput.requiredEvidenceRefs,
+  });
+  return protocol.transitionToolCallDraft({
+    toolCallDraftId: opened.toolCallDraftId,
+    nextDraftState: "finalized",
+    parameters: compileInput.candidate.parameters,
+    nonSecretParamsSummary: compileInput.candidate.nonSecretParamsSummary,
+    secretRefs: compileInput.candidate.secretRefs,
+    finalizedAt: new Date().toISOString(),
+    expiresAt: compileInput.candidate.expiresAt,
+    evidenceRefs: compileInput.requiredEvidenceRefs,
+  });
+}
+
 function assertRuntimeConfigScope(config: CodemodeMultiActionRuntimeConfig): void {
   const packageConfig = config.packageInstall;
   const repoConfig = config.repoWrite;
+  const previewConfig = config.previewDeploy;
   const mismatchedFields = [
     "tenantId",
     "organizationId",
@@ -261,7 +357,9 @@ function assertRuntimeConfigScope(config: CodemodeMultiActionRuntimeConfig): voi
     "gatewayRegistryRef",
   ].filter(
     (field) =>
-      packageConfig[field as keyof PackageInstallRuntimeConfig] !== repoConfig[field as keyof RepoWriteRuntimeConfig],
+      packageConfig[field as keyof PackageInstallRuntimeConfig] !== repoConfig[field as keyof RepoWriteRuntimeConfig] ||
+      packageConfig[field as keyof PackageInstallRuntimeConfig] !==
+        previewConfig[field as keyof PreviewDeployRuntimeConfig],
   );
   if (mismatchedFields.length > 0) {
     throw new Error(`Codemode multi-action config scope mismatch: ${mismatchedFields.join(", ")}`);
@@ -291,9 +389,11 @@ function refusalProposalForPreflight(compiled: CompiledCodemodeAction): Codemode
 
 function signingSecretForAction(
   config: CodemodeMultiActionRuntimeConfig,
-  actionClass: "package.install" | "repo.write",
+  actionClass: CodemodeActionClass,
 ): string | undefined {
-  return actionClass === "package.install" ? config.packageInstall.signingSecret : config.repoWrite.signingSecret;
+  if (actionClass === "package.install") return config.packageInstall.signingSecret;
+  if (actionClass === "preview_deploy.create") return config.previewDeploy.signingSecret;
+  return config.repoWrite.signingSecret;
 }
 
 function requireCompiled(compiled: CompiledCodemodeAction | undefined): CompiledCodemodeAction {

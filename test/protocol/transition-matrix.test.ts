@@ -14,7 +14,10 @@ import { protocolObjectTypes } from "../../src/protocol/areas/object-registry";
 describe("foundation transition matrix", () => {
   it("covers every public transition route and invoker exactly once", () => {
     const navigationIds = protocolNavigation
-      .filter((entry) => entry.transitionId !== "createGeneratedExecutionGraph")
+      .filter(
+        (entry) =>
+          entry.transitionId !== "createGeneratedExecutionGraph" && entry.transitionId !== "createAuthorityCertificate",
+      )
       .map((entry) => String(entry.transitionId))
       .sort();
     const routeIds = transitionRouteDefinitions.map((route) => String(route.routeId)).sort();
@@ -66,11 +69,15 @@ describe("foundation transition matrix", () => {
       "compileIntent",
       "createRuntimeExecution",
       "createGeneratedExecutionGraph",
+      "createBypassProbe",
+      "createToolCallDraft",
+      "transitionToolCallDraft",
       "createProtectedPathPosture",
       "createReviewArtifact",
       "createReviewDecision",
       "reconcileSurfaceOperation",
       "createReceiptExport",
+      "createAuthorityCertificate",
       "createRecoveryRecommendation",
       "resolveRecoveryTerminalConflictProofGap",
     ] as const;

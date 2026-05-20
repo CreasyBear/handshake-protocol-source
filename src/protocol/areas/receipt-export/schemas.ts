@@ -5,9 +5,23 @@ import {
   IsoDateSchema,
   ProtocolBaseSchema,
   ReasonCodeSchema,
+  SignaturePostureSchema,
 } from "../../foundation/schema-core";
 import { GateDecisionSchema } from "../gateway-gate/schemas";
 import { PolicyDecisionValueSchema } from "../policy-greenlight/schemas";
+
+export const GatewayAdmissionStatusSchema = z.enum(["not_requested", "admitted", "refused", "proof_gap", "replayed"]);
+export type GatewayAdmissionStatus = z.infer<typeof GatewayAdmissionStatusSchema>;
+
+export const DownstreamOutcomeStatusSchema = z.enum([
+  "not_started",
+  "pending",
+  "succeeded",
+  "refused",
+  "failed",
+  "unknown",
+]);
+export type DownstreamOutcomeStatus = z.infer<typeof DownstreamOutcomeStatusSchema>;
 
 export const ReceiptStreamReferenceSchema = z
   .strictObject({
@@ -34,9 +48,11 @@ export const ReceiptSchema = ProtocolBaseSchema.extend({
   gatewayId: IdSchema,
   policyDecisionStatus: PolicyDecisionValueSchema,
   gatewayCheckStatus: GateDecisionSchema.nullable(),
+  gatewayAdmissionStatus: GatewayAdmissionStatusSchema,
   greenlightConsumptionStatus: z.enum(["not_applicable", "not_consumed", "consumed", "replayed"]),
   mutationAttemptStatus: z.enum(["not_attempted", "submitted", "succeeded", "downstream_refused", "failed", "unknown"]),
   downstreamExecutionStatus: z.enum(["not_started", "pending", "succeeded", "refused", "failed", "unknown"]),
+  downstreamOutcomeStatus: DownstreamOutcomeStatusSchema,
   proofGapIds: z.array(IdSchema).default([]),
   evidenceRefs: z.array(z.string()).default([]),
   streamEventIds: z.array(IdSchema).default([]),
@@ -63,10 +79,12 @@ export const ReceiptExportSchema = ProtocolBaseSchema.extend({
   gatewayPolicyVersion: z.string().min(1),
   policyDecisionStatus: PolicyDecisionValueSchema,
   gatewayCheckStatus: GateDecisionSchema.nullable(),
+  gatewayAdmissionStatus: GatewayAdmissionStatusSchema,
   gatewayCheckedAt: IsoDateSchema.nullable(),
   greenlightConsumptionStatus: ReceiptSchema.shape.greenlightConsumptionStatus,
   mutationAttemptStatus: ReceiptSchema.shape.mutationAttemptStatus,
   downstreamExecutionStatus: ReceiptSchema.shape.downstreamExecutionStatus,
+  downstreamOutcomeStatus: DownstreamOutcomeStatusSchema,
   proofGapStatus: z.enum(["none", "present"]),
   proofGapIds: z.array(IdSchema).default([]),
   proofGapReasonCodes: z.array(ReasonCodeSchema).default([]),
@@ -75,6 +93,9 @@ export const ReceiptExportSchema = ProtocolBaseSchema.extend({
   streamOffsets: z.array(ReceiptStreamReferenceSchema).default([]),
   receiptDigest: DigestSchema,
   auditChainDigest: DigestSchema,
+  signaturePosture: SignaturePostureSchema,
+  keyIdentityRef: z.string().min(1).nullable(),
+  verificationPolicyRef: z.string().min(1).nullable(),
   exportFormat: z.enum(["json", "redacted_json"]),
   redactionProfileRef: z.string().min(1),
   exportPurposeCode: z.string().min(1),

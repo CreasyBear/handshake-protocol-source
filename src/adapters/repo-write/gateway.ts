@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { downstreamFailureEvidence } from "../downstream-failure-evidence";
 import {
   verifiedGatewayCheckFromResult,
   type GatewayCheckInput,
@@ -122,17 +123,26 @@ export async function runRepoWriteGateway(input: RepoWriteGatewayInput): Promise
       idempotencyKey: verifiedGate.idempotencyKey,
       observedSurfaceOperationRef: mutationEvidence.surfaceOperationRef,
       observedDownstreamStatus: "succeeded",
+      downstreamRetryability: "non_retryable",
+      providerOperationRef: mutationEvidence.surfaceOperationRef,
+      diagnosticsRedactionPosture: "redacted",
       evidenceRefs: [mutationEvidence.evidenceRef],
       resolvedProofGapIds: [],
     });
     return { outcome: "mutation_reconciled", gatewayCheck, reconciliation, mutationEvidence };
-  } catch {
+  } catch (error) {
+    const failureEvidence = await downstreamFailureEvidence({
+      adapterId: "repo-write",
+      surfaceOperationRef,
+      error,
+      evidenceRef: `evidence:repo-write-failed:${surfaceOperationRef}`,
+    });
     const { reconciliation } = await input.protocol.reconcileSurfaceOperation({
       mutationAttemptId: verifiedGate.mutationAttemptId,
       idempotencyKey: verifiedGate.idempotencyKey,
       observedSurfaceOperationRef: surfaceOperationRef,
       observedDownstreamStatus: "failed",
-      evidenceRefs: [`evidence:repo-write-failed:${surfaceOperationRef}`],
+      ...failureEvidence,
       resolvedProofGapIds: [],
     });
     return { outcome: "mutation_failed", gatewayCheck, reconciliation, mutationEvidence: null };

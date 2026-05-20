@@ -3,6 +3,7 @@ import type {
   GatewayCheckCommit,
   GatewayCheckCommitResult,
   GreenlightConsumption,
+  IdempotencyLedgerEntry,
   IsolationScopeRef,
   IsolationState,
   ProtocolCommit,
@@ -142,6 +143,13 @@ export class TransitionBudgetRecorder implements ProtocolStore {
   ): Promise<StoredProtocolRecord<ProtectedPathPosture> | null> {
     this.countRead("getCurrentProtectedPathPosture");
     return this.delegate.getCurrentProtectedPathPosture(postureScopeKey);
+  }
+
+  async getCurrentIdempotencyLedgerEntry(
+    ledgerKeyDigest: string,
+  ): Promise<StoredProtocolRecord<IdempotencyLedgerEntry> | null> {
+    this.countRead("getCurrentIdempotencyLedgerEntry");
+    return this.delegate.getCurrentIdempotencyLedgerEntry(ledgerKeyDigest);
   }
 
   async getCurrentProtectedSurfaceOperationClaim(

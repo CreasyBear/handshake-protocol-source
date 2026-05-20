@@ -72,6 +72,58 @@ describe("codemode multi-action runtime wrapper", () => {
     expect(await recordCount(store, "mutation_attempt")).toBe(0);
   });
 
+  it("routes preview deploy through the same generated graph and draft finalization path", async () => {
+    const { store, kernel, fixture } = await makeCodemodeKernelFixture();
+
+    const result = await proposeCodemodeActionContracts(kernel, codemodeMultiActionRuntimeConfig(fixture), {
+      principalIntentRef: "intent:install package, write file, and create preview",
+      generatedCodeOrSpecRef: "code:codemode-multi-action-preview",
+      actions: [
+        { actionClass: "package.install", package: "hono", versionRange: "^4.12.19" },
+        {
+          actionClass: "repo.write",
+          repositoryRef: fixture.repoWrite.repositoryRef,
+          filePath: fixture.repoWrite.filePath,
+          content: "export const generatedValue = 42;\n",
+        },
+        {
+          actionClass: "preview_deploy.create",
+          provider: "local",
+          projectRef: "demo-web",
+          branchRef: "feature/handshake",
+          commitRef: "commit_123",
+          previewUrlHint: "http://127.0.0.1/preview/demo-web",
+        },
+      ],
+    });
+
+    expect(result.outcome).toBe("action_contracts_proposed");
+    expect(result.proposals.map((proposal) => proposal.actionContract?.actionClass)).toEqual([
+      "package.install",
+      "repo.write",
+      "preview_deploy.create",
+    ]);
+    const first = result.proposals[0]?.actionContract;
+    const second = result.proposals[1]?.actionContract;
+    const third = result.proposals[2]?.actionContract;
+    if (!first || !second || !third) throw new Error("expected three action contracts");
+    expect(third.requiredPriorActionContractIds).toEqual([first.actionContractId, second.actionContractId]);
+    expect(third.generatedExecutionNodeId).toBe("codemode_action_3");
+    expect(third.parameters).toMatchObject({
+      provider: "local",
+      projectRef: "demo-web",
+      branchRef: "feature/handshake",
+      commitRef: "commit_123",
+    });
+
+    const graphs = await store.listRecordsByType<GeneratedExecutionGraph>("generated_execution_graph");
+    expect(graphs).toHaveLength(1);
+    expect(graphs[0]?.payload.nodeCount).toBe(3);
+    expect(await recordCount(store, "action_contract")).toBe(3);
+    expect(await recordCount(store, "greenlight")).toBe(0);
+    expect(await recordCount(store, "mutation_attempt")).toBe(0);
+  });
+
   it("refuses the whole generated program when one sibling candidate is refused", async () => {
     const { store, kernel, fixture } = await makeCodemodeKernelFixture({
       mutateFixture: (objects) => {

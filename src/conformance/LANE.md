@@ -6,7 +6,7 @@ Reference conformance checks for protocol behavior. This lane verifies adapter p
 
 ## Current proof claim
 
-Source-package conformance surface for protected mutation adapters. It proves no mutation without a `VerifiedGatewayCheck` in reference probes only.
+Source-package conformance surface for protected mutation adapters and adapter-pack posture checks. It proves no mutation without a `VerifiedGatewayCheck` and can surface adapter-owned raw authority checks in reference probes only.
 
 ## Use cases
 
@@ -18,7 +18,7 @@ Conformance probes are supplied by the caller. A passing result means the probe 
 
 ## Core components
 
-`index.ts`.
+`index.ts`, with adapter-pack checks re-exported from their adapter lanes when intentionally exposed.
 
 ## Failure and scale posture
 
@@ -38,11 +38,11 @@ Storage implementations, Hono transport, SDK internals, runtime wrappers as auth
 
 ## Guarding tests
 
-`test/architecture/import-posture.test.ts`, `test/architecture/package-surface.test.ts`, and `test/conformance/protected-mutation-adapter-conformance.test.ts`.
+`test/architecture/import-posture.test.ts`, `test/architecture/package-surface.test.ts`, `test/conformance/protected-mutation-adapter-conformance.test.ts`, and `test/conformance/x402-payment-conformance.test.ts`.
 
 ## Public surface
 
-Protected mutation adapter probe types, structured conformance check results, and assertion helper.
+Protected mutation adapter probe types, adapter-pack posture checks, structured conformance check results, and assertion helpers.
 
 ## Extraction trigger
 

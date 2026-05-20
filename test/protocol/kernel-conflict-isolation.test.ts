@@ -33,9 +33,9 @@ describe("Handshake kernel invariants: conflict and isolation", () => {
 
     expect(result.gateAttempt.gateDecision).toBe("passed");
     expect(result.mutationAttempt?.outcome).toBe("submitted");
-    expect(gateEvent?.offset).toBe(4);
+    expect(gateEvent?.offset).toBe(5);
     expect(gateEvent?.previousEventDigest).toBe(
-      store.listEventsForPartition(streamId, partitionKey).find((event) => event.offset === 3)?.eventDigest,
+      store.listEventsForPartition(streamId, partitionKey).find((event) => event.offset === 4)?.eventDigest,
     );
   });
 

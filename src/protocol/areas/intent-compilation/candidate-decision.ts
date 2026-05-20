@@ -2,6 +2,7 @@ import type { ActionType, GatewayRegistryEntry, OperatingEnvelope, ToolCapabilit
 import { HandshakeProtocolError } from "../../foundation/errors";
 import type { GeneratedExecutionGraph, GeneratedExecutionNode } from "../generated-execution-graph";
 import type { RuntimeExecutionRecord } from "../runtime-evidence";
+import type { ToolCallDraft } from "../tool-call-draft";
 import type { CandidateActionStatus, CompileIntentInputSchema, JsonValue } from "./types";
 
 type ParsedCompileIntentInput = ReturnType<typeof CompileIntentInputSchema.parse>;
@@ -16,6 +17,7 @@ export type IntentCompilationDecisionContext = {
   envelope: OperatingEnvelope | null;
   runtimeExecution: RuntimeExecutionRecord | null;
   generatedExecutionGraph: GeneratedExecutionGraph | null;
+  toolCallDraft: ToolCallDraft | null;
 };
 
 export type CandidateDecision = {
@@ -30,6 +32,7 @@ export function deriveCandidateDecision(context: IntentCompilationDecisionContex
   const uncertaintyMarkers = deriveUncertaintyMarkers(context);
   const overreachReasonCodes = [
     ...deriveRuntimeExecutionReasonCodes(context),
+    ...deriveToolCallDraftReasonCodes(context),
     ...deriveCatalogAndEnvelopeReasonCodes(context),
   ];
   if (requiresMissingGeneratedExecutionGraphRefusal(context)) {
@@ -55,7 +58,8 @@ export function deriveCandidateDecision(context: IntentCompilationDecisionContex
 }
 
 function deriveUncertaintyMarkers(context: IntentCompilationDecisionContext): string[] {
-  const { input, tool, actionType, gateway, envelope, runtimeExecution, generatedExecutionGraph } = context;
+  const { input, tool, actionType, gateway, envelope, runtimeExecution, generatedExecutionGraph, toolCallDraft } =
+    context;
   const markers: string[] = [];
   if (!tool) markers.push("unknown_tool_capability");
   if (!actionType) markers.push("unknown_action_type");
@@ -63,6 +67,7 @@ function deriveUncertaintyMarkers(context: IntentCompilationDecisionContext): st
   if (!envelope) markers.push("unknown_operating_envelope");
   if (input.runtimeExecutionId && !runtimeExecution) markers.push("unknown_runtime_execution");
   if (input.generatedExecutionGraphId && !generatedExecutionGraph) markers.push("unknown_generated_execution_graph");
+  if (input.toolCallDraftId && !toolCallDraft) markers.push("unknown_tool_call_draft");
   return markers;
 }
 
@@ -89,6 +94,34 @@ function deriveRuntimeExecutionReasonCodes(context: IntentCompilationDecisionCon
   }
   runtimeOverreachCodes.push(...runtimeExecution.refusalReasonCodes.map((code) => `runtime_${code}`));
   return runtimeOverreachCodes;
+}
+
+function deriveToolCallDraftReasonCodes(context: IntentCompilationDecisionContext): string[] {
+  const { input, createdAt, paramsDigest, toolCallDraft } = context;
+  const draftReasonCodes: string[] = [];
+  if ((input.generatedExecutionGraphId || input.generatedExecutionNodeId) && !input.toolCallDraftId) {
+    draftReasonCodes.push("tool_call_draft_missing");
+  }
+  if (!toolCallDraft) return draftReasonCodes;
+  if (toolCallDraft.draftState !== "finalized") draftReasonCodes.push("tool_call_draft_not_finalized");
+  if (Date.parse(toolCallDraft.expiresAt) <= Date.parse(createdAt)) draftReasonCodes.push("tool_call_draft_stale");
+  if (
+    toolCallDraft.tenantId !== input.tenantId ||
+    toolCallDraft.organizationId !== input.organizationId ||
+    toolCallDraft.runtimeExecutionId !== input.runtimeExecutionId ||
+    toolCallDraft.generatedExecutionGraphId !== input.generatedExecutionGraphId ||
+    toolCallDraft.generatedExecutionNodeId !== input.generatedExecutionNodeId ||
+    toolCallDraft.toolCapabilityId !== input.candidate.toolCapabilityId ||
+    toolCallDraft.actionTypeId !== input.candidate.actionTypeId ||
+    toolCallDraft.gatewayRegistryEntryId !== input.candidate.gatewayRegistryEntryId ||
+    toolCallDraft.actionClass !== input.candidate.actionClass ||
+    toolCallDraft.gatewayId !== input.candidate.gatewayId ||
+    toolCallDraft.resourceRef !== input.candidate.resourceRef
+  ) {
+    draftReasonCodes.push("tool_call_draft_binding_mismatch");
+  }
+  if (toolCallDraft.paramsDigest !== paramsDigest) draftReasonCodes.push("tool_call_draft_params_digest_mismatch");
+  return draftReasonCodes;
 }
 
 function deriveCatalogAndEnvelopeReasonCodes(context: IntentCompilationDecisionContext): string[] {
@@ -195,7 +228,12 @@ function assertSecretSafeCandidateInput(
 }
 
 function requiresGeneratedExecutionGraph(executionShape: RuntimeExecutionRecord["executionShape"]): boolean {
-  return executionShape === "shell_exec_block" || executionShape === "codemode_block";
+  return (
+    executionShape === "shell_exec_block" ||
+    executionShape === "codemode_block" ||
+    executionShape === "tool_dispatch_chain" ||
+    executionShape === "generated_mcp_tool_chain"
+  );
 }
 
 function deriveGeneratedExecutionCoverage(args: {

@@ -18,7 +18,7 @@ Generated programs may construct dynamic tool names, omit graph coverage, includ
 
 ## Core components
 
-`package-install/action-proposal.ts`, `repo-write/action-proposal.ts`, `preview-deploy/action-proposal.ts`, `codemode-multi-action/generated-program-runner.ts`, and `codemode-multi-action/generated-graph-evidence.ts`.
+`ingress/index.ts`, `package-install/action-proposal.ts`, `repo-write/action-proposal.ts`, `preview-deploy/action-proposal.ts`, `codemode-multi-action/generated-program-runner.ts`, and `codemode-multi-action/generated-graph-evidence.ts`.
 
 ## Failure and scale posture
 
@@ -38,11 +38,11 @@ Protocol root compatibility aggregators, policy decision issuance as authority, 
 
 ## Guarding tests
 
-`test/architecture/import-posture.test.ts`, `test/runtime/package-install-runtime.test.ts`, `test/runtime/codemode-multi-action-runtime.test.ts`, and `test/protocol/generated-execution-graph.test.ts`.
+`test/architecture/import-posture.test.ts`, `test/architecture/claim-boundary.test.ts`, `test/runtime/runtime-ingress.test.ts`, `test/runtime/package-install-runtime.test.ts`, `test/runtime/codemode-multi-action-runtime.test.ts`, and `test/protocol/generated-execution-graph.test.ts`.
 
 ## Public surface
 
-Runtime wrapper helpers that turn local generated tool calls or codemode blocks into runtime execution evidence, generated graph evidence, intent compilation, action contracts, or refusals.
+Runtime ingress and wrapper helpers that turn local observed dispatches, generated tool calls, or codemode blocks into runtime execution evidence, generated graph evidence, intent compilation, action contracts, or refusals.
 
 ## Extraction trigger
 

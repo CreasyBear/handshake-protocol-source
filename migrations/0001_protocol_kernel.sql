@@ -41,6 +41,22 @@ CREATE TABLE IF NOT EXISTS greenlight_issuances (
 CREATE INDEX IF NOT EXISTS idx_greenlight_issuances_greenlight
   ON greenlight_issuances (greenlight_id, claimed_at);
 
+CREATE TABLE IF NOT EXISTS idempotency_ledger_current (
+  ledger_key_digest TEXT PRIMARY KEY,
+  idempotency_ledger_entry_id TEXT NOT NULL,
+  tenant_id TEXT NOT NULL,
+  organization_id TEXT NOT NULL,
+  params_digest TEXT NOT NULL,
+  action_contract_id TEXT NOT NULL,
+  policy_decision_id TEXT NOT NULL,
+  greenlight_id TEXT,
+  ledger_state TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_idempotency_ledger_current_scope
+  ON idempotency_ledger_current (tenant_id, organization_id, ledger_key_digest);
+
 CREATE TABLE IF NOT EXISTS recovery_terminal_claims (
   recovery_recommendation_id TEXT PRIMARY KEY,
   status_transition_id TEXT NOT NULL,
@@ -61,6 +77,20 @@ CREATE TABLE IF NOT EXISTS protected_path_posture_current (
 
 CREATE INDEX IF NOT EXISTS idx_protected_path_posture_current_scope
   ON protected_path_posture_current (tenant_id, organization_id, posture_scope_key);
+
+CREATE TABLE IF NOT EXISTS isolation_state_current (
+  isolation_scope_key TEXT PRIMARY KEY,
+  isolation_state_id TEXT NOT NULL,
+  tenant_id TEXT NOT NULL,
+  organization_id TEXT NOT NULL,
+  scope_type TEXT NOT NULL,
+  scope_id TEXT NOT NULL,
+  state TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_isolation_state_current_scope
+  ON isolation_state_current (tenant_id, organization_id, scope_type, scope_id);
 
 CREATE TABLE IF NOT EXISTS protected_surface_operation_claim_current (
   claim_key_digest TEXT PRIMARY KEY,

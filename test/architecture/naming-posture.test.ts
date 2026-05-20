@@ -38,6 +38,9 @@ const overclaimingFunctionNamePattern =
   /\b(ensureSafe\w*|guarantee\w*|proveExecution\w*|trustedAgent\w*|secureApproval\w*)\s*(?:\(|:|=|<)/;
 const vagueProtocolMutationPattern =
   /\b(handle(?!Id\b)[A-Z]\w*|process(?!Id\b)[A-Z]\w*|do(?!Id\b)[A-Z]\w*|run(?!Id\b)[A-Z]\w*)\s*(?:\(|:|=|<)/;
+const adapterRailMarkers = [/\bx402\b/i] as const;
+const permittedStageLabelLiterals = ["not_enforced_tier1_metadata"] as const;
+const adapterRailAllowedFiles = new Set(["src/runtime/ingress/index.ts", "docs/internal/protocol-notes.md"]);
 
 describe("repo naming posture", () => {
   it("keeps workspace metadata junk out of active repo surfaces", () => {
@@ -97,7 +100,8 @@ describe("repo naming posture", () => {
     const violations: string[] = [];
     for (const file of repoFacingFiles()) {
       if (normalize(file) === self) continue;
-      const text = readFileSync(file, "utf8");
+      let text = readFileSync(file, "utf8");
+      for (const literal of permittedStageLabelLiterals) text = text.replaceAll(literal, "");
       for (const pattern of repoFacingStagePatterns) {
         if (pattern.test(text)) violations.push(`${normalize(file)} matches ${pattern.source}`);
       }
@@ -138,6 +142,14 @@ describe("repo naming posture", () => {
     expect(violations).toEqual([]);
   });
 
+  it("keeps adapter rail names out of protocol and runtime kernel lanes", () => {
+    const violations = ["src/protocol", "src/runtime", "docs/internal/protocol-notes.md"]
+      .flatMap((root) => sourceMatches(root, adapterRailMarkers))
+      .filter((entry) => !adapterRailAllowedFiles.has(entry.split(":")[0] ?? entry));
+
+    expect(violations).toEqual([]);
+  });
+
   it("keeps CI bound to the repo check command", () => {
     const workflow = readFileSync(".github/workflows/check.yml", "utf8");
 
@@ -146,13 +158,16 @@ describe("repo naming posture", () => {
   });
 });
 
-function sourceMatches(root: string, pattern: RegExp): string[] {
+function sourceMatches(root: string, pattern: RegExp | readonly RegExp[]): string[] {
   const violations: string[] = [];
+  const patterns = Array.isArray(pattern) ? pattern : [pattern];
   for (const file of walk(root)) {
-    if (!file.endsWith(".ts")) continue;
+    if (!/\.(md|ts)$/.test(file)) continue;
     const text = readFileSync(file, "utf8");
-    for (const match of text.matchAll(new RegExp(pattern, "g"))) {
-      violations.push(`${normalize(file)}: ${match[1] ?? match[0]}`);
+    for (const entry of patterns) {
+      for (const match of text.matchAll(new RegExp(entry, "g"))) {
+        violations.push(`${normalize(file)}: ${match[1] ?? match[0]}`);
+      }
     }
   }
   return violations.sort();

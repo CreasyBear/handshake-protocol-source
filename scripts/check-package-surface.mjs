@@ -12,9 +12,11 @@ const requiredFiles = [
   "docs/internal/protocol-notes.md",
   "src/index.ts",
   "src/conformance/index.ts",
+  "src/runtime/index.ts",
   "src/experimental.ts",
   "dist/index.d.ts",
   "dist/conformance/index.d.ts",
+  "dist/runtime/index.d.ts",
   "dist/experimental.d.ts",
 ];
 

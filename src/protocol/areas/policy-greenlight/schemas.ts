@@ -6,6 +6,7 @@ import {
   ProtocolBaseSchema,
   ReasonCodeSchema,
   ResourceRefSchema,
+  SignaturePostureSchema,
   SignatureSchema,
 } from "../../foundation/schema-core";
 import { RequiredProtectedPathStateSchema } from "../catalog-envelope/schemas";
@@ -29,6 +30,9 @@ export const PolicyDecisionSchema = ProtocolBaseSchema.extend({
   isolationSnapshotRef: z.string().min(1),
   expiresAt: IsoDateSchema,
   decisionSignature: SignatureSchema.nullable(),
+  signaturePosture: SignaturePostureSchema,
+  keyIdentityRef: z.string().min(1).nullable(),
+  verificationPolicyRef: z.string().min(1).nullable(),
 });
 export type PolicyDecision = z.infer<typeof PolicyDecisionSchema>;
 
@@ -54,6 +58,9 @@ export const GreenlightSchema = ProtocolBaseSchema.extend({
   isolationSnapshotRef: z.string().min(1),
   requiredReceipt: z.enum(["none", "gate", "mutation", "downstream_finality"]),
   decisionSignature: SignatureSchema.nullable(),
+  signaturePosture: SignaturePostureSchema,
+  keyIdentityRef: z.string().min(1).nullable(),
+  verificationPolicyRef: z.string().min(1).nullable(),
   consumedAt: IsoDateSchema.nullable(),
   consumedByGateAttemptId: IdSchema.nullable(),
 });

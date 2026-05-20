@@ -6,6 +6,7 @@ import type { GatewayCheckAttempt } from "../gateway-gate";
 import { createId, nowIso } from "../../foundation/ids";
 import type { ProofGap } from "../proof-gap";
 import { CreateReceiptExportInputSchema, type CreateReceiptExportInput } from "./types";
+import { deriveDownstreamOutcomeStatus, deriveGatewayAdmissionStatus } from "./status";
 import type { ProtocolRecorder } from "../../events/records";
 import type { ProtocolRecord } from "../object-registry";
 import { PROTOCOL_VERSION, ReceiptExportSchema, type JsonValue, type Receipt, type ReceiptExport } from "./types";
@@ -91,10 +92,12 @@ async function buildReceiptExport(context: ReceiptExportContext): Promise<Receip
     gatewayPolicyVersion: contract.gatewayPolicyVersion,
     policyDecisionStatus: receipt.policyDecisionStatus,
     gatewayCheckStatus: receipt.gatewayCheckStatus,
+    gatewayAdmissionStatus: deriveGatewayAdmissionStatus(receipt),
     gatewayCheckedAt: gateAttempt?.createdAt ?? null,
     greenlightConsumptionStatus: receipt.greenlightConsumptionStatus,
     mutationAttemptStatus: receipt.mutationAttemptStatus,
     downstreamExecutionStatus: receipt.downstreamExecutionStatus,
+    downstreamOutcomeStatus: deriveDownstreamOutcomeStatus(receipt),
     proofGapStatus: receipt.proofGapIds.length > 0 ? "present" : "none",
     proofGapIds: receipt.proofGapIds,
     proofGapReasonCodes: proofGaps.map((proofGap) => proofGap.reasonCode),
@@ -103,6 +106,9 @@ async function buildReceiptExport(context: ReceiptExportContext): Promise<Receip
     streamOffsets: receipt.streamOffsets,
     receiptDigest: receipt.receiptDigest,
     auditChainDigest: receipt.auditChainDigest,
+    signaturePosture: contract.signaturePosture,
+    keyIdentityRef: contract.keyIdentityRef,
+    verificationPolicyRef: contract.verificationPolicyRef,
     exportFormat: input.exportFormat,
     redactionProfileRef: input.redactionProfileRef,
     exportPurposeCode: input.exportPurposeCode,

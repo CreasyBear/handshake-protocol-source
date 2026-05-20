@@ -16,7 +16,13 @@ import type { ProtectedSurfaceOperationClaim } from "../operation-lifecycle";
 import { buildProofGap } from "../proof-gap";
 import type { ProofGap } from "../proof-gap";
 import type { ProtectedPathPosture } from "../protected-path-posture";
-import { ReceiptSchema, type Receipt } from "../receipt-export";
+import { buildRefusal, protocolObjectRef, type Refusal } from "../refusal";
+import {
+  deriveDownstreamOutcomeStatus,
+  deriveGatewayAdmissionStatus,
+  ReceiptSchema,
+  type Receipt,
+} from "../receipt-export";
 import {
   downstreamStatusFor,
   mutationOutcomeFor,
@@ -39,6 +45,11 @@ export type GatewayCheckResult = {
   mutationAttempt: MutationAttempt | null;
   receipt: Receipt;
   proofGap: ProofGap | null;
+};
+
+export type GatewayCheckArtifacts = {
+  result: GatewayCheckResult;
+  refusal: Refusal | null;
 };
 
 export type VerifiedGatewayCheck = {
@@ -84,9 +95,7 @@ export function verifiedGatewayCheckFromResult(result: GatewayCheckResult): Veri
   };
 }
 
-export function buildGateArtifacts(input: GatewayCheckArtifactInput): {
-  result: GatewayCheckResult;
-} {
+export async function buildGateArtifacts(input: GatewayCheckArtifactInput): Promise<GatewayCheckArtifacts> {
   const receiptId = createId("rcp");
   const mutationAttempt = input.refusal ? null : buildMutationAttempt(input);
   const proofGap = buildMutationProofGap(input, mutationAttempt, receiptId);
@@ -94,7 +103,8 @@ export function buildGateArtifacts(input: GatewayCheckArtifactInput): {
   const reasonCode = proofGap ? "downstream_status_unknown" : (input.refusal ?? "gate_passed");
   const gateAttempt = buildGateAttempt(input, gateDecision, reasonCode, mutationAttempt);
   const receipt = buildReceipt(input, receiptId, gateAttempt, mutationAttempt, proofGap);
-  return { result: { gateAttempt, mutationAttempt, receipt, proofGap } };
+  const refusal = gateDecision === "refused" ? await buildGatewayRefusal(input, gateAttempt) : null;
+  return { result: { gateAttempt, mutationAttempt, receipt, proofGap }, refusal };
 }
 
 export async function withReceiptStreamReferences(
@@ -117,16 +127,23 @@ export async function withReceiptStreamReferences(
     proofGapIds: receiptWithStreamRefs.proofGapIds,
     finalityStatus: receiptWithStreamRefs.finalityStatus,
   } satisfies JsonValue);
-  const receipt = ReceiptSchema.parse({ ...receiptWithStreamRefs, receiptDigest, auditChainDigest });
+  const receipt = ReceiptSchema.parse({
+    ...receiptWithStreamRefs,
+    gatewayAdmissionStatus: deriveGatewayAdmissionStatus(receiptWithStreamRefs),
+    downstreamOutcomeStatus: deriveDownstreamOutcomeStatus(receiptWithStreamRefs),
+    receiptDigest,
+    auditChainDigest,
+  });
   return { ...result, receipt };
 }
 
 export function gateEventDescriptors(
-  artifacts: { result: GatewayCheckResult },
+  artifacts: GatewayCheckArtifacts,
   streamRefs: ActionLifecycleStreamRefs,
   operationClaim?: ProtectedSurfaceOperationClaim | null,
 ): EventDescriptor[] {
   const { gateAttempt, mutationAttempt, proofGap, receipt } = artifacts.result;
+  const { refusal } = artifacts;
   const descriptors: EventDescriptor[] = [
     {
       source: gateAttempt,
@@ -167,6 +184,15 @@ export function gateEventDescriptors(
       payload: { reasonCode: proofGap.reasonCode, finalityImpact: proofGap.finalityImpact },
     });
   }
+  if (refusal) {
+    descriptors.push({
+      source: refusal,
+      eventType: "gateway_refused",
+      objectRefs: [refusal.refusalId, gateAttempt.gateAttemptId, streamRefs.actionContractId],
+      streamRefs,
+      payload: { reasonCode: refusal.reasonCode, refusedObjectRef: refusal.refusedObjectRef },
+    });
+  }
   descriptors.push({
     source: receipt,
     eventType: "receipt_emitted",
@@ -175,6 +201,31 @@ export function gateEventDescriptors(
     payload: { finalityStatus: receipt.finalityStatus, proofGapIds: receipt.proofGapIds },
   });
   return descriptors;
+}
+
+async function buildGatewayRefusal(
+  input: GatewayCheckArtifactInput,
+  gateAttempt: GatewayCheckAttempt,
+): Promise<Refusal> {
+  return buildRefusal({
+    tenantId: input.contract.tenantId,
+    organizationId: input.contract.organizationId,
+    createdAt: input.now,
+    phase: "gateway",
+    actionContractId: input.contract.actionContractId,
+    policyDecisionId: input.greenlight.policyDecisionId,
+    greenlightId: input.greenlight.greenlightId,
+    gateAttemptId: gateAttempt.gateAttemptId,
+    refusedObjectRef: protocolObjectRef("gateway_check_attempt", gateAttempt.gateAttemptId),
+    reasonCode: gateAttempt.gateDecisionReasonCode,
+    reason: `Gateway refused before mutation with reason code ${gateAttempt.gateDecisionReasonCode}.`,
+    evidenceRefs: [
+      protocolObjectRef("action_contract", input.contract.actionContractId),
+      protocolObjectRef("greenlight", input.greenlight.greenlightId),
+      protocolObjectRef("gateway_check_attempt", gateAttempt.gateAttemptId),
+    ],
+    refusedAt: input.now,
+  });
 }
 
 function buildMutationAttempt(input: GatewayCheckArtifactInput): MutationAttempt {
@@ -254,7 +305,7 @@ function buildReceipt(
   mutationAttempt: MutationAttempt | null,
   proofGap: ProofGap | null,
 ): Receipt {
-  return ReceiptSchema.parse({
+  const receiptSeed = {
     schemaVersion: PROTOCOL_VERSION,
     tenantId: input.contract.tenantId,
     organizationId: input.contract.organizationId,
@@ -283,10 +334,19 @@ function buildReceipt(
     auditChainDigest: null,
     finalityStatus: receiptFinalityFor(gateAttempt.gateDecision, proofGap !== null),
     emittedAt: input.now,
+  } satisfies Omit<Receipt, "gatewayAdmissionStatus" | "downstreamOutcomeStatus">;
+  return ReceiptSchema.parse({
+    ...receiptSeed,
+    gatewayAdmissionStatus: deriveGatewayAdmissionStatus(receiptSeed),
+    downstreamOutcomeStatus: deriveDownstreamOutcomeStatus(receiptSeed),
   });
 }
 
-export function gateProtocolRecords(input: GatewayCheckArtifactInput, result: GatewayCheckResult): ProtocolRecord[] {
+export function gateProtocolRecords(
+  input: GatewayCheckArtifactInput,
+  result: GatewayCheckResult,
+  refusal: Refusal | null,
+): ProtocolRecord[] {
   const updatedGreenlight = input.refusal
     ? null
     : GreenlightSchema.parse({
@@ -301,5 +361,6 @@ export function gateProtocolRecords(input: GatewayCheckArtifactInput, result: Ga
   if (updatedGreenlight) records.push({ objectType: "greenlight", payload: updatedGreenlight });
   if (result.mutationAttempt) records.push({ objectType: "mutation_attempt", payload: result.mutationAttempt });
   if (result.proofGap) records.push({ objectType: "proof_gap", payload: result.proofGap });
+  if (refusal) records.push({ objectType: "refusal", payload: refusal });
   return records;
 }

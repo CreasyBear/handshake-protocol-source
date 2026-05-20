@@ -6,8 +6,12 @@ export type KernelTransitionMethod =
   | "compileIntent"
   | "createRuntimeExecution"
   | "createGeneratedExecutionGraph"
+  | "createBypassProbe"
+  | "createToolCallDraft"
+  | "transitionToolCallDraft"
   | "createProtectedPathPosture"
   | "proposeActionContract"
+  | "createAuthorityCertificate"
   | "evaluatePolicy"
   | "createReviewArtifact"
   | "createReviewDecision"
@@ -28,8 +32,12 @@ export type ProtocolTransitionId =
   | "compileIntent"
   | "createRuntimeExecution"
   | "createGeneratedExecutionGraph"
+  | "createBypassProbe"
+  | "createToolCallDraft"
+  | "transitionToolCallDraft"
   | "createProtectedPathPosture"
   | "proposeActionContract"
+  | "createAuthorityCertificate"
   | "evaluatePolicy"
   | "createReviewArtifact"
   | "createReviewDecision"
@@ -49,6 +57,7 @@ export type ProtocolTransitionPhase =
   | "generated_execution_graph"
   | "protected_path_posture"
   | "action_contract"
+  | "authority_certificate"
   | "policy"
   | "review"
   | "gateway"
@@ -116,6 +125,38 @@ export const protocolNavigation = [
     evidenceObligation: "record execution-block shape without issuing policy, greenlight, gate, or mutation authority",
   },
   {
+    transitionId: "createBypassProbe",
+    kernelMethod: "createBypassProbe",
+    phase: "protected_path_posture",
+    outcomeClasses: ["recorded"],
+    recordsWritten: ["bypass_probe", "contract_stream_event"],
+    eventsEmitted: ["bypass_probe_recorded"],
+    authorityBoundary: "bypass probe evidence only",
+    evidenceObligation:
+      "record protected-path probe outcome without issuing posture, policy, greenlight, or mutation authority",
+  },
+  {
+    transitionId: "createToolCallDraft",
+    kernelMethod: "createToolCallDraft",
+    phase: "intent_compilation",
+    outcomeClasses: ["recorded"],
+    recordsWritten: ["tool_call_draft", "contract_stream_event"],
+    eventsEmitted: ["tool_call_draft_recorded"],
+    authorityBoundary: "tool call draft evidence only",
+    evidenceObligation: "open generated tool-call input state without issuing candidate or execution authority",
+  },
+  {
+    transitionId: "transitionToolCallDraft",
+    kernelMethod: "transitionToolCallDraft",
+    phase: "intent_compilation",
+    outcomeClasses: ["recorded", "refusal"],
+    recordsWritten: ["tool_call_draft", "contract_stream_event"],
+    eventsEmitted: ["tool_call_draft_recorded"],
+    authorityBoundary: "tool call draft evidence only",
+    evidenceObligation:
+      "transition generated tool-call input state monotonically without issuing candidate or execution authority",
+  },
+  {
     transitionId: "createProtectedPathPosture",
     kernelMethod: "createProtectedPathPosture",
     phase: "protected_path_posture",
@@ -139,6 +180,17 @@ export const protocolNavigation = [
     eventsEmitted: ["action_proposed", "recovery_status_changed", "proof_gap_recorded"],
     authorityBoundary: "proposed exact action only",
     evidenceObligation: "bind a contractable candidate or record refusal/proof-gap evidence",
+  },
+  {
+    transitionId: "createAuthorityCertificate",
+    kernelMethod: "createAuthorityCertificate",
+    phase: "authority_certificate",
+    outcomeClasses: ["exported"],
+    recordsWritten: ["authority_certificate", "contract_stream_event"],
+    eventsEmitted: ["authority_certificate_emitted"],
+    authorityBoundary: "terminal signed evidence only",
+    evidenceObligation:
+      "sign canonical terminal evidence after receipt, durable refusal, proof-gap, or replay-refusal terminalization",
   },
   {
     transitionId: "evaluatePolicy",

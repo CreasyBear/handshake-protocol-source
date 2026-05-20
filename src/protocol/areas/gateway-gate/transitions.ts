@@ -8,10 +8,18 @@ import { GatewayCheckInputSchema, type GatewayCheckInput } from "./types";
 import type { Greenlight, PolicyDecision } from "../policy-greenlight";
 import type { IsolationState } from "../isolation-breaker";
 import {
+  buildIdempotencyLedgerMutationStarted,
+  idempotencyLedgerIndexEntry,
+  idempotencyLedgerKey,
+  idempotencyLedgerKeyDigest,
+  type IdempotencyLedgerEntry,
+} from "../idempotency-ledger";
+import {
   buildGateArtifacts,
   gateEventDescriptors,
   gateProtocolRecords,
   withReceiptStreamReferences,
+  type GatewayCheckArtifacts,
   type GatewayCheckResult,
 } from "./artifacts";
 import type { ProtocolRecorder } from "../../events/records";
@@ -59,12 +67,14 @@ type GatewayConstraintEvaluation = {
   isolationStates: IsolationState[];
   gatewayPolicyDrift: GatewayPolicyDriftCheck;
   protectedPathPosture: StoredProtocolRecord<ProtectedPathPosture> | null;
+  idempotencyLedgerEntry: StoredProtocolRecord<IdempotencyLedgerEntry> | null;
   refusal: string | null;
 };
 
 type GatewayCommitPlan = GatewayConstraintEvaluation & {
-  artifacts: ReturnType<typeof buildGateArtifacts>;
+  artifacts: GatewayCheckArtifacts;
   operationClaim: ProtectedSurfaceOperationClaim | null;
+  idempotencyLedgerUpdate: IdempotencyLedgerEntry | null;
   requestContextRecord: ProtocolRecord | null;
   events: EventDescriptor[];
   consumption: GreenlightConsumption | null;
@@ -129,6 +139,9 @@ async function deriveGatewayConstraintEvaluation(
     ...isolationScopeRefsForGreenlight(greenlight),
   ]);
   const protectedPathPosture = await loadCurrentPostureForContract(store, contract);
+  const idempotencyLedgerEntry = await store.getCurrentIdempotencyLedgerEntry(
+    await idempotencyLedgerKeyDigest(idempotencyLedgerKey(contract)),
+  );
   const protectedPathEvaluation = evaluateRequiredProtectedPathPosture({
     contract,
     gateway: contract,
@@ -159,6 +172,7 @@ async function deriveGatewayConstraintEvaluation(
     isolationStates,
     gatewayPolicyDrift,
     protectedPathPosture,
+    idempotencyLedgerEntry,
     refusal,
   };
 }
@@ -167,9 +181,10 @@ async function buildGatewayCommitPlan(
   recorder: ProtocolRecorder,
   evaluation: GatewayConstraintEvaluation,
 ): Promise<GatewayCommitPlan> {
-  const artifacts = buildGateArtifacts(evaluation);
+  const artifacts = await buildGateArtifacts(evaluation);
   const streamRefs = actionLifecycleStreamRefs(evaluation.contract);
   const operationClaim = await deriveProtectedSurfaceOperationClaim(evaluation, artifacts.result);
+  const idempotencyLedgerUpdate = await deriveIdempotencyLedgerUpdate(evaluation, artifacts.result);
   const requestContextRecord = await recorder.transitionRequestContextRecordFor({
     tenantId: evaluation.contract.tenantId,
     organizationId: evaluation.contract.organizationId,
@@ -182,6 +197,7 @@ async function buildGatewayCommitPlan(
     ...evaluation,
     artifacts,
     operationClaim,
+    idempotencyLedgerUpdate,
     requestContextRecord,
     events,
     consumption: buildGreenlightConsumption(evaluation),
@@ -215,6 +231,16 @@ async function commitGatewayCheckPlan(
         greenlightConsumptionStatus: "not_consumed",
       });
     }
+    if (commitResult === "receipt_index_conflict") {
+      return commitReplayRefusal(store, recorder, plan.contract, plan.greenlight, {
+        observedParamsDigest: plan.observedParamsDigest,
+        isolationStates: plan.isolationStates,
+        gatewayPolicyDrift: plan.gatewayPolicyDrift,
+        protectedPathPosture: plan.protectedPathPosture,
+        refusalReasonCode: "receipt_index_conflict",
+        greenlightConsumptionStatus: "not_consumed",
+      });
+    }
   }
   throw new HandshakeProtocolError(
     "stream_append_conflict",
@@ -233,6 +259,20 @@ async function deriveProtectedSurfaceOperationClaim(
     greenlight: evaluation.greenlight,
     gateAttemptId: evaluation.gateAttemptId,
     mutationAttempt: result.mutationAttempt,
+    now: evaluation.now,
+  });
+}
+
+async function deriveIdempotencyLedgerUpdate(
+  evaluation: GatewayConstraintEvaluation,
+  result: GatewayCheckResult,
+): Promise<IdempotencyLedgerEntry | null> {
+  if (evaluation.refusal || !result.mutationAttempt || !evaluation.idempotencyLedgerEntry) return null;
+  return buildIdempotencyLedgerMutationStarted({
+    current: evaluation.idempotencyLedgerEntry.payload,
+    gateAttempt: result.gateAttempt,
+    mutationAttempt: result.mutationAttempt,
+    receiptId: result.receipt.receiptId,
     now: evaluation.now,
   });
 }
@@ -257,10 +297,13 @@ async function buildGatewayCheckCommit(
   const finalizedResult = await withReceiptStreamReferences(plan.artifacts.result, streamEvents);
   const protocolRecords = [
     ...(plan.requestContextRecord ? [plan.requestContextRecord] : []),
-    ...gateProtocolRecords(plan, finalizedResult),
+    ...gateProtocolRecords(plan, finalizedResult, plan.artifacts.refusal),
   ];
   if (plan.operationClaim) {
     protocolRecords.push({ objectType: "protected_surface_operation_claim", payload: plan.operationClaim });
+  }
+  if (plan.idempotencyLedgerUpdate) {
+    protocolRecords.push({ objectType: "idempotency_ledger_entry", payload: plan.idempotencyLedgerUpdate });
   }
   const records = await Promise.all(protocolRecords.map((record) => recorder.buildRecord(record)));
   return {
@@ -271,6 +314,9 @@ async function buildGatewayCheckCommit(
       events: streamEvents,
       protectedSurfaceOperationClaimIndexEntries: plan.operationClaim
         ? [operationClaimIndexEntry(plan.operationClaim, plan.now)]
+        : [],
+      idempotencyLedgerIndexEntries: plan.idempotencyLedgerUpdate
+        ? [idempotencyLedgerIndexEntry(plan.idempotencyLedgerUpdate)]
         : [],
       receiptMutationAttemptIndexEntries: receiptMutationAttemptIndexEntriesFor(finalizedResult),
     },

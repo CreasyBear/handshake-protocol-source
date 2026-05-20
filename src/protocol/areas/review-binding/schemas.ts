@@ -7,6 +7,13 @@ import {
   ReasonCodeSchema,
 } from "../../foundation/schema-core";
 
+export const ReviewHiddenActionPostureSchema = z.enum(["no_hidden_actions_detected", "hidden_action_risk", "unknown"]);
+export const ReviewSecondaryActionPostureSchema = z.enum([
+  "no_secondary_actions_detected",
+  "secondary_action_risk",
+  "unknown",
+]);
+
 export const ReviewArtifactRecordSchema = ProtocolBaseSchema.extend({
   reviewArtifactId: IdSchema,
   reviewArtifactRef: z.string().min(1),
@@ -21,6 +28,11 @@ export const ReviewArtifactRecordSchema = ProtocolBaseSchema.extend({
   renderedPolicyInputDigest: DigestSchema,
   renderedUncertaintyDigest: DigestSchema,
   renderedArtifactDigest: DigestSchema,
+  catalogDigest: DigestSchema.nullable().default(null),
+  rendererDigest: DigestSchema.nullable().default(null),
+  actionBindingDigest: DigestSchema.nullable().default(null),
+  hiddenActionPosture: ReviewHiddenActionPostureSchema.default("unknown"),
+  secondaryActionPosture: ReviewSecondaryActionPostureSchema.default("unknown"),
   uncertaintyMarkers: z.array(z.string().min(1)).default([]),
   evidenceRefs: z.array(z.string().min(1)).default([]),
   reviewArtifactDigest: DigestSchema,

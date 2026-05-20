@@ -6,11 +6,17 @@ import { createId, nowIso } from "../../../foundation/ids";
 import { isolationSnapshotRef } from "../../policy-greenlight";
 import type { Greenlight } from "../../policy-greenlight";
 import type { IsolationState } from "../../isolation-breaker";
+import { buildRefusal, protocolObjectRef } from "../../refusal";
 import { gateEventDescriptors, withReceiptStreamReferences, type GatewayCheckResult } from "../artifacts";
 import type { ProtocolRecorder } from "../../../events/records";
 import type { GatewayPolicyDriftCheck } from "../gateway-policy";
 import type { ProtectedPathPosture } from "../../protected-path-posture";
-import { ReceiptSchema, type Receipt } from "../../receipt-export";
+import {
+  deriveDownstreamOutcomeStatus,
+  deriveGatewayAdmissionStatus,
+  ReceiptSchema,
+  type Receipt,
+} from "../../receipt-export";
 import { PROTOCOL_VERSION, GatewayCheckAttemptSchema, type GatewayCheckAttempt, type JsonValue } from "../types";
 import type { ProtocolStore, StoredProtocolRecord } from "../../../store/port";
 
@@ -33,6 +39,25 @@ export async function commitReplayRefusal(
   const now = nowIso();
   const greenlightDigestSeen = await digestCanonical(greenlight as unknown as JsonValue);
   const gateAttempt = buildReplayGateAttempt(contract, greenlight, context, greenlightDigestSeen, now);
+  const refusal = await buildRefusal({
+    tenantId: contract.tenantId,
+    organizationId: contract.organizationId,
+    createdAt: now,
+    phase: "gateway",
+    actionContractId: contract.actionContractId,
+    policyDecisionId: greenlight.policyDecisionId,
+    greenlightId: greenlight.greenlightId,
+    gateAttemptId: gateAttempt.gateAttemptId,
+    refusedObjectRef: protocolObjectRef("gateway_check_attempt", gateAttempt.gateAttemptId),
+    reasonCode: gateAttempt.gateDecisionReasonCode,
+    reason: `Gateway refused before mutation with reason code ${gateAttempt.gateDecisionReasonCode}.`,
+    evidenceRefs: [
+      protocolObjectRef("action_contract", contract.actionContractId),
+      protocolObjectRef("greenlight", greenlight.greenlightId),
+      protocolObjectRef("gateway_check_attempt", gateAttempt.gateAttemptId),
+    ],
+    refusedAt: now,
+  });
   const receipt = buildReplayReceipt(
     contract,
     greenlight,
@@ -41,7 +66,7 @@ export async function commitReplayRefusal(
     context.greenlightConsumptionStatus ?? "replayed",
   );
   const eventDescriptors = gateEventDescriptors(
-    { result: { gateAttempt, mutationAttempt: null, receipt, proofGap: null } },
+    { result: { gateAttempt, mutationAttempt: null, receipt, proofGap: null }, refusal },
     actionLifecycleStreamRefs(contract),
   );
   const requestContextRecord = await recorder.transitionRequestContextRecordFor({
@@ -62,6 +87,7 @@ export async function commitReplayRefusal(
       [
         ...(requestContextRecord ? [requestContextRecord] : []),
         { objectType: "gateway_check_attempt" as const, payload: finalizedResult.gateAttempt },
+        { objectType: "refusal" as const, payload: refusal },
         { objectType: "receipt" as const, payload: finalizedResult.receipt },
       ].map((record) => recorder.buildRecord(record)),
     );
@@ -126,7 +152,7 @@ function buildReplayReceipt(
   now: string,
   greenlightConsumptionStatus: Receipt["greenlightConsumptionStatus"],
 ): Receipt {
-  return ReceiptSchema.parse({
+  const receiptSeed = {
     schemaVersion: PROTOCOL_VERSION,
     tenantId: contract.tenantId,
     organizationId: contract.organizationId,
@@ -151,5 +177,10 @@ function buildReplayReceipt(
     auditChainDigest: null,
     finalityStatus: "suspect",
     emittedAt: now,
+  } satisfies Omit<Receipt, "gatewayAdmissionStatus" | "downstreamOutcomeStatus">;
+  return ReceiptSchema.parse({
+    ...receiptSeed,
+    gatewayAdmissionStatus: deriveGatewayAdmissionStatus(receiptSeed),
+    downstreamOutcomeStatus: deriveDownstreamOutcomeStatus(receiptSeed),
   });
 }

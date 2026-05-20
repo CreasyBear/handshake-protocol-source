@@ -37,3 +37,11 @@ export async function assertProtectedMutationAdapterConformance(
   }
   return result;
 }
+
+export {
+  X402PaymentConformancePostureSchema,
+  assertX402PaymentInstallConformance,
+  checkX402PaymentInstallConformance,
+  type X402PaymentConformancePosture,
+  type X402PaymentConformanceResult,
+} from "../adapters/x402-payment/conformance";

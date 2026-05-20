@@ -1,6 +1,10 @@
 import { HandshakeKernel } from "../../src/protocol/kernel";
 import { nowIso } from "../../src/protocol/foundation/ids";
-import type { CompileIntentInput, ProposeActionContractInput } from "../../src/protocol/public/inputs";
+import type {
+  CompileIntentInput,
+  CreateBypassProbeInput,
+  ProposeActionContractInput,
+} from "../../src/protocol/public/inputs";
 import type { ProtocolStore } from "../../src/protocol/store/port";
 import type {
   ActionType,
@@ -8,7 +12,7 @@ import type {
   GatewayRegistryEntry,
   ToolCapability,
 } from "../../src/protocol/public/schemas";
-import { PROTOCOL_VERSION } from "../../src/protocol/public/schemas";
+import { PROTOCOL_VERSION, requiredGatewayCheckedBypassProbeKinds } from "../../src/protocol/public/schemas";
 import { InMemoryProtocolStore } from "../../src/storage/memory";
 
 export type KernelFixture = {
@@ -130,6 +134,36 @@ export async function registerFixtureObjects(
   await fixture.kernel.putCatalogObject({ objectType: "action_type", payload: fixture.actionType });
   await fixture.kernel.putCatalogObject({ objectType: "gateway_registry_entry", payload: fixture.gateway });
   await fixture.kernel.putCatalogObject({ objectType: "operating_envelope", payload: fixture.envelope });
+}
+
+export async function recordSafeBypassProbes(
+  fixture: Pick<KernelFixture, "kernel" | "gateway">,
+  overrides: Partial<CreateBypassProbeInput> = {},
+): Promise<string[]> {
+  const scope = {
+    tenantId: overrides.tenantId ?? "tenant_demo",
+    organizationId: overrides.organizationId ?? "org_demo",
+    runtimeAdapterId: overrides.runtimeAdapterId ?? "runtime_codex",
+    gatewayId: overrides.gatewayId ?? fixture.gateway.gatewayId,
+    actionClass: overrides.actionClass ?? "package.install",
+    resourceRef: overrides.resourceRef ?? "npm:hono",
+    protectedSurfaceKind: overrides.protectedSurfaceKind ?? "package_manager",
+    expiresAt: overrides.expiresAt ?? futureIso(),
+  };
+  const probes = [];
+  for (const probeKind of requiredGatewayCheckedBypassProbeKinds) {
+    probes.push(
+      await fixture.kernel.createBypassProbe({
+        ...scope,
+        probeKind,
+        probeOutcome: "passed",
+        sourceAuthority: "gateway_probe",
+        reasonCodes: ["test_gateway_probe_passed"],
+        evidenceRefs: [`evidence:test-gateway-probe:${probeKind}`],
+      }),
+    );
+  }
+  return probes.map((probe) => probe.bypassProbeId);
 }
 
 export function makePackageInstallCandidate(

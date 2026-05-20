@@ -38,6 +38,7 @@ export type HostedCallerVerifierInput = {
   method: string;
   url: string;
   requiredRole: TransitionCallerRole;
+  requiredRoles: readonly TransitionCallerRole[];
   routeId: string;
   routePath: string;
   now: string;
@@ -70,6 +71,20 @@ export function assertHostedCallerRole(identity: TransitionCallerIdentity, requi
     throw new HandshakeProtocolError(
       "hosted_caller_role_forbidden",
       `Hosted caller identity does not satisfy ${requiredRole} transition custody.`,
+      403,
+      { retryability: "terminal", commitState: "not_started" },
+    );
+  }
+}
+
+export function assertHostedCallerAnyRole(
+  identity: TransitionCallerIdentity,
+  requiredRoles: readonly TransitionCallerRole[],
+): void {
+  if (!requiredRoles.some((role) => identity.custodyRoles.includes(role))) {
+    throw new HandshakeProtocolError(
+      "hosted_caller_role_forbidden",
+      `Hosted caller identity does not satisfy ${requiredRoles.join(" or ")} transition custody.`,
       403,
       { retryability: "terminal", commitState: "not_started" },
     );

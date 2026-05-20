@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { ActionContractSchema } from "../action-contract/schemas";
+import { AuthorityCertificateSchema } from "../authority-certificate/schemas";
 import {
   ActionTypeSchema,
   GatewayRegistryEntrySchema,
@@ -9,6 +10,9 @@ import {
 import { ContractStreamEventSchema } from "../../events/schemas";
 import { GatewayCheckAttemptSchema, MutationAttemptSchema } from "../gateway-gate/schemas";
 import { GeneratedExecutionGraphSchema } from "../generated-execution-graph/schemas";
+import { IdempotencyLedgerEntrySchema } from "../idempotency-ledger/schemas";
+import { BypassProbeSchema } from "../bypass-probe/schemas";
+import { ToolCallDraftSchema } from "../tool-call-draft/schemas";
 import { IntentCompilationRecordSchema } from "../intent-compilation/schemas";
 import { BreakerDecisionSchema, IsolationStateSchema } from "../isolation-breaker/schemas";
 import {
@@ -18,6 +22,7 @@ import {
 import { GreenlightSchema, PolicyDecisionSchema } from "../policy-greenlight/schemas";
 import { ProofGapSchema } from "../proof-gap/schemas";
 import { ProtectedPathPostureSchema } from "../protected-path-posture/schemas";
+import { RefusalSchema } from "../refusal/schemas";
 import { ReceiptExportSchema, ReceiptSchema } from "../receipt-export/schemas";
 import { RecoveryRecommendationSchema, RecoveryRecommendationStatusTransitionSchema } from "../recovery/schemas";
 import { ReviewArtifactRecordSchema, ReviewDecisionSchema } from "../review-binding/schemas";
@@ -32,9 +37,13 @@ export const ProtocolObjectTypeSchema = z.enum([
   "transition_request_context",
   "runtime_execution",
   "generated_execution_graph",
+  "idempotency_ledger_entry",
+  "bypass_probe",
+  "tool_call_draft",
   "protected_path_posture",
   "intent_compilation",
   "action_contract",
+  "authority_certificate",
   "policy_decision",
   "greenlight",
   "review_artifact",
@@ -46,6 +55,7 @@ export const ProtocolObjectTypeSchema = z.enum([
   "protected_surface_operation_claim",
   "surface_operation_reconciliation",
   "proof_gap",
+  "refusal",
   "receipt",
   "receipt_export",
   "recovery_recommendation",
@@ -62,9 +72,13 @@ export const ProtocolRecordSchema = z.discriminatedUnion("objectType", [
   z.strictObject({ objectType: z.literal("transition_request_context"), payload: TransitionRequestContextSchema }),
   z.strictObject({ objectType: z.literal("runtime_execution"), payload: RuntimeExecutionRecordSchema }),
   z.strictObject({ objectType: z.literal("generated_execution_graph"), payload: GeneratedExecutionGraphSchema }),
+  z.strictObject({ objectType: z.literal("idempotency_ledger_entry"), payload: IdempotencyLedgerEntrySchema }),
+  z.strictObject({ objectType: z.literal("bypass_probe"), payload: BypassProbeSchema }),
+  z.strictObject({ objectType: z.literal("tool_call_draft"), payload: ToolCallDraftSchema }),
   z.strictObject({ objectType: z.literal("protected_path_posture"), payload: ProtectedPathPostureSchema }),
   z.strictObject({ objectType: z.literal("intent_compilation"), payload: IntentCompilationRecordSchema }),
   z.strictObject({ objectType: z.literal("action_contract"), payload: ActionContractSchema }),
+  z.strictObject({ objectType: z.literal("authority_certificate"), payload: AuthorityCertificateSchema }),
   z.strictObject({ objectType: z.literal("policy_decision"), payload: PolicyDecisionSchema }),
   z.strictObject({ objectType: z.literal("greenlight"), payload: GreenlightSchema }),
   z.strictObject({ objectType: z.literal("review_artifact"), payload: ReviewArtifactRecordSchema }),
@@ -82,6 +96,7 @@ export const ProtocolRecordSchema = z.discriminatedUnion("objectType", [
     payload: SurfaceOperationReconciliationSchema,
   }),
   z.strictObject({ objectType: z.literal("proof_gap"), payload: ProofGapSchema }),
+  z.strictObject({ objectType: z.literal("refusal"), payload: RefusalSchema }),
   z.strictObject({ objectType: z.literal("receipt"), payload: ReceiptSchema }),
   z.strictObject({ objectType: z.literal("receipt_export"), payload: ReceiptExportSchema }),
   z.strictObject({ objectType: z.literal("recovery_recommendation"), payload: RecoveryRecommendationSchema }),

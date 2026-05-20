@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import { HandshakeKernel } from "../../src/protocol/kernel";
 import { protectedPathPostureScopeKeyForContract } from "../../src/protocol/areas/protected-path-posture";
+import { runBypassProbeExecutors } from "../../src/adapters/protected-path-probes";
 import { ProtocolRecorder } from "../../src/protocol/events/records";
 import { digestCanonical } from "../../src/protocol/foundation/canonical";
 import { InMemoryProtocolStore } from "../../src/storage/memory";
@@ -11,8 +12,15 @@ import {
   makeKernelFixture,
   makePackageInstallCandidate,
   proposalInputForCompilation,
+  recordSafeBypassProbes,
   registerFixtureObjects,
 } from "../support/fixtures";
+import {
+  requiredGatewayCheckedBypassProbeKinds,
+  type BypassProbeKind,
+  type BypassProbeOutcome,
+  type Refusal,
+} from "../../src/protocol/public/schemas";
 import {
   replaceGatewayRecordOutOfBand,
   createContractRequiringGatewayCheckedPosture,
@@ -44,32 +52,44 @@ describe("Handshake kernel invariants: policy and gateway", () => {
     ).rejects.toThrow("Policy may evaluate only the envelope pinned by the action contract");
   });
 
-  it("rejects issuing a second greenlight for the same action contract", async () => {
+  it("records refusal instead of issuing a second greenlight for the same action contract", async () => {
     const fixture = await createGreenlitContract();
 
-    await expect(
-      fixture.kernel.evaluatePolicy({
-        actionContractId: fixture.contract.actionContractId,
-        envelopeId: fixture.envelope.envelopeId,
-      }),
-    ).rejects.toThrow("already has a greenlight");
+    const duplicate = await fixture.kernel.evaluatePolicy({
+      actionContractId: fixture.contract.actionContractId,
+      envelopeId: fixture.envelope.envelopeId,
+    });
 
+    expect(duplicate.decision.decision).toBe("refuse");
+    expect(duplicate.decision.decisionReasonCode).toBe("idempotency_duplicate_authority");
+    expect(duplicate.greenlight).toBeNull();
     expect(fixture.store.countRecordsOfType("greenlight")).toBe(1);
+    const refusals = await fixture.store.listRecordsByType<Refusal>("refusal");
+    expect(refusals.at(-1)?.payload).toMatchObject({
+      phase: "policy",
+      actionContractId: fixture.contract.actionContractId,
+      policyDecisionId: duplicate.decision.policyDecisionId,
+      greenlightId: null,
+      mutationAttempted: false,
+      authorityCreated: false,
+      reasonCode: "idempotency_duplicate_authority",
+    });
   });
 
-  it("rejects duplicate greenlight issuance through the durable action-contract claim", async () => {
+  it("uses the idempotency ledger even when the durable greenlight claim read is stale", async () => {
     const base = makeKernelFixture();
     const store = new FaultInjectingProtocolStore(new InMemoryProtocolStore());
     const fixture = await createGreenlitContract({ ...base, store, kernel: new HandshakeKernel(store) });
     store.hideListRecordsByTypeOnce("greenlight");
 
-    await expect(
-      fixture.kernel.evaluatePolicy({
-        actionContractId: fixture.contract.actionContractId,
-        envelopeId: fixture.envelope.envelopeId,
-      }),
-    ).rejects.toThrow("already has a greenlight");
+    const duplicate = await fixture.kernel.evaluatePolicy({
+      actionContractId: fixture.contract.actionContractId,
+      envelopeId: fixture.envelope.envelopeId,
+    });
 
+    expect(duplicate.decision.decision).toBe("refuse");
+    expect(duplicate.decision.decisionReasonCode).toBe("idempotency_duplicate_authority");
+    expect(duplicate.greenlight).toBeNull();
     expect(store.countRecordsOfType("greenlight")).toBe(1);
   });
 
@@ -89,6 +109,19 @@ describe("Handshake kernel invariants: policy and gateway", () => {
     expect(missingPosture.decision.decision).toBe("refuse");
     expect(missingPosture.decision.decisionReasonCode).toBe("protected_path_posture_missing");
     expect(missingPosture.greenlight).toBeNull();
+    const policyRefusals = await fixture.store.listRecordsByType<Refusal>("refusal");
+    expect(policyRefusals).toHaveLength(1);
+    expect(policyRefusals[0]?.payload).toMatchObject({
+      phase: "policy",
+      actionContractId: fixture.contract.actionContractId,
+      policyDecisionId: missingPosture.decision.policyDecisionId,
+      greenlightId: null,
+      gateAttemptId: null,
+      refusedObjectRef: `policy_decision:${missingPosture.decision.policyDecisionId}`,
+      reasonCode: "protected_path_posture_missing",
+      mutationAttempted: false,
+      authorityCreated: false,
+    });
 
     await fixture.kernel.createProtectedPathPosture({
       tenantId: "tenant_demo",
@@ -114,7 +147,7 @@ describe("Handshake kernel invariants: policy and gateway", () => {
     expect(weakSource.decision.decisionReasonCode).toBe("protected_path_source_authority_weak");
     expect(weakSource.greenlight).toBeNull();
 
-    const posture = await fixture.kernel.createProtectedPathPosture({
+    await fixture.kernel.createProtectedPathPosture({
       tenantId: "tenant_demo",
       organizationId: "org_demo",
       runtimeAdapterId: "runtime_codex",
@@ -127,7 +160,33 @@ describe("Handshake kernel invariants: policy and gateway", () => {
       rawSiblingToolStatus: "blocked",
       sourceAuthority: "conformance_fixture",
       reasonCodes: ["local_fixture_gateway_checked"],
+      evidenceRefs: ["evidence:posture:caller-reported"],
+      expiresAt: futureIso(),
+    });
+    const callerReported = await fixture.kernel.evaluatePolicy({
+      actionContractId: fixture.contract.actionContractId,
+      envelopeId: fixture.envelope.envelopeId,
+    });
+    expect(callerReported.decision.decision).toBe("refuse");
+    expect(callerReported.decision.decisionReasonCode).toBe("protected_path_source_authority_weak");
+    expect(callerReported.greenlight).toBeNull();
+
+    const bypassProbeIds = await recordSafeBypassProbes(fixture);
+    const posture = await fixture.kernel.createProtectedPathPosture({
+      tenantId: "tenant_demo",
+      organizationId: "org_demo",
+      runtimeAdapterId: "runtime_codex",
+      gatewayId: fixture.gateway.gatewayId,
+      actionClass: "package.install",
+      resourceRef: fixture.contract.resourceRef,
+      protectedSurfaceKind: "package_manager",
+      postureState: "gateway_checked",
+      credentialCustodyStatus: "gateway_held",
+      rawSiblingToolStatus: "blocked",
+      sourceAuthority: "gateway_probe",
+      reasonCodes: ["local_fixture_gateway_checked"],
       evidenceRefs: ["evidence:posture:local-fixture"],
+      bypassProbeIds,
       expiresAt: futureIso(),
     });
     const currentPosture = await fixture.store.getCurrentProtectedPathPosture(
@@ -167,8 +226,22 @@ describe("Handshake kernel invariants: policy and gateway", () => {
     expect(greenlit.greenlight?.protectedPathPostureDigest).toBe(posture.postureDigest);
   });
 
-  it("refuses at the gateway when protected-path posture drifts unsafe after greenlight", async () => {
-    const fixture = await createContractRequiringGatewayCheckedPosture("idem_posture_drift");
+  it("treats executor-recorded unsafe bypass probes as protection failure", async () => {
+    const fixture = await createContractRequiringGatewayCheckedPosture("idem_probe_executor_failed");
+    const probes = await runBypassProbeExecutors(
+      fixture.kernel,
+      {
+        tenantId: "tenant_demo",
+        organizationId: "org_demo",
+        runtimeAdapterId: "runtime_codex",
+        gatewayId: fixture.gateway.gatewayId,
+        actionClass: "package.install",
+        resourceRef: fixture.contract.resourceRef,
+        protectedSurfaceKind: "package_manager",
+        expiresAt: futureIso(),
+      },
+      gatewayProbeExecutors({ token_passthrough_blocking: "failed" }),
+    );
     await fixture.kernel.createProtectedPathPosture({
       tenantId: "tenant_demo",
       organizationId: "org_demo",
@@ -180,7 +253,39 @@ describe("Handshake kernel invariants: policy and gateway", () => {
       postureState: "gateway_checked",
       credentialCustodyStatus: "gateway_held",
       rawSiblingToolStatus: "blocked",
-      sourceAuthority: "conformance_fixture",
+      sourceAuthority: "gateway_probe",
+      reasonCodes: ["local_fixture_gateway_checked"],
+      evidenceRefs: ["evidence:posture:local-probe-executor"],
+      bypassProbeIds: probes.map((probe) => probe.bypassProbeId),
+      expiresAt: futureIso(),
+    });
+
+    const decision = await fixture.kernel.evaluatePolicy({
+      actionContractId: fixture.contract.actionContractId,
+      envelopeId: fixture.envelope.envelopeId,
+    });
+
+    expect(decision.decision.decision).toBe("refuse");
+    expect(decision.decision.decisionReasonCode).toBe("protected_path_probe_failed");
+    expect(decision.greenlight).toBeNull();
+  });
+
+  it("refuses at the gateway when protected-path posture drifts unsafe after greenlight", async () => {
+    const fixture = await createContractRequiringGatewayCheckedPosture("idem_posture_drift");
+    const bypassProbeIds = await recordSafeBypassProbes(fixture);
+    await fixture.kernel.createProtectedPathPosture({
+      tenantId: "tenant_demo",
+      organizationId: "org_demo",
+      runtimeAdapterId: "runtime_codex",
+      gatewayId: fixture.gateway.gatewayId,
+      actionClass: "package.install",
+      resourceRef: fixture.contract.resourceRef,
+      protectedSurfaceKind: "package_manager",
+      postureState: "gateway_checked",
+      credentialCustodyStatus: "gateway_held",
+      rawSiblingToolStatus: "blocked",
+      sourceAuthority: "gateway_probe",
+      bypassProbeIds,
       expiresAt: futureIso(),
     });
     const policy = await fixture.kernel.evaluatePolicy({
@@ -243,6 +348,21 @@ describe("Handshake kernel invariants: policy and gateway", () => {
     expect(replay.gateAttempt.gateDecisionReasonCode).toBe("already_consumed");
     expect(replay.mutationAttempt).toBeNull();
     expect(replay.receipt.greenlightConsumptionStatus).toBe("replayed");
+
+    const refusals = await fixture.store.listRecordsByType<Refusal>("refusal");
+    expect(refusals).toHaveLength(1);
+    expect(refusals[0]?.payload).toMatchObject({
+      phase: "gateway",
+      actionContractId: fixture.contract.actionContractId,
+      policyDecisionId: fixture.greenlight.policyDecisionId,
+      greenlightId: fixture.greenlight.greenlightId,
+      gateAttemptId: replay.gateAttempt.gateAttemptId,
+      refusedObjectRef: `gateway_check_attempt:${replay.gateAttempt.gateAttemptId}`,
+      reasonCode: "already_consumed",
+      mutationAttempted: false,
+      authorityCreated: false,
+    });
+    expect(fixture.store.countRecordsOfType("mutation_attempt")).toBe(1);
   });
 
   it("chains action stream events with per-partition offsets and previous digests", async () => {
@@ -255,11 +375,13 @@ describe("Handshake kernel invariants: policy and gateway", () => {
       "action_proposed",
       "policy_decision_recorded",
       "action_greenlit",
+      "idempotency_ledger_recorded",
     ]);
-    expect(beforeGate.map((event) => event.offset)).toEqual([0, 1, 2]);
+    expect(beforeGate.map((event) => event.offset)).toEqual([0, 1, 2, 3]);
     expect(beforeGate[0]?.previousEventDigest).toBeNull();
     expect(beforeGate[1]?.previousEventDigest).toBe(beforeGate[0]?.eventDigest);
     expect(beforeGate[2]?.previousEventDigest).toBe(beforeGate[1]?.eventDigest);
+    expect(beforeGate[3]?.previousEventDigest).toBe(beforeGate[2]?.eventDigest);
 
     const gate = await fixture.kernel.gatewayCheck({
       actionContractId: fixture.contract.actionContractId,
@@ -272,19 +394,20 @@ describe("Handshake kernel invariants: policy and gateway", () => {
       "action_proposed",
       "policy_decision_recorded",
       "action_greenlit",
+      "idempotency_ledger_recorded",
       "gateway_checked",
       "mutation_attempted",
       "protected_surface_operation_claimed",
       "receipt_emitted",
     ]);
-    expect(afterGate.map((event) => event.offset)).toEqual([0, 1, 2, 3, 4, 5, 6]);
+    expect(afterGate.map((event) => event.offset)).toEqual([0, 1, 2, 3, 4, 5, 6, 7]);
     for (let index = 1; index < afterGate.length; index += 1) {
       expect(afterGate[index]?.previousEventDigest).toBe(afterGate[index - 1]?.eventDigest);
     }
 
     const runEvents = fixture.store.listEventsForPartition(streamId, `run:${fixture.contract.runId}`);
     expect(runEvents.map((event) => event.eventType)).toEqual(afterGate.map((event) => event.eventType));
-    expect(runEvents.map((event) => event.offset)).toEqual([0, 1, 2, 3, 4, 5, 6]);
+    expect(runEvents.map((event) => event.offset)).toEqual([0, 1, 2, 3, 4, 5, 6, 7]);
     expect(runEvents.every((event) => event.streamScope === "run")).toBe(true);
     for (let index = 1; index < runEvents.length; index += 1) {
       expect(runEvents[index]?.previousEventDigest).toBe(runEvents[index - 1]?.eventDigest);
@@ -295,7 +418,7 @@ describe("Handshake kernel invariants: policy and gateway", () => {
       `protected_surface_resource:${fixture.contract.gatewayId}:${fixture.contract.resourceRef}`,
     );
     expect(resourceEvents.map((event) => event.eventType)).toEqual(afterGate.map((event) => event.eventType));
-    expect(resourceEvents.map((event) => event.offset)).toEqual([0, 1, 2, 3, 4, 5, 6]);
+    expect(resourceEvents.map((event) => event.offset)).toEqual([0, 1, 2, 3, 4, 5, 6, 7]);
     expect(resourceEvents.every((event) => event.streamScope === "protected_surface_resource")).toBe(true);
     for (let index = 1; index < resourceEvents.length; index += 1) {
       expect(resourceEvents[index]?.previousEventDigest).toBe(resourceEvents[index - 1]?.eventDigest);
@@ -316,7 +439,7 @@ describe("Handshake kernel invariants: policy and gateway", () => {
         streamScope: "organization",
         partitionKey,
         offsetStart: 0,
-        offsetEnd: 6,
+        offsetEnd: 7,
         terminalEventDigest: actionReceiptEvent.eventDigest,
       },
       {
@@ -324,7 +447,7 @@ describe("Handshake kernel invariants: policy and gateway", () => {
         streamScope: "run",
         partitionKey: `run:${fixture.contract.runId}`,
         offsetStart: 0,
-        offsetEnd: 6,
+        offsetEnd: 7,
         terminalEventDigest: runReceiptEvent.eventDigest,
       },
       {
@@ -332,7 +455,7 @@ describe("Handshake kernel invariants: policy and gateway", () => {
         streamScope: "protected_surface_resource",
         partitionKey: `protected_surface_resource:${fixture.contract.gatewayId}:${fixture.contract.resourceRef}`,
         offsetStart: 0,
-        offsetEnd: 6,
+        offsetEnd: 7,
         terminalEventDigest: resourceReceiptEvent.eventDigest,
       },
     ]);
@@ -393,6 +516,9 @@ describe("Handshake kernel invariants: policy and gateway", () => {
     expect(fixture.store.countRecordsOfType("gateway_check_attempt")).toBe(1);
     expect(fixture.store.countRecordsOfType("mutation_attempt")).toBe(0);
     expect(fixture.store.countRecordsOfType("receipt")).toBe(1);
+    const refusals = await fixture.store.listRecordsByType<Refusal>("refusal");
+    expect(refusals).toHaveLength(1);
+    expect(refusals[0]?.payload.gateAttemptId).toBe(result.gateAttempt.gateAttemptId);
   });
 
   it("refuses parameter mismatch before mutation", async () => {
@@ -564,6 +690,11 @@ describe("Handshake kernel invariants: policy and gateway", () => {
       renderedPolicyInputDigest: reviewRequired.decision.policyInputDigest,
       renderedUncertaintyDigest: await digestCanonical({ uncertaintyMarkers: [] }),
       renderedArtifactDigest: await digestCanonical({ artifact: "review:exact-contract" }),
+      catalogDigest: await digestCanonical({ catalog: "action_catalog_demo@v1" }),
+      rendererDigest: await digestCanonical({ renderer: "renderer:test-review" }),
+      actionBindingDigest: await digestCanonical({ actionContractId: contract.actionContractId }),
+      hiddenActionPosture: "no_hidden_actions_detected",
+      secondaryActionPosture: "no_secondary_actions_detected",
       uncertaintyMarkers: [],
       evidenceRefs: ["review:evidence:test"],
     });
@@ -578,6 +709,29 @@ describe("Handshake kernel invariants: policy and gateway", () => {
       decisionExpiresAt: new Date(Date.now() + 60_000).toISOString(),
       signatureOrAttestationRef: "attestation:test-review",
     });
+    const rejectedReview = await fixture.kernel.createReviewDecision({
+      actionContractId: contract.actionContractId,
+      policyDecisionId: reviewRequired.decision.policyDecisionId,
+      reviewArtifactId: reviewArtifact.reviewArtifactId,
+      reviewArtifactDigest: reviewArtifact.reviewArtifactDigest,
+      reviewerPrincipalId: "principal_reviewer",
+      decision: "reject",
+      decisionReasonCode: "sensitive_action",
+      decisionExpiresAt: new Date(Date.now() + 60_000).toISOString(),
+      signatureOrAttestationRef: "attestation:test-review-reject",
+    });
+    const reviewRefusals = (await fixture.store.listRecordsByType<Refusal>("refusal")).filter(
+      (record) => record.payload.phase === "review",
+    );
+    expect(reviewRefusals).toHaveLength(1);
+    expect(reviewRefusals[0]?.payload).toMatchObject({
+      actionContractId: contract.actionContractId,
+      policyDecisionId: reviewRequired.decision.policyDecisionId,
+      refusedObjectRef: `review_decision:${rejectedReview.reviewDecisionId}`,
+      reasonCode: "sensitive_action",
+      mutationAttempted: false,
+      authorityCreated: false,
+    });
     const approved = await fixture.kernel.evaluatePolicy({
       actionContractId: contract.actionContractId,
       envelopeId: fixture.envelope.envelopeId,
@@ -590,3 +744,18 @@ describe("Handshake kernel invariants: policy and gateway", () => {
     expect(approved.greenlight?.actionContractId).toBe(contract.actionContractId);
   });
 });
+
+function gatewayProbeExecutors(posture: Partial<Record<BypassProbeKind, BypassProbeOutcome>> = {}) {
+  return requiredGatewayCheckedBypassProbeKinds.map((probeKind) => ({
+    probeKind,
+    async execute() {
+      const probeOutcome = posture[probeKind] ?? "passed";
+      return {
+        probeOutcome,
+        sourceAuthority: "gateway_probe" as const,
+        reasonCodes: [probeOutcome === "passed" ? "bypass_probe_passed" : "protected_path_probe_failed"],
+        evidenceRefs: [`evidence:gateway-probe:${probeKind}:${probeOutcome}`],
+      };
+    },
+  }));
+}

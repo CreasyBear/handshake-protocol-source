@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { JsonValueSchema } from "../../foundation/schema-core";
+import { ClearingEvidenceRefsSchema, JsonValueSchema } from "../../foundation/schema-core";
 
 export const CompileIntentInputSchema = z.strictObject({
   tenantId: z.string().min(1),
@@ -16,6 +16,7 @@ export const CompileIntentInputSchema = z.strictObject({
   runtimeExecutionId: z.string().min(1).nullable().default(null),
   generatedExecutionGraphId: z.string().min(1).nullable().default(null),
   generatedExecutionNodeId: z.string().min(1).nullable().default(null),
+  toolCallDraftId: z.string().min(1).nullable().default(null),
   generatedCodeOrSpecRefs: z.array(z.string()).default([]),
   declaredAssumptions: z.array(z.string()).default([]),
   requiredEvidenceRefs: z.array(z.string()).default([]),
@@ -35,6 +36,7 @@ export const CompileIntentInputSchema = z.strictObject({
     purposeCode: z.string().min(1),
     expectedSideEffectCodes: z.array(z.string().min(1)),
     evidenceRefs: z.array(z.string()).default([]),
+    clearingEvidenceRefs: ClearingEvidenceRefsSchema,
     bounds: z.record(z.string(), JsonValueSchema).default({}),
     idempotencyKey: z.string().min(1),
     rollbackHint: z.string().max(500).nullable().default(null),

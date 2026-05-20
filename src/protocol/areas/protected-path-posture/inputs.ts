@@ -16,6 +16,7 @@ export const CreateProtectedPathPostureInputSchema = z.strictObject({
   sourceAuthority: PostureSourceAuthoritySchema,
   reasonCodes: z.array(z.string().min(2)).default([]),
   evidenceRefs: z.array(z.string().min(1)).default([]),
+  bypassProbeIds: z.array(z.string().min(1)).default([]),
   observedAt: z.string().datetime({ offset: true }).optional(),
   expiresAt: z.string().datetime({ offset: true }),
 });

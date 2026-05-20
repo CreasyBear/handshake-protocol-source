@@ -3,6 +3,10 @@ import {
   type PackageInstallRuntimeConfig,
 } from "../package-install/action-proposal";
 import { buildRepoWriteCompileIntentInput, type RepoWriteRuntimeConfig } from "../repo-write/action-proposal";
+import {
+  buildPreviewDeployCompileIntentInput,
+  type PreviewDeployRuntimeConfig,
+} from "../preview-deploy/action-proposal";
 import { digestCanonical } from "../../protocol/foundation/canonical";
 import type {
   CreateGeneratedExecutionGraphInput,
@@ -16,6 +20,7 @@ import type { CodemodeAction, ParsedCodemodeMultiActionProgram } from "./generat
 export type CodemodeMultiActionRuntimeConfig = {
   packageInstall: PackageInstallRuntimeConfig;
   repoWrite: RepoWriteRuntimeConfig;
+  previewDeploy: PreviewDeployRuntimeConfig;
 };
 
 export type GeneratedExecutionGraphRefs = {
@@ -102,13 +107,25 @@ export async function buildGeneratedExecutionGraphInput(
     maxGraphByteSize: 65536,
     truncationStatus: "complete",
     catalogSnapshotDigest: await digestCanonical({
-      toolCatalogRefs: unique([config.packageInstall.toolCatalogRef, config.repoWrite.toolCatalogRef]),
-      actionCatalogRefs: unique([config.packageInstall.actionCatalogRef, config.repoWrite.actionCatalogRef]),
+      actionCatalogRefs: unique([
+        config.packageInstall.actionCatalogRef,
+        config.repoWrite.actionCatalogRef,
+        config.previewDeploy.actionCatalogRef,
+      ]),
+      toolCatalogRefs: unique([
+        config.packageInstall.toolCatalogRef,
+        config.repoWrite.toolCatalogRef,
+        config.previewDeploy.toolCatalogRef,
+      ]),
       toolCapabilityIds: nodes.map((node) => node.toolCapabilityId),
       actionTypeIds: nodes.map((node) => node.actionTypeId),
     } as JsonValue),
     gatewayRegistrySnapshotDigest: await digestCanonical({
-      gatewayRegistryRefs: unique([config.packageInstall.gatewayRegistryRef, config.repoWrite.gatewayRegistryRef]),
+      gatewayRegistryRefs: unique([
+        config.packageInstall.gatewayRegistryRef,
+        config.repoWrite.gatewayRegistryRef,
+        config.previewDeploy.gatewayRegistryRef,
+      ]),
       gatewayRegistryEntryIds: nodes.map((node) => node.gatewayRegistryEntryId),
     } as JsonValue),
     registryBindingSetDigest: await digestCanonical({ nodeGatewayBindingDigests } as JsonValue),
@@ -208,6 +225,16 @@ async function buildCompileIntentInputForAction(
       versionRange: action.versionRange,
     });
   }
+  if (action.actionClass === "preview_deploy.create") {
+    return buildPreviewDeployCompileIntentInput(config.previewDeploy, {
+      ...base,
+      provider: action.provider,
+      projectRef: action.projectRef,
+      branchRef: action.branchRef,
+      commitRef: action.commitRef,
+      previewUrlHint: action.previewUrlHint,
+    });
+  }
   return buildRepoWriteCompileIntentInput(config.repoWrite, {
     ...base,
     repositoryRef: action.repositoryRef,
@@ -218,9 +245,11 @@ async function buildCompileIntentInputForAction(
 
 function configForAction(
   config: CodemodeMultiActionRuntimeConfig,
-  actionClass: "package.install" | "repo.write",
-): PackageInstallRuntimeConfig | RepoWriteRuntimeConfig {
-  return actionClass === "package.install" ? config.packageInstall : config.repoWrite;
+  actionClass: "package.install" | "repo.write" | "preview_deploy.create",
+): PackageInstallRuntimeConfig | RepoWriteRuntimeConfig | PreviewDeployRuntimeConfig {
+  if (actionClass === "package.install") return config.packageInstall;
+  if (actionClass === "preview_deploy.create") return config.previewDeploy;
+  return config.repoWrite;
 }
 
 function unique(values: string[]): string[] {

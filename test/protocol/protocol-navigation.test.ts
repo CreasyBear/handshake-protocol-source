@@ -11,7 +11,10 @@ describe("protocol navigation", () => {
     const routeIds = transitionRouteDefinitions.map((route) => String(route.routeId)).sort();
     const httpIds = httpTransitionNavigation.map((entry) => String(entry.routeId)).sort();
     const protocolHttpIds = protocolNavigation
-      .filter((entry) => entry.transitionId !== "createGeneratedExecutionGraph")
+      .filter(
+        (entry) =>
+          entry.transitionId !== "createGeneratedExecutionGraph" && entry.transitionId !== "createAuthorityCertificate",
+      )
       .map((entry) => String(entry.transitionId))
       .sort();
 
@@ -34,14 +37,18 @@ describe("protocol navigation", () => {
     }
   });
 
-  it("represents generated graph coverage as kernel-only evidence, not an HTTP transition", () => {
+  it("represents generated graph coverage and certificate minting as kernel-only evidence", () => {
     const graphEntry = protocolNavigationByTransitionId.createGeneratedExecutionGraph;
+    const certificateEntry = protocolNavigationByTransitionId.createAuthorityCertificate;
 
     expect(graphEntry.kernelMethod).toBe("createGeneratedExecutionGraph");
     expect(graphEntry.phase).toBe("generated_execution_graph");
     expect(httpTransitionNavigation.some((entry) => entry.transitionId === "createGeneratedExecutionGraph")).toBe(
       false,
     );
+    expect(certificateEntry.kernelMethod).toBe("createAuthorityCertificate");
+    expect(certificateEntry.phase).toBe("authority_certificate");
+    expect(httpTransitionNavigation.some((entry) => entry.transitionId === "createAuthorityCertificate")).toBe(false);
   });
 
   it("declares valid protocol object and stream event effects", () => {
@@ -68,7 +75,7 @@ describe("protocol navigation", () => {
         method: "GET",
         honoPath: route.honoPath,
         openApiPath: route.openApiPath,
-        role: route.role,
+        roles: route.roles,
         readOnly: true,
         diagnosticOnly: true,
         recordsWritten: [],

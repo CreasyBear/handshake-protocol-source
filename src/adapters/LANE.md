@@ -6,11 +6,11 @@ Reference gateway proof lanes for protected mutations that run only after a `Ver
 
 ## Current proof claim
 
-Reference gateway fixtures for package install, repo write, and preview deploy behavior. These are proof lanes, not production provider integrations.
+Reference gateway fixtures and adapter-pack proofs for package install, repo write, preview deploy, and external payment signing behavior. These are proof lanes, not production provider integrations.
 
 ## Use cases
 
-Demonstrate mutation-side enforcement for protected package installs, repository writes, and preview deploys after the protocol derives a verified gateway check.
+Demonstrate mutation-side enforcement for protected package installs, repository writes, preview deploys, and payment signatures after the protocol derives a verified gateway check.
 
 ## Constraints and assumptions
 
@@ -18,7 +18,7 @@ Adapters are consequence holders. They must re-check observed parameters against
 
 ## Core components
 
-`package-install/gateway.ts`, `repo-write/gateway.ts`, `preview-deploy/gateway.ts`, and adapter conformance tests.
+`package-install/gateway.ts`, `repo-write/gateway.ts`, `preview-deploy/gateway.ts`, `x402-payment/install-proposal.ts`, `x402-payment/action-proposal.ts`, `x402-payment/wallet-gateway.ts`, `x402-payment/conformance.ts`, and adapter conformance tests.
 
 ## Failure and scale posture
 
@@ -38,7 +38,7 @@ Storage internals, protocol primitive internals, Hono route handlers, SDK/client
 
 ## Guarding tests
 
-`test/architecture/import-posture.test.ts`, `test/conformance/protected-mutation-adapter-conformance.test.ts`, `test/adapters/package-install-gateway.test.ts`, `test/adapters/repo-write-gateway.test.ts`, `test/adapters/preview-deploy-gateway.test.ts`, and `test/integration/repo-write-d1-http.test.ts`.
+`test/architecture/import-posture.test.ts`, `test/conformance/protected-mutation-adapter-conformance.test.ts`, `test/adapters/package-install-gateway.test.ts`, `test/adapters/repo-write-gateway.test.ts`, `test/adapters/preview-deploy-gateway.test.ts`, `test/adapters/x402-wallet-gateway.test.ts`, and `test/integration/repo-write-d1-http.test.ts`.
 
 ## Public surface
 

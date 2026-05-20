@@ -20,10 +20,15 @@ import {
   proposePreviewDeployActionContract,
   previewDeployResourceRef,
 } from "../../src/runtime/preview-deploy/action-proposal";
+import { proposePackageInstallActionContract } from "../../src/runtime/package-install/action-proposal";
 import { proposeRepoWriteActionContract } from "../../src/runtime/repo-write/action-proposal";
 import { InMemoryProtocolStore } from "../../src/storage/memory";
-import { createGreenlitContract, futureIso } from "../support/fixtures";
-import { createPackageManifestSurface } from "../support/package-install-flow";
+import { futureIso, makeKernelFixture, recordSafeBypassProbes, registerFixtureObjects } from "../support/fixtures";
+import {
+  createPackageManifestSurface,
+  packageInstallObservedParameters,
+  packageInstallRuntimeConfig,
+} from "../support/package-install-flow";
 import {
   createRepoWriteSurface,
   makeRepoWriteFixtureObjects,
@@ -69,7 +74,22 @@ describe("ProtectedMutationAdapter conformance contract", () => {
 });
 
 async function packageInstallProbe(): Promise<ProtectedMutationAdapterProbe> {
-  const fixture = await createGreenlitContract();
+  const fixture = makeKernelFixture();
+  await registerFixtureObjects(fixture);
+  const proposal = await proposePackageInstallActionContract(fixture.kernel, packageInstallRuntimeConfig(fixture), {
+    principalIntentRef: "intent:install hono",
+    generatedCodeOrSpecRef: "code:package-install-conformance",
+    package: "hono",
+    versionRange: "^4.12.19",
+  });
+  if (proposal.outcome !== "action_contract_proposed") throw new Error("expected package install contract");
+  const policy = await fixture.kernel.evaluatePolicy({
+    actionContractId: proposal.actionContract.actionContractId,
+    envelopeId: fixture.envelope.envelopeId,
+    signingSecret: "test-secret",
+  });
+  if (!policy.greenlight) throw new Error("expected package install greenlight");
+  const greenlight = policy.greenlight;
   const surface = await createPackageManifestSurface("handshake-conformance-package-");
   return {
     name: "package-install",
@@ -78,9 +98,9 @@ async function packageInstallProbe(): Promise<ProtectedMutationAdapterProbe> {
       const result = await runPackageInstallGateway({
         protocol: fixture.kernel,
         surface,
-        actionContractId: fixture.contract.actionContractId,
-        greenlightId: fixture.greenlight.greenlightId,
-        observedParameters: { package: "hono", versionRange: "^99.0.0" },
+        actionContractId: proposal.actionContract.actionContractId,
+        greenlightId: greenlight.greenlightId,
+        observedParameters: packageInstallObservedParameters({ versionRange: "^99.0.0" }),
       });
       expect(result.outcome).toBe("gateway_check_refused");
       expect(result.gatewayCheck.gateAttempt.gateDecisionReasonCode).toBe("params_mismatch");
@@ -142,6 +162,15 @@ async function previewDeployProbe(): Promise<ProtectedMutationAdapterProbe> {
   await kernel.putCatalogObject({ objectType: "action_type", payload: objects.actionType });
   await kernel.putCatalogObject({ objectType: "gateway_registry_entry", payload: objects.gateway });
   await kernel.putCatalogObject({ objectType: "operating_envelope", payload: objects.envelope });
+  const bypassProbeIds = await recordSafeBypassProbes(
+    { kernel, gateway: objects.gateway },
+    {
+      runtimeAdapterId: objects.tool.runtimeAdapterId,
+      actionClass: objects.actionType.actionClass,
+      resourceRef: objects.resourceRef,
+      protectedSurfaceKind: objects.actionType.protectedSurfaceKind,
+    },
+  );
   await kernel.createProtectedPathPosture({
     tenantId: objects.tool.tenantId,
     organizationId: objects.tool.organizationId,
@@ -153,9 +182,10 @@ async function previewDeployProbe(): Promise<ProtectedMutationAdapterProbe> {
     postureState: "gateway_checked",
     credentialCustodyStatus: "fixture_gateway_held",
     rawSiblingToolStatus: "blocked",
-    sourceAuthority: "conformance_fixture",
+    sourceAuthority: "gateway_probe",
     reasonCodes: ["local_preview_fixture_only"],
     evidenceRefs: ["evidence:local-preview-posture"],
+    bypassProbeIds,
     expiresAt: futureIso(),
   });
   const parameters = {

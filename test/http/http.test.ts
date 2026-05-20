@@ -6,11 +6,15 @@ import { HandshakeProtocolError } from "../../src/protocol/foundation/errors";
 import { transitionInvokers, transitionRouteDefinitions } from "../../src/http/routes/transition-route-registry";
 import { HandshakeKernel } from "../../src/protocol/kernel";
 import {
+  type ContractEvidenceProjection,
   type GeneratedGraphEvidenceProjection,
+  type IdempotencyRecoveryProjection,
+  type ProtectedPathInstallHealthProjection,
   PROTOCOL_VERSION,
   type ContractStreamEvent,
   type ProofGap,
   type RecoveryRecommendationStatusTransition,
+  type ReceiptTimelineProjection,
   type TransitionRequestContext,
 } from "../../src/protocol/public/schemas";
 import { HandshakeClient } from "../../src/sdk/client";
@@ -18,9 +22,11 @@ import type { HandshakeClientError } from "../../src/sdk/client";
 import { InMemoryProtocolStore } from "../../src/storage/memory";
 import {
   createGreenlitContract,
+  futureIso,
   makeKernelFixture,
   makePackageInstallCandidate,
   proposalInputForCompilation,
+  recordSafeBypassProbes,
   recordUnknownDownstreamProofGap,
 } from "../support/fixtures";
 import { FaultInjectingProtocolStore } from "../support/fault-injecting-protocol-store";
@@ -69,7 +75,10 @@ describe("Hono protocol surface", () => {
     expect(gatewayCheckPath?.post?.security).toEqual([{ handshakeGatewayCustodyBearer: [] }]);
     const graphEvidencePath =
       openapiDocument.paths["/v0.2/evidence/generated-execution-graphs/{generatedExecutionGraphId}"];
-    expect(graphEvidencePath?.get?.security).toEqual([{ handshakeControlPlaneBearer: [] }]);
+    expect(graphEvidencePath?.get?.security).toEqual([
+      { handshakeReviewCustodyBearer: [] },
+      { handshakeRuntimeEvidenceBearer: [] },
+    ]);
     expect(openapiDocument.paths["/v0.2/records/{objectType}/{objectId}"]).toBeUndefined();
   });
 
@@ -88,9 +97,9 @@ describe("Hono protocol surface", () => {
       expect(openapiDocument.paths[route.path]?.post?.security).toEqual([{ [expectedSecurityScheme(route.role)]: [] }]);
     }
     for (const route of evidenceReadRouteDefinitions) {
-      expect(openapiDocument.paths[route.openApiPath]?.get?.security).toEqual([
-        { [expectedSecurityScheme(route.role)]: [] },
-      ]);
+      expect(openapiDocument.paths[route.openApiPath]?.get?.security).toEqual(
+        route.roles.map((role) => ({ [expectedSecurityScheme(role)]: [] })),
+      );
     }
 
     expect(Object.keys(transitionInvokers).sort()).toEqual(
@@ -190,6 +199,42 @@ describe("Hono protocol surface", () => {
     });
   });
 
+  it("keeps action contract proposal on runtime-evidence custody", async () => {
+    const app = createApp({
+      store: new InMemoryProtocolStore(),
+      callerAuthTokens: TEST_CALLER_AUTH_TOKENS,
+    });
+
+    const controlPlane = await app.request("/v0.2/action-contracts", {
+      method: "POST",
+      headers: jsonHeaders("control_plane"),
+      body: JSON.stringify({ invalid: true }),
+    });
+    expect(controlPlane.status).toBe(403);
+    expect(await controlPlane.json()).toMatchObject({
+      error: {
+        code: "caller_auth_forbidden",
+        transitionName: "proposeActionContract",
+        callerCustodyRole: "runtime_evidence",
+        commitState: "not_started",
+      },
+    });
+
+    const runtimeEvidence = await app.request("/v0.2/action-contracts", {
+      method: "POST",
+      headers: jsonHeaders("runtime_evidence"),
+      body: JSON.stringify({ invalid: true }),
+    });
+    expect(runtimeEvidence.status).toBe(400);
+    expect(await runtimeEvidence.json()).toMatchObject({
+      error: {
+        code: "invalid_request",
+        transitionName: "proposeActionContract",
+        callerCustodyRole: "runtime_evidence",
+      },
+    });
+  });
+
   it("requires control-plane custody for internal record reads", async () => {
     const app = createApp({
       store: new InMemoryProtocolStore(),
@@ -225,6 +270,59 @@ describe("Hono protocol surface", () => {
     expect(await invalidType.json()).toMatchObject({
       error: { code: "invalid_protocol_object_type" },
     });
+  });
+
+  it("blocks raw HTTP reads for internal-only protocol objects", async () => {
+    const fixture = await createGreenlitContract();
+    const [bypassProbeId] = await recordSafeBypassProbes(fixture);
+    if (!bypassProbeId) throw new Error("expected bypass probe record");
+    const toolCallDraft = await fixture.kernel.createToolCallDraft({
+      tenantId: "tenant_demo",
+      organizationId: "org_demo",
+      runtimeExecutionId: null,
+      generatedExecutionGraphId: null,
+      generatedExecutionNodeId: null,
+      toolCapabilityId: fixture.tool.toolCapabilityId,
+      actionTypeId: fixture.actionType.actionTypeId,
+      gatewayRegistryEntryId: fixture.gateway.gatewayRegistryEntryId,
+      actionClass: "package.install",
+      gatewayId: fixture.gateway.gatewayId,
+      resourceRef: "npm:hono",
+      parameters: { package: "hono", versionRange: "^4.12.19" },
+      nonSecretParamsSummary: { package: "hono", versionRange: "^4.12.19" },
+      expiresAt: futureIso(),
+      evidenceRefs: ["evidence:tool-call-draft"],
+    });
+    const app = createApp({
+      store: fixture.store,
+      callerAuthTokens: TEST_CALLER_AUTH_TOKENS,
+    });
+    const streamEvents = await fixture.store.listRecordsByType<ContractStreamEvent>("contract_stream_event");
+    const internalEventId = streamEvents[0]?.objectId;
+    if (!internalEventId) throw new Error("expected internal stream event record");
+    const ledgerRecords = await fixture.store.listRecordsByType("idempotency_ledger_entry");
+    const ledgerId = ledgerRecords[0]?.objectId;
+    if (!ledgerId) throw new Error("expected idempotency ledger record");
+
+    const publicRecord = await app.request(`/v0.2/records/action_contract/${fixture.contract.actionContractId}`, {
+      headers: jsonHeaders("control_plane"),
+    });
+    expect(publicRecord.status).toBe(200);
+
+    for (const [objectType, objectId] of [
+      ["contract_stream_event", internalEventId],
+      ["idempotency_ledger_entry", ledgerId],
+      ["bypass_probe", bypassProbeId],
+      ["tool_call_draft", toolCallDraft.toolCallDraftId],
+    ] as const) {
+      const internalRecord = await app.request(`/v0.2/records/${objectType}/${objectId}`, {
+        headers: jsonHeaders("control_plane"),
+      });
+      expect(internalRecord.status).toBe(404);
+      expect(await internalRecord.json()).toMatchObject({
+        error: { code: "record_not_found" },
+      });
+    }
   });
 
   it("hosted mode refuses lane-token-only transition admission before parsing request bodies", async () => {
@@ -660,7 +758,7 @@ describe("Hono protocol surface", () => {
     const contextCountBefore = store.countRecordsOfType("transition_request_context");
 
     const response = await app.request(`/v0.2/evidence/generated-execution-graphs/${graph.generatedExecutionGraphId}`, {
-      headers: jsonHeaders("control_plane"),
+      headers: jsonHeaders("review_custody"),
     });
 
     expect(response.status).toBe(200);
@@ -689,18 +787,145 @@ describe("Hono protocol surface", () => {
     expect(store.countRecordsOfType("transition_request_context")).toBe(contextCountBefore);
   });
 
+  it("returns redacted contract, receipt timeline, and install-health projections", async () => {
+    const fixture = makeKernelFixture();
+    fixture.envelope.requiredProtectedPathState = "gateway_checked";
+    const bypassProbeIds = await recordSafeBypassProbes(fixture);
+    const posture = await fixture.kernel.createProtectedPathPosture({
+      tenantId: "tenant_demo",
+      organizationId: "org_demo",
+      runtimeAdapterId: "runtime_codex",
+      gatewayId: fixture.gateway.gatewayId,
+      actionClass: "package.install",
+      resourceRef: "npm:hono",
+      protectedSurfaceKind: "package_manager",
+      postureState: "gateway_checked",
+      credentialCustodyStatus: "gateway_held",
+      rawSiblingToolStatus: "blocked",
+      sourceAuthority: "gateway_probe",
+      reasonCodes: ["bypass_probe_passed"],
+      evidenceRefs: ["evidence:protected-path-posture"],
+      bypassProbeIds,
+      expiresAt: futureIso(),
+    });
+    const greenlit = await createGreenlitContract(fixture);
+    const gate = await greenlit.kernel.gatewayCheck({
+      actionContractId: greenlit.contract.actionContractId,
+      greenlightId: greenlit.greenlight.greenlightId,
+      observedParameters: { package: "hono", versionRange: "^4.12.19" },
+      surfaceOperationRef: "npm-install:operation:demo",
+    });
+    const app = createApp({ store: fixture.store, callerAuthTokens: TEST_CALLER_AUTH_TOKENS });
+    const contextCountBefore = fixture.store.countRecordsOfType("transition_request_context");
+
+    const contractResponse = await app.request(`/v0.2/evidence/contracts/${greenlit.contract.actionContractId}`, {
+      headers: jsonHeaders("review_custody"),
+    });
+    expect(contractResponse.status).toBe(200);
+    const contractView = (await contractResponse.json()) as ContractEvidenceProjection & {
+      parameters?: unknown;
+      secretRefs?: unknown;
+      contractSignature?: unknown;
+    };
+    expect(contractView).toMatchObject({
+      actionContractRef: greenlit.contract.actionContractId,
+      contractDigest: greenlit.contract.actionContractDigest,
+      paramsDigest: greenlit.contract.paramsDigest,
+      signaturePosture: "local_hmac",
+      redactionProfileRef: "contract-view:v0.2-redacted",
+    });
+    expect(contractView.parameters).toBeUndefined();
+    expect(contractView.secretRefs).toBeUndefined();
+    expect(contractView.contractSignature).toBeUndefined();
+
+    const idempotencyRecoveryResponse = await app.request(
+      `/v0.2/evidence/idempotency-recovery/${greenlit.contract.actionContractId}`,
+      { headers: jsonHeaders("review_custody") },
+    );
+    expect(idempotencyRecoveryResponse.status).toBe(200);
+    const idempotencyRecovery = (await idempotencyRecoveryResponse.json()) as IdempotencyRecoveryProjection & {
+      parameters?: unknown;
+      secretRefs?: unknown;
+    };
+    expect(idempotencyRecovery).toMatchObject({
+      actionContractRef: greenlit.contract.actionContractId,
+      idempotencyKey: greenlit.contract.idempotencyKey,
+      paramsDigest: greenlit.contract.paramsDigest,
+      currentLedgerState: "mutation_started",
+      paramsDigestMatch: true,
+      greenlightRef: greenlit.greenlight.greenlightId,
+      gateAttemptRef: gate.gateAttempt.gateAttemptId,
+      mutationAttemptRef: gate.mutationAttempt?.mutationAttemptId,
+      receiptRef: gate.receipt.receiptId,
+      recoveryDisposition: "same_params_duplicate_refused",
+      reasonCodes: ["idempotency_duplicate_authority"],
+      redactionProfileRef: "idempotency-recovery:v0.2-redacted",
+    });
+    expect(idempotencyRecovery.parameters).toBeUndefined();
+    expect(idempotencyRecovery.secretRefs).toBeUndefined();
+
+    const timelineResponse = await app.request(`/v0.2/evidence/receipts/${gate.receipt.receiptId}/timeline`, {
+      headers: jsonHeaders("runtime_evidence"),
+    });
+    expect(timelineResponse.status).toBe(200);
+    const timeline = (await timelineResponse.json()) as ReceiptTimelineProjection & {
+      payload?: unknown;
+      evidenceRefs?: unknown;
+    };
+    expect(timeline).toMatchObject({
+      receiptRef: gate.receipt.receiptId,
+      actionContractRef: greenlit.contract.actionContractId,
+      gatewayCheckStatus: "passed",
+      mutationAttemptStatus: "submitted",
+      redactionProfileRef: "receipt-timeline:v0.2-redacted",
+      missingEventCount: 0,
+    });
+    expect(timeline.events.map((event) => event.eventType)).toContain("gateway_checked");
+    expect(timeline.events.map((event) => event.eventType)).toContain("receipt_emitted");
+    expect(timeline.payload).toBeUndefined();
+    expect(timeline.evidenceRefs).toBeUndefined();
+
+    const installHealthResponse = await app.request(
+      `/v0.2/evidence/protected-path-install-health/${greenlit.contract.actionContractId}`,
+      { headers: jsonHeaders("runtime_evidence") },
+    );
+    expect(installHealthResponse.status).toBe(200);
+    const installHealth = (await installHealthResponse.json()) as ProtectedPathInstallHealthProjection & {
+      evidenceRefs?: unknown;
+    };
+    expect(installHealth).toMatchObject({
+      actionContractRef: greenlit.contract.actionContractId,
+      currentPostureRef: posture.protectedPathPostureId,
+      currentPostureDigest: posture.postureDigest,
+      installHealthStatus: "satisfies_gateway_checked",
+      redactionProfileRef: "protected-path-install-health:v0.2-redacted",
+    });
+    expect(installHealth.bypassProbeCoverage).toHaveLength(bypassProbeIds.length);
+    expect(installHealth.evidenceRefs).toBeUndefined();
+    expect(JSON.stringify(installHealth)).not.toContain("evidence:probe");
+    const controlPlaneRead = await app.request(`/v0.2/evidence/contracts/${greenlit.contract.actionContractId}`, {
+      headers: jsonHeaders("control_plane"),
+    });
+    expect(controlPlaneRead.status).toBe(403);
+    const gatewayRead = await app.request(`/v0.2/evidence/contracts/${greenlit.contract.actionContractId}`, {
+      headers: jsonHeaders("gateway_custody"),
+    });
+    expect(gatewayRead.status).toBe(403);
+    expect(fixture.store.countRecordsOfType("transition_request_context")).toBe(contextCountBefore);
+  });
+
   it("hides generated graph evidence projections across hosted tenant boundaries", async () => {
     const { graph, store } = await createGeneratedGraphEvidenceFixture();
     const app = createApp({
       store,
       authMode: "hosted",
       hostedCallerVerifier: staticHostedVerifier(
-        hostedIdentity({ tenantId: "tenant_other", custodyRoles: ["control_plane"] }),
+        hostedIdentity({ tenantId: "tenant_other", custodyRoles: ["review_custody"] }),
       ),
     });
 
     const response = await app.request(`/v0.2/evidence/generated-execution-graphs/${graph.generatedExecutionGraphId}`, {
-      headers: jsonHeaders("control_plane"),
+      headers: jsonHeaders("review_custody"),
     });
 
     expect(response.status).toBe(404);
@@ -731,7 +956,7 @@ describe("Hono protocol surface", () => {
     expect(calls[0]?.headers.get("x-handshake-request-identity")).toBe("sdk-request-id");
   });
 
-  it("SDK reads generated graph evidence projections with GET auth and typed errors", async () => {
+  it("SDK reads evidence projections with GET auth and typed errors", async () => {
     const calls: Array<{
       path: string;
       method: string | undefined;
@@ -748,19 +973,34 @@ describe("Hono protocol surface", () => {
       return new Response(JSON.stringify({ graphRef: "geg_demo" }), { status: 200 });
     };
     const client = new HandshakeClient("http://handshake.test", fetchImpl, {
-      transitionTokens: { control_plane: "control-token" },
+      transitionTokens: {
+        review_custody: "review-token",
+        runtime_evidence: "runtime-token",
+      },
       requestIdentityFactory: () => "sdk-read-request-id",
     });
 
     await client.getGeneratedGraphEvidenceProjection("geg_demo");
+    await client.getContractEvidenceProjection("act_demo");
+    await client.getIdempotencyRecoveryProjection("act_demo");
+    await client.getReceiptTimelineProjection("rcp_demo", "runtime_evidence");
+    await client.getProtectedPathInstallHealthProjection("act_demo", "runtime_evidence");
 
     expect(calls[0]?.path).toBe("/v0.2/evidence/generated-execution-graphs/geg_demo");
     expect(calls[0]?.method).toBe("GET");
-    expect(calls[0]?.headers.get("authorization")).toBe("Bearer control-token");
+    expect(calls[0]?.headers.get("authorization")).toBe("Bearer review-token");
+    expect(calls[3]?.headers.get("authorization")).toBe("Bearer runtime-token");
     expect(calls[0]?.headers.get("x-handshake-protocol-version")).toBe(PROTOCOL_VERSION);
     expect(calls[0]?.headers.get("x-handshake-request-identity")).toBe("sdk-read-request-id");
     expect(calls[0]?.headers.get("content-type")).toBeNull();
     expect(calls[0]?.body).toBeUndefined();
+    expect(calls.map((call) => call.path)).toEqual([
+      "/v0.2/evidence/generated-execution-graphs/geg_demo",
+      "/v0.2/evidence/contracts/act_demo",
+      "/v0.2/evidence/idempotency-recovery/act_demo",
+      "/v0.2/evidence/receipts/rcp_demo/timeline",
+      "/v0.2/evidence/protected-path-install-health/act_demo",
+    ]);
 
     const errorClient = new HandshakeClient(
       "http://handshake.test",
@@ -771,7 +1011,7 @@ describe("Hono protocol surface", () => {
               code: "record_not_found",
               message: "Protocol evidence record was not found.",
               transitionName: "getGeneratedGraphEvidenceProjection",
-              callerCustodyRole: "control_plane",
+              callerCustodyRole: "review_custody",
               retryability: "terminal",
               commitState: "not_applicable",
               requestIdentity: null,
@@ -798,7 +1038,7 @@ describe("Hono protocol surface", () => {
             code: "recovery_terminal_conflict",
             message: "Recovery recommendation already has a terminal status transition.",
             transitionName: "proposeActionContract",
-            callerCustodyRole: "control_plane",
+            callerCustodyRole: "runtime_evidence",
             retryability: "recoverable",
             commitState: "committed",
             requestIdentity: "sdk-request-id",
@@ -878,7 +1118,7 @@ describe("Hono protocol surface", () => {
 
     const response = await app.request("/v0.2/action-contracts", {
       method: "POST",
-      headers: jsonHeaders("control_plane"),
+      headers: jsonHeaders("runtime_evidence"),
       body: JSON.stringify(state.followUpInput),
     });
 
@@ -888,10 +1128,10 @@ describe("Hono protocol surface", () => {
       error: {
         code: "recovery_terminal_conflict",
         transitionName: "proposeActionContract",
-        callerCustodyRole: "control_plane",
+        callerCustodyRole: "runtime_evidence",
         retryability: "recoverable",
         commitState: "committed",
-        requestIdentity: "test-request-control_plane",
+        requestIdentity: "test-request-runtime_evidence",
         refusalRef: null,
       },
     });

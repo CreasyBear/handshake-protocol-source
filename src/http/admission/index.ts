@@ -1,11 +1,12 @@
 import type { Context } from "hono";
 import { HandshakeProtocolError } from "../../protocol/foundation/errors";
 import type { TransitionRequestCallerEvidence } from "../../protocol/context/request-contexts";
-import { authorizeTransitionCaller, type TransitionCallerRole } from "./caller-auth";
+import { authorizeTransitionCaller, authorizeTransitionCallerForAny, type TransitionCallerRole } from "./caller-auth";
 import type { AppOptions, WorkerBindings } from "../app-options";
 import type { EvidenceReadRouteDefinition } from "../routes/evidence-read-route-registry";
 import {
   assertHostedCallerFresh,
+  assertHostedCallerAnyRole,
   assertHostedCallerRole,
   parseHostedCallerIdentity,
   transitionCallerEvidenceFromIdentity,
@@ -28,7 +29,7 @@ export async function authorizeTransitionAdmission(
   context: TransitionErrorContext,
 ): Promise<AdmissionResult> {
   if (options.authMode === "hosted") {
-    return authorizeHosted(c, options.hostedCallerVerifier, route.routeId, route.path, route.role);
+    return authorizeHosted(c, options.hostedCallerVerifier, route.routeId, route.path, [route.role]);
   }
   return {
     failure: authorizeTransitionCaller(c, options.callerAuthTokens, route.role, context),
@@ -44,10 +45,10 @@ export async function authorizeEvidenceReadAdmission(
   context: TransitionErrorContext,
 ): Promise<AdmissionResult> {
   if (options.authMode === "hosted") {
-    return authorizeHosted(c, options.hostedCallerVerifier, route.routeId, route.honoPath, route.role);
+    return authorizeHosted(c, options.hostedCallerVerifier, route.routeId, route.honoPath, route.roles);
   }
   return {
-    failure: authorizeTransitionCaller(c, options.callerAuthTokens, route.role, context),
+    failure: authorizeTransitionCallerForAny(c, options.callerAuthTokens, route.roles, context),
     hostedIdentity: null,
     callerEvidence: undefined,
   };
@@ -58,7 +59,7 @@ async function authorizeHosted(
   verifier: HostedCallerVerifier | undefined,
   routeId: string,
   routePath: string,
-  requiredRole: TransitionCallerRole,
+  requiredRoles: readonly TransitionCallerRole[],
 ): Promise<AdmissionResult> {
   if (!verifier) {
     throw new HandshakeProtocolError(
@@ -69,6 +70,7 @@ async function authorizeHosted(
     );
   }
   const now = new Date().toISOString();
+  const requiredRole = requiredRoles[0] ?? "control_plane";
   const identity = parseHostedCallerIdentity(
     await verifier.verify({
       headers: c.req.raw.headers,
@@ -78,10 +80,15 @@ async function authorizeHosted(
       routeId,
       routePath,
       now,
+      requiredRoles,
     }),
   );
   assertHostedCallerFresh(identity, now);
-  assertHostedCallerRole(identity, requiredRole);
+  if (requiredRoles.length === 1) {
+    assertHostedCallerRole(identity, requiredRole);
+  } else {
+    assertHostedCallerAnyRole(identity, requiredRoles);
+  }
   return {
     failure: null,
     hostedIdentity: identity,

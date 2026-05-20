@@ -6,9 +6,13 @@ import type {
   JsonValue,
   RuntimeExecutionRecord,
 } from "../../src/protocol/public/schemas";
+import type { CreateToolCallDraftInput } from "../../src/protocol/public/inputs";
 import { makeKernelFixture, makePackageInstallCandidate, registerFixtureObjects } from "../support/fixtures";
 
 const ZERO_DIGEST = `sha256:${"0".repeat(64)}`;
+type DraftTestOverride = Partial<Omit<CreateToolCallDraftInput, "draftState">> & {
+  draftState?: "opened" | "streaming" | "finalized" | "invalid" | "abandoned";
+};
 
 describe("generated execution graph coverage boundary", () => {
   it("refuses shell runtime candidates when graph coverage is missing and creates no contract or proof gap", async () => {
@@ -64,12 +68,9 @@ describe("generated execution graph coverage boundary", () => {
       unsupportedNode("node_sibling"),
     ]);
 
-    const compilation = await fixture.kernel.compileIntent({
-      ...compileInput(fixture),
-      runtimeExecutionId: runtimeExecution.runtimeExecutionId,
-      generatedExecutionGraphId: graph.generatedExecutionGraphId,
-      generatedExecutionNodeId: "node_install",
-    });
+    const compilation = await fixture.kernel.compileIntent(
+      await compileInputWithFinalizedDraft(fixture, runtimeExecution, graph, "node_install"),
+    );
 
     expect(graph.coverageStatus).toBe("unsupported_or_ambiguous");
     expect(compilation.candidateAction.candidateStatus).toBe("rejected");
@@ -86,12 +87,9 @@ describe("generated execution graph coverage boundary", () => {
       readOnlyNode("node_version_check"),
     ]);
 
-    const compilation = await fixture.kernel.compileIntent({
-      ...compileInput(fixture),
-      runtimeExecutionId: runtimeExecution.runtimeExecutionId,
-      generatedExecutionGraphId: graph.generatedExecutionGraphId,
-      generatedExecutionNodeId: "node_install",
-    });
+    const compilation = await fixture.kernel.compileIntent(
+      await compileInputWithFinalizedDraft(fixture, runtimeExecution, graph, "node_install"),
+    );
 
     expect(graph.coverageStatus).toBe("fully_covered_no_unsupported_nodes");
     expect(compilation.candidateAction.candidateStatus).toBe("contractable");
@@ -108,6 +106,41 @@ describe("generated execution graph coverage boundary", () => {
     expect(contract.generatedExecutionNodeDigest).toBe(graphNode!.nodeDigest);
   });
 
+  it("refuses generated graph candidates when tool-call draft input is not finalized or stale", async () => {
+    const fixture = makeKernelFixture();
+    await registerFixtureObjects(fixture);
+    const runtimeExecution = await createShellRuntimeExecution(fixture);
+    const graph = await createGeneratedExecutionGraph(fixture, runtimeExecution, [
+      await eligiblePackageNode(fixture, "node_install"),
+    ]);
+
+    const streamingDraft = await createFinalizedPackageDraft(fixture, runtimeExecution, graph, "node_install", {
+      draftState: "streaming",
+    });
+    const streamingCompilation = await fixture.kernel.compileIntent({
+      ...compileInput(fixture),
+      runtimeExecutionId: runtimeExecution.runtimeExecutionId,
+      generatedExecutionGraphId: graph.generatedExecutionGraphId,
+      generatedExecutionNodeId: "node_install",
+      toolCallDraftId: streamingDraft.toolCallDraftId,
+    });
+    expect(streamingCompilation.candidateAction.candidateStatus).toBe("rejected");
+    expect(streamingCompilation.candidateAction.refusalReasonCodes).toContain("tool_call_draft_not_finalized");
+
+    const staleDraft = await createFinalizedPackageDraft(fixture, runtimeExecution, graph, "node_install", {
+      expiresAt: new Date(Date.now() - 1_000).toISOString(),
+    });
+    const staleCompilation = await fixture.kernel.compileIntent({
+      ...compileInput(fixture),
+      runtimeExecutionId: runtimeExecution.runtimeExecutionId,
+      generatedExecutionGraphId: graph.generatedExecutionGraphId,
+      generatedExecutionNodeId: "node_install",
+      toolCallDraftId: staleDraft.toolCallDraftId,
+    });
+    expect(staleCompilation.candidateAction.candidateStatus).toBe("rejected");
+    expect(staleCompilation.candidateAction.refusalReasonCodes).toContain("tool_call_draft_stale");
+  });
+
   it("refuses contract proposal when durable graph evidence drifts after compilation", async () => {
     const fixture = makeKernelFixture();
     await registerFixtureObjects(fixture);
@@ -115,12 +148,9 @@ describe("generated execution graph coverage boundary", () => {
     const graph = await createGeneratedExecutionGraph(fixture, runtimeExecution, [
       await eligiblePackageNode(fixture, "node_install"),
     ]);
-    const compilation = await fixture.kernel.compileIntent({
-      ...compileInput(fixture),
-      runtimeExecutionId: runtimeExecution.runtimeExecutionId,
-      generatedExecutionGraphId: graph.generatedExecutionGraphId,
-      generatedExecutionNodeId: "node_install",
-    });
+    const compilation = await fixture.kernel.compileIntent(
+      await compileInputWithFinalizedDraft(fixture, runtimeExecution, graph, "node_install"),
+    );
     expect(compilation.candidateAction.candidateStatus).toBe("contractable");
 
     await overwriteStoredGeneratedExecutionGraph(fixture, {
@@ -328,6 +358,67 @@ function compileInput(fixture: ReturnType<typeof makeKernelFixture>) {
     requiredEvidenceRefs: ["evidence:package-lock-diff"],
     candidate: makePackageInstallCandidate(fixture),
   };
+}
+
+async function compileInputWithFinalizedDraft(
+  fixture: ReturnType<typeof makeKernelFixture>,
+  runtimeExecution: RuntimeExecutionRecord,
+  graph: GeneratedExecutionGraph,
+  generatedExecutionNodeId: string,
+) {
+  const input = {
+    ...compileInput(fixture),
+    runtimeExecutionId: runtimeExecution.runtimeExecutionId,
+    generatedExecutionGraphId: graph.generatedExecutionGraphId,
+    generatedExecutionNodeId,
+  };
+  const draft = await createFinalizedPackageDraft(fixture, runtimeExecution, graph, generatedExecutionNodeId);
+  return { ...input, toolCallDraftId: draft.toolCallDraftId };
+}
+
+async function createFinalizedPackageDraft(
+  fixture: ReturnType<typeof makeKernelFixture>,
+  runtimeExecution: RuntimeExecutionRecord,
+  graph: GeneratedExecutionGraph,
+  generatedExecutionNodeId: string,
+  overrides: DraftTestOverride = {},
+) {
+  const candidate = makePackageInstallCandidate(fixture);
+  const { draftState, expiresAt, ...createOverrides } = overrides;
+  const opened = await fixture.kernel.createToolCallDraft({
+    tenantId: fixture.tool.tenantId,
+    organizationId: fixture.tool.organizationId,
+    runtimeExecutionId: runtimeExecution.runtimeExecutionId,
+    generatedExecutionGraphId: graph.generatedExecutionGraphId,
+    generatedExecutionNodeId,
+    toolCapabilityId: candidate.toolCapabilityId,
+    actionTypeId: candidate.actionTypeId,
+    gatewayRegistryEntryId: candidate.gatewayRegistryEntryId,
+    actionClass: candidate.actionClass,
+    gatewayId: candidate.gatewayId,
+    resourceRef: candidate.resourceRef,
+    expiresAt: expiresAt ?? candidate.expiresAt,
+    evidenceRefs: ["evidence:tool-call-draft"],
+    ...createOverrides,
+  });
+  if (draftState && draftState !== "finalized") {
+    return fixture.kernel.transitionToolCallDraft({
+      toolCallDraftId: opened.toolCallDraftId,
+      nextDraftState: draftState === "opened" ? "streaming" : draftState,
+      expiresAt,
+      evidenceRefs: ["evidence:tool-call-draft"],
+    });
+  }
+  return fixture.kernel.transitionToolCallDraft({
+    toolCallDraftId: opened.toolCallDraftId,
+    nextDraftState: "finalized",
+    parameters: candidate.parameters,
+    nonSecretParamsSummary: candidate.nonSecretParamsSummary,
+    secretRefs: candidate.secretRefs ?? {},
+    finalizedAt: new Date().toISOString(),
+    expiresAt: expiresAt ?? candidate.expiresAt,
+    evidenceRefs: ["evidence:tool-call-draft"],
+  });
 }
 
 async function createGeneratedExecutionGraph(

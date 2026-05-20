@@ -2,25 +2,26 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { Database, type SQLQueryBindings } from "bun:sqlite";
 import { createApp, type WorkerBindings } from "../../src/http/app";
-import type { CallerAuthTokens } from "../../src/http/admission/caller-auth";
+import type { CallerAuthTokens, TransitionCallerRole } from "../../src/http/admission/caller-auth";
+import { transitionRouteDefinitions } from "../../src/http/routes/transition-route-registry";
 import { PROTOCOL_VERSION } from "../../src/protocol/public/schemas";
 import type { HandshakeFetch } from "../../src/sdk/client";
 
 type QueryBinding = string | number | boolean | null;
 
-export const D1_HARNESS_TRANSITION_TOKEN = "test_d1_transition_token";
+export const D1_HARNESS_TRANSITION_TOKEN = "test_d1_control_plane_token";
 
 export const D1_HARNESS_CALLER_AUTH_TOKENS = {
   control_plane: D1_HARNESS_TRANSITION_TOKEN,
-  runtime_evidence: D1_HARNESS_TRANSITION_TOKEN,
-  gateway_custody: D1_HARNESS_TRANSITION_TOKEN,
-  review_custody: D1_HARNESS_TRANSITION_TOKEN,
+  runtime_evidence: "test_d1_runtime_evidence_token",
+  gateway_custody: "test_d1_gateway_custody_token",
+  review_custody: "test_d1_review_custody_token",
 } as const satisfies CallerAuthTokens;
 
 export type D1HttpHarness = {
   db: D1Database;
   fetch: HandshakeFetch;
-  post<T>(path: string, body: unknown): Promise<T>;
+  post<T>(path: string, body: unknown, role?: TransitionCallerRole): Promise<T>;
   get<T>(path: string): Promise<T>;
   query<T>(sql: string, ...bindings: QueryBinding[]): Promise<T[]>;
   dispose(): Promise<void>;
@@ -45,8 +46,8 @@ export async function createD1HttpHarness(): Promise<D1HttpHarness> {
     async fetch(input, init) {
       return app.request(requestPath(input), init, env);
     },
-    post<T>(path: string, body: unknown): Promise<T> {
-      return requestJson<T>(app.request(path, jsonRequest(body), env));
+    post<T>(path: string, body: unknown, role?: TransitionCallerRole): Promise<T> {
+      return requestJson<T>(app.request(path, jsonRequest(body, role ?? roleForPostPath(path)), env));
     },
     get<T>(path: string): Promise<T> {
       return requestJson<T>(app.request(path, undefined, env));
@@ -146,17 +147,22 @@ class LocalD1PreparedStatement {
   }
 }
 
-function jsonRequest(body: unknown): RequestInit {
+function jsonRequest(body: unknown, role: TransitionCallerRole = "control_plane"): RequestInit {
+  const token = D1_HARNESS_CALLER_AUTH_TOKENS[role];
   return {
     method: "POST",
     headers: {
       "content-type": "application/json",
       "x-handshake-protocol-version": PROTOCOL_VERSION,
       "x-handshake-request-identity": "test-d1-harness-request",
-      authorization: `Bearer ${D1_HARNESS_TRANSITION_TOKEN}`,
+      authorization: `Bearer ${token}`,
     },
     body: JSON.stringify(body),
   };
+}
+
+function roleForPostPath(path: string): TransitionCallerRole {
+  return transitionRouteDefinitions.find((route) => route.path === path)?.role ?? "control_plane";
 }
 
 async function requestJson<T>(responseOrPromise: Response | Promise<Response>): Promise<T> {

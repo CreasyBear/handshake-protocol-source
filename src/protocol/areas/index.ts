@@ -1,4 +1,6 @@
 export * from "./action-contract";
+export * from "./action-attempt-lifecycle";
+export * from "./authority-certificate";
 export * from "./catalog-envelope";
 export * from "./gateway-gate";
 export * from "./generated-execution-graph";
@@ -8,6 +10,7 @@ export * from "./object-registry";
 export * from "./operation-lifecycle";
 export * from "./policy-greenlight";
 export * from "./proof-gap";
+export * from "./protected-action-representation";
 export * from "./protected-path-posture";
 export * from "./refusal";
 export * from "./receipt-export";

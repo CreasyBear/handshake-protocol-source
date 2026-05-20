@@ -2,8 +2,15 @@ import { HandshakeProtocolError } from "../../foundation/errors";
 import type { ActionContract } from "../action-contract";
 import { actionLifecycleStreamRefs } from "../../events/chains";
 import type { MutationAttempt } from "../gateway-gate";
+import {
+  buildIdempotencyLedgerTerminal,
+  idempotencyLedgerIndexEntry,
+  idempotencyLedgerKey,
+  idempotencyLedgerKeyDigest,
+  type IdempotencyLedgerEntry,
+} from "../idempotency-ledger";
 import { createId, nowIso } from "../../foundation/ids";
-import { IsolationStateSchema, type IsolationState } from "../isolation-breaker";
+import { IsolationStateSchema, isolationStateIndexEntry, type IsolationState } from "../isolation-breaker";
 import type { ProtocolRecord } from "../object-registry";
 import { ReconcileSurfaceOperationInputSchema, type ReconcileSurfaceOperationInput } from "./types";
 import { buildProofGap, resolveProofGaps } from "../proof-gap";
@@ -38,6 +45,7 @@ type SurfaceOperationReconciliationContext = {
 type SurfaceOperationEvidencePlan = {
   activeClaim: Awaited<ReturnType<typeof currentClaimForContract>>;
   terminalClaim: ProtectedSurfaceOperationClaim | null;
+  idempotencyLedgerUpdate: IdempotencyLedgerEntry | null;
   isolationState: IsolationState | null;
   resolvedProofGaps: ProofGap[];
   createdProofGap: ProofGap | null;
@@ -127,6 +135,13 @@ function buildSurfaceOperationReconciliation(
     surfaceOperationRef: input.observedSurfaceOperationRef ?? mutationAttempt.surfaceOperationRef,
     previousMutationOutcome: mutationAttempt.outcome,
     observedDownstreamStatus: input.observedDownstreamStatus,
+    downstreamRetryability: input.downstreamRetryability,
+    providerRequestRef: input.providerRequestRef,
+    providerOperationRef: input.providerOperationRef,
+    redactedDiagnosticsDigest: input.redactedDiagnosticsDigest,
+    traceRef: input.traceRef,
+    spanRef: input.spanRef,
+    diagnosticsRedactionPosture: input.diagnosticsRedactionPosture,
     observedAt: now,
     evidenceRefs: input.evidenceRefs,
     resolvedProofGapIds: input.resolvedProofGapIds,
@@ -144,6 +159,7 @@ async function buildSurfaceOperationEvidencePlan(
   const { input, mutationAttempt, contract, now, lifecycle } = context;
   const resolvedProofGaps = await resolveProofGaps(recorder, input.resolvedProofGapIds, reconciliation, now);
   const activeClaim = await currentClaimForContract(store, contract);
+  const activeLedger = await currentIdempotencyLedgerForContract(store, contract);
   const terminalClaim =
     activeClaim && lifecycle.claimState !== "active"
       ? await buildTerminalProtectedSurfaceOperationClaim(activeClaim.payload, {
@@ -151,6 +167,14 @@ async function buildSurfaceOperationEvidencePlan(
           terminalAt: now,
           terminalReasonCode: lifecycle.proofGapReasonCode ?? input.observedDownstreamStatus,
           releasedByRef: reconciliation.reconciliationId,
+        })
+      : null;
+  const idempotencyLedgerUpdate =
+    activeLedger && lifecycle.claimState !== "active"
+      ? await buildIdempotencyLedgerTerminal({
+          current: activeLedger.payload,
+          reconciliation,
+          now,
         })
       : null;
   const isolationState =
@@ -164,7 +188,7 @@ async function buildSurfaceOperationEvidencePlan(
         receiptId: await receiptIdForMutation(store, mutationAttempt),
       })
     : null;
-  return { activeClaim, terminalClaim, isolationState, resolvedProofGaps, createdProofGap };
+  return { activeClaim, terminalClaim, idempotencyLedgerUpdate, isolationState, resolvedProofGaps, createdProofGap };
 }
 
 async function commitSurfaceOperationReconciliation(
@@ -173,7 +197,8 @@ async function commitSurfaceOperationReconciliation(
   reconciliation: SurfaceOperationReconciliation,
   evidencePlan: SurfaceOperationEvidencePlan,
 ): Promise<void> {
-  const { activeClaim, terminalClaim, isolationState, resolvedProofGaps, createdProofGap } = evidencePlan;
+  const { activeClaim, terminalClaim, idempotencyLedgerUpdate, isolationState, resolvedProofGaps, createdProofGap } =
+    evidencePlan;
   const { lifecycle, now } = context;
   const protocolRecords: ProtocolRecord[] = [
     { objectType: "surface_operation_reconciliation", payload: reconciliation },
@@ -181,6 +206,9 @@ async function commitSurfaceOperationReconciliation(
     ...(createdProofGap ? ([{ objectType: "proof_gap", payload: createdProofGap }] satisfies ProtocolRecord[]) : []),
     ...(terminalClaim
       ? ([{ objectType: "protected_surface_operation_claim", payload: terminalClaim }] satisfies ProtocolRecord[])
+      : []),
+    ...(idempotencyLedgerUpdate
+      ? ([{ objectType: "idempotency_ledger_entry", payload: idempotencyLedgerUpdate }] satisfies ProtocolRecord[])
       : []),
     ...(isolationState
       ? ([{ objectType: "isolation_state", payload: isolationState }] satisfies ProtocolRecord[])
@@ -200,6 +228,7 @@ async function commitSurfaceOperationReconciliation(
         streamRefs: actionLifecycleStreamRefs(context.contract),
         payload: {
           observedDownstreamStatus: reconciliation.observedDownstreamStatus,
+          downstreamRetryability: reconciliation.downstreamRetryability,
           reconciliationStatus: reconciliation.reconciliationStatus,
           finalityStatus: reconciliation.finalityStatus,
           resolvedProofGapIds: reconciliation.resolvedProofGapIds,
@@ -269,6 +298,10 @@ async function commitSurfaceOperationReconciliation(
         terminalClaim && lifecycle.keepClaimBlocking ? [operationClaimIndexEntry(terminalClaim, now)] : [],
       protectedSurfaceOperationClaimIndexReleases:
         activeClaim && terminalClaim && !lifecycle.keepClaimBlocking ? [activeClaim.payload.claimKeyDigest] : [],
+      idempotencyLedgerIndexEntries: idempotencyLedgerUpdate
+        ? [idempotencyLedgerIndexEntry(idempotencyLedgerUpdate)]
+        : [],
+      isolationStateIndexEntries: isolationState ? [isolationStateIndexEntry(isolationState)] : [],
     },
   );
 }
@@ -280,6 +313,11 @@ async function receiptIdForMutation(store: ProtocolStore, mutationAttempt: Mutat
 async function currentClaimForContract(store: ProtocolStore, contract: ActionContract) {
   const claimKeyDigest = await protectedSurfaceOperationClaimKeyDigest(protectedSurfaceOperationClaimKey(contract));
   return store.getCurrentProtectedSurfaceOperationClaim(claimKeyDigest);
+}
+
+async function currentIdempotencyLedgerForContract(store: ProtocolStore, contract: ActionContract) {
+  const ledgerKeyDigest = await idempotencyLedgerKeyDigest(idempotencyLedgerKey(contract));
+  return store.getCurrentIdempotencyLedgerEntry(ledgerKeyDigest);
 }
 
 function buildOrphanIsolationState(

@@ -1,5 +1,7 @@
 import { proposeActionContract as proposeActionContractTransition } from "./areas/action-contract";
 import type { ActionContract, ProposeActionContractInput } from "./areas/action-contract";
+import { createAuthorityCertificate as createAuthorityCertificateTransition } from "./areas/authority-certificate";
+import type { AuthorityCertificate, CreateAuthorityCertificateInput } from "./areas/authority-certificate";
 import { guardCatalogRegistration } from "./areas/catalog-envelope";
 import { HandshakeProtocolError } from "./foundation/errors";
 import { gatewayCheck as gatewayCheckTransition, type GatewayCheckResult } from "./areas/gateway-gate";
@@ -10,6 +12,13 @@ import type {
   GeneratedExecutionGraph,
   GraphEvidenceIssuerContext,
 } from "./areas/generated-execution-graph";
+import { createBypassProbe as createBypassProbeTransition } from "./areas/bypass-probe";
+import type { BypassProbe, CreateBypassProbeInput } from "./areas/bypass-probe";
+import {
+  createToolCallDraft as createToolCallDraftTransition,
+  transitionToolCallDraft as transitionToolCallDraftTransition,
+} from "./areas/tool-call-draft";
+import type { CreateToolCallDraftInput, ToolCallDraft, TransitionToolCallDraftInput } from "./areas/tool-call-draft";
 import { compileIntent as compileIntentTransition } from "./areas/intent-compilation";
 import type { CompileIntentInput, IntentCompilationRecord } from "./areas/intent-compilation";
 import {
@@ -93,6 +102,18 @@ export class HandshakeKernel {
     return createGeneratedExecutionGraphTransition(this.store, this.recorder, input, issuerContext);
   }
 
+  createBypassProbe(input: CreateBypassProbeInput): Promise<BypassProbe> {
+    return createBypassProbeTransition(this.recorder, input);
+  }
+
+  createToolCallDraft(input: CreateToolCallDraftInput): Promise<ToolCallDraft> {
+    return createToolCallDraftTransition(this.recorder, input);
+  }
+
+  transitionToolCallDraft(input: TransitionToolCallDraftInput): Promise<ToolCallDraft> {
+    return transitionToolCallDraftTransition(this.store, this.recorder, input);
+  }
+
   createProtectedPathPosture(input: CreateProtectedPathPostureInput): Promise<ProtectedPathPosture> {
     return createProtectedPathPostureTransition(this.recorder, input);
   }
@@ -103,6 +124,10 @@ export class HandshakeKernel {
 
   proposeActionContract(input: ProposeActionContractInput): Promise<ActionContract> {
     return proposeActionContractTransition(this.recorder, input);
+  }
+
+  createAuthorityCertificate(input: CreateAuthorityCertificateInput): Promise<AuthorityCertificate> {
+    return createAuthorityCertificateTransition(this.store, this.recorder, input);
   }
 
   evaluatePolicy(input: EvaluatePolicyInput): Promise<{ decision: PolicyDecision; greenlight: Greenlight | null }> {

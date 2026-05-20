@@ -28,6 +28,7 @@ export type ProtocolReasonCodePrefixEntry = {
 export const protocolReasonCodes = [
   code("bootstrap_record_digest_conflict", "transition_error", "catalog"),
   code("invalid_transition_greenlight_already_issued", "transition_error", "policy"),
+  code("idempotency_ledger_conflict", "transition_error", "policy"),
   code("stream_append_conflict", "transition_error", "gateway"),
   code("ambiguous_commit", "transition_error", "gateway", false),
 
@@ -39,6 +40,16 @@ export const protocolReasonCodes = [
   code("generated_execution_graph_missing", "refusal", "intent_compilation"),
   code("generated_execution_graph_not_contractable", "refusal", "intent_compilation"),
   code("generated_execution_node_not_contractable", "refusal", "intent_compilation"),
+  code("tool_call_draft_missing", "refusal", "intent_compilation"),
+  code("tool_call_draft_not_finalized", "refusal", "intent_compilation"),
+  code("tool_call_draft_stale", "refusal", "intent_compilation"),
+  code("tool_call_draft_binding_mismatch", "refusal", "intent_compilation"),
+  code("tool_call_draft_params_digest_mismatch", "refusal", "intent_compilation"),
+  code("tool_call_draft_terminal_state", "transition_error", "intent_compilation"),
+  code("tool_call_draft_transition_invalid", "transition_error", "intent_compilation"),
+  code("tool_call_draft_finalize_params_missing", "transition_error", "intent_compilation"),
+  code("tool_call_draft_invalid_reason_missing", "transition_error", "intent_compilation"),
+  code("x402_amount_exceeds_call_bound", "refusal", "intent_compilation"),
 
   code("candidate_params_digest_mismatch", "transition_error", "action_contract"),
   code("candidate_action_mismatch", "transition_error", "action_contract"),
@@ -66,6 +77,11 @@ export const protocolReasonCodes = [
   code("prior_action_not_greenlit", "policy_decision", "policy"),
   code("review_approved", "policy_decision", "policy"),
   code("review_decision_invalid", "policy_decision", "policy"),
+  code("idempotency_duplicate_authority", "policy_decision", "policy"),
+  code("idempotency_key_params_mismatch", "policy_decision", "policy"),
+  code("idempotency_recovery_missing", "recovery", "recovery"),
+  code("idempotency_result_reusable", "recovery", "recovery"),
+  code("idempotency_terminal_unknown_recovery_required", "recovery", "recovery"),
 
   code("gateway_registry_not_enforcing", "protected_path_posture", "protected_path_posture"),
   code("protected_path_posture_missing", "protected_path_posture", "protected_path_posture"),
@@ -76,7 +92,12 @@ export const protocolReasonCodes = [
   code("protected_path_source_authority_weak", "protected_path_posture", "protected_path_posture"),
   code("protected_path_credential_custody_unsafe", "protected_path_posture", "protected_path_posture"),
   code("protected_path_raw_sibling_tool_present", "protected_path_posture", "protected_path_posture"),
-
+  code("bypass_probe_passed", "protected_path_posture", "protected_path_posture"),
+  code("protected_path_probe_missing", "protected_path_posture", "protected_path_posture"),
+  code("protected_path_probe_failed", "protected_path_posture", "protected_path_posture"),
+  code("protected_path_probe_source_authority_weak", "protected_path_posture", "protected_path_posture"),
+  code("protected_path_probe_scope_mismatch", "transition_error", "protected_path_posture"),
+  code("protected_path_probe_stale", "transition_error", "protected_path_posture"),
   code("contract_mismatch", "gateway_decision", "gateway"),
   code("gateway_registry_mismatch", "gateway_decision", "gateway"),
   code("gateway_registry_version_mismatch", "gateway_decision", "gateway"),
@@ -116,6 +137,7 @@ export const protocolReasonCodes = [
   code("review_artifact_policy_input_digest_mismatch", "transition_error", "review"),
   code("review_artifact_digest_mismatch", "transition_error", "review"),
   code("review_artifact_contract_mismatch", "transition_error", "review"),
+  code("review_artifact_action_posture_unsafe", "transition_error", "review"),
   code("review_artifact_policy_input_mismatch", "transition_error", "review"),
   code("review_artifact_gateway_policy_mismatch", "transition_error", "review"),
   code("human_verified_exact_contract", "policy_decision", "review"),
@@ -125,6 +147,9 @@ export const protocolReasonCodes = [
   code("receipt_stream_offsets_missing", "transition_error", "receipt_export"),
   code("receipt_digest_mismatch", "transition_error", "receipt_export"),
   code("audit_chain_digest_mismatch", "transition_error", "receipt_export"),
+
+  code("invalid_authority_certificate_terminal", "transition_error", "authority_certificate"),
+  code("invalid_authority_certificate_terminal_ref", "transition_error", "authority_certificate"),
 
   code("proof_gap_already_resolved", "transition_error", "recovery"),
   code("invalid_transition_proof_gap_mismatch", "transition_error", "recovery"),

@@ -2,25 +2,32 @@ import type {
   ActionContract,
   ActionType,
   BreakerDecision,
+  BypassProbe,
+  ContractEvidenceProjection,
   Greenlight,
   IntentCompilationRecord,
+  IdempotencyRecoveryProjection,
   IsolationState,
   OperatingEnvelope,
   PolicyDecision,
+  ProtectedPathInstallHealthProjection,
   ProtectedPathPosture,
   RecoveryRecommendation,
   ReceiptExport,
   GatewayRegistryEntry,
   GeneratedGraphEvidenceProjection,
+  ReceiptTimelineProjection,
   ReviewArtifactRecord,
   ReviewDecision,
   RuntimeExecutionRecord,
+  ToolCallDraft,
   ToolCapability,
 } from "../protocol/public/schemas";
 import type { GatewayCheckResult } from "../protocol/areas/gateway-gate";
 import type { SurfaceOperationReconciliationResult } from "../protocol/areas/operation-lifecycle";
 import type {
   CompileIntentInput,
+  CreateBypassProbeInput,
   CreateBreakerDecisionInput,
   CreateIsolationInput,
   CreateProtectedPathPostureInput,
@@ -29,11 +36,13 @@ import type {
   CreateReviewArtifactInput,
   CreateReviewDecisionInput,
   CreateRuntimeExecutionInput,
+  CreateToolCallDraftInput,
   EvaluatePolicyInput,
   ProposeActionContractInput,
   ReconcileSurfaceOperationInput,
   ResolveRecoveryTerminalConflictInput,
   GatewayCheckInput,
+  TransitionToolCallDraftInput,
   TransitionRecoveryRecommendationStatusInput,
 } from "../protocol/public/inputs";
 import type {
@@ -61,6 +70,8 @@ export type HandshakeClientOptions = {
   requestIdentityFactory?: () => string;
   originatingIdentity?: string;
 };
+
+export type EvidenceReadCallerRole = Extract<TransitionCallerRole, "review_custody" | "runtime_evidence">;
 
 export class HandshakeClientError extends Error {
   public readonly code: string;
@@ -120,12 +131,24 @@ export class HandshakeClient {
     return this.post("/v0.2/runtime-executions", input, "runtime_evidence");
   }
 
+  createBypassProbe(input: CreateBypassProbeInput): Promise<BypassProbe> {
+    return this.post("/v0.2/bypass-probes", input, "gateway_custody");
+  }
+
+  createToolCallDraft(input: CreateToolCallDraftInput): Promise<ToolCallDraft> {
+    return this.post("/v0.2/tool-call-drafts", input, "runtime_evidence");
+  }
+
+  transitionToolCallDraft(input: TransitionToolCallDraftInput): Promise<ToolCallDraft> {
+    return this.post("/v0.2/tool-call-draft-transitions", input, "runtime_evidence");
+  }
+
   createProtectedPathPosture(input: CreateProtectedPathPostureInput): Promise<ProtectedPathPosture> {
     return this.post("/v0.2/protected-path-postures", input, "gateway_custody");
   }
 
   proposeActionContract(input: ProposeActionContractInput): Promise<ActionContract> {
-    return this.post("/v0.2/action-contracts", input, "control_plane");
+    return this.post("/v0.2/action-contracts", input, "runtime_evidence");
   }
 
   evaluatePolicy(input: EvaluatePolicyInput): Promise<{ decision: PolicyDecision; greenlight: Greenlight | null }> {
@@ -179,11 +202,39 @@ export class HandshakeClient {
     return this.post("/v0.2/surface-operation-reconciliations", input, "gateway_custody");
   }
 
-  getGeneratedGraphEvidenceProjection(generatedExecutionGraphId: string): Promise<GeneratedGraphEvidenceProjection> {
-    return this.get(
-      `/v0.2/evidence/generated-execution-graphs/${encodeURIComponent(generatedExecutionGraphId)}`,
-      "control_plane",
-    );
+  getGeneratedGraphEvidenceProjection(
+    generatedExecutionGraphId: string,
+    role: EvidenceReadCallerRole = "review_custody",
+  ): Promise<GeneratedGraphEvidenceProjection> {
+    return this.get(`/v0.2/evidence/generated-execution-graphs/${encodeURIComponent(generatedExecutionGraphId)}`, role);
+  }
+
+  getContractEvidenceProjection(
+    actionContractId: string,
+    role: EvidenceReadCallerRole = "review_custody",
+  ): Promise<ContractEvidenceProjection> {
+    return this.get(`/v0.2/evidence/contracts/${encodeURIComponent(actionContractId)}`, role);
+  }
+
+  getIdempotencyRecoveryProjection(
+    actionContractId: string,
+    role: EvidenceReadCallerRole = "review_custody",
+  ): Promise<IdempotencyRecoveryProjection> {
+    return this.get(`/v0.2/evidence/idempotency-recovery/${encodeURIComponent(actionContractId)}`, role);
+  }
+
+  getReceiptTimelineProjection(
+    receiptId: string,
+    role: EvidenceReadCallerRole = "review_custody",
+  ): Promise<ReceiptTimelineProjection> {
+    return this.get(`/v0.2/evidence/receipts/${encodeURIComponent(receiptId)}/timeline`, role);
+  }
+
+  getProtectedPathInstallHealthProjection(
+    actionContractId: string,
+    role: EvidenceReadCallerRole = "review_custody",
+  ): Promise<ProtectedPathInstallHealthProjection> {
+    return this.get(`/v0.2/evidence/protected-path-install-health/${encodeURIComponent(actionContractId)}`, role);
   }
 
   private async post<T>(path: string, body: unknown, role: TransitionCallerRole): Promise<T> {

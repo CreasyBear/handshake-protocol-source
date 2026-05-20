@@ -19,6 +19,11 @@ export const ProtectedSurfaceOperationClaimStateSchema = z.enum([
 ]);
 export type ProtectedSurfaceOperationClaimState = z.infer<typeof ProtectedSurfaceOperationClaimStateSchema>;
 
+export const DownstreamRetryabilitySchema = z.enum(["retryable", "non_retryable", "unknown"]);
+export type DownstreamRetryability = z.infer<typeof DownstreamRetryabilitySchema>;
+export const DownstreamDiagnosticsRedactionPostureSchema = z.enum(["redacted", "digest_only", "none", "unknown"]);
+export type DownstreamDiagnosticsRedactionPosture = z.infer<typeof DownstreamDiagnosticsRedactionPostureSchema>;
+
 export const ProtectedSurfaceOperationClaimSchema = ProtocolBaseSchema.extend({
   protectedSurfaceOperationClaimId: IdSchema,
   claimKeyDigest: DigestSchema,
@@ -50,6 +55,13 @@ export const SurfaceOperationReconciliationSchema = ProtocolBaseSchema.extend({
   surfaceOperationRef: z.string().min(1).nullable(),
   previousMutationOutcome: MutationAttemptSchema.shape.outcome,
   observedDownstreamStatus: z.enum(["pending", "succeeded", "refused", "failed", "unknown"]),
+  downstreamRetryability: DownstreamRetryabilitySchema.default("unknown"),
+  providerRequestRef: z.string().min(1).nullable().default(null),
+  providerOperationRef: z.string().min(1).nullable().default(null),
+  redactedDiagnosticsDigest: DigestSchema.nullable().default(null),
+  traceRef: z.string().min(1).nullable().default(null),
+  spanRef: z.string().min(1).nullable().default(null),
+  diagnosticsRedactionPosture: DownstreamDiagnosticsRedactionPostureSchema.default("unknown"),
   observedAt: IsoDateSchema,
   evidenceRefs: z.array(z.string()).default([]),
   resolvedProofGapIds: z.array(IdSchema).default([]),

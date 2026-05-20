@@ -6,16 +6,45 @@ describe("root package exports", () => {
     const exportNames = Object.keys(root).sort();
 
     expect(exportNames).toEqual([
+      "ActionAttemptAuthorityEffectSchema",
+      "ActionAttemptLifecycleEntrySchema",
+      "ActionAttemptLifecyclePhaseSchema",
+      "ActionAttemptLifecycleStateSchema",
+      "ActionAttemptTerminalOutcomeSchema",
       "ActionContractSchema",
       "ActionTypeSchema",
+      "AgentTransactionEnvelopeProjectionSchema",
+      "AuthorityCertificateArtifactKindSchema",
+      "AuthorityCertificateArtifactSchema",
+      "AuthorityCertificateConsumerBindingSchema",
+      "AuthorityCertificateSchema",
+      "AuthorityCertificateSignatureAlgorithmSchema",
+      "AuthorityCertificateSignatureEntrySchema",
+      "AuthorityCertificateSignerInputSchema",
+      "AuthorityCertificateSignerRoleSchema",
+      "AuthorityCertificateTerminalKindSchema",
+      "AuthorityCertificateTerminalSchema",
+      "AuthorityCertificateTrustKeySchema",
+      "AuthorityCertificateTrustMaterialSchema",
+      "AuthorityCertificateVerificationFailureCodeSchema",
+      "AuthorityCertificateVerificationFailureSchema",
+      "AuthorityCertificateVerificationPolicySchema",
+      "AuthorityCertificateVersionSchema",
       "BreakerDecisionSchema",
       "BreakerIsolationDecisionSchema",
+      "BypassProbeKindSchema",
+      "BypassProbeOutcomeSchema",
+      "BypassProbeSchema",
       "CandidateActionSchema",
       "CandidateActionStatusSchema",
+      "ClearingEvidenceRefsSchema",
       "CommandRiskClassifierPostureSchema",
       "CompileIntentInputSchema",
+      "ContractEvidenceProjectionSchema",
       "ContractStreamEventSchema",
+      "CreateAuthorityCertificateInputSchema",
       "CreateBreakerDecisionInputSchema",
+      "CreateBypassProbeInputSchema",
       "CreateGeneratedExecutionGraphInputSchema",
       "CreateIsolationInputSchema",
       "CreateProtectedPathPostureInputSchema",
@@ -24,10 +53,15 @@ describe("root package exports", () => {
       "CreateReviewArtifactInputSchema",
       "CreateReviewDecisionInputSchema",
       "CreateRuntimeExecutionInputSchema",
+      "CreateToolCallDraftInputSchema",
       "CredentialCustodyStatusSchema",
       "DigestSchema",
+      "DownstreamDiagnosticsRedactionPostureSchema",
+      "DownstreamOutcomeStatusSchema",
+      "DownstreamRetryabilitySchema",
       "EvaluatePolicyInputSchema",
       "GateDecisionSchema",
+      "GatewayAdmissionStatusSchema",
       "GatewayCheckAttemptSchema",
       "GatewayCheckInputSchema",
       "GatewayEnforcementModeSchema",
@@ -53,6 +87,10 @@ describe("root package exports", () => {
       "HandshakeClientError",
       "HandshakeProtocolError",
       "IdSchema",
+      "IdempotencyLedgerEntrySchema",
+      "IdempotencyLedgerStateSchema",
+      "IdempotencyRecoveryDispositionSchema",
+      "IdempotencyRecoveryProjectionSchema",
       "IntentCompilationRecordSchema",
       "IsoDateSchema",
       "IsolationStateSchema",
@@ -65,6 +103,9 @@ describe("root package exports", () => {
       "PostureSourceAuthoritySchema",
       "ProofGapSchema",
       "ProposeActionContractInputSchema",
+      "ProtectedPathBypassProbeCoverageSchema",
+      "ProtectedPathInstallHealthProjectionSchema",
+      "ProtectedPathInstallHealthStatusSchema",
       "ProtectedPathPostureSchema",
       "ProtectedPathStateSchema",
       "ProtectedSurfaceOperationClaimSchema",
@@ -77,6 +118,9 @@ describe("root package exports", () => {
       "ReceiptExportSchema",
       "ReceiptSchema",
       "ReceiptStreamReferenceSchema",
+      "ReceiptTimelineEventProjectionSchema",
+      "ReceiptTimelineFailureEvidenceProjectionSchema",
+      "ReceiptTimelineProjectionSchema",
       "ReconcileSurfaceOperationInputSchema",
       "RecoveryRecommendationSchema",
       "RecoveryRecommendationStatusSchema",
@@ -90,13 +134,18 @@ describe("root package exports", () => {
       "ResourceRefSchema",
       "ReviewArtifactRecordSchema",
       "ReviewDecisionSchema",
+      "ReviewHiddenActionPostureSchema",
+      "ReviewSecondaryActionPostureSchema",
       "RuntimeAccessPostureSchema",
       "RuntimeExecutionRecordSchema",
       "RuntimeExecutionShapeSchema",
       "RuntimePostureSchema",
+      "SignaturePostureSchema",
       "SignatureSchema",
       "StreamWatermarkSchema",
       "SurfaceOperationReconciliationSchema",
+      "ToolCallDraftSchema",
+      "ToolCallDraftStateSchema",
       "ToolCapabilitySchema",
       "TransitionCommitStateSchema",
       "TransitionErrorEnvelopeSchema",
@@ -104,13 +153,18 @@ describe("root package exports", () => {
       "TransitionErrorRetryabilitySchema",
       "TransitionRecoveryRecommendationStatusInputSchema",
       "TransitionRequestContextSchema",
+      "TransitionToolCallDraftInputSchema",
+      "authorityCertificateSigningInputDigest",
       "authorizeTransitionCaller",
+      "buildAuthorityCertificateSigningInput",
       "createApp",
       "evidenceReadNavigation",
       "httpTransitionNavigation",
       "protocolNavigation",
+      "requiredGatewayCheckedBypassProbeKinds",
       "transitionCallerSecuritySchemeName",
       "verifiedGatewayCheckFromResult",
+      "verifyAuthorityCertificate",
     ]);
 
     expect(exportNames).not.toContain("HandshakeKernel");
@@ -130,6 +184,7 @@ describe("root package exports", () => {
     expect(root.GatewayCheckInputSchema).toBeDefined();
     expect(root.RefusalSchema).toBeDefined();
     expect(root.verifiedGatewayCheckFromResult).toBeFunction();
+    expect(root.verifyAuthorityCertificate).toBeFunction();
   });
 
   it("keeps reference gateway fixtures on an explicit experimental surface", async () => {
@@ -140,9 +195,13 @@ describe("root package exports", () => {
       "ExperimentalPackageInstallParametersSchema",
       "ExperimentalPreviewDeployParametersSchema",
       "ExperimentalRepoWriteParametersSchema",
+      "ExperimentalX402PaymentParametersSchema",
+      "experimentalFixtureGatewayCheckedBypassProbeExecutors",
+      "experimentalRunBypassProbeExecutors",
       "experimentalRunPackageInstallGateway",
       "experimentalRunPreviewDeployGateway",
       "experimentalRunRepoWriteGateway",
+      "experimentalRunX402WalletGateway",
     ]);
     expect(experimental.experimentalRunPackageInstallGateway).toBeFunction();
   });
@@ -154,9 +213,28 @@ describe("root package exports", () => {
 
     expect(Object.keys(root)).not.toContain("checkProtectedMutationAdapterConformance");
     expect(exportNames).toEqual([
+      "X402PaymentConformancePostureSchema",
       "assertProtectedMutationAdapterConformance",
+      "assertX402PaymentInstallConformance",
       "checkProtectedMutationAdapterConformance",
+      "checkX402PaymentInstallConformance",
     ]);
     expect(conformance.checkProtectedMutationAdapterConformance).toBeFunction();
+  });
+
+  it("keeps runtime ingress on an explicit observer/compiler surface", async () => {
+    const root = await import("../../src");
+    const runtime = await import("../../src/runtime");
+    const exportNames = Object.keys(runtime).sort();
+
+    expect(Object.keys(root)).not.toContain("proposeRuntimeIngressActionContracts");
+    expect(exportNames).toEqual([
+      "RuntimeIngressDispatchBlockSchema",
+      "RuntimeIngressObservedDispatchSchema",
+      "proposeRuntimeIngressActionContracts",
+      "runtimeIngressDispatchNodeId",
+    ]);
+    expect(exportNames.join(" ")).not.toMatch(/GatewayCheck|Greenlight|Mutation|PolicyDecision|Receipt/);
+    expect(runtime.proposeRuntimeIngressActionContracts).toBeFunction();
   });
 });

@@ -2,7 +2,11 @@ import { describe, expect, it } from "bun:test";
 import { runPackageInstallGateway } from "../../src/adapters/package-install/gateway";
 import { proposePackageInstallActionContract } from "../../src/runtime/package-install/action-proposal";
 import { makeKernelFixture, registerFixtureObjects } from "../support/fixtures";
-import { createPackageManifestSurface, packageInstallRuntimeConfig } from "../support/package-install-flow";
+import {
+  createPackageManifestSurface,
+  packageInstallObservedParameters,
+  packageInstallRuntimeConfig,
+} from "../support/package-install-flow";
 
 describe("package install end-to-end reference flow", () => {
   it("turns generated orchestration into one greenlit gateway-checked mutation chain", async () => {
@@ -37,7 +41,7 @@ describe("package install end-to-end reference flow", () => {
       surface,
       actionContractId: proposed.actionContract.actionContractId,
       greenlightId: policy.greenlight.greenlightId,
-      observedParameters: { package: "hono", versionRange: "^4.12.19" },
+      observedParameters: packageInstallObservedParameters(),
       surfaceOperationRef: "surface-op:e2e-package-install-hono",
     });
 
@@ -64,6 +68,7 @@ describe("package install end-to-end reference flow", () => {
       "action_proposed",
       "policy_decision_recorded",
       "action_greenlit",
+      "idempotency_ledger_recorded",
       "gateway_checked",
       "mutation_attempted",
       "protected_surface_operation_claimed",
@@ -71,7 +76,7 @@ describe("package install end-to-end reference flow", () => {
       "surface_operation_reconciled",
       "protected_surface_operation_released",
     ]);
-    expect(events.map((event) => event.offset)).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8]);
+    expect(events.map((event) => event.offset)).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
     for (let index = 1; index < events.length; index += 1) {
       expect(events[index]?.previousEventDigest).toBe(events[index - 1]?.eventDigest);
     }

@@ -5,6 +5,7 @@ import type {
   GatewayCheckCommit,
   GatewayCheckCommitResult,
   GreenlightConsumption,
+  IdempotencyLedgerEntry,
   IsolationScopeRef,
   IsolationState,
   ProtocolCommit,
@@ -174,6 +175,12 @@ export class FaultInjectingProtocolStore implements ProtocolStore {
     );
     if (fault) return fault.replacement ?? null;
     return this.delegate.getCurrentProtectedPathPosture(postureScopeKey);
+  }
+
+  async getCurrentIdempotencyLedgerEntry(
+    ledgerKeyDigest: string,
+  ): Promise<StoredProtocolRecord<IdempotencyLedgerEntry> | null> {
+    return this.delegate.getCurrentIdempotencyLedgerEntry(ledgerKeyDigest);
   }
 
   async getCurrentProtectedSurfaceOperationClaim(

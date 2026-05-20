@@ -15,6 +15,11 @@
       "import": "./src/conformance/index.ts",
       "default": "./src/conformance/index.ts"
     },
+    "./runtime": {
+      "types": "./dist/runtime/index.d.ts",
+      "import": "./src/runtime/index.ts",
+      "default": "./src/runtime/index.ts"
+    },
     "./experimental": {
       "types": "./dist/experimental.d.ts",
       "import": "./src/experimental.ts",
@@ -47,8 +52,8 @@
     "pack:check": "npm run build && node scripts/check-package-surface.mjs",
     "check:repo": "npm run check:types && npm run lint && npm run format:check && npm run test && npm run pack:check && git diff --check",
     "quality:architecture": "npm run test -- test/architecture/import-posture.test.ts test/architecture/naming-posture.test.ts test/architecture/package-surface.test.ts test/architecture/root-exports.test.ts test/conformance/protected-mutation-adapter-conformance.test.ts",
-    "quality:claims": "npm run test -- test/architecture/active-vocabulary.test.ts",
-    "quality:storage": "npm run test -- test/http/d1-http.test.ts test/protocol/kernel-*.test.ts test/protocol/transition-matrix.test.ts test/protocol/model-based-invariants.test.ts"
+    "quality:claims": "npm run test -- test/architecture/active-vocabulary.test.ts test/architecture/claim-boundary.test.ts",
+    "quality:storage": "npm run test -- test/http/d1-http.test.ts test/protocol/kernel-*.test.ts test/protocol/transition-matrix.test.ts test/protocol/model-based-invariants.test.ts test/protocol/action-attempt-lifecycle.test.ts test/protocol/evidence-projections.test.ts test/protocol/protocol-store-atomicity-contract.test.ts test/protocol/authority-certificate.test.ts"
   },
   "dependencies": {
     "hono": "^4.12.19",

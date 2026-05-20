@@ -3,6 +3,13 @@ import type { ActionContract } from "../action-contract";
 import type { OperatingEnvelope } from "../catalog-envelope";
 import { HandshakeProtocolError } from "../../foundation/errors";
 import { nowIso } from "../../foundation/ids";
+import {
+  buildIdempotencyLedgerReservation,
+  idempotencyConflictDecisionValue,
+  idempotencyLedgerKey,
+  idempotencyLedgerKeyDigest,
+  type IdempotencyLedgerEntry,
+} from "../idempotency-ledger";
 import { EvaluatePolicyInputSchema, type EvaluatePolicyInput } from "./types";
 import {
   evaluateDeterministicPolicy,
@@ -45,6 +52,7 @@ type PolicyConstraintEvaluation = PolicyEvaluationContext & {
   isolationStates: Awaited<ReturnType<ProtocolStore["listIsolationStates"]>>;
   sequenceDependencyStates: SequenceDependencyState[];
   protectedPathPosture: StoredProtocolRecord<ProtectedPathPosture> | null;
+  idempotencyLedgerEntry: StoredProtocolRecord<IdempotencyLedgerEntry> | null;
   protectedPathEvaluation: ReturnType<typeof evaluateRequiredProtectedPathPosture>;
   policyInput: {
     contractDigest: string;
@@ -56,6 +64,12 @@ type PolicyConstraintEvaluation = PolicyEvaluationContext & {
     gatewayEnforcementMode: ActionContract["enforcementMode"];
     credentialCustodyStatus: ActionContract["credentialCustodyStatus"];
     protectedPathPosture: ReturnType<typeof protectedPathPolicyInput>;
+    idempotencyLedger: {
+      ledgerKeyDigest: `sha256:${string}`;
+      existingLedgerEntryId: string | null;
+      existingLedgerState: IdempotencyLedgerEntry["ledgerState"] | null;
+      paramsDigestMatch: boolean | null;
+    };
   };
   policyInputDigest: `sha256:${string}`;
   isolationSnapshot: string;
@@ -81,11 +95,22 @@ export async function evaluatePolicy(
     context.now,
   );
   const greenlight = decision.decision === "greenlight" ? buildGreenlightFromDecision(decision, constraints) : null;
-  const plan = { ...constraints, decisionValue, decision, greenlight };
+  const idempotencyLedgerEntry = greenlight
+    ? await buildIdempotencyLedgerReservation({
+        contract: context.contract,
+        policyDecision: decision,
+        greenlight,
+        now: context.now,
+      })
+    : null;
+  const plan = { ...constraints, decisionValue, decision, greenlight, idempotencyLedgerEntry };
   if (greenlight) {
     await assertGreenlightIssuable(store, context.contract);
   }
-  await commitPolicyEvaluation(recorder, plan);
+  const commitResult = await commitPolicyEvaluation(recorder, plan);
+  if (commitResult === "idempotency_ledger_conflict") {
+    return commitIdempotencyConflictRefusal(store, recorder, constraints);
+  }
   return { decision, greenlight };
 }
 
@@ -120,19 +145,29 @@ async function derivePolicyConstraintEvaluation(
   const isolationStates = await store.listIsolationStates(isolationScopeRefsForContract(context.contract));
   const sequenceDependencyStates = await loadSequenceDependencyStates(store, context.contract);
   const protectedPathPosture = await loadCurrentPostureForContract(store, context.contract);
+  const ledgerKeyDigest = await idempotencyLedgerKeyDigest(idempotencyLedgerKey(context.contract));
+  const idempotencyLedgerEntry = await store.getCurrentIdempotencyLedgerEntry(ledgerKeyDigest);
   const protectedPathEvaluation = evaluateRequiredProtectedPathPosture({
     contract: context.contract,
     gateway: context.contract,
     posture: protectedPathPosture,
     now: context.now,
   });
-  const policyInput = buildPolicyInput(context, isolationStates, sequenceDependencyStates, protectedPathPosture);
+  const policyInput = buildPolicyInput(
+    context,
+    isolationStates,
+    sequenceDependencyStates,
+    protectedPathPosture,
+    ledgerKeyDigest,
+    idempotencyLedgerEntry,
+  );
   const policyInputDigest = await digestCanonical(policyInput);
   return {
     ...context,
     isolationStates,
     sequenceDependencyStates,
     protectedPathPosture,
+    idempotencyLedgerEntry,
     protectedPathEvaluation,
     policyInput,
     policyInputDigest,
@@ -145,6 +180,8 @@ function buildPolicyInput(
   isolationStates: PolicyConstraintEvaluation["isolationStates"],
   sequenceDependencyStates: SequenceDependencyState[],
   protectedPathPosture: StoredProtocolRecord<ProtectedPathPosture> | null,
+  ledgerKeyDigest: `sha256:${string}`,
+  idempotencyLedgerEntry: StoredProtocolRecord<IdempotencyLedgerEntry> | null,
 ): PolicyConstraintEvaluation["policyInput"] {
   return {
     contractDigest: context.contract.actionContractDigest,
@@ -156,6 +193,14 @@ function buildPolicyInput(
     gatewayEnforcementMode: context.contract.enforcementMode,
     credentialCustodyStatus: context.contract.credentialCustodyStatus,
     protectedPathPosture: protectedPathPolicyInput(protectedPathPosture, context.now),
+    idempotencyLedger: {
+      ledgerKeyDigest,
+      existingLedgerEntryId: idempotencyLedgerEntry?.payload.idempotencyLedgerEntryId ?? null,
+      existingLedgerState: idempotencyLedgerEntry?.payload.ledgerState ?? null,
+      paramsDigestMatch: idempotencyLedgerEntry
+        ? idempotencyLedgerEntry.payload.paramsDigest === context.contract.paramsDigest
+        : null,
+    },
   };
 }
 
@@ -173,6 +218,7 @@ async function resolvePolicyDecisionValue(
     decisionValue = evaluateSequenceDependencies(constraints.sequenceDependencyStates) ?? decisionValue;
   }
   decisionValue = applyProtectedPathPolicy(decisionValue, constraints);
+  decisionValue = applyIdempotencyLedgerPolicy(decisionValue, constraints);
   if (decisionValue.decision === "review_required" && constraints.input.reviewDecisionId) {
     const reviewDecision = await recorder.requiredRecord<ReviewDecision>(
       "review_decision",
@@ -198,8 +244,50 @@ async function resolvePolicyDecisionValue(
           matchedRuleIds: ["review_decision_binding"],
         };
     decisionValue = applyProtectedPathPolicy(decisionValue, constraints);
+    decisionValue = applyIdempotencyLedgerPolicy(decisionValue, constraints);
   }
   return decisionValue;
+}
+
+function applyIdempotencyLedgerPolicy(
+  decisionValue: PolicyEvaluationResult,
+  constraints: PolicyConstraintEvaluation,
+): PolicyEvaluationResult {
+  if (decisionValue.decision !== "greenlight" || !constraints.idempotencyLedgerEntry) return decisionValue;
+  return idempotencyConflictDecisionValue(constraints.contract, constraints.idempotencyLedgerEntry.payload);
+}
+
+async function commitIdempotencyConflictRefusal(
+  store: ProtocolStore,
+  recorder: ProtocolRecorder,
+  constraints: PolicyConstraintEvaluation,
+): Promise<{ decision: PolicyDecision; greenlight: null }> {
+  const ledgerKeyDigest = await idempotencyLedgerKeyDigest(idempotencyLedgerKey(constraints.contract));
+  const current = await store.getCurrentIdempotencyLedgerEntry(ledgerKeyDigest);
+  const decisionValue = current
+    ? idempotencyConflictDecisionValue(constraints.contract, current.payload)
+    : {
+        decision: "refuse" as const,
+        reasonCode: "idempotency_duplicate_authority",
+        reason: "Idempotency ledger reservation raced with this policy evaluation; fresh authority is refused.",
+        matchedRuleIds: ["idempotency_ledger_duplicate_authority"],
+      };
+  const decision = await buildPolicyDecision(
+    constraints.input,
+    constraints.contract,
+    constraints.envelope,
+    decisionValue,
+    constraints.policyInputDigest,
+    constraints.isolationSnapshot,
+    constraints.now,
+  );
+  await commitPolicyEvaluation(recorder, {
+    ...constraints,
+    decision,
+    greenlight: null,
+    idempotencyLedgerEntry: null,
+  });
+  return { decision, greenlight: null };
 }
 
 function applyProtectedPathPolicy(

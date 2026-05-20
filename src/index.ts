@@ -37,6 +37,12 @@ export {
   type GatewayCheckResult,
   type VerifiedGatewayCheck,
 } from "./protocol/areas/gateway-gate";
+export {
+  authorityCertificateSigningInputDigest,
+  buildAuthorityCertificateSigningInput,
+  verifyAuthorityCertificate,
+  type VerifyAuthorityCertificateResult,
+} from "./protocol/areas/authority-certificate";
 export * from "./protocol/public/inputs";
 export * from "./protocol/public/schemas";
 export { HandshakeClient, HandshakeClientError, type HandshakeClientOptions, type HandshakeFetch } from "./sdk/client";

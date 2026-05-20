@@ -30,6 +30,16 @@ export const PROTOCOL_TRANSITIONS = {
     guard:
       "Runtime evidence records orchestration shape only; it cannot mint policy, greenlight, gate, or mutation authority.",
   },
+  createBypassProbe: {
+    from: "protected_path_probe",
+    to: "bypass_probe_recorded",
+    guard: "Bypass probes record probe outcomes only; they cannot satisfy posture unless a later posture binds them.",
+  },
+  createToolCallDraft: {
+    from: "generated_tool_input",
+    to: "tool_call_draft_recorded",
+    guard: "Tool-call drafts record generated input state only; finalized binding is checked later by compilation.",
+  },
   createProtectedPathPosture: {
     from: "runtime_gateway_surface_probe",
     to: "protected_path_posture_recorded",

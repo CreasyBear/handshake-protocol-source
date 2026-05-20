@@ -1,6 +1,7 @@
 import type { ZodType } from "zod";
 export * from "./schemas";
 import { ActionContractSchema, type ActionContract } from "../action-contract/schemas";
+import { AuthorityCertificateSchema } from "../authority-certificate/schemas";
 import {
   ActionTypeSchema,
   GatewayRegistryEntrySchema,
@@ -10,6 +11,9 @@ import {
 import { ContractStreamEventSchema } from "../../events/schemas";
 import { GatewayCheckAttemptSchema, MutationAttemptSchema } from "../gateway-gate/schemas";
 import { GeneratedExecutionGraphSchema } from "../generated-execution-graph/schemas";
+import { IdempotencyLedgerEntrySchema } from "../idempotency-ledger/schemas";
+import { BypassProbeSchema } from "../bypass-probe/schemas";
+import { ToolCallDraftSchema } from "../tool-call-draft/schemas";
 import { IntentCompilationRecordSchema } from "../intent-compilation/schemas";
 import { BreakerDecisionSchema, IsolationStateSchema, type IsolationState } from "../isolation-breaker/schemas";
 import {
@@ -20,6 +24,7 @@ import { ProtocolObjectTypeSchema, type ProtocolObjectType, type ProtocolRecord 
 import { GreenlightSchema, PolicyDecisionSchema, type Greenlight } from "../policy-greenlight/schemas";
 import { ProofGapSchema } from "../proof-gap/schemas";
 import { ProtectedPathPostureSchema } from "../protected-path-posture/schemas";
+import { RefusalSchema } from "../refusal/schemas";
 import { ReceiptExportSchema, ReceiptSchema } from "../receipt-export/schemas";
 import { RecoveryRecommendationSchema, RecoveryRecommendationStatusTransitionSchema } from "../recovery/schemas";
 import { ReviewArtifactRecordSchema, ReviewDecisionSchema } from "../review-binding/schemas";
@@ -94,6 +99,27 @@ export const protocolObjectRegistry = {
     "transition_evidence",
     "audit_read",
   ),
+  idempotency_ledger_entry: entry(
+    "idempotency_ledger_entry",
+    IdempotencyLedgerEntrySchema,
+    (record) => record.payload.idempotencyLedgerEntryId,
+    "internal_evidence",
+    "internal_only",
+  ),
+  bypass_probe: entry(
+    "bypass_probe",
+    BypassProbeSchema,
+    (record) => record.payload.bypassProbeId,
+    "internal_evidence",
+    "internal_only",
+  ),
+  tool_call_draft: entry(
+    "tool_call_draft",
+    ToolCallDraftSchema,
+    (record) => record.payload.toolCallDraftId,
+    "internal_evidence",
+    "internal_only",
+  ),
   protected_path_posture: entry(
     "protected_path_posture",
     ProtectedPathPostureSchema,
@@ -113,6 +139,13 @@ export const protocolObjectRegistry = {
     ActionContractSchema,
     (record) => record.payload.actionContractId,
     "transition_evidence",
+    "audit_read",
+  ),
+  authority_certificate: entry(
+    "authority_certificate",
+    AuthorityCertificateSchema,
+    (record) => record.payload.authorityCertificateId,
+    "receipt_evidence",
     "audit_read",
   ),
   policy_decision: entry(
@@ -192,6 +225,7 @@ export const protocolObjectRegistry = {
     "transition_evidence",
     "audit_read",
   ),
+  refusal: entry("refusal", RefusalSchema, (record) => record.payload.refusalId, "transition_evidence", "audit_read"),
   receipt: entry("receipt", ReceiptSchema, (record) => record.payload.receiptId, "receipt_evidence", "audit_read"),
   receipt_export: entry(
     "receipt_export",

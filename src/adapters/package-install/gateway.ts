@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { downstreamFailureEvidence } from "../downstream-failure-evidence";
 import {
   verifiedGatewayCheckFromResult,
   type GatewayCheckInput,
@@ -14,13 +15,35 @@ import type {
 export const PackageInstallParametersSchema = z.strictObject({
   package: z.string().min(1),
   versionRange: z.string().min(1),
+  packageManager: z.string().min(1),
+  registryRef: z.string().min(1),
+  workspaceRef: z.string().min(1).nullable(),
+  manifestRef: z.string().min(1).nullable(),
+  lockfileRef: z.string().min(1).nullable(),
+  installFlags: z.array(z.string().min(1)),
+  lifecycleScriptPolicy: z.enum(["blocked", "allowed", "unknown"]),
+  resolvedMaterialDigest: z
+    .string()
+    .regex(/^sha256:[a-f0-9]{64}$/)
+    .nullable(),
+  resolvedMaterialEvidenceRefs: z.array(z.string().min(1)),
 });
 export type PackageInstallParameters = z.infer<typeof PackageInstallParametersSchema>;
 
 export type PackageInstallMutationCommand = {
   verifiedGate: VerifiedGatewayCheck;
+  parameters: PackageInstallParameters;
   packageName: string;
   versionRange: string;
+  packageManager: string;
+  registryRef: string;
+  workspaceRef: string | null;
+  manifestRef: string | null;
+  lockfileRef: string | null;
+  installFlags: string[];
+  lifecycleScriptPolicy: "blocked" | "allowed" | "unknown";
+  resolvedMaterialDigest: PackageInstallParameters["resolvedMaterialDigest"];
+  resolvedMaterialEvidenceRefs: string[];
 };
 
 export type PackageInstallMutationEvidence = {
@@ -96,25 +119,44 @@ export async function runPackageInstallGateway(
   try {
     const mutationEvidence = await input.surface.applyPackageInstall({
       verifiedGate,
+      parameters: observedParameters,
       packageName: observedParameters.package,
       versionRange: observedParameters.versionRange,
+      packageManager: observedParameters.packageManager,
+      registryRef: observedParameters.registryRef,
+      workspaceRef: observedParameters.workspaceRef,
+      manifestRef: observedParameters.manifestRef,
+      lockfileRef: observedParameters.lockfileRef,
+      installFlags: observedParameters.installFlags,
+      lifecycleScriptPolicy: observedParameters.lifecycleScriptPolicy,
+      resolvedMaterialDigest: observedParameters.resolvedMaterialDigest,
+      resolvedMaterialEvidenceRefs: observedParameters.resolvedMaterialEvidenceRefs,
     });
     const { reconciliation } = await input.protocol.reconcileSurfaceOperation({
       mutationAttemptId: verifiedGate.mutationAttemptId,
       idempotencyKey: verifiedGate.idempotencyKey,
       observedSurfaceOperationRef: mutationEvidence.surfaceOperationRef,
       observedDownstreamStatus: "succeeded",
+      downstreamRetryability: "non_retryable",
+      providerOperationRef: mutationEvidence.surfaceOperationRef,
+      diagnosticsRedactionPosture: "redacted",
       evidenceRefs: [mutationEvidence.evidenceRef],
       resolvedProofGapIds: [],
     });
     return { outcome: "mutation_reconciled", gatewayCheck, reconciliation, mutationEvidence };
-  } catch {
+  } catch (error) {
+    const failureEvidence = await downstreamFailureEvidence({
+      adapterId: "package-install",
+      surfaceOperationRef,
+      error,
+      evidenceRef: `evidence:package-install-failed:${surfaceOperationRef}`,
+    });
     const { reconciliation } = await input.protocol.reconcileSurfaceOperation({
       mutationAttemptId: verifiedGate.mutationAttemptId,
       idempotencyKey: verifiedGate.idempotencyKey,
       observedSurfaceOperationRef: surfaceOperationRef,
       observedDownstreamStatus: "failed",
-      evidenceRefs: [`evidence:package-install-failed:${surfaceOperationRef}`],
+      ...failureEvidence,
       resolvedProofGapIds: [],
     });
     return { outcome: "mutation_failed", gatewayCheck, reconciliation, mutationEvidence: null };

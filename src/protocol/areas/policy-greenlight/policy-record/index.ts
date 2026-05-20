@@ -1,10 +1,12 @@
 import { signCanonicalHmac } from "../../../foundation/canonical";
 import type { ActionContract } from "../../action-contract";
+import { idempotencyLedgerIndexEntry, type IdempotencyLedgerEntry } from "../../idempotency-ledger";
 import type { OperatingEnvelope } from "../../catalog-envelope";
 import { actionLifecycleStreamRefs } from "../../../events/chains";
 import { createId } from "../../../foundation/ids";
 import type { ProtocolRecorder } from "../../../events/records";
 import type { ProtectedPathPosture } from "../../protected-path-posture";
+import { buildRefusal, protocolObjectRef } from "../../refusal";
 import type { StoredProtocolRecord } from "../../../store/port";
 import {
   GreenlightSchema,
@@ -28,6 +30,7 @@ export type PolicyCommitPlan = {
   contract: ActionContract;
   decision: PolicyDecision;
   greenlight: Greenlight | null;
+  idempotencyLedgerEntry: IdempotencyLedgerEntry | null;
   now: string;
 };
 
@@ -69,6 +72,9 @@ export async function buildPolicyDecision(
     isolationSnapshotRef: isolationSnapshot,
     expiresAt: contract.expiresAt,
     decisionSignature,
+    signaturePosture: input.signingSecret ? "local_hmac" : "unsigned",
+    keyIdentityRef: input.signingSecret ? "local:hmac" : null,
+    verificationPolicyRef: input.signingSecret ? "local-hmac-only" : null,
   });
 }
 
@@ -104,23 +110,52 @@ export function buildGreenlight(
     isolationSnapshotRef: decision.isolationSnapshotRef,
     requiredReceipt: decision.requiredReceipt,
     decisionSignature: decision.decisionSignature,
+    signaturePosture: decision.signaturePosture,
+    keyIdentityRef: decision.keyIdentityRef,
+    verificationPolicyRef: decision.verificationPolicyRef,
     consumedAt: null,
     consumedByGateAttemptId: null,
   });
 }
 
-export async function commitPolicyEvaluation(recorder: ProtocolRecorder, plan: PolicyCommitPlan): Promise<void> {
+export async function commitPolicyEvaluation(
+  recorder: ProtocolRecorder,
+  plan: PolicyCommitPlan,
+): Promise<"committed" | "idempotency_ledger_conflict"> {
   if (!plan.greenlight) {
     await commitPolicyDecisionOnly(recorder, plan);
-    return;
+    return "committed";
   }
-  await commitGreenlightPolicyDecision(recorder, plan, plan.greenlight);
+  return commitGreenlightPolicyDecision(recorder, plan, plan.greenlight);
 }
 
 async function commitPolicyDecisionOnly(recorder: ProtocolRecorder, plan: PolicyCommitPlan): Promise<void> {
   const { contract, decision } = plan;
+  const refusal =
+    decision.decision === "review_required"
+      ? null
+      : await buildRefusal({
+          tenantId: contract.tenantId,
+          organizationId: contract.organizationId,
+          createdAt: plan.now,
+          phase: "policy",
+          actionContractId: contract.actionContractId,
+          policyDecisionId: decision.policyDecisionId,
+          refusedObjectRef: protocolObjectRef("policy_decision", decision.policyDecisionId),
+          reasonCode: decision.decisionReasonCode,
+          reason: decision.decisionReason,
+          evidenceRefs: [
+            protocolObjectRef("action_contract", contract.actionContractId),
+            protocolObjectRef("policy_decision", decision.policyDecisionId),
+            decision.policyInputDigest,
+          ],
+          refusedAt: plan.now,
+        });
   await recorder.commitRecordsWithEvents(
-    [{ objectType: "policy_decision", payload: decision }],
+    [
+      { objectType: "policy_decision", payload: decision },
+      ...(refusal ? ([{ objectType: "refusal", payload: refusal }] as const) : []),
+    ],
     [
       {
         source: decision,
@@ -130,9 +165,9 @@ async function commitPolicyDecisionOnly(recorder: ProtocolRecorder, plan: Policy
         payload: { decision: decision.decision, reasonCode: decision.decisionReasonCode },
       },
       {
-        source: decision,
+        source: refusal ?? decision,
         eventType: decision.decision === "review_required" ? "review_required" : "action_refused",
-        objectRefs: [decision.policyDecisionId, contract.actionContractId],
+        objectRefs: [...(refusal ? [refusal.refusalId] : []), decision.policyDecisionId, contract.actionContractId],
         streamRefs: actionLifecycleStreamRefs(contract),
         payload: { reasonCode: decision.decisionReasonCode },
       },
@@ -144,13 +179,17 @@ async function commitGreenlightPolicyDecision(
   recorder: ProtocolRecorder,
   plan: PolicyCommitPlan,
   greenlight: Greenlight,
-): Promise<void> {
+): Promise<"committed" | "idempotency_ledger_conflict"> {
   const { contract, decision } = plan;
-  await recorder.commitRecordsWithEvents(
-    [
-      { objectType: "policy_decision", payload: decision },
-      { objectType: "greenlight", payload: greenlight },
-    ],
+  const records = [
+    { objectType: "policy_decision", payload: decision },
+    { objectType: "greenlight", payload: greenlight },
+    ...(plan.idempotencyLedgerEntry
+      ? ([{ objectType: "idempotency_ledger_entry", payload: plan.idempotencyLedgerEntry }] as const)
+      : []),
+  ] as const;
+  const commitResult = await recorder.tryCommitRecordsWithEvents(
+    [...records],
     [
       {
         source: decision,
@@ -166,6 +205,24 @@ async function commitGreenlightPolicyDecision(
         streamRefs: actionLifecycleStreamRefs(contract),
         payload: { gatewayId: greenlight.gatewayId, actionClass: greenlight.actionClass },
       },
+      ...(plan.idempotencyLedgerEntry
+        ? [
+            {
+              source: plan.idempotencyLedgerEntry,
+              eventType: "idempotency_ledger_recorded" as const,
+              objectRefs: [
+                plan.idempotencyLedgerEntry.idempotencyLedgerEntryId,
+                plan.idempotencyLedgerEntry.ledgerKeyDigest,
+                contract.actionContractId,
+              ],
+              streamRefs: actionLifecycleStreamRefs(contract),
+              payload: {
+                ledgerState: plan.idempotencyLedgerEntry.ledgerState,
+                reasonCode: plan.idempotencyLedgerEntry.reasonCode,
+              },
+            },
+          ]
+        : []),
     ],
     {
       greenlightIssuanceClaims: [
@@ -178,6 +235,10 @@ async function commitGreenlightPolicyDecision(
           claimedAt: plan.now,
         },
       ],
+      idempotencyLedgerReservationEntries: plan.idempotencyLedgerEntry
+        ? [idempotencyLedgerIndexEntry(plan.idempotencyLedgerEntry)]
+        : [],
     },
   );
+  return commitResult.status;
 }

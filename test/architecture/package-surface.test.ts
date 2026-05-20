@@ -32,6 +32,11 @@ describe("package surface", () => {
       import: "./src/conformance/index.ts",
       default: "./src/conformance/index.ts",
     });
+    expect(pkg.exports["./runtime"]).toEqual({
+      types: "./dist/runtime/index.d.ts",
+      import: "./src/runtime/index.ts",
+      default: "./src/runtime/index.ts",
+    });
     expect(pkg.exports["./experimental"]).toEqual({
       types: "./dist/experimental.d.ts",
       import: "./src/experimental.ts",

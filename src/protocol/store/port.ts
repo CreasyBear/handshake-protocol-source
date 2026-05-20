@@ -1,4 +1,5 @@
 import type { ContractStreamEvent } from "../events/schemas";
+import type { IdempotencyLedgerEntry } from "../areas/idempotency-ledger";
 import type { IsolationState } from "../areas/isolation-breaker";
 import type { ProtocolObjectType } from "../areas/object-registry/schemas";
 import type { ProtectedSurfaceOperationClaim } from "../areas/operation-lifecycle";
@@ -6,6 +7,7 @@ import type { ProtectedPathPosture } from "../areas/protected-path-posture";
 import type { Receipt } from "../areas/receipt-export";
 
 export type { ContractStreamEvent } from "../events/schemas";
+export type { IdempotencyLedgerEntry } from "../areas/idempotency-ledger";
 export type { IsolationState } from "../areas/isolation-breaker";
 export type { ProtocolObjectType } from "../areas/object-registry/schemas";
 export type { ProtectedSurfaceOperationClaim } from "../areas/operation-lifecycle";
@@ -73,11 +75,36 @@ export type ReceiptMutationAttemptIndexEntry = {
   createdAt: string;
 };
 
+export type IdempotencyLedgerIndexEntry = {
+  ledgerKeyDigest: string;
+  idempotencyLedgerEntryId: string;
+  tenantId: string;
+  organizationId: string;
+  paramsDigest: string;
+  actionContractId: string;
+  policyDecisionId: string;
+  greenlightId: string | null;
+  ledgerState: IdempotencyLedgerEntry["ledgerState"];
+  updatedAt: string;
+};
+
+export type IsolationStateIndexEntry = {
+  isolationScopeKey: string;
+  isolationStateId: string;
+  tenantId: string;
+  organizationId: string;
+  scopeType: IsolationState["scopeType"];
+  scopeId: string;
+  state: IsolationState["state"];
+  updatedAt: string;
+};
+
 export type IsolationScopeRef = Pick<IsolationState, "tenantId" | "organizationId" | "scopeType" | "scopeId">;
 
 export type GatewayCheckCommit = {
   consumption: GreenlightConsumption | null;
   protectedSurfaceOperationClaimIndexEntries?: ProtectedSurfaceOperationClaimIndexEntry[];
+  idempotencyLedgerIndexEntries?: IdempotencyLedgerIndexEntry[];
   receiptMutationAttemptIndexEntries?: ReceiptMutationAttemptIndexEntry[];
   records: StoredProtocolRecord[];
   events: ContractStreamEvent[];
@@ -87,6 +114,9 @@ export type ProtocolCommit = {
   greenlightIssuanceClaims?: GreenlightIssuanceClaim[];
   recoveryTerminalClaims?: RecoveryTerminalClaim[];
   protectedPathPostureIndexEntries?: ProtectedPathPostureIndexEntry[];
+  isolationStateIndexEntries?: IsolationStateIndexEntry[];
+  idempotencyLedgerReservationEntries?: IdempotencyLedgerIndexEntry[];
+  idempotencyLedgerIndexEntries?: IdempotencyLedgerIndexEntry[];
   protectedSurfaceOperationClaimIndexEntries?: ProtectedSurfaceOperationClaimIndexEntry[];
   protectedSurfaceOperationClaimIndexReleases?: string[];
   receiptMutationAttemptIndexEntries?: ReceiptMutationAttemptIndexEntry[];
@@ -98,11 +128,13 @@ export type ProtocolCommitResult =
   | "committed"
   | "stream_conflict"
   | "recovery_terminal_conflict"
-  | "greenlight_issuance_conflict";
+  | "greenlight_issuance_conflict"
+  | "idempotency_ledger_conflict";
 export type GatewayCheckCommitResult =
   | "committed"
   | "already_consumed"
   | "operation_claim_conflict"
+  | "receipt_index_conflict"
   | "stream_conflict";
 
 export type StreamTail = {
@@ -121,6 +153,9 @@ export interface ProtocolStore {
   getStreamTail(streamId: string, partitionKey: string): Promise<StreamTail>;
   getStreamEvent(streamId: string, partitionKey: string, offset: number): Promise<ContractStreamEvent | null>;
   getCurrentProtectedPathPosture(postureScopeKey: string): Promise<StoredProtocolRecord<ProtectedPathPosture> | null>;
+  getCurrentIdempotencyLedgerEntry(
+    ledgerKeyDigest: string,
+  ): Promise<StoredProtocolRecord<IdempotencyLedgerEntry> | null>;
   getCurrentProtectedSurfaceOperationClaim(
     claimKeyDigest: string,
   ): Promise<StoredProtocolRecord<ProtectedSurfaceOperationClaim> | null>;

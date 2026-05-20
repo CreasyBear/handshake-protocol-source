@@ -20,7 +20,7 @@ import {
   previewDeployResourceRef,
 } from "../../src/runtime/preview-deploy/action-proposal";
 import { InMemoryProtocolStore } from "../../src/storage/memory";
-import { futureIso } from "../support/fixtures";
+import { futureIso, recordSafeBypassProbes } from "../support/fixtures";
 
 describe("local preview deploy fixture", () => {
   it("creates a local preview artifact only after exact contract, greenlight, and gateway check", async () => {
@@ -115,6 +115,15 @@ async function createPreviewDeployFixture(idempotencyMarker = "preview") {
     observedConsequentialCallCount: 1,
     accessPosture: "controlled_outbound",
   });
+  const bypassProbeIds = await recordSafeBypassProbes(
+    { kernel, gateway: objects.gateway },
+    {
+      runtimeAdapterId: objects.tool.runtimeAdapterId,
+      actionClass: objects.actionType.actionClass,
+      resourceRef: objects.resourceRef,
+      protectedSurfaceKind: objects.actionType.protectedSurfaceKind,
+    },
+  );
   await kernel.createProtectedPathPosture({
     tenantId: objects.tool.tenantId,
     organizationId: objects.tool.organizationId,
@@ -126,9 +135,10 @@ async function createPreviewDeployFixture(idempotencyMarker = "preview") {
     postureState: "gateway_checked",
     credentialCustodyStatus: "fixture_gateway_held",
     rawSiblingToolStatus: "blocked",
-    sourceAuthority: "conformance_fixture",
+    sourceAuthority: "gateway_probe",
     reasonCodes: ["local_preview_fixture_only"],
     evidenceRefs: ["evidence:local-preview-posture"],
+    bypassProbeIds,
     expiresAt: futureIso(),
   });
   const parameters = {
@@ -165,6 +175,31 @@ async function createPreviewDeployFixture(idempotencyMarker = "preview") {
       graphIssuedAt: runtimeExecution.createdAt,
     },
   );
+  const openedDraft = await kernel.createToolCallDraft({
+    tenantId: objects.tool.tenantId,
+    organizationId: objects.tool.organizationId,
+    runtimeExecutionId: runtimeExecution.runtimeExecutionId,
+    generatedExecutionGraphId: graph.generatedExecutionGraphId,
+    generatedExecutionNodeId: graphNodeId,
+    toolCapabilityId: objects.tool.toolCapabilityId,
+    actionTypeId: objects.actionType.actionTypeId,
+    gatewayRegistryEntryId: objects.gateway.gatewayRegistryEntryId,
+    actionClass: objects.actionType.actionClass,
+    gatewayId: objects.gateway.gatewayId,
+    resourceRef: objects.resourceRef,
+    expiresAt: futureIso(),
+    evidenceRefs: ["evidence:preview-tool-call-draft"],
+  });
+  const toolCallDraft = await kernel.transitionToolCallDraft({
+    toolCallDraftId: openedDraft.toolCallDraftId,
+    nextDraftState: "finalized",
+    parameters,
+    nonSecretParamsSummary: parameters,
+    secretRefs: {},
+    finalizedAt: new Date().toISOString(),
+    expiresAt: futureIso(),
+    evidenceRefs: ["evidence:preview-tool-call-draft"],
+  });
   const proposal = await proposePreviewDeployActionContract(
     kernel,
     {
@@ -183,14 +218,15 @@ async function createPreviewDeployFixture(idempotencyMarker = "preview") {
       gatewayRegistryEntryId: objects.gateway.gatewayRegistryEntryId,
       gatewayId: objects.gateway.gatewayId,
       contractExpiresAt: futureIso(),
-      runtimeExecutionId: runtimeExecution.runtimeExecutionId,
-      generatedExecutionGraphId: graph.generatedExecutionGraphId,
-      generatedExecutionNodeId: graphNodeId,
       signingSecret: "test-secret",
     },
     {
       principalIntentRef: "intent:create local preview",
       generatedCodeOrSpecRef: "code:preview-deploy-block",
+      runtimeExecutionId: runtimeExecution.runtimeExecutionId,
+      generatedExecutionGraphId: graph.generatedExecutionGraphId,
+      generatedExecutionNodeId: graphNodeId,
+      toolCallDraftId: toolCallDraft.toolCallDraftId,
       ...parameters,
     },
   );

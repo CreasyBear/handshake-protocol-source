@@ -2,6 +2,8 @@ import type {
   ContractStreamEvent,
   GreenlightConsumption,
   GreenlightIssuanceClaim,
+  IdempotencyLedgerIndexEntry,
+  IsolationStateIndexEntry,
   ProtocolCommit,
   ProtectedPathPostureIndexEntry,
   ProtectedSurfaceOperationClaimIndexEntry,
@@ -13,7 +15,10 @@ import type {
 type ProtocolCommitStatementOptions = Pick<
   ProtocolCommit,
   | "greenlightIssuanceClaims"
+  | "idempotencyLedgerReservationEntries"
+  | "idempotencyLedgerIndexEntries"
   | "recoveryTerminalClaims"
+  | "isolationStateIndexEntries"
   | "protectedPathPostureIndexEntries"
   | "protectedSurfaceOperationClaimIndexEntries"
   | "protectedSurfaceOperationClaimIndexReleases"
@@ -32,8 +37,17 @@ export class D1ProtocolStatements {
     for (const claim of options.greenlightIssuanceClaims ?? []) {
       statements.push(this.greenlightIssuanceClaimStatement(claim));
     }
+    for (const entry of options.idempotencyLedgerReservationEntries ?? []) {
+      statements.push(this.idempotencyLedgerIndexStatement(entry, "insert"));
+    }
+    for (const entry of options.idempotencyLedgerIndexEntries ?? []) {
+      statements.push(this.idempotencyLedgerIndexStatement(entry, "replace"));
+    }
     for (const claim of options.recoveryTerminalClaims ?? []) {
       statements.push(this.recoveryTerminalClaimStatement(claim));
+    }
+    for (const entry of options.isolationStateIndexEntries ?? []) {
+      statements.push(this.isolationStateIndexStatement(entry));
     }
     for (const entry of options.protectedPathPostureIndexEntries ?? []) {
       statements.push(this.protectedPathPostureIndexStatement(entry));
@@ -106,10 +120,32 @@ export class D1ProtocolStatements {
       );
   }
 
+  idempotencyLedgerIndexStatement(entry: IdempotencyLedgerIndexEntry, mode: "insert" | "replace"): D1PreparedStatement {
+    const verb = mode === "insert" ? "INSERT" : "INSERT OR REPLACE";
+    return this.db
+      .prepare(
+        `${verb} INTO idempotency_ledger_current
+          (ledger_key_digest, idempotency_ledger_entry_id, tenant_id, organization_id, params_digest, action_contract_id, policy_decision_id, greenlight_id, ledger_state, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .bind(
+        entry.ledgerKeyDigest,
+        entry.idempotencyLedgerEntryId,
+        entry.tenantId,
+        entry.organizationId,
+        entry.paramsDigest,
+        entry.actionContractId,
+        entry.policyDecisionId,
+        entry.greenlightId,
+        entry.ledgerState,
+        entry.updatedAt,
+      );
+  }
+
   receiptMutationAttemptIndexStatement(entry: ReceiptMutationAttemptIndexEntry): D1PreparedStatement {
     return this.db
       .prepare(
-        `INSERT OR REPLACE INTO receipt_by_mutation_attempt
+        `INSERT INTO receipt_by_mutation_attempt
           (mutation_attempt_id, receipt_id, tenant_id, organization_id, created_at)
          VALUES (?, ?, ?, ?, ?)`,
       )
@@ -203,6 +239,25 @@ export class D1ProtocolStatements {
          VALUES (?, ?, ?, ?)`,
       )
       .bind(claim.recoveryRecommendationId, claim.statusTransitionId, claim.nextStatus, claim.claimedAt);
+  }
+
+  private isolationStateIndexStatement(entry: IsolationStateIndexEntry): D1PreparedStatement {
+    return this.db
+      .prepare(
+        `INSERT OR REPLACE INTO isolation_state_current
+          (isolation_scope_key, isolation_state_id, tenant_id, organization_id, scope_type, scope_id, state, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .bind(
+        entry.isolationScopeKey,
+        entry.isolationStateId,
+        entry.tenantId,
+        entry.organizationId,
+        entry.scopeType,
+        entry.scopeId,
+        entry.state,
+        entry.updatedAt,
+      );
   }
 
   private protectedPathPostureIndexStatement(entry: ProtectedPathPostureIndexEntry): D1PreparedStatement {

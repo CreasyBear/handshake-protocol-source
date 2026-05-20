@@ -59,6 +59,9 @@ export async function buildActionContractRecord(
     rollbackHint: candidate.rollbackHint,
     actionContractDigest,
     contractSignature,
+    signaturePosture: input.signingSecret ? "local_hmac" : "unsigned",
+    keyIdentityRef: input.signingSecret ? "local:hmac" : null,
+    verificationPolicyRef: input.signingSecret ? "local-hmac-only" : null,
   });
   return { createdAt, contractBinding, contract };
 }
@@ -117,8 +120,21 @@ function buildContractBinding(args: ActionContractRecordContext & { createdAt: s
     purposeCode: candidate.purposeCode,
     expectedSideEffectCodes: candidate.expectedSideEffectCodes,
     evidenceRefs: candidate.evidenceRefs,
+    clearingEvidenceRefs: clearingEvidenceRefsJson(candidate.clearingEvidenceRefs),
     bounds: candidate.bounds,
     idempotencyKey: candidate.idempotencyKey,
     canonicalizerVersion: CANONICALIZER_VERSION,
   } satisfies JsonValue;
+}
+
+function clearingEvidenceRefsJson(refs: {
+  correlationRef?: string | undefined;
+  obligationRef?: string | undefined;
+  counterpartyRef?: string | undefined;
+}): { [key: string]: JsonValue } {
+  const json: { [key: string]: JsonValue } = {};
+  if (refs.correlationRef !== undefined) json.correlationRef = refs.correlationRef;
+  if (refs.obligationRef !== undefined) json.obligationRef = refs.obligationRef;
+  if (refs.counterpartyRef !== undefined) json.counterpartyRef = refs.counterpartyRef;
+  return json;
 }

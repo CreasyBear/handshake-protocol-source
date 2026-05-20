@@ -3,7 +3,7 @@ import { runRepoWriteGateway } from "../../src/adapters/repo-write/gateway";
 import { digestUtf8Content, utf8ByteLength } from "../../src/protocol/foundation/content-digests";
 import { HandshakeClient } from "../../src/sdk/client";
 import { proposeRepoWriteActionContract } from "../../src/runtime/repo-write/action-proposal";
-import { createD1HttpHarness, D1_HARNESS_TRANSITION_TOKEN, type D1HttpHarness } from "../support/d1-http-harness";
+import { createD1HttpHarness, D1_HARNESS_CALLER_AUTH_TOKENS, type D1HttpHarness } from "../support/d1-http-harness";
 import {
   createRepoWriteSurface,
   makeRepoWriteFixtureObjects,
@@ -60,6 +60,7 @@ describe("repo write Hono/D1 reference gateway", () => {
         "action_proposed",
         "policy_decision_recorded",
         "action_greenlit",
+        "idempotency_ledger_recorded",
         "gateway_checked",
         "mutation_attempted",
         "protected_surface_operation_claimed",
@@ -67,7 +68,7 @@ describe("repo write Hono/D1 reference gateway", () => {
         "surface_operation_reconciled",
         "protected_surface_operation_released",
       ]);
-      expect(events.map((event) => event.offset)).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8]);
+      expect(events.map((event) => event.offset)).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
       for (let index = 1; index < events.length; index += 1) {
         expect(events[index]?.previous_event_digest).toBe(events[index - 1]?.event_digest);
       }
@@ -112,11 +113,14 @@ describe("repo write Hono/D1 reference gateway", () => {
         "action_proposed",
         "policy_decision_recorded",
         "action_greenlit",
+        "idempotency_ledger_recorded",
         "gateway_checked",
+        "gateway_refused",
         "receipt_emitted",
       ]);
       expect(await recordCount(harness, "mutation_attempt")).toBe(0);
       expect(await recordCount(harness, "gateway_check_attempt")).toBe(1);
+      expect(await recordCount(harness, "refusal")).toBe(1);
       expect(await recordCount(harness, "receipt")).toBe(1);
     } finally {
       await harness.dispose();
@@ -126,7 +130,7 @@ describe("repo write Hono/D1 reference gateway", () => {
 
 async function createRepoWriteContract(harness: D1HttpHarness, content: string) {
   const client = new HandshakeClient("http://handshake.test", harness.fetch, {
-    transitionToken: D1_HARNESS_TRANSITION_TOKEN,
+    transitionTokens: D1_HARNESS_CALLER_AUTH_TOKENS,
   });
   const fixture = makeRepoWriteFixtureObjects();
   await registerRepoWriteFixtureObjectsWithClient(client, fixture);

@@ -1,6 +1,7 @@
 import type {
   ContractStreamEvent,
   GreenlightConsumption,
+  IdempotencyLedgerEntry,
   IsolationScopeRef,
   IsolationState,
   ProtocolCommit,
@@ -29,11 +30,14 @@ export class D1ProtocolStore implements ProtocolStore {
   }
 
   async putRecordIfAbsentOrSame(record: StoredProtocolRecord): Promise<"inserted" | "unchanged" | "conflict"> {
+    const before = await this.getRecord(record.objectType, record.objectId);
+    if (before) return before.canonicalDigest === record.canonicalDigest ? "unchanged" : "conflict";
+
     await this.statements.recordIfAbsentStatement(record).run();
 
     const existing = await this.getRecord(record.objectType, record.objectId);
     if (!existing) return "conflict";
-    if (existing.canonicalDigest === record.canonicalDigest) return "unchanged";
+    if (existing.canonicalDigest === record.canonicalDigest) return "inserted";
     return "conflict";
   }
 
@@ -138,6 +142,22 @@ export class D1ProtocolStore implements ProtocolStore {
     return this.getRecord<ProtectedPathPosture>("protected_path_posture", row.protected_path_posture_id);
   }
 
+  async getCurrentIdempotencyLedgerEntry(
+    ledgerKeyDigest: string,
+  ): Promise<StoredProtocolRecord<IdempotencyLedgerEntry> | null> {
+    const row = await this.db
+      .prepare(
+        `SELECT idempotency_ledger_entry_id
+         FROM idempotency_ledger_current
+         WHERE ledger_key_digest = ?
+         LIMIT 1`,
+      )
+      .bind(ledgerKeyDigest)
+      .first<{ idempotency_ledger_entry_id: string }>();
+    if (!row) return null;
+    return this.getRecord<IdempotencyLedgerEntry>("idempotency_ledger_entry", row.idempotency_ledger_entry_id);
+  }
+
   async getCurrentProtectedSurfaceOperationClaim(
     claimKeyDigest: string,
   ): Promise<StoredProtocolRecord<ProtectedSurfaceOperationClaim> | null> {
@@ -177,18 +197,20 @@ export class D1ProtocolStore implements ProtocolStore {
     const clauses = refs
       .map(
         () =>
-          `(tenant_id = ?
-            AND organization_id = ?
-            AND json_extract(payload_json, '$.scopeType') = ?
-            AND json_extract(payload_json, '$.scopeId') = ?)`,
+          `(c.tenant_id = ?
+            AND c.organization_id = ?
+            AND c.scope_type = ?
+            AND c.scope_id = ?)`,
       )
       .join(" OR ");
     const result = await this.db
       .prepare(
-        `SELECT payload_json
-         FROM protocol_records
-         WHERE object_type = 'isolation_state'
-           AND json_extract(payload_json, '$.clearedAt') IS NULL
+        `SELECT r.payload_json
+         FROM isolation_state_current c
+         JOIN protocol_records r
+           ON r.object_type = 'isolation_state'
+          AND r.object_id = c.isolation_state_id
+         WHERE json_extract(r.payload_json, '$.clearedAt') IS NULL
            AND (${clauses})`,
       )
       .bind(...refs.flatMap((ref) => [ref.tenantId, ref.organizationId, ref.scopeType, ref.scopeId]))
@@ -213,6 +235,9 @@ export class D1ProtocolStore implements ProtocolStore {
       if (isGreenlightIssuanceConflict(error)) {
         return "greenlight_issuance_conflict";
       }
+      if (isIdempotencyLedgerConflict(error)) {
+        return "idempotency_ledger_conflict";
+      }
       if (isRecoveryTerminalConflict(error)) {
         return "recovery_terminal_conflict";
       }
@@ -231,6 +256,9 @@ export class D1ProtocolStore implements ProtocolStore {
     for (const entry of commit.protectedSurfaceOperationClaimIndexEntries ?? []) {
       statements.push(this.statements.protectedSurfaceOperationClaimIndexStatement(entry, "insert"));
     }
+    for (const entry of commit.idempotencyLedgerIndexEntries ?? []) {
+      statements.push(this.statements.idempotencyLedgerIndexStatement(entry, "replace"));
+    }
     for (const entry of commit.receiptMutationAttemptIndexEntries ?? []) {
       statements.push(this.statements.receiptMutationAttemptIndexStatement(entry));
     }
@@ -245,6 +273,9 @@ export class D1ProtocolStore implements ProtocolStore {
       }
       if (isProtectedSurfaceOperationClaimConflict(error)) {
         return "operation_claim_conflict";
+      }
+      if (isReceiptMutationAttemptIndexConflict(error)) {
+        return "receipt_index_conflict";
       }
       if (isStreamConflict(error)) {
         return "stream_conflict";
@@ -310,10 +341,26 @@ function isGreenlightIssuanceConflict(error: unknown): boolean {
   );
 }
 
+function isIdempotencyLedgerConflict(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return (
+    message.includes("idempotency_ledger_current") &&
+    (message.includes("UNIQUE") || message.includes("unique") || message.includes("constraint"))
+  );
+}
+
 function isProtectedSurfaceOperationClaimConflict(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error);
   return (
     message.includes("protected_surface_operation_claim_current") &&
+    (message.includes("UNIQUE") || message.includes("unique") || message.includes("constraint"))
+  );
+}
+
+function isReceiptMutationAttemptIndexConflict(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return (
+    message.includes("receipt_by_mutation_attempt") &&
     (message.includes("UNIQUE") || message.includes("unique") || message.includes("constraint"))
   );
 }

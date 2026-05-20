@@ -1,0 +1,63 @@
+import { describe, expect, it } from "bun:test";
+import { readFileSync } from "node:fs";
+import packageJson from "../../package.json";
+
+type PackageExport = {
+  types: string;
+  import: string;
+  default: string;
+};
+
+type PackageJson = {
+  exports: Record<string, PackageExport | string>;
+};
+
+const pkg = packageJson as PackageJson;
+
+describe("claim boundary", () => {
+  it("keeps public entrypoints separated by authority boundary", async () => {
+    const root = await import("../../src");
+    const runtime = await import("../../src/runtime");
+    const conformance = await import("../../src/conformance");
+    const experimental = await import("../../src/experimental");
+    const runtimeExportNames = Object.keys(runtime).sort();
+
+    expect(pkg.exports["./runtime"]).toEqual({
+      types: "./dist/runtime/index.d.ts",
+      import: "./src/runtime/index.ts",
+      default: "./src/runtime/index.ts",
+    });
+    expect(Object.keys(root)).not.toContain("proposeRuntimeIngressActionContracts");
+    expect(Object.keys(root)).not.toContain("experimentalRunPackageInstallGateway");
+    expect(Object.keys(root)).not.toContain("checkProtectedMutationAdapterConformance");
+    expect(runtimeExportNames).toEqual([
+      "RuntimeIngressDispatchBlockSchema",
+      "RuntimeIngressObservedDispatchSchema",
+      "proposeRuntimeIngressActionContracts",
+      "runtimeIngressDispatchNodeId",
+    ]);
+    expect(runtimeExportNames.join(" ")).not.toMatch(/Gateway|Greenlight|Mutation|Policy|Receipt/);
+    expect(Object.keys(conformance)).toContain("checkProtectedMutationAdapterConformance");
+    expect(
+      Object.keys(experimental).every((name) => name.startsWith("experimental") || name.startsWith("Experimental")),
+    ).toBe(true);
+  });
+
+  it("requires docs to state local runtime ingress without provider or hosted claims", () => {
+    const readme = readFileSync("README.md", "utf8");
+    const runtimeLane = readFileSync("src/runtime/LANE.md", "utf8");
+    const conformanceLane = readFileSync("src/conformance/LANE.md", "utf8");
+    const adaptersLane = readFileSync("src/adapters/LANE.md", "utf8");
+
+    expect(readme).toContain("x402 is a local proof profile");
+    expect(readme).toContain("package install remains a regression fixture");
+    expect(readme).toContain("No adapter family defines the protocol");
+    expect(readme).toContain("public runtime ingress for local x402 payment and package-install dispatch boundaries");
+    expect(readme).toContain("not live provider custody, hosted operation, generic MCP/runtime control");
+    expect(readme).toContain("cross-org AuthorityCertificate trust, live JWKS/revocation, hosted verifier operation");
+    expect(readme).toContain("session/day/review spend windows are metadata until a ledger exists");
+    expect(runtimeLane).toContain("It must not issue policy decisions, greenlights, gateway checks, receipts");
+    expect(conformanceLane).toContain("does not prove provider-side enforcement");
+    expect(adaptersLane).toContain("must not imply generic adapters, hosted operation");
+  });
+});

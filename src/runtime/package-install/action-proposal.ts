@@ -8,8 +8,22 @@ export const PackageInstallToolCallSchema = z.strictObject({
   runtimeExecutionId: z.string().min(1).nullable().default(null),
   generatedExecutionGraphId: z.string().min(1).nullable().default(null),
   generatedExecutionNodeId: z.string().min(1).nullable().default(null),
+  toolCallDraftId: z.string().min(1).nullable().default(null),
   package: z.string().min(1),
   versionRange: z.string().min(1),
+  packageManager: z.string().min(1).default("bun"),
+  registryRef: z.string().min(1).default("registry:npmjs"),
+  workspaceRef: z.string().min(1).nullable().default(null),
+  manifestRef: z.string().min(1).nullable().default("manifest:package.json"),
+  lockfileRef: z.string().min(1).nullable().default("lockfile:bun.lock"),
+  installFlags: z.array(z.string().min(1)).default([]),
+  lifecycleScriptPolicy: z.enum(["blocked", "allowed", "unknown"]).default("blocked"),
+  resolvedMaterialDigest: z
+    .string()
+    .regex(/^sha256:[a-f0-9]{64}$/)
+    .nullable()
+    .default(null),
+  resolvedMaterialEvidenceRefs: z.array(z.string().min(1)).default([]),
   sequenceNumber: z.number().int().nonnegative().default(1),
   requiredPriorActionContractIds: z.array(z.string().min(1)).default([]),
 });
@@ -85,7 +99,19 @@ export function buildPackageInstallCompileIntentInput(
   toolCallValue: PackageInstallToolCall,
 ): CompileIntentInput {
   const toolCall = PackageInstallToolCallSchema.parse(toolCallValue);
-  const parameters = { package: toolCall.package, versionRange: toolCall.versionRange };
+  const parameters = {
+    package: toolCall.package,
+    versionRange: toolCall.versionRange,
+    packageManager: toolCall.packageManager,
+    registryRef: toolCall.registryRef,
+    workspaceRef: toolCall.workspaceRef,
+    manifestRef: toolCall.manifestRef,
+    lockfileRef: toolCall.lockfileRef,
+    installFlags: toolCall.installFlags,
+    lifecycleScriptPolicy: toolCall.lifecycleScriptPolicy,
+    resolvedMaterialDigest: toolCall.resolvedMaterialDigest,
+    resolvedMaterialEvidenceRefs: toolCall.resolvedMaterialEvidenceRefs,
+  };
   return {
     tenantId: config.tenantId,
     organizationId: config.organizationId,
@@ -101,6 +127,7 @@ export function buildPackageInstallCompileIntentInput(
     runtimeExecutionId: toolCall.runtimeExecutionId,
     generatedExecutionGraphId: toolCall.generatedExecutionGraphId,
     generatedExecutionNodeId: toolCall.generatedExecutionNodeId,
+    toolCallDraftId: toolCall.toolCallDraftId,
     generatedCodeOrSpecRefs: [toolCall.generatedCodeOrSpecRef],
     declaredAssumptions: ["package install tool call provided explicit package and version range"],
     requiredEvidenceRefs: ["evidence:package-manifest-diff"],

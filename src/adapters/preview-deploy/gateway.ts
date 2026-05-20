@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { downstreamFailureEvidence } from "../downstream-failure-evidence";
 import {
   verifiedGatewayCheckFromResult,
   type GatewayCheckInput,
@@ -114,17 +115,26 @@ export async function runPreviewDeployGateway(input: PreviewDeployGatewayInput):
       idempotencyKey: verifiedGate.idempotencyKey,
       observedSurfaceOperationRef: previewEvidence.surfaceOperationRef,
       observedDownstreamStatus: "succeeded",
+      downstreamRetryability: "non_retryable",
+      providerOperationRef: previewEvidence.surfaceOperationRef,
+      diagnosticsRedactionPosture: "redacted",
       evidenceRefs: [previewEvidence.evidenceRef],
       resolvedProofGapIds: [],
     });
     return { outcome: "preview_created", gatewayCheck, reconciliation, previewEvidence };
-  } catch {
+  } catch (error) {
+    const failureEvidence = await downstreamFailureEvidence({
+      adapterId: "preview-deploy",
+      surfaceOperationRef,
+      error,
+      evidenceRef: `evidence:preview-deploy-failed:${surfaceOperationRef}`,
+    });
     const { reconciliation } = await input.protocol.reconcileSurfaceOperation({
       mutationAttemptId: verifiedGate.mutationAttemptId,
       idempotencyKey: verifiedGate.idempotencyKey,
       observedSurfaceOperationRef: surfaceOperationRef,
       observedDownstreamStatus: "failed",
-      evidenceRefs: [`evidence:preview-deploy-failed:${surfaceOperationRef}`],
+      ...failureEvidence,
       resolvedProofGapIds: [],
     });
     return { outcome: "preview_failed", gatewayCheck, reconciliation, previewEvidence: null };

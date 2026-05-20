@@ -75,7 +75,7 @@ function openApiEvidenceReadPathFor(route: (typeof evidenceReadRouteDefinitions)
     get: {
       summary: route.summary,
       description: route.responseDescription,
-      security: transitionSecurity(route.role),
+      security: route.roles.map((role) => ({ [transitionCallerSecuritySchemeName(role)]: [] })),
       parameters: route.pathParameters.map((parameter) => pathParameter(parameter.name, parameter.description)),
       responses: {
         "200": jsonResponse(route.responseDescription, route.responseSchema),

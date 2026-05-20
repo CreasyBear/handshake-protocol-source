@@ -19,6 +19,20 @@ export type PackageInstallFixtureObjects = {
   envelope: OperatingEnvelope;
 };
 
+export type PackageInstallObservedParameters = {
+  package: string;
+  versionRange: string;
+  packageManager: string;
+  registryRef: string;
+  workspaceRef: string | null;
+  manifestRef: string | null;
+  lockfileRef: string | null;
+  installFlags: string[];
+  lifecycleScriptPolicy: "blocked" | "allowed" | "unknown";
+  resolvedMaterialDigest: `sha256:${string}` | null;
+  resolvedMaterialEvidenceRefs: string[];
+};
+
 export async function createPackageManifestSurface(
   prefix = "handshake-package-flow-",
 ): Promise<FilePackageManifestSurface> {
@@ -56,5 +70,30 @@ export function packageInstallRuntimeConfig(fixture: PackageInstallFixtureObject
     gatewayId: fixture.gateway.gatewayId,
     contractExpiresAt: futureIso(),
     signingSecret: "test-secret",
+  };
+}
+
+export function packageInstallObservedParameters(
+  overrides: Partial<PackageInstallObservedParameters> = {},
+): PackageInstallObservedParameters {
+  return {
+    ...packageInstallObservedParametersBase(),
+    ...overrides,
+  };
+}
+
+function packageInstallObservedParametersBase(): PackageInstallObservedParameters {
+  return {
+    package: "hono",
+    versionRange: "^4.12.19",
+    packageManager: "bun",
+    registryRef: "registry:npmjs",
+    workspaceRef: null,
+    manifestRef: "manifest:package.json",
+    lockfileRef: "lockfile:bun.lock",
+    installFlags: [],
+    lifecycleScriptPolicy: "blocked" as const,
+    resolvedMaterialDigest: null,
+    resolvedMaterialEvidenceRefs: [],
   };
 }

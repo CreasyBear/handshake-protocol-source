@@ -27,7 +27,7 @@ export type EvidenceReadNavigationEntry = {
   method: "GET";
   honoPath: `/v0.2/${string}`;
   openApiPath: `/v0.2/${string}`;
-  role: TransitionCallerRole;
+  roles: readonly TransitionCallerRole[];
   readOnly: true;
   diagnosticOnly: true;
   recordsWritten: readonly ProtocolObjectType[];
@@ -54,7 +54,7 @@ export const evidenceReadNavigation = evidenceReadRouteDefinitions.map((route) =
   method: "GET",
   honoPath: route.honoPath,
   openApiPath: route.openApiPath,
-  role: route.role,
+  roles: route.roles,
   readOnly: true,
   diagnosticOnly: true,
   recordsWritten: [],

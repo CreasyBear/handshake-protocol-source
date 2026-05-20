@@ -11,6 +11,13 @@ export const CreateReviewArtifactInputSchema = z.strictObject({
   renderedPolicyInputDigest: DigestSchema,
   renderedUncertaintyDigest: DigestSchema,
   renderedArtifactDigest: DigestSchema,
+  catalogDigest: DigestSchema.nullable().default(null),
+  rendererDigest: DigestSchema.nullable().default(null),
+  actionBindingDigest: DigestSchema.nullable().default(null),
+  hiddenActionPosture: z.enum(["no_hidden_actions_detected", "hidden_action_risk", "unknown"]).default("unknown"),
+  secondaryActionPosture: z
+    .enum(["no_secondary_actions_detected", "secondary_action_risk", "unknown"])
+    .default("unknown"),
   uncertaintyMarkers: z.array(z.string().min(1)).default([]),
   evidenceRefs: z.array(z.string().min(1)).default([]),
 });
