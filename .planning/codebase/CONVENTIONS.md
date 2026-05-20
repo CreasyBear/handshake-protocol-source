@@ -1,144 +1,97 @@
 # Coding Conventions
 
-**Analysis Date:** 2026-05-19
+**Analysis Date:** 2026-05-20
 
 ## Naming Patterns
 
 **Files:**
-- Use lowercase owned-concept file names with hyphens for multi-word concepts: `src/runtime/package-install/action-proposal.ts`, `src/http/routes/transition-route-registry.ts`, `src/protocol/foundation/reason-codes.ts`.
-- Use `index.ts` as the public face for multi-file folders: `src/protocol/areas/action-contract/index.ts`, `src/http/routes/index.ts`, `src/storage/d1/index.ts`.
-- Keep protocol areas under owned primitive folders: `src/protocol/areas/action-contract`, `src/protocol/areas/policy-greenlight`, `src/protocol/areas/gateway-gate`, `src/protocol/areas/proof-gap`.
-- Do not create bucket directories named `utils`, `helpers`, `common`, `misc`, `stuff`, `manager`, or `service`; `test/architecture/naming-posture.test.ts` enforces this for `src/**`.
-- Root `test/` has no loose `*.test.ts` files; place tests under domain folders such as `test/protocol`, `test/http`, `test/runtime`, `test/adapters`, `test/architecture`, `test/integration`, and `test/conformance`.
+- Use ownership nouns, not generic buckets. `QUALITY.md`, `STRUCTURE.md`, and `test/architecture/naming-posture.test.ts` forbid source path segments such as `utils`, `helpers`, `common`, `misc`, `stuff`, `manager`, and `service`.
+- Keep first-level source lanes explicit and documented. `src/protocol/LANE.md`, `src/http/LANE.md`, `src/runtime/LANE.md`, `src/adapters/LANE.md`, `src/conformance/LANE.md`, `src/storage/LANE.md`, `src/sdk/LANE.md`, and `src/install/LANE.md` must each declare ownership, proof claim, imports, public surface, and extraction trigger.
+- Use protocol area folders under `src/protocol/areas/*` for owned primitives. `test/architecture/import-posture.test.ts` enumerates the active protocol areas and checks that deprecated root compatibility shims stay removed.
+- Keep generated-execution helper files named for proposal and graph roles. `src/runtime/package-install/action-proposal.ts`, `src/runtime/repo-write/action-proposal.ts`, `src/runtime/preview-deploy/action-proposal.ts`, and `src/runtime/codemode-multi-action/generated-program-runner.ts` are the current runtime naming pattern.
 
 **Functions:**
-- Use camelCase for functions and methods: `createRuntimeExecution`, `proposeActionContract`, `evaluatePolicy`, `gatewayCheck`, `reconcileSurfaceOperation`.
-- Durable write functions should start with explicit write verbs from `QUALITY.md`: `record*`, `persist*`, `commit*`, `consume*`, `mark*`, `activate*`.
-- Read and derivation functions should use explicit read/derive verbs from `QUALITY.md`: `get*`, `list*`, `derive*`, `build*`, `format*`, `resolve*`.
-- Avoid vague mutation verbs inside protocol modules: `handle*`, `process*`, `do*`, and `run*`; `test/architecture/naming-posture.test.ts` enforces this in `src/protocol/**`.
-- Runtime and adapter public runners may use `run*` only for runner entrypoints such as `runPackageInstallGateway` in `src/adapters/package-install/gateway.ts`.
-- Avoid overclaiming names such as `ensureSafe*`, `guarantee*`, `proveExecution*`, `trustedAgent*`, and `secureApproval*`; `test/architecture/naming-posture.test.ts` enforces this in `src/**`.
+- Durable writes should use explicit verbs such as `record*`, `persist*`, `commit*`, `consume*`, `mark*`, and `activate*` per `QUALITY.md`.
+- Reads and derivations should use `get*`, `list*`, `derive*`, `build*`, `format*`, and `resolve*` per `QUALITY.md`.
+- Avoid vague protocol mutation names such as `handle*`, `process*`, `do*`, and `run*` inside `src/protocol/**`; `test/architecture/naming-posture.test.ts` enforces this. Public adapter and runtime entrypoints may use `run*`, as in `src/adapters/package-install/gateway.ts` and `src/runtime/codemode-multi-action/generated-program-runner.ts`.
+- Avoid overclaiming names such as `ensureSafe*`, `guarantee*`, `proveExecution*`, `trustedAgent*`, and `secureApproval*`; `test/architecture/naming-posture.test.ts` enforces this over `src/**`.
 
 **Variables:**
-- Use camelCase for local variables and parameters: `observedParameters`, `surfaceOperationRef`, `refusalReasonCodes`, `gatewayPolicyDrift`.
-- Use uppercase constants for stable shared constants: `PROTOCOL_VERSION` in `src/protocol/foundation/schema-core.ts`, `MAX_STREAM_COMMIT_RETRIES` in `src/protocol/areas/gateway-gate/transitions.ts`, `TEST_CALLER_AUTH_TOKENS` in `test/http/http.test.ts`.
-- Prefer discriminated outcome values over booleans for authority-bearing results: `outcome: "action_contract_proposed"`, `outcome: "intent_compilation_refused"`, `outcome: "gateway_check_refused"`.
-- Use `_`-prefixed names only for intentionally unused variables; `eslint.config.js` permits unused args, caught errors, and vars only when they match `^_`.
+- Use explicit protocol nouns for records and outcomes. Representative examples are `actionContract`, `policy`, `greenlight`, `gatewayResult`, `proofGap`, and `surfaceOperationRef` in `test/integration/package-install-end-to-end.test.ts` and `test/integration/repo-write-d1-http.test.ts`.
+- Use `*Ref`, `*Id`, `*Digest`, `*ReasonCode`, and `*Status` suffixes for protocol identity, canonicalization, refusal, and state fields. This pattern is visible in `src/protocol/public/schemas.ts`, `src/protocol/store/port.ts`, and `test/support/fixtures.ts`.
+- Use `as const` and `satisfies` when values must remain narrow and checked. Examples include role-token maps in `test/http/http.test.ts` and `test/support/d1-http-harness.ts`.
 
 **Types:**
-- Use PascalCase for exported types, interfaces, and classes: `HandshakeKernel`, `HandshakeProtocolError`, `PackageInstallGatewayResult`, `ProtocolStore`.
-- Zod schemas use the `*Schema` suffix and infer exported types from schemas: `ActionContractSchema` and `type ActionContract` in `src/protocol/areas/action-contract/schemas.ts`.
-- Transition input types use the `*Input` suffix and are backed by Zod input schemas: `ProposeActionContractInputSchema` and `ProposeActionContractInput` in `src/protocol/areas/action-contract/inputs.ts`.
-- Result unions should use exact string discriminants instead of loosely shaped nullable objects: `PackageInstallGatewayResult` in `src/adapters/package-install/gateway.ts`.
-- Protocol object names stay exact: `ActionContract`, `PolicyDecision`, `Greenlight`, `GatewayCheck`, `Receipt`, `Refusal`, `ProofGap`, `IsolationState`.
+- Schema-derived types use the paired `Schema`/type pattern with Zod. Examples include `ReceiptSchema` and `Receipt` in `src/protocol/areas/receipt-export/schemas.ts`, plus public aggregators in `src/protocol/public/schemas.ts`.
+- Public package types are exported deliberately through `src/index.ts`, `src/conformance/index.ts`, and `src/experimental.ts`; `test/architecture/root-exports.test.ts` enforces the root, conformance, and experimental export sets.
+- Store and adapter contracts are structural TypeScript types, not classes where plain contracts are enough. Examples include `ProtocolStore` in `src/protocol/store/port.ts`, `ProtectedMutationAdapterProbe` in `src/conformance/index.ts`, and gateway input/result types under `src/adapters/*/gateway.ts`.
 
 ## Code Style
 
 **Formatting:**
-- Use Prettier from `.prettierrc.json`.
-- Settings: `printWidth: 120`, semicolons enabled, double quotes, trailing commas enabled.
-- Run `npm run format:check` for verification and `npm run format` to rewrite formatting.
+- Use Prettier from `.prettierrc.json`: `printWidth` 120, semicolons enabled, double quotes, and trailing commas.
+- Keep all TypeScript and markdown compatible with `npm run format:check` from `package.json`; the full gate also runs `git diff --check` from `package.json`.
 
 **Linting:**
-- Use ESLint flat config in `eslint.config.js` with `typescript-eslint` recommended rules.
-- Lint scope is `src` and `test` via `npm run lint`.
-- Warnings are failures: `eslint src test --max-warnings=0`.
-- Use separate type-only imports where possible; `@typescript-eslint/consistent-type-imports` is `error`.
-- Do not leave unused values unless the name is intentionally `_`-prefixed.
-- Do not use `console` except `console.warn` and `console.error`; ordinary logging is not a code pattern in `src/**`.
-
-**TypeScript:**
-- `tsconfig.json` enables strict mode, `noUncheckedIndexedAccess`, and `exactOptionalPropertyTypes`.
-- Target is `ES2022`, module is `ESNext`, and module resolution is `Bundler`.
-- Runtime type surfaces use `zod` schemas at transition, adapter, HTTP, SDK, and fixture boundaries.
+- Use ESLint via `eslint.config.js` and `npm run lint` from `package.json`.
+- `eslint.config.js` applies `typescript-eslint` recommended rules to `src/**/*.ts` and `test/**/*.ts`.
+- `eslint.config.js` requires separate type-only imports through `@typescript-eslint/consistent-type-imports`.
+- `eslint.config.js` fails unused variables unless prefixed with `_`, and forbids `console` except `console.warn` and `console.error`.
 
 ## Import Organization
 
 **Order:**
-1. External runtime dependencies such as `hono` and `zod`.
-2. Node and Bun built-ins in tests and harnesses, such as `node:fs/promises`, `node:path`, and `bun:sqlite`.
-3. Local source value imports from the owning lane.
-4. Local source type imports using `import type`.
-5. Test support imports from `test/support/*`.
+1. External runtime and standard-library imports, as in `src/http/openapi/index.ts` importing `zod` before local route and protocol modules.
+2. Type-only local imports should use `import type`, as in `src/sdk/client.ts`, `src/protocol/store/port.ts`, and `test/protocol/model-based-invariants.test.ts`.
+3. Value imports from local lanes should use the lane public face where the guard tests require it. `test/architecture/import-posture.test.ts` checks that HTTP, SDK, kernel, and protocol areas avoid importing protected internals directly.
 
 **Path Aliases:**
-- Not detected. Use relative imports inside `src/**` and `test/**`.
-- Package-style public imports are smoke-tested through `await import("../../src")` in `test/architecture/root-exports.test.ts`.
-
-**Import Boundaries:**
-- `src/protocol/**` must not import storage adapters, HTTP transport, runtime wrappers, SDK code, or reference gateways; see `src/protocol/LANE.md` and `test/architecture/import-posture.test.ts`.
-- `src/http/**` and `src/sdk/**` must not import protocol area internals except public area indexes; see `test/architecture/import-posture.test.ts`.
-- `src/storage/**` imports store interfaces and object metadata, not primitive transition behavior; see `src/storage/LANE.md`.
-- `src/adapters/**` imports gateway verification helpers and adapter-local schemas, not storage internals; see `src/adapters/LANE.md`.
-- `src/runtime/**` may observe and propose but must not issue policy decisions, greenlights, gateway checks, receipts, or mutation attempts; see `src/runtime/LANE.md`.
+- No TypeScript path aliases are configured. `tsconfig.json` uses `moduleResolution: "Bundler"` and repo code imports with relative paths.
+- Use package subpaths only at the package boundary declared in `package.json`: `.`, `./conformance`, `./experimental`, and `./package.json`.
 
 ## Error Handling
 
 **Patterns:**
-- Validate external or transition input with Zod before business logic: `GatewayCheckInputSchema.parse` in `src/protocol/areas/gateway-gate/transitions.ts`, `PackageInstallParametersSchema.parse` in `src/adapters/package-install/gateway.ts`, and `route.requestSchema` parsing in `src/http/app.ts`.
-- Use `HandshakeProtocolError` for protocol and HTTP-facing failures, with stable `code`, HTTP `status`, and optional metadata in `src/protocol/foundation/errors.ts`.
-- Use `HandshakeAmbiguousCommitError` for ambiguous durable commits and preserve `retryability: "ambiguous"` plus `commitState: "unknown"`.
-- Convert HTTP errors into typed transition envelopes through `src/http/errors/transition-error-envelope.ts`.
-- SDK callers receive `HandshakeClientError` with typed `code`, `retryability`, `commitState`, `proofRef`, and `refusalRef` in `src/sdk/client.ts`.
-- Adapters catch mutation-surface failures only after a verified gate, then reconcile the surface operation as failed; see `runPackageInstallGateway` in `src/adapters/package-install/gateway.ts`.
-- Record missing or uncertain evidence as refusals, proof gaps, or ambiguous commit metadata rather than smoothing it into success.
+- Use `HandshakeProtocolError` for protocol and HTTP transition failures that need status, retryability, commit-state, or request metadata. Examples live in `src/protocol/foundation/errors.ts`, `src/http/errors/transition-error-envelope.ts`, `src/http/admission/caller-auth.ts`, and `src/http/admission/request-context.ts`.
+- Register stable source-emitted reason and transition error codes. `test/protocol/reason-code-registry.test.ts` scans `src/**` for emitted codes and verifies they exist in `src/protocol/foundation/reason-codes.ts` or `src/http/errors/codes.ts`.
+- Represent expected negative outcomes as refusals, proof gaps, or typed result objects instead of throwing when the protocol can record evidence. Examples are gateway refusal assertions in `test/adapters/package-install-gateway.test.ts` and proof-gap assertions in `test/protocol/evidence-projections.test.ts`.
+- Use plain `throw new Error(...)` for impossible test narrowing and local invariant failures where TypeScript cannot prove the branch, as in `test/runtime/package-install-runtime.test.ts`, `test/runtime/codemode-multi-action-runtime.test.ts`, and `test/support/fixtures.ts`.
 
 ## Logging
 
-**Framework:** console restricted by ESLint
+**Framework:** console
 
 **Patterns:**
-- No general application logging framework is present.
-- `no-console` is enforced for `src` and `test`, with only `console.warn` and `console.error` allowed in `eslint.config.js`.
-- Tests expose debugging detail through assertion failure messages, structured error envelopes, and helper snapshots such as `TransitionBudgetRecorder` in `test/support/transition-budget-recorder.ts`.
+- Source and tests should not use routine logging. `eslint.config.js` forbids `console` in `src/**/*.ts` and `test/**/*.ts` except `warn` and `error`.
+- Operational scripts may write concise process output. `scripts/check-package-surface.mjs` prints the package dry-run result after checking required and forbidden package files.
 
 ## Comments
 
 **When to Comment:**
-- Keep source comments sparse. The dominant documentation pattern is explicit naming, schemas, lane manifests, and invariant tests.
-- Add comments only when code cannot make an authority boundary or failure mode obvious on its own.
-- Use `src/*/LANE.md` manifests for lane-level constraints, not inline comments.
+- Prefer lane manifests and explicit names over inline explanation. Ownership and constraints belong in `src/*/LANE.md`.
+- Use comments sparingly in source. Current convention is to let Zod schemas, transition names, and tests carry meaning in `src/protocol/**` and `test/protocol/**`.
 
 **JSDoc/TSDoc:**
-- Not detected as a routine convention in `src/**` or `test/**`.
-- Prefer exported schema/type names and lane manifests over broad JSDoc blocks unless a public API needs generated documentation.
+- Not a dominant pattern. Public contracts are documented through exported type names in `src/index.ts`, schema names in `src/protocol/public/schemas.ts`, and guard tests in `test/architecture/*`.
 
 ## Function Design
 
-**Size:**
-- Protocol transitions split into parse, context loading, assertion, build-plan, and commit-plan helpers: `src/protocol/areas/action-contract/transitions.ts` and `src/protocol/areas/gateway-gate/transitions.ts`.
-- Keep public methods on `HandshakeKernel` thin; `src/protocol/kernel.ts` delegates to area transition functions and only wraps guard failures.
+**Size:** Keep functions narrow around one transition, projection, adapter action, or guard. `STRUCTURE.md` and `test/architecture/import-posture.test.ts` keep route metadata, invokers, response schemas, and protocol meaning separate.
 
-**Parameters:**
-- Transition functions take typed input objects, not positional argument lists: `EvaluatePolicyInput`, `GatewayCheckInput`, `CreateReceiptExportInput`.
-- Adapter runners take a single input object that includes protocol port, mutation surface, IDs, and observed parameters: `PackageInstallGatewayInput` in `src/adapters/package-install/gateway.ts`.
-- Runtime helper configs are explicit objects with tenant, organization, principal, agent, run, catalog, action, gateway, expiry, and optional signing secret fields: `PackageInstallRuntimeConfig`.
+**Parameters:** Prefer typed object inputs for protocol transitions and adapters. Examples include `CompileIntentInput` and `ProposeActionContractInput` in `src/protocol/public/inputs.ts`, gateway input types under `src/adapters/*/gateway.ts`, and client methods in `src/sdk/client.ts`.
 
-**Return Values:**
-- Return exact protocol records, typed result objects, or discriminated unions.
-- Avoid returning bare success booleans for authority-bearing operations.
-- Use `null` explicitly where protocol state requires absence, such as `greenlight: Greenlight | null` from `evaluatePolicy`.
+**Return Values:** Return typed records or discriminated outcomes. Examples include gateway results in `src/protocol/areas/gateway-gate`, runtime proposal outcomes in `src/runtime/package-install/action-proposal.ts`, and conformance results in `src/conformance/index.ts`.
 
 ## Module Design
 
-**Exports:**
-- Root exports are curated in `src/index.ts` and enforced by `test/architecture/root-exports.test.ts`.
-- Internal kernel and store objects are intentionally absent from the package root: `HandshakeKernel`, `InMemoryProtocolStore`, and `D1ProtocolStore` are not root exports.
-- Experimental reference gateway fixtures live on `src/experimental.ts` and are tested as a separate surface.
-- Conformance checks live on `src/conformance/index.ts` and are exported through the `./conformance` package subpath in `package.json`.
+**Exports:** Keep exports curated by authority boundary. `src/index.ts` exposes stable root APIs, `src/conformance/index.ts` exposes reference checks, and `src/experimental.ts` exposes fixture gateway runners with explicit experimental names.
 
-**Barrel Files:**
-- Use `index.ts` barrels as public faces for multi-file folders.
-- Area `types.ts` faces stay local and should only re-export `../../foundation/schema-core`, `./schemas`, and `./inputs`; `test/architecture/import-posture.test.ts` enforces this.
-- Public schema and input aggregators in `src/protocol/public/schemas.ts` and `src/protocol/public/inputs.ts` are aggregation-only files.
+**Barrel Files:** Use `index.ts` as an intentional public face for multi-file folders. `QUALITY.md`, `STRUCTURE.md`, and `test/architecture/naming-posture.test.ts` require a public face for larger source folders and prevent loose source buckets.
 
-**Architecture Conventions:**
-- Every first-level `src/*` lane must keep `LANE.md` or `README.md` with the required fields listed in `QUALITY.md`; `test/architecture/import-posture.test.ts` enforces this.
-- Split by authority owner, not by implementation convenience: `src/protocol`, `src/http`, `src/runtime`, `src/adapters`, `src/conformance`, `src/storage`, and `src/sdk`.
-- Keep `.planning/` scratch out of canonical repo-facing surfaces; `README.md`, `QUALITY.md`, and `STRUCTURE.md` state that `.planning/` is not repo truth.
-- Keep stale boundary vocabulary out of active docs, code, migrations, commands, and tests through `test/architecture/active-vocabulary.test.ts`.
-- Preserve package surface curation through `package.json`, `scripts/check-package-surface.mjs`, and `test/architecture/package-surface.test.ts`.
+**Source-Owned Truth:** Put durable metadata in source or tests that consume it. Examples include `src/protocol/navigation/index.ts`, `src/http/navigation/index.ts`, `src/protocol/foundation/reason-codes.ts`, and guard tests in `test/protocol/protocol-navigation.test.ts` and `test/protocol/reason-code-registry.test.ts`.
+
+**Planning Boundary:** Treat `.planning/**` as scratch only. `AGENTS.md`, `README.md`, `QUALITY.md`, and `STRUCTURE.md` say tracked canon and source/tests are truth; do not promote planning labels into `package.json`, `.github/workflows/check.yml`, `src/**`, `test/**`, or canonical docs.
 
 ---
 
-*Convention analysis: 2026-05-19*
+*Convention analysis: 2026-05-20*

@@ -1,376 +1,353 @@
 # Codebase Structure
 
-**Analysis Date:** 2026-05-19
+**Analysis Date:** 2026-05-20
 
 ## Directory Layout
 
 ```text
 [project-root]/
-├── AGENTS.md                  # Handshake doctrine, invariants, and authority language
-├── README.md                  # Current repo orientation, source map, and command contract
-├── QUALITY.md                 # TypeScript quality, naming, and verification rules
-├── STRUCTURE.md               # Canonical source/test/docs ownership map
-├── package.json               # Private package boundary, exports, scripts, dependencies
-├── tsconfig.json              # Strict TypeScript config for source and tests
-├── tsconfig.build.json        # Declaration-only package build config
-├── eslint.config.js           # ESLint rules for source and tests
-├── wrangler.toml              # Cloudflare Worker, D1, and KV binding config
+├── AGENTS.md                         # Product doctrine, invariants, and response posture
+├── README.md                         # Current package orientation, install/use commands, and quality gates
+├── QUALITY.md                        # TypeScript, naming, and quality rules
+├── STRUCTURE.md                      # Canonical source/test/docs ownership map
+├── package.json                      # Package exports, scripts, dependencies, Bun package manager
+├── tsconfig.json                     # TypeScript compiler settings
+├── eslint.config.js                  # ESLint flat config
+├── wrangler.toml                     # Cloudflare Worker/D1/KV configuration
+├── migrations/                       # D1 schema for protocol store atomicity
 ├── src/
-│   ├── protocol/              # Protocol meaning, transitions, schemas, events, store port
-│   ├── http/                  # Hono/Worker transport, admission, routes, errors, OpenAPI
-│   ├── runtime/               # Generated-execution proposal helpers
-│   ├── adapters/              # Reference gateway mutation fixtures
-│   ├── storage/               # D1, memory, KV, and store plumbing
-│   ├── sdk/                   # Typed HTTP client
-│   ├── conformance/           # Reference conformance probes
-│   ├── index.ts               # Curated package root
-│   ├── experimental.ts        # Explicit experimental gateway surface
-│   └── worker.ts              # Cloudflare Worker entrypoint
+│   ├── index.ts                      # Curated root package API
+│   ├── experimental.ts               # Explicit experimental/reference adapter API
+│   ├── worker.ts                     # Cloudflare Worker entry
+│   ├── protocol/                     # Protocol kernel, transition areas, records, navigation, public schemas
+│   ├── http/                         # Hosted HTTP app, route metadata, admission, evidence reads
+│   ├── storage/                      # Memory, D1, and KV storage implementations
+│   ├── runtime/                      # Runtime proposal helpers and generated program evidence helpers
+│   ├── adapters/                     # Reference and experimental gateway fixtures/probes
+│   ├── install/                      # Install proposal and protected action adapter pack types
+│   ├── conformance/                  # Narrow conformance/proof helper surface
+│   └── sdk/                          # Client SDK types and helpers
 ├── test/
-│   ├── architecture/          # Repo shape, imports, naming, exports, vocabulary
-│   ├── protocol/              # Protocol primitive and state-machine invariants
-│   ├── http/                  # Transport, admission, SDK, and D1-over-HTTP behavior
-│   ├── runtime/               # Runtime proposal helper behavior
-│   ├── adapters/              # Reference gateway fixture behavior
-│   ├── conformance/           # Conformance probe behavior
-│   ├── integration/           # End-to-end protected action paths
-│   └── support/               # Test fixtures, surfaces, harnesses, fault injection
-├── migrations/
-│   └── 0001_protocol_kernel.sql # Canonical D1 protocol storage schema
+│   ├── architecture/                 # Import, export, naming, and public surface posture tests
+│   ├── protocol/                     # Protocol transition and invariant tests
+│   ├── http/                         # HTTP route/admission/evidence tests
+│   ├── storage/                      # Store parity and atomicity tests
+│   ├── runtime/                      # Runtime helper tests
+│   ├── adapters/                     # Reference adapter tests
+│   ├── install/                      # Install proposal tests
+│   └── sdk/                          # SDK tests
 ├── docs/
-│   └── internal/              # Compact internal protocol canon and decisions
-├── scripts/
-│   └── check-package-surface.mjs # Package dry-run allow/deny surface check
-├── .github/
-│   └── workflows/check.yml    # CI gate bound to npm run check:repo
-├── .planning/
-│   └── codebase/              # Generated GSD mapper documents; scratch, not repo truth
-├── dist/                      # Generated declaration build output
-├── node_modules/              # Local dependency install output
-└── bun.lock                   # Bun lockfile
+│   ├── internal/                     # Canonical protocol notes, definitions, architecture, decisions
+│   ├── protocol/                     # Public-facing protocol walkthrough and integration docs
+│   └── examples/                     # Example/reference documentation
+├── examples/                         # Runnable/reference example code
+└── .planning/                        # Scratch planning workspace, not repo-facing canon
 ```
 
 ## Directory Purposes
 
-**`src/protocol`:**
-- Purpose: Own all protocol meaning and authority semantics.
-- Contains: `kernel.ts`, `areas/*`, `foundation/*`, `events/*`, `context/*`, `navigation/*`, `public/*`, `store/*`, `LANE.md`.
-- Key files: `src/protocol/kernel.ts`, `src/protocol/store/port.ts`, `src/protocol/navigation/index.ts`, `src/protocol/public/schemas.ts`, `src/protocol/public/inputs.ts`.
+**Repository Canon:**
+- Purpose: Define current product doctrine, package posture, source ownership, quality gates, and durable decisions.
+- Contains: `AGENTS.md`, `README.md`, `QUALITY.md`, `STRUCTURE.md`, `docs/internal/decisions.md`, `docs/internal/protocol-definition.md`, `docs/internal/protocol-kernel-architecture.md`, `docs/internal/protocol-notes.md`.
+- Key files: `AGENTS.md`, `README.md`, `STRUCTURE.md`, `docs/internal/protocol-kernel-architecture.md`.
 
-**`src/protocol/areas`:**
-- Purpose: House owned primitive modules.
-- Contains: One directory per protocol primitive: `action-contract`, `catalog-envelope`, `gateway-gate`, `generated-execution-graph`, `intent-compilation`, `isolation-breaker`, `object-registry`, `operation-lifecycle`, `policy-greenlight`, `proof-gap`, `protected-path-posture`, `receipt-export`, `recovery`, `refusal`, `review-binding`, `runtime-evidence`.
-- Key files: Each multi-file area uses `index.ts`, `schemas.ts`, `inputs.ts`, `types.ts`, and transition/guard files as needed.
+**`src/protocol/`:**
+- Purpose: Own the protocol kernel, transition areas, canonical record creation, store port, navigation map, public inputs/schemas, and evidence projections.
+- Contains: `kernel.ts`, `store/port.ts`, `events/records.ts`, `navigation/index.ts`, `public/*`, `evidence-projections/*`, and `areas/*`.
+- Key files: `src/protocol/kernel.ts`, `src/protocol/store/port.ts`, `src/protocol/events/records.ts`, `src/protocol/navigation/index.ts`, `src/protocol/areas/object-registry/index.ts`.
 
-**`src/protocol/foundation`:**
-- Purpose: Shared deterministic protocol primitives.
-- Contains: Canonicalization, content digests, IDs, errors, reason codes, base schema core, transition guard helpers.
-- Key files: `src/protocol/foundation/canonical.ts`, `src/protocol/foundation/content-digests.ts`, `src/protocol/foundation/errors.ts`, `src/protocol/foundation/ids.ts`, `src/protocol/foundation/schema-core.ts`, `src/protocol/foundation/transition-guards.ts`.
+**`src/protocol/areas/`:**
+- Purpose: Own protocol primitives by bounded area. Add protocol behavior here, not in HTTP, storage, runtime helpers, or adapters.
+- Contains: `intent-compilation`, `action-contract`, `policy-greenlight`, `gateway-gate`, `operation-lifecycle`, `protected-path-posture`, `idempotency-ledger`, `isolation`, `object-registry`, `action-attempt-lifecycle`, and supporting protocol areas.
+- Key files: `src/protocol/areas/intent-compilation/transitions.ts`, `src/protocol/areas/action-contract/transitions.ts`, `src/protocol/areas/policy-greenlight/transitions.ts`, `src/protocol/areas/gateway-gate/transitions.ts`, `src/protocol/areas/operation-lifecycle/transitions.ts`.
 
-**`src/protocol/events`:**
-- Purpose: Record and chain transition evidence.
-- Contains: Event schemas, event chain builder, protocol recorder.
-- Key files: `src/protocol/events/chains.ts`, `src/protocol/events/records.ts`, `src/protocol/events/schemas.ts`.
+**`src/protocol/public/`:**
+- Purpose: Provide public input parsers, schemas, and transition wrappers while hiding internal stored record shapes.
+- Contains: `inputs.ts`, `schemas.ts`, `transitions.ts`.
+- Key files: `src/protocol/public/inputs.ts`, `src/protocol/public/schemas.ts`, `src/protocol/public/transitions.ts`.
 
-**`src/protocol/context`:**
-- Purpose: Bind transition request context into protocol records and event payloads.
-- Contains: Request context schemas and builders.
-- Key files: `src/protocol/context/request-contexts.ts`, `src/protocol/context/request-context-schemas.ts`.
+**`src/protocol/evidence-projections/`:**
+- Purpose: Build redacted read-only evidence and review projections from committed protocol records.
+- Contains: Projection builders and schemas.
+- Key files: `src/protocol/evidence-projections/projections.ts`, `src/protocol/evidence-projections/schemas.ts`.
 
-**`src/protocol/public`:**
-- Purpose: Aggregate public protocol schemas and transition inputs.
-- Contains: Aggregator-only `schemas.ts` and `inputs.ts`.
-- Key files: `src/protocol/public/schemas.ts`, `src/protocol/public/inputs.ts`.
+**`src/http/`:**
+- Purpose: Host protocol transitions over HTTP without owning primitive semantics.
+- Contains: Hono app creation, route definitions, transition invokers, admission, request context, evidence reads, internal raw record reads, OpenAPI helpers, and store resolution.
+- Key files: `src/http/app.ts`, `src/http/routes/transition-route-registry.ts`, `src/http/routes/transition-invokers.ts`, `src/http/admission/index.ts`, `src/http/store/resolution.ts`.
 
-**`src/protocol/store`:**
-- Purpose: Define storage port and atomic commit contracts.
-- Contains: `ProtocolStore`, stored record shapes, commit result types, greenlight consumption, indexes, stream tail types.
-- Key files: `src/protocol/store/port.ts`, `src/protocol/store/index.ts`.
+**`src/storage/`:**
+- Purpose: Implement `ProtocolStore` and support isolation caching.
+- Contains: `memory/index.ts`, `d1/index.ts`, `d1/statements.ts`, `kv/index.ts`.
+- Key files: `src/storage/memory/index.ts`, `src/storage/d1/index.ts`, `src/storage/d1/statements.ts`, `src/storage/kv/index.ts`.
 
-**`src/http`:**
-- Purpose: Own Hono/Worker transport, caller custody, route metadata, route dispatch, OpenAPI projection, evidence reads, HTTP errors, and store/kernel resolution.
-- Contains: `admission/*`, `routes/*`, `handlers/*`, `errors/*`, `openapi/*`, `navigation/*`, `store/*`, `app.ts`, `app-options.ts`, `LANE.md`.
-- Key files: `src/http/app.ts`, `src/http/routes/transition-route-registry.ts`, `src/http/routes/transition-invokers.ts`, `src/http/admission/caller-auth.ts`, `src/http/admission/hosted-caller-identity.ts`.
-
-**`src/runtime`:**
-- Purpose: Convert generated execution into protocol evidence and action contract proposal calls.
-- Contains: Action proposal helpers for package install, repo write, preview deploy, and codemode multi-action graphs.
-- Key files: `src/runtime/package-install/action-proposal.ts`, `src/runtime/repo-write/action-proposal.ts`, `src/runtime/preview-deploy/action-proposal.ts`, `src/runtime/codemode-multi-action/generated-program-runner.ts`, `src/runtime/codemode-multi-action/generated-graph-evidence.ts`.
-
-**`src/adapters`:**
-- Purpose: Provide reference gateway fixtures that mutate only after `VerifiedGatewayCheck`.
-- Contains: Gateway runners for package install, repo write, and preview deploy.
-- Key files: `src/adapters/package-install/gateway.ts`, `src/adapters/repo-write/gateway.ts`, `src/adapters/preview-deploy/gateway.ts`.
-
-**`src/storage`:**
-- Purpose: Implement `ProtocolStore` and storage-side plumbing.
-- Contains: `d1/*`, `memory/*`, `kv/*`, `store.ts`, `LANE.md`.
-- Key files: `src/storage/d1/index.ts`, `src/storage/d1/statements.ts`, `src/storage/memory/index.ts`, `src/storage/kv/index.ts`, `src/storage/store.ts`.
-
-**`src/sdk`:**
-- Purpose: Provide typed client calls over the public HTTP transition and diagnostic evidence routes.
-- Contains: `HandshakeClient`, error type, options, fetch adapter types.
-- Key files: `src/sdk/client.ts`, `src/sdk/LANE.md`.
-
-**`src/conformance`:**
-- Purpose: Provide narrow reference conformance checks without claiming certification.
-- Contains: Protected mutation adapter probe types and assertion helpers.
-- Key files: `src/conformance/index.ts`, `src/conformance/LANE.md`.
-
-**`test`:**
-- Purpose: Mirror source ownership and protect invariant behavior.
-- Contains: Architecture, protocol, HTTP, runtime, adapter, integration, conformance, and support tests.
-- Key files: `test/architecture/import-posture.test.ts`, `test/protocol/model-based-invariants.test.ts`, `test/protocol/kernel-policy-gateway.test.ts`, `test/integration/package-install-end-to-end.test.ts`.
-
-**`docs/internal`:**
-- Purpose: Compact internal canon for protocol definition, kernel architecture, plain-English explanation, notes, and durable decisions.
-- Contains: `decisions.md`, `protocol-definition.md`, `protocol-kernel-architecture.md`, `protocol-layman.md`, `protocol-notes.md`.
-- Key files: `docs/internal/protocol-definition.md`, `docs/internal/protocol-kernel-architecture.md`.
-
-**`migrations`:**
-- Purpose: Canonical D1 schema for durable protocol storage.
-- Contains: `0001_protocol_kernel.sql`.
+**`migrations/`:**
+- Purpose: Own durable D1 schema for protocol records, authority indexes, event streams, current posture/state, and receipt indexes.
+- Contains: SQL migration files.
 - Key files: `migrations/0001_protocol_kernel.sql`.
 
-**`.planning/codebase`:**
-- Purpose: Generated GSD codebase maps for planner/executor context.
-- Contains: `STACK.md`, `INTEGRATIONS.md`, `ARCHITECTURE.md`, `STRUCTURE.md`.
+**`src/runtime/`:**
+- Purpose: Convert concrete runtime scenarios and generated program evidence into protocol proposals.
+- Contains: Package install, repo write, preview deploy, and codemode multi-action helper lanes.
+- Key files: `src/runtime/package-install/action-proposal.ts`, `src/runtime/repo-write/action-proposal.ts`, `src/runtime/preview-deploy/action-proposal.ts`, `src/runtime/codemode-multi-action/generated-program-runner.ts`, `src/runtime/codemode-multi-action/generated-graph-evidence.ts`.
+
+**`src/adapters/`:**
+- Purpose: Demonstrate reference gateway check-and-mutate patterns and protected-path probes. Keep provider/native enforcement claims out of this lane unless source-backed by a real provider gateway.
+- Contains: Package install, repo write, preview deploy, protected-path probes, and x402 payment adapter fixtures.
+- Key files: `src/adapters/package-install/gateway.ts`, `src/adapters/repo-write/gateway.ts`, `src/adapters/preview-deploy/gateway.ts`, `src/adapters/protected-path-probes/executor.ts`, `src/adapters/x402-payment/wallet-gateway.ts`, `src/adapters/x402-payment/install-proposal.ts`, `src/adapters/x402-payment/action-proposal.ts`.
+
+**`src/install/`:**
+- Purpose: Compile install-time declarations for protected action adapter packs, gateway manifests, and policy envelopes.
+- Contains: Install proposal and protected action adapter pack code.
+- Key files: `src/install/install-proposal/index.ts`, `src/install/protected-action-adapter-pack/index.ts`.
+
+**`src/conformance/`:**
+- Purpose: Expose narrow conformance/proof helper types. Do not use this directory to imply certification.
+- Contains: `index.ts`.
+- Key files: `src/conformance/index.ts`.
+
+**`src/sdk/`:**
+- Purpose: Provide SDK-facing client helpers and package-facing types separate from protocol internals.
+- Contains: SDK lane files and `LANE.md`.
+- Key files: `src/sdk/LANE.md`.
+
+**`docs/internal/`:**
+- Purpose: Maintain compact canonical protocol architecture, protocol definition, durable decisions, and notes.
+- Contains: `decisions.md`, `protocol-definition.md`, `protocol-kernel-architecture.md`, `protocol-notes.md`, `protocol-layman.md`.
+- Key files: `docs/internal/decisions.md`, `docs/internal/protocol-definition.md`, `docs/internal/protocol-kernel-architecture.md`, `docs/internal/protocol-notes.md`.
+
+**`docs/protocol/`:**
+- Purpose: Provide public protocol walkthroughs and integration guidance.
+- Contains: First-contract walkthrough, runtime integration, gateway integration, and related docs.
+- Key files: `docs/protocol/first-contract-walkthrough.md`, `docs/protocol/runtime-integration.md`, `docs/protocol/gateway-integration.md`.
+
+**`test/architecture/`:**
+- Purpose: Enforce source ownership, lane boundaries, package exports, naming posture, and public/private representation constraints.
+- Contains: Architecture and hygiene tests.
+- Key files: `test/architecture/import-posture.test.ts`, `test/architecture/root-exports.test.ts`, `test/architecture/package-surface.test.ts`, `test/architecture/naming-posture.test.ts`, `test/architecture/active-vocabulary.test.ts`.
+
+**`.planning/`:**
+- Purpose: Scratch planning workspace for GSD and local analysis.
+- Contains: Planning docs and generated mapper outputs.
 - Key files: `.planning/codebase/ARCHITECTURE.md`, `.planning/codebase/STRUCTURE.md`.
 
 ## Key File Locations
 
 **Entry Points:**
-- `src/index.ts`: Curated stable package root exports.
-- `src/experimental.ts`: Experimental reference gateway fixture exports.
-- `src/conformance/index.ts`: Conformance package subpath exports.
-- `src/worker.ts`: Cloudflare Worker `fetch` entrypoint.
-- `src/http/app.ts`: Hono app factory and route registration.
-- `src/sdk/client.ts`: Typed HTTP client entrypoint.
-- `src/protocol/kernel.ts`: Embedded protocol transition facade.
+- `src/index.ts`: Curated stable package API.
+- `src/experimental.ts`: Experimental/reference adapter API.
+- `src/worker.ts`: Cloudflare Worker entry point.
+- `src/http/app.ts`: Hosted HTTP app creation and transition request handling.
+- `src/protocol/kernel.ts`: In-process protocol transition facade.
 
 **Configuration:**
-- `package.json`: Private package, subpath exports, scripts, dependencies, package files.
-- `tsconfig.json`: Strict TypeScript config for `src`, `test`, and Worker types.
-- `tsconfig.build.json`: Declaration-only build from `src` to `dist`.
-- `eslint.config.js`: Type import, no unused vars, and console rules.
-- `wrangler.toml`: Worker main file and Cloudflare D1/KV bindings.
-- `.github/workflows/check.yml`: CI checkout, Bun setup, install, and `npm run check:repo`.
-- `scripts/check-package-surface.mjs`: Dry-run package allowlist/denylist.
+- `package.json`: Scripts, dependencies, package manager, and export map.
+- `tsconfig.json`: Strict TypeScript compiler configuration.
+- `eslint.config.js`: ESLint flat config and repo-specific rule posture.
+- `.prettierrc.json`: Formatting defaults.
+- `.editorconfig`: Cross-editor whitespace rules.
+- `wrangler.toml`: Cloudflare Worker, D1, and KV bindings.
+- `.github/workflows/check.yml`: CI quality command sequence.
 
 **Core Logic:**
-- `src/protocol/kernel.ts`: Transition facade.
-- `src/protocol/areas/intent-compilation/transitions.ts`: Catalog/envelope/gateway/runtime/graph lookup and candidate derivation.
-- `src/protocol/areas/action-contract/transitions.ts`: Candidate proposal validation and contract commit.
-- `src/protocol/areas/action-contract/contract-record.ts`: Exact contract binding and digest/signature construction.
-- `src/protocol/areas/policy-greenlight/transitions.ts`: Policy evaluation, sequence dependency, isolation, protected-path posture, greenlight issuance.
-- `src/protocol/areas/gateway-gate/transitions.ts`: Gateway authority check, replay refusal, operation claim, and receipt commit.
-- `src/protocol/areas/operation-lifecycle/transitions.ts`: Downstream finality reconciliation, proof gaps, operation claim release, orphan isolation.
-- `src/protocol/areas/recovery/recommendations.ts`: Recovery recommendation creation without reusing greenlights.
-- `src/protocol/events/records.ts`: Canonical stored record construction and commit orchestration.
-- `src/protocol/events/chains.ts`: Stream event partitioning, offsets, and digest chaining.
+- `src/protocol/store/port.ts`: Store atomicity and conflict contract.
+- `src/protocol/events/records.ts`: Record/event creation and commit path.
+- `src/protocol/navigation/index.ts`: Transition catalog and lifecycle source of truth.
+- `src/protocol/areas/intent-compilation/transitions.ts`: Candidate action and refusal creation.
+- `src/protocol/areas/action-contract/transitions.ts`: Contract proposal transition.
+- `src/protocol/areas/action-contract/contract-record.ts`: Deterministic contract record construction.
+- `src/protocol/areas/policy-greenlight/transitions.ts`: Policy decision transition.
+- `src/protocol/areas/gateway-gate/transitions.ts`: Gateway check transition.
+- `src/protocol/areas/gateway-gate/artifacts.ts`: `VerifiedGatewayCheck` artifact helper.
+- `src/protocol/areas/operation-lifecycle/transitions.ts`: Receipt/refusal/proof-gap/downstream uncertainty reconciliation.
+- `src/protocol/areas/protected-path-posture/transitions.ts`: Bypass and protected path posture records.
+- `src/protocol/areas/idempotency-ledger/entries.ts`: Idempotency and replay-control entries.
+- `src/protocol/areas/object-registry/index.ts`: Object schema, ID, export posture, and raw-read posture registry.
 
 **Storage:**
-- `src/protocol/store/port.ts`: Store interface and commit result contracts.
-- `src/storage/memory/index.ts`: In-memory store used as test fixture and invariant oracle.
-- `src/storage/d1/index.ts`: Cloudflare D1-backed `ProtocolStore`.
-- `src/storage/d1/statements.ts`: D1 insert/update/delete statement assembly.
-- `src/storage/kv/index.ts`: Isolation cache interface, no-op cache, and KV cache implementation.
-- `migrations/0001_protocol_kernel.sql`: D1 tables and indexes.
+- `src/storage/memory/index.ts`: In-memory `ProtocolStore` implementation.
+- `src/storage/d1/index.ts`: D1 `ProtocolStore` implementation.
+- `src/storage/d1/statements.ts`: D1 query/statement helpers.
+- `src/storage/kv/index.ts`: Isolation cache implementation.
+- `migrations/0001_protocol_kernel.sql`: Durable D1 schema.
 
-**HTTP And SDK:**
-- `src/http/routes/transition-route-registry.ts`: HTTP transition registry.
-- `src/http/routes/transition-invokers.ts`: Route-to-kernel dispatch map.
-- `src/http/routes/transition-response-schemas.ts`: HTTP response schema composition.
-- `src/http/routes/transition-scope-resolvers.ts`: Tenant/org scope resolution for hosted admission.
-- `src/http/admission/index.ts`: Local or hosted admission dispatch.
-- `src/http/admission/request-context.ts`: Required protocol/request/originating identity headers and request digest.
-- `src/http/errors/transition-error-envelope.ts`: HTTP error envelope classification.
-- `src/http/openapi/index.ts`: OpenAPI 3.1 projection.
-- `src/sdk/client.ts`: Client methods and typed error parsing.
+**HTTP:**
+- `src/http/routes/transition-route-registry.ts`: HTTP route metadata and request/response schemas.
+- `src/http/routes/transition-invokers.ts`: Route-to-transition invoker map.
+- `src/http/admission/index.ts`: Request admission.
+- `src/http/admission/request-context.ts`: Transition request context.
+- `src/http/handlers/evidence-read.ts`: Evidence projection read endpoint.
+- `src/http/handlers/internal-record-read.ts`: Raw record read with internal-only refusal behavior.
+- `src/http/store/resolution.ts`: D1/fallback store selection.
 
-**Runtime And Gateway Fixtures:**
-- `src/runtime/package-install/action-proposal.ts`: Package install compile/propose helper.
-- `src/runtime/repo-write/action-proposal.ts`: Repo write compile/propose helper and content digesting.
-- `src/runtime/preview-deploy/action-proposal.ts`: Preview deploy compile/propose helper.
-- `src/runtime/codemode-multi-action/generated-program-runner.ts`: Multi-action preflight, sequencing, and proposal runner.
-- `src/runtime/codemode-multi-action/generated-graph-evidence.ts`: Runtime execution and generated graph evidence builder.
-- `src/adapters/package-install/gateway.ts`: Package install verified-gate mutation fixture.
-- `src/adapters/repo-write/gateway.ts`: Repo write verified-gate mutation fixture.
-- `src/adapters/preview-deploy/gateway.ts`: Preview deploy verified-gate mutation fixture.
+**Runtime and Adapters:**
+- `src/runtime/codemode-multi-action/generated-program-runner.ts`: Generated program evidence and sibling action proposal flow.
+- `src/runtime/codemode-multi-action/generated-graph-evidence.ts`: Generated graph evidence helpers.
+- `src/adapters/package-install/gateway.ts`: Package install reference gateway.
+- `src/adapters/repo-write/gateway.ts`: Repo write reference gateway.
+- `src/adapters/preview-deploy/gateway.ts`: Preview deploy reference gateway.
+- `src/adapters/x402-payment/wallet-gateway.ts`: x402 wallet reference gateway.
+- `src/adapters/x402-payment/bypass-probes.ts`: x402 bypass posture probes.
+- `src/adapters/protected-path-probes/executor.ts`: Protected-path probe executor.
+
+**Representation and Evidence:**
+- `src/protocol/evidence-projections/projections.ts`: Projection builders.
+- `src/protocol/evidence-projections/schemas.ts`: Projection schemas.
+- `src/protocol/areas/action-attempt-lifecycle/*`: Derived lifecycle view from protocol navigation.
+- `src/protocol/areas/object-registry/index.ts`: Read/export posture for protocol objects.
 
 **Testing:**
-- `test/architecture/import-posture.test.ts`: Lane manifest and import-boundary guard.
-- `test/architecture/naming-posture.test.ts`: Naming, folder, canonical surface, CI command, and stale label guard.
-- `test/architecture/root-exports.test.ts`: Public root, experimental, and conformance export guard.
-- `test/architecture/package-surface.test.ts`: Package boundary and packable file guard.
-- `test/protocol/transition-matrix.test.ts`: Protocol navigation, route, invoker, method, record, event, authority, and evidence matrix guard.
-- `test/protocol/model-based-invariants.test.ts`: Model scenarios for mutation count, replay, recovery, isolation, receipt export.
-- `test/protocol/kernel-policy-gateway.test.ts`: Policy, posture, greenlight, gateway, replay, stream chain invariants.
-- `test/http/http.test.ts`: HTTP route and SDK behavior.
-- `test/http/d1-http.test.ts`: D1-backed HTTP behavior.
-- `test/integration/package-install-end-to-end.test.ts`: Runtime -> contract -> policy -> gateway -> reconciliation flow.
-- `test/integration/repo-write-d1-http.test.ts`: Repo write flow through D1-backed HTTP.
-
-**Canonical Docs:**
-- `AGENTS.md`: Doctrine and invariant language.
-- `README.md`: Source map, commands, and working rule.
-- `QUALITY.md`: Quality bar and naming rules.
-- `STRUCTURE.md`: Source/test/docs ownership rules.
-- `docs/internal/decisions.md`: Durable product and architecture decisions.
-- `docs/internal/protocol-definition.md`: Canonical protocol definition and authority rule.
-- `docs/internal/protocol-kernel-architecture.md`: Kernel architecture and schema map.
-- `docs/internal/protocol-layman.md`: Plain-English translation.
-- `docs/internal/protocol-notes.md`: Implementation-facing notes.
+- `test/architecture/import-posture.test.ts`: Lane and import-boundary tests.
+- `test/architecture/root-exports.test.ts`: Curated root export tests.
+- `test/architecture/package-surface.test.ts`: Package export surface tests.
+- `test/architecture/naming-posture.test.ts`: Naming posture and forbidden taxonomy tests.
+- `test/architecture/active-vocabulary.test.ts`: Active vocabulary tests.
+- `test/protocol/*`: Protocol behavior and invariant tests.
+- `test/storage/*`: Store parity and atomicity tests.
+- `test/http/*`: HTTP route and admission tests.
+- `test/runtime/*`: Runtime helper tests.
+- `test/adapters/*`: Reference adapter tests.
 
 ## Naming Conventions
 
 **Files:**
-- Use kebab-case for multi-word concept files and folders: `action-contract`, `policy-greenlight`, `generated-execution-graph`, `protected-path-posture`.
-- Use `index.ts` as the public face for multi-file source folders.
-- Use `schemas.ts` for Zod object schemas and inferred protocol types.
-- Use `inputs.ts` for transition input schemas.
-- Use `types.ts` as an area-local aggregator that re-exports foundation schema core, schemas, and inputs.
-- Use `transitions.ts` for transition functions that build and commit records/events.
-- Use `guards.ts` for transition guard logic.
-- Use `gateway.ts` for reference gateway fixture runners.
-- Use `action-proposal.ts` for runtime proposal helpers.
-- Use `LANE.md` for first-level source lane ownership manifests.
+- Use domain-specific names that expose ownership: `src/protocol/areas/gateway-gate/transitions.ts`, `src/http/routes/transition-route-registry.ts`, `src/adapters/x402-payment/wallet-gateway.ts`.
+- Use `index.ts` for lane-level public aggregation only when the directory owns a clear API boundary, such as `src/conformance/index.ts` and `src/install/install-proposal/index.ts`.
+- Keep transition behavior in `transitions.ts` inside protocol areas.
+- Keep protocol record builders in specific files such as `src/protocol/areas/action-contract/contract-record.ts`.
+- Avoid generic bucket names such as `utils`, `helpers`, `common`, `shared`, `misc`, or `lib`; `test/architecture/naming-posture.test.ts` enforces this posture.
 
 **Directories:**
-- Split by authority boundary and owned concept, not by generic utility bucket.
-- Keep protocol primitives under `src/protocol/areas/<primitive-name>`.
-- Keep public protocol aggregators under `src/protocol/public`.
-- Keep HTTP route metadata, invokers, response schemas, and scope resolvers under `src/http/routes`.
-- Keep HTTP caller custody and request context under `src/http/admission`.
-- Keep storage implementations under `src/storage/d1`, `src/storage/memory`, and `src/storage/kv`.
-- Keep runtime helpers grouped by protected action or generated execution shape under `src/runtime/<action-or-runtime>`.
-- Keep tests in ownership mirrors under `test/<lane>`.
-
-**Source Shape Rules:**
-- A source folder with more than three TypeScript files needs `index.ts`.
-- A source folder should not exceed seven loose TypeScript files excluding `index.ts`.
-- Root `test/` must not contain loose `.test.ts` files.
-- First-level source lanes need `LANE.md` or `README.md` with the required manifest fields.
-- Avoid source path segments `utils`, `helpers`, `common`, `misc`, `stuff`, `manager`, and `service`.
+- Use lane names with `LANE.md` ownership files for major source lanes: `src/protocol/`, `src/http/`, `src/runtime/`, `src/adapters/`, `src/install/`, `src/conformance/`, `src/storage/`, `src/sdk/`.
+- Use protocol area names for primitive ownership: `intent-compilation`, `action-contract`, `policy-greenlight`, `gateway-gate`, `operation-lifecycle`, `protected-path-posture`.
+- Use adapter names for reference fixture domains: `package-install`, `repo-write`, `preview-deploy`, `x402-payment`.
+- Empty placeholder directories such as `src/runtime/x402-payment`, `src/runtime/consequence-ingress`, `src/adapters/x402-wallet-gateway`, and `src/conformance/x402-payment` are not active ownership locations. Prefer active files and lane manifests unless a phase explicitly fills or removes them.
 
 ## Where to Add New Code
 
 **New Protocol Primitive:**
 - Primary code: `src/protocol/areas/<primitive-name>/`
-- Required public face: `src/protocol/areas/<primitive-name>/index.ts`
-- Schemas: `src/protocol/areas/<primitive-name>/schemas.ts`
-- Inputs: `src/protocol/areas/<primitive-name>/inputs.ts`
-- Local type face: `src/protocol/areas/<primitive-name>/types.ts`
-- Transition behavior: `src/protocol/areas/<primitive-name>/transitions.ts`
-- Guards: `src/protocol/areas/<primitive-name>/guards.ts`
-- Public aggregation: `src/protocol/public/schemas.ts`, `src/protocol/public/inputs.ts`
-- Object metadata: `src/protocol/areas/object-registry/index.ts`, `src/protocol/areas/object-registry/schemas.ts`
-- Navigation: `src/protocol/navigation/index.ts`
-- Kernel method: `src/protocol/kernel.ts`
-- Tests: `test/protocol/*`, `test/architecture/import-posture.test.ts`, `test/protocol/transition-matrix.test.ts`
+- Transition entry: `src/protocol/areas/<primitive-name>/transitions.ts`
+- Public exposure: `src/protocol/public/inputs.ts`, `src/protocol/public/schemas.ts`, `src/protocol/public/transitions.ts` only when the primitive is intended for external callers.
+- Navigation metadata: `src/protocol/navigation/index.ts`
+- Object metadata: `src/protocol/areas/object-registry/index.ts`
+- Tests: `test/protocol/<primitive-name>.test.ts` plus boundary tests in `test/architecture/import-posture.test.ts` when ownership changes.
 
-**New HTTP Transition:**
-- Route metadata: `src/http/routes/transition-route-registry.ts`
-- Dispatcher: `src/http/routes/transition-invokers.ts`
-- Response schema: `src/http/routes/transition-response-schemas.ts`
-- Scope resolver if needed: `src/http/routes/transition-scope-resolvers.ts`
-- OpenAPI updates: usually automatic through registry schema usage in `src/http/openapi/index.ts`
-- SDK method: `src/sdk/client.ts`
-- Tests: `test/http/http.test.ts`, `test/protocol/transition-matrix.test.ts`
+**New Transition on an Existing Primitive:**
+- Primary code: Existing `src/protocol/areas/<area>/transitions.ts`.
+- Kernel facade: `src/protocol/kernel.ts`.
+- HTTP route: `src/http/routes/transition-route-registry.ts` and `src/http/routes/transition-invokers.ts` only if hosted HTTP needs it.
+- Public schemas: `src/protocol/public/schemas.ts` and `src/protocol/public/inputs.ts`.
+- Tests: `test/protocol/*`, `test/http/*` if routed, and `test/architecture/import-posture.test.ts` if import posture changes.
 
-**New Evidence Read Route:**
-- Route metadata: `src/http/routes/evidence-read-route-registry.ts`
-- Handler logic: `src/http/handlers/evidence-read.ts`
-- Navigation: `src/http/navigation/index.ts`
-- SDK method: `src/sdk/client.ts`
-- Tests: `test/http/http.test.ts`
+**New Store-Backed Authority or Evidence Index:**
+- Contract first: `src/protocol/store/port.ts`.
+- Durable schema: `migrations/0001_protocol_kernel.sql` or a new migration under `migrations/`.
+- D1 implementation: `src/storage/d1/index.ts`, with SQL helpers in `src/storage/d1/statements.ts`.
+- Memory implementation: `src/storage/memory/index.ts`.
+- Tests: `test/storage/*` for D1/memory parity and protocol tests for conflict behavior.
+- Do not implement authority indexes in `src/storage/kv/index.ts`; KV is an isolation cache only.
+
+**New Evidence Projection or Review View:**
+- Projection builder: `src/protocol/evidence-projections/projections.ts`.
+- Projection schema: `src/protocol/evidence-projections/schemas.ts`.
+- Object/read posture: `src/protocol/areas/object-registry/index.ts`.
+- HTTP read endpoint: `src/http/handlers/evidence-read.ts` only when hosted read access is needed.
+- Tests: `test/protocol/*` or `test/http/*`, plus architecture tests if public/raw posture changes.
 
 **New Runtime Proposal Helper:**
-- Implementation: `src/runtime/<action-or-runtime>/action-proposal.ts`
-- Generated graph helper if needed: `src/runtime/<runtime-shape>/generated-graph-evidence.ts`
-- Tests: `test/runtime/*`
-- Keep authority out: call `compileIntent` and `proposeActionContract`; do not evaluate policy, issue greenlights, gateway check, receipt, or mutate.
+- Primary code: `src/runtime/<domain>/`.
+- Proposal flow: call `HandshakeKernel` transitions up to candidate/contract/policy proposal as needed.
+- Authority boundary: do not mutate protected surfaces from `src/runtime/*`.
+- Tests: `test/runtime/<domain>.test.ts`.
 
-**New Reference Gateway Fixture:**
-- Implementation: `src/adapters/<action-class>/gateway.ts`
-- Experimental export: `src/experimental.ts`
-- Conformance usage: `test/conformance/protected-mutation-adapter-conformance.test.ts`
-- Tests: `test/adapters/*`, `test/integration/*`
-- Required pattern: call `protocol.gatewayCheck`, derive `VerifiedGatewayCheck`, mutate only after verified gate, then call `protocol.reconcileSurfaceOperation`.
+**New Reference Gateway Adapter:**
+- Primary code: `src/adapters/<domain>/`.
+- Required pattern: call `gatewayCheck`, require `VerifiedGatewayCheck` from `src/protocol/areas/gateway-gate/artifacts.ts`, then mutate, then call operation lifecycle reconciliation.
+- Experimental exposure: `src/experimental.ts`, not `src/index.ts`, unless the adapter becomes part of the curated stable API.
+- Tests: `test/adapters/<domain>.test.ts` and conformance helpers when applicable.
+- Documentation: Name it as a reference or experimental adapter unless provider-native gateway enforcement exists.
 
-**New Storage Behavior:**
-- Port contract: `src/protocol/store/port.ts`
-- Memory implementation: `src/storage/memory/index.ts`
-- D1 behavior: `src/storage/d1/index.ts`
-- D1 statement assembly: `src/storage/d1/statements.ts`
-- Schema migration: `migrations/0001_protocol_kernel.sql` or a new sequential migration if schema changes are additive.
-- Tests: `test/protocol/*`, `test/http/d1-http.test.ts`, `test/support/fault-injecting-protocol-store.ts`
+**New Install-Time Adapter Metadata:**
+- Primary code: `src/install/install-proposal/index.ts` or `src/install/protected-action-adapter-pack/index.ts`.
+- Domain-specific compile logic: `src/adapters/<domain>/install-proposal.ts`.
+- Tests: `test/install/*` or adapter-specific tests.
 
-**New SDK Method:**
-- Implementation: `src/sdk/client.ts`
-- Source of truth: existing HTTP route path and role in `src/http/routes/transition-route-registry.ts` or `src/http/routes/evidence-read-route-registry.ts`
-- Tests: `test/http/http.test.ts`
-- Rule: The SDK sends requests and parses responses; it must not infer authority or mutate protected surfaces.
+**New Conformance Check:**
+- Primary code: `src/conformance/index.ts` or a clearly named submodule under `src/conformance/` if the surface grows.
+- Scope: narrow posture/evidence helper, not certification language.
+- Tests: `test/conformance/*` or adapter-specific conformance tests.
 
-**New Conformance Probe:**
-- Implementation: `src/conformance/index.ts`
-- Tests: `test/conformance/*`
-- Export surface: `package.json` `./conformance` subpath and `test/architecture/root-exports.test.ts`
+**New HTTP Route:**
+- Metadata and schemas: `src/http/routes/transition-route-registry.ts`.
+- Invocation: `src/http/routes/transition-invokers.ts`.
+- Admission/context use: `src/http/app.ts`, `src/http/admission/index.ts`, `src/http/admission/request-context.ts`.
+- Tests: `test/http/*`.
+- Do not move protocol transition semantics into `src/http/*`.
 
-**New Architecture Guard:**
-- Implementation: `test/architecture/<guard-name>.test.ts`
-- Command group: add to `package.json` `quality:architecture` when it protects repo shape.
-- Keep root test files out of `test/`.
+**New SDK Surface:**
+- Implementation: `src/sdk/`.
+- Package exposure: `src/index.ts` only for stable root API; `src/experimental.ts` for experimental surfaces.
+- Tests: `test/sdk/*`, `test/architecture/root-exports.test.ts`, `test/architecture/package-surface.test.ts`.
 
-**New Canonical Documentation:**
-- Durable product/architecture decision: `docs/internal/decisions.md`
-- Protocol definition change: `docs/internal/protocol-definition.md`
-- Schema/architecture map change: `docs/internal/protocol-kernel-architecture.md`
-- Implementation note: `docs/internal/protocol-notes.md`
-- Do not add public product, GTM, planning taxonomy, or historical prompt docs to active repo canon.
+**Documentation Updates:**
+- Product invariant or repo posture: `AGENTS.md`, `README.md`, `QUALITY.md`, `STRUCTURE.md`.
+- Durable architecture/product decisions: `docs/internal/decisions.md`.
+- Protocol architecture or definition: `docs/internal/protocol-kernel-architecture.md`, `docs/internal/protocol-definition.md`, `docs/internal/protocol-notes.md`.
+- Public adoption walkthrough: `docs/protocol/*`.
+- Scratch planning or mapper output: `.planning/*`.
 
 ## Special Directories
 
-**`src/*/LANE.md`:**
-- Purpose: Lane-local ownership contract.
-- Generated: No.
-- Committed: Yes.
+**`.planning/`:**
+- Purpose: Scratch planning workspace and generated codebase maps.
+- Generated: Partially.
+- Committed: May be committed when orchestrator chooses, but it is not repo-facing canon.
+- Constraint: Do not let `.planning/*` stage labels, taxonomy, or long-form reports leak into source paths, package scripts, CI names, README sections, exported symbols, or canonical docs.
 
-**`docs/internal`:**
-- Purpose: Compact canonical docs for active repo truth.
-- Generated: No.
-- Committed: Yes.
-
-**`.planning`:**
-- Purpose: GSD scratch planning and generated codebase maps.
-- Generated: Yes.
-- Committed: Scratch status depends on workflow; not active repo truth.
-
-**`dist`:**
-- Purpose: Declaration build output for package surface checks.
-- Generated: Yes, by `npm run build`.
-- Committed: Present in the checkout and included by `package.json` `files`.
-
-**`migrations`:**
-- Purpose: D1 storage schema ownership.
-- Generated: No.
-- Committed: Yes.
-
-**`.github/workflows`:**
-- Purpose: CI gate definition.
-- Generated: No.
-- Committed: Yes.
-
-**`node_modules`:**
-- Purpose: Local dependency installation output.
+**`dist/`:**
+- Purpose: Build output from `tsup`.
 - Generated: Yes.
 - Committed: No.
+- Constraint: Do not edit by hand.
 
-**`test/support`:**
-- Purpose: Fixtures, fake protected surfaces, D1 harnesses, and fault-injecting store used by tests.
+**`node_modules/`:**
+- Purpose: Bun/npm dependency install directory.
+- Generated: Yes.
+- Committed: No.
+- Constraint: Do not inspect for source ownership or edit directly.
+
+**`migrations/`:**
+- Purpose: Durable D1 schema for protocol store behavior.
 - Generated: No.
 - Committed: Yes.
+- Constraint: Treat schema changes as authority/evidence changes; update D1, memory store parity, and storage tests together.
+
+**`docs/internal/`:**
+- Purpose: Canonical compact product/protocol architecture and decision record.
+- Generated: No.
+- Committed: Yes.
+- Constraint: Keep current-state language tight and source-backed. Do not move scratch planning labels here.
+
+**`examples/`:**
+- Purpose: Reference usage and runnable examples.
+- Generated: No.
+- Committed: Yes.
+- Constraint: Examples must not imply enforcement that source does not provide.
+
+**`src/*/LANE.md`:**
+- Purpose: Lane ownership manifests for source directories.
+- Generated: No.
+- Committed: Yes.
+- Constraint: Update when source ownership changes; `test/architecture/import-posture.test.ts` expects lane posture to stay coherent.
+
+**Empty Placeholder Directories:**
+- Purpose: None unless a phase explicitly fills or removes them.
+- Generated: No.
+- Committed: Directory entries are not meaningful without files.
+- Examples: `src/runtime/x402-payment`, `src/runtime/consequence-ingress`, `src/adapters/x402-wallet-gateway`, `src/conformance/x402-payment`.
+- Constraint: Do not infer active architecture from empty placeholders.
 
 ---
 
-*Structure analysis: 2026-05-19*
+*Structure analysis: 2026-05-20*

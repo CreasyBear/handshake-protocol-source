@@ -1,256 +1,282 @@
 # Codebase Concerns
 
-**Analysis Date:** 2026-05-19
+**Analysis Date:** 2026-05-20
 
-## Risk Posture
+## Review Scope
 
-This checkout is a credible Tier 1 protocol-kernel/reference-fixture baseline. The strongest current protections are exact contract binding, one-use greenlight consumption, gateway-side checks, protected-path posture evaluation, proof-gap recording, isolation, and recovery state. The major risks are claim drift and adoption drift: the source proves local protocol behavior and reference gateway fixtures, while strategy docs define Tier 2 self-hosted activation, Tier 3 hosted operation, and Tier 4 ecosystem/provider integration that are not implemented in this repo.
+This concerns map treats tracked canon, source, migrations, and tests as truth.
+Planning files under `.planning/` are pressure context only, not repo-facing
+taxonomy or claim authority.
 
-Grounding:
-- Kernel/canon: `README.md`, `QUALITY.md`, `STRUCTURE.md`, `docs/internal/decisions.md`, `docs/internal/protocol-definition.md`, `docs/internal/protocol-kernel-architecture.md`, `docs/internal/protocol-notes.md`.
-- Tier doctrine: `.planning/strategy/tiered-product-doctrine.md`, `.planning/strategy/tier-1-closeout.md`, `.planning/strategy/tier-3-strategy-findings.md`.
-- Runtime hardening pressure: `.planning/strategy/0.3.0-agent-runtime-source-study.md`, `.planning/strategy/tier-2-meta-requirements.md`.
+**Canon and source anchors:**
+- `AGENTS.md`
+- `README.md`
+- `docs/internal/decisions.md`
+- `docs/internal/protocol-definition.md`
+- `docs/internal/protocol-kernel-architecture.md`
+- `docs/internal/protocol-notes.md`
+- `src/protocol/kernel.ts`
+- `src/protocol/areas/*`
+- `src/http/*`
+- `src/adapters/*`
+- `src/runtime/*`
+- `src/storage/*`
+- `test/**/*`
+- `migrations/0001_protocol_kernel.sql`
+
+**Planning pressure read:**
+- `.planning/tier2/06-policy-agent-management-interface-map.md`
+- `.planning/tier2/07-agentic-economy-clearing-house-research.md`
+- `.planning/tier2/08-external-adapter-plug-in-architecture.md`
+- `.planning/tier2/09-tier1-kernel-establishment-delta.md`
+
+## Foundation Status
+
+**Local kernel foundation:**
+- Issue: No local-foundation blocker is detected in the current source/test map.
+- Files: `README.md`, `docs/internal/decisions.md`, `docs/internal/protocol-definition.md`, `docs/internal/protocol-kernel-architecture.md`, `src/protocol/kernel.ts`, `test/protocol/model-based-invariants.test.ts`, `test/protocol/transition-matrix.test.ts`, `test/protocol/action-attempt-lifecycle.test.ts`, `test/protocol/protocol-store-atomicity-contract.test.ts`
+- Impact: The repo can accurately claim local protocol-kernel foundation for exact contract, policy decision, one-use greenlight, gateway check, receipt/refusal/proof-gap, derived lifecycle evidence, idempotency ledger, redacted projections, package-install local binding, and local x402 D1/HTTP fixture proof.
+- Fix approach: Keep the claim local. Do not promote local fixtures, hosted seams, or planning docs into provider/runtime enforcement language.
+
+**Boundary exclusions:**
+- Issue: The repo explicitly does not prove live provider custody, hosted org auth/RBAC/search, external package material attestation, public runtime/MCP/CLI/browser interception, or portable verifier trust.
+- Files: `README.md`, `docs/internal/decisions.md`, `docs/internal/protocol-definition.md`, `src/experimental.ts`, `src/conformance/index.ts`, `src/http/admission/hosted-caller-identity.ts`
+- Impact: Any product, README, package, or planning artifact that implies those surfaces are currently enforced overclaims the code.
+- Fix approach: Preserve the local-foundation wording and require new source/tests before expanding the claim.
+
+## Blockers
+
+**Public runtime/tool-stream interception claim:**
+- Issue: Runtime evidence and codemode flows are source-owned fixtures, not a live adapter that intercepts MCP calls, browser tools, shell commands, network calls, package managers, filesystem writes, or dynamically constructed tool dispatch from a real agent runtime.
+- Files: `src/runtime/codemode-multi-action/generated-program-runner.ts`, `src/runtime/codemode-multi-action/generated-graph-evidence.ts`, `src/protocol/areas/generated-execution-graph/coverage.ts`, `src/protocol/areas/tool-call-draft/`, `test/runtime/codemode-multi-action-runtime.test.ts`, `test/protocol/generated-execution-graph.test.ts`, `test/protocol/representation-contract.test.ts`
+- Impact: This blocks public claims that Handshake currently detects arbitrary consequential candidates from live generated programs. The generated code has not been forced through a real runtime dispatch boundary.
+- Fix approach: Build a runtime ingress adapter that observes actual tool dispatch, emits `RuntimeExecution`, `GeneratedExecutionGraph`, and finalized `ToolCallDraft` records, and proves raw sibling mutation paths terminate as refusal or proof gap.
+
+**Live provider/customer gateway enforcement claim:**
+- Issue: Gateway enforcement is locally proven through reference adapters and x402 wallet fixtures. It is not proven through a production provider gateway or customer-installed credential boundary.
+- Files: `src/adapters/package-install/gateway.ts`, `src/adapters/repo-write/gateway.ts`, `src/adapters/preview-deploy/gateway.ts`, `src/adapters/x402-payment/wallet-gateway.ts`, `src/adapters/x402-payment/bypass-probes.ts`, `test/integration/x402-d1-http.test.ts`, `test/adapters/x402-bypass-probes.test.ts`, `test/conformance/protected-mutation-adapter-conformance.test.ts`
+- Impact: This blocks provider-side enforcement, live wallet custody, and production protected-surface claims. Local x402 D1/HTTP proof remains valid as a reference path only.
+- Fix approach: Keep gateway adapters behind `src/experimental.ts` until a real provider/customer gateway runs the same exact-greenlight, posture, replay, custody, and proof-gap tests outside the local fixture harness.
+
+**Hosted operation claim:**
+- Issue: HTTP admission has bearer-token roles and a hosted caller identity seam, but no hosted org auth, policy management, RBAC, retention, search, alerting, audit export, or credential custody operation.
+- Files: `src/http/admission/caller-auth.ts`, `src/http/admission/hosted-caller-identity.ts`, `src/http/routes/transition-route-registry.ts`, `src/http/handlers/evidence-read.ts`, `test/http/http.test.ts`, `test/http/d1-http.test.ts`
+- Impact: This blocks claims that the repo is an operated control plane. The HTTP surface is a transport/reference seam, not a hosted product boundary.
+- Fix approach: Add hosted identity verification, authorization models, retention/read policies, and custody tests before calling any route surface hosted enforcement.
+
+## Deferred Risks
+
+**Protected-action representation is non-authority scaffolding:**
+- Issue: Metadata, Challenge, Request, and EvidenceProjection contracts exist as internal representation shapes, but no public MCP/CLI/SDK workflow makes them an ergonomic activation surface.
+- Files: `src/protocol/areas/protected-action-representation/`, `test/protocol/representation-contract.test.ts`, `.planning/tier2/06-policy-agent-management-interface-map.md`
+- Impact: The representation layer can guide future product work, but it must not be treated as admission or authority.
+- Fix approach: Build public representation surfaces only after tests prove they cannot mint greenlights, mutate, or hide raw records.
+
+**External adapter plug-in architecture is not a general SDK contract:**
+- Issue: x402, package install, repo write, and preview deploy establish reference shapes, while adapter-pack distribution, manifests, hostile probe gates, marketplace/certification language, and external conformance remain planning-level.
+- Files: `src/install/`, `src/adapters/x402-payment/install-proposal.ts`, `src/conformance/index.ts`, `src/experimental.ts`, `test/architecture/root-exports.test.ts`, `.planning/tier2/08-external-adapter-plug-in-architecture.md`
+- Impact: Adapter extensibility is directionally sound but not yet a public plug-in platform.
+- Fix approach: Keep plug-in and certification claims out of canon until adapter manifests, probe requirements, package boundaries, and root exports are source-enforced.
+
+**Clearing-house envelope remains read-only evidence:**
+- Issue: `clearingEvidenceRefs` and `AgentTransactionEnvelopeProjection` carry correlation, obligation, counterparty, refusal, proof-gap, ledger, recovery, and isolation references without creating new authority.
+- Files: `src/protocol/foundation/schema-core.ts`, `src/protocol/areas/intent-compilation/schemas.ts`, `src/protocol/areas/action-contract/schemas.ts`, `src/protocol/evidence-projections/projections.ts`, `test/protocol/evidence-projections.test.ts`, `.planning/tier2/07-agentic-economy-clearing-house-research.md`
+- Impact: Clearing language is safe only as evidence projection. It is not settlement, counterparty novation, marketplace operation, or portable verifier trust.
+- Fix approach: Keep envelope projections read-only until external verifiers, dispute/recovery rules, and settlement/finality evidence have their own policy model.
 
 ## Tech Debt
 
-**Durable refusal model is incomplete:**
-- Issue: `RefusalSchema` exists and `test/protocol/refusal-format.test.ts` validates the portable format, but `refusal` is not a `ProtocolObjectType`, is not present in `ProtocolRecordSchema`, and is not in `protocolObjectRegistry`. Actual refusals are encoded inside `IntentCompilationRecord.candidateAction.refusalReasonCodes`, `PolicyDecision`, `GatewayCheckAttempt`, and HTTP error envelopes.
-- Files: `src/protocol/areas/refusal/schemas.ts`, `src/protocol/areas/object-registry/schemas.ts`, `src/protocol/areas/object-registry/index.ts`, `src/protocol/areas/intent-compilation/schemas.ts`, `src/protocol/areas/gateway-gate/artifacts.ts`, `src/http/errors/transition-error-envelope.ts`, `test/protocol/refusal-format.test.ts`.
-- Impact: The docs say refusal is first-class evidence, but the store cannot query a uniform refusal record by phase, object refs, authority-created flag, or mutation-attempted flag. Tier 2 receipt/refusal timelines and Tier 3 refusal/proof-gap queues would need ad hoc joins across several record shapes.
-- Fix approach: Either add `refusal` to `ProtocolObjectTypeSchema` with commit helpers/events for compiler, policy, review, gateway, receipt-export, and recovery refusals, or narrow claims to "refusal reason evidence is embedded in transition records."
+**x402 spend-bound schema exposes unenforced counters:**
+- Issue: `maxAtomicAmountPerCall` is enforced before compilation, but `maxAtomicAmountPerSession`, `maxAtomicAmountPerDay`, and `reviewThresholdAtomicAmount` have no accumulator, reservation, policy read path, or review routing.
+- Files: `src/adapters/x402-payment/install-proposal.ts`, `src/adapters/x402-payment/action-proposal.ts`, `test/adapters/x402-install-proposal.test.ts`, `test/adapters/x402-payment-action-proposal.test.ts`
+- Impact: The schema can look more authority-bearing than the implementation. Only per-call spend is enforced in the local x402 path.
+- Fix approach: Either mark session/day/review fields as declared non-authority metadata or add a replay-safe spend counter table and policy evaluator path.
 
-**Tier 2 activation surface is not present:**
-- Issue: Tier 2 requires a self-hostable protected action loop with CLI or MCP proposal surface, local policy file, local receipt store, readable contract output, receipt/refusal/proof-gap timeline, install health, and conformance. The repo contains a private package, HTTP/SDK surfaces, runtime helpers, tests, and reference gateways, but no `bin`, CLI setup, MCP broker, policy-file loader, contract viewer, receipt timeline, or install-health surface.
-- Files: `package.json`, `src/sdk/client.ts`, `src/http/app.ts`, `src/runtime/LANE.md`, `src/adapters/LANE.md`, `.planning/strategy/tiered-product-doctrine.md`, `.planning/strategy/tier-2-meta-requirements.md`.
-- Impact: A developer cannot reach the Tier 2 golden path from product surfaces alone. They must stitch together tests and fixtures, which weakens activation and makes Tier 3 hosted operation tempting before the local primitive is obvious.
-- Fix approach: Build one installable golden path around one protected action: proposal surface, deterministic policy config, gateway-owned mutation authority, local receipt timeline, and hostile conformance cases.
+**Review artifact provenance is caller-supplied:**
+- Issue: Review artifacts bind exact contract and policy input digests, but renderer, catalog, and action-binding digests are supplied by the caller. There is no source-owned renderer registry or artifact generator.
+- Files: `src/protocol/areas/review-binding/artifacts.ts`, `src/protocol/areas/review-binding/decisions.ts`, `src/protocol/areas/review-binding/schemas.ts`, `test/protocol/kernel-policy-gateway.test.ts`
+- Impact: Protocol binding is strong, but product review surfaces remain unaudited until renderer provenance is source-owned. A weak renderer can still produce bad human comprehension while satisfying digest fields supplied by its own caller.
+- Fix approach: Add a renderer registry/generator that computes artifact, catalog, renderer, and action-binding digests from source-owned inputs.
 
-**Preview deploy product proof is split across paths:**
-- Issue: Tier doctrine names preview deploy as the first wedge, and `src/runtime/preview-deploy/action-proposal.ts` plus `src/adapters/preview-deploy/gateway.ts` prove a standalone local fixture. The codemode multi-action runner only accepts `package.install` and `repo.write`.
-- Files: `.planning/strategy/tiered-product-doctrine.md`, `src/runtime/preview-deploy/action-proposal.ts`, `src/adapters/preview-deploy/gateway.ts`, `src/runtime/codemode-multi-action/generated-program-runner.ts`, `test/adapters/preview-deploy-gateway.test.ts`, `test/runtime/codemode-multi-action-runtime.test.ts`.
-- Impact: The generated-program proof lane does not exercise the declared first wedge. This keeps "preview deploy" buyer language and "codemode multi-action" implementation proof slightly divergent.
-- Fix approach: Add `preview_deploy.create` to the generated-program/action-group path or explicitly define the first preview-deploy path as MCP/tool-dispatcher-only and keep codemode as secondary proof.
+**Lifecycle, receipt, and projection status models can drift:**
+- Issue: Terminal meanings appear in `protocolNavigation`, `ActionAttemptLifecycle`, receipt status derivation, and evidence projections.
+- Files: `src/protocol/navigation/index.ts`, `src/protocol/areas/action-attempt-lifecycle/matrix.ts`, `src/protocol/areas/receipt-export/status.ts`, `src/protocol/evidence-projections/projections.ts`, `test/protocol/action-attempt-lifecycle.test.ts`, `test/protocol/evidence-projections.test.ts`
+- Impact: Multiple maps make status drift easy when new transitions or outcomes are added.
+- Fix approach: Keep one source-owned terminal status map and derive receipt/projection/lifecycle assertions from it.
 
-**Raw-read posture is metadata, not enforcement:**
-- Issue: `protocolObjectRegistry` classifies objects as `control_plane_read`, `audit_read`, or `internal_only`, but `handleInternalRecordRead` accepts any `ProtocolObjectType` and returns the raw record to any caller with `control_plane` bearer custody.
-- Files: `src/protocol/areas/object-registry/index.ts`, `src/http/handlers/internal-record-read.ts`, `src/http/app.ts`, `test/http/http.test.ts`.
-- Impact: This is acceptable as an internal diagnostic seam, but it is unsafe to promote to Tier 3 audit/search without enforcing redaction, tenant scope, and raw-read posture. `contract_stream_event` and `transition_request_context` are marked internal but are retrievable through the internal route.
-- Fix approach: Enforce `rawReadPosture` in handlers, add scoped audit projections, and keep raw internal reads behind explicit local/admin-only admission.
-
-**Idempotency is recorded but not a duplicate-authority ledger:**
-- Issue: A greenlight is one-use per `greenlightId`, and active protected-surface operation claims block concurrent operations by gateway/action/resource. There is no store index that prevents a second action contract with the same idempotency key, resource, and params from receiving a new greenlight after the first operation reaches terminal state.
-- Files: `src/protocol/areas/policy-greenlight/guards.ts`, `src/protocol/areas/operation-lifecycle/claims.ts`, `src/protocol/store/port.ts`, `migrations/0001_protocol_kernel.sql`, `test/protocol/kernel-operation-lifecycle.test.ts`.
-- Impact: One-use greenlight replay is protected, but retry/idempotency semantics across newly minted contracts are not fully enforced by the protocol store. A real Tier 2 gateway must not treat this as complete double-mutation protection.
-- Fix approach: Add an idempotency/operation ledger keyed by tenant, org, gateway, action class, resource, params digest, and idempotency key, with explicit retry/reuse/refusal semantics.
+**Conformance probes are caller-supplied and narrow:**
+- Issue: `checkProtectedMutationAdapterConformance` checks whether a supplied probe mutates without `VerifiedGatewayCheck`; it does not inspect the adapter implementation, credential custody, provider behavior, or bypass surfaces.
+- Files: `src/conformance/index.ts`, `src/conformance/LANE.md`, `test/conformance/protected-mutation-adapter-conformance.test.ts`, `test/conformance/x402-payment-conformance.test.ts`
+- Impact: Passing conformance proves one supplied probe did not mutate. It is not adapter certification.
+- Fix approach: Keep conformance language narrow and add probe suites per adapter family instead of broad pass/fail certification.
 
 ## Known Bugs
 
-**D1 and memory stores disagree on `putRecordIfAbsentOrSame` result semantics:**
-- Symptoms: `InMemoryProtocolStore.putRecordIfAbsentOrSame` returns `inserted` for a new record. `D1ProtocolStore.putRecordIfAbsentOrSame` uses `INSERT OR IGNORE`, then reads the record and returns `unchanged` whenever the digest matches, including the inserted case.
-- Files: `src/storage/memory/index.ts`, `src/storage/d1/index.ts`, `src/protocol/store/port.ts`, `src/protocol/events/records.ts`.
-- Trigger: Call `putRecordIfAbsentOrSame` against an empty D1 store with a valid record.
-- Workaround: Current callers treat non-conflict as success, so the mismatch does not break the observed transition path.
-- Fix approach: Return `inserted` from D1 when the insert actually changes the table, or remove `inserted` from the interface if callers must not depend on it.
+**No confirmed local-foundation correctness bug detected:**
+- Symptoms: Current source/tests preserve the local authority path from exact contract to policy, greenlight, gateway check, receipt/refusal/proof-gap, lifecycle, idempotency, and D1/memory atomicity.
+- Files: `test/protocol/model-based-invariants.test.ts`, `test/protocol/kernel-policy-gateway.test.ts`, `test/protocol/kernel-idempotency-ledger.test.ts`, `test/protocol/protocol-store-atomicity-contract.test.ts`, `test/integration/x402-d1-http.test.ts`
+- Trigger: Not applicable.
+- Workaround: Not applicable.
 
-**Adapter failure evidence erases provider error detail:**
-- Symptoms: Reference gateways catch all mutation-surface errors and record generic failed evidence refs such as `evidence:package-install-failed:*`, `evidence:repo-write-failed:*`, or `evidence:preview-deploy-failed:*`.
-- Files: `src/adapters/package-install/gateway.ts`, `src/adapters/repo-write/gateway.ts`, `src/adapters/preview-deploy/gateway.ts`.
-- Trigger: A mutation surface throws after `VerifiedGatewayCheck`.
-- Workaround: The adapters still reconcile a failed downstream status and do not hide the failure as success.
-- Fix approach: Use typed downstream errors that preserve retryability, provider operation refs, redacted diagnostics, and evidence refs without leaking secrets.
+**False posture injection remains a trust-boundary bug class:**
+- Symptoms: A caller admitted as `gateway_custody` can submit `gateway_probe` records; the protocol checks scope, freshness, required probe kinds, source authority, and outcomes, but it cannot independently prove the probe actually ran.
+- Files: `src/protocol/areas/bypass-probe/transitions.ts`, `src/protocol/areas/protected-path-posture/transitions.ts`, `src/http/routes/transition-route-registry.ts`, `src/sdk/client.ts`, `test/adapters/x402-bypass-probes.test.ts`
+- Trigger: A compromised or dishonest gateway-custody caller records passing hostile probes without running them.
+- Workaround: Treat gateway custody as the trust boundary. Hosted/provider claims require independent attestation or monitored probe execution.
 
 ## Security Considerations
 
-**Protected-path posture is caller-reported, not probed:**
-- Risk: `createProtectedPathPosture` records `postureState`, `credentialCustodyStatus`, `rawSiblingToolStatus`, and `sourceAuthority` from input. The evaluator rejects weak posture, but the repo does not implement gateway credential custody probes, raw credential scans, sibling CLI/API checks, MCP direct-call checks, or wrapper installation checks.
-- Files: `src/protocol/areas/protected-path-posture/inputs.ts`, `src/protocol/areas/protected-path-posture/transitions.ts`, `src/protocol/areas/protected-path-posture/schemas.ts`, `.planning/strategy/0.3.0-agent-runtime-source-study.md`, `.planning/strategy/tier-2-meta-requirements.md`.
-- Current mitigation: Policy and gateway evaluation require fresh `gateway_checked` posture from acceptable source authorities and reject present/unknown raw sibling tools.
-- Recommendations: Add posture probe modules and hostile tests for raw credential reachability, direct MCP calls, shell/browser sibling paths, gateway policy drift, and wrapper installation.
+**Gateway custody is the authority holder, not the runtime:**
+- Risk: If mutation credentials remain available to raw sibling tools, shell paths, browser tools, MCP direct calls, token passthrough, or generated-code side effects, the generated code escaped the contract boundary.
+- Files: `AGENTS.md`, `src/protocol/areas/protected-path-posture/transitions.ts`, `src/adapters/x402-payment/bypass-probes.ts`, `test/adapters/x402-bypass-probes.test.ts`, `test/protocol/action-attempt-lifecycle.test.ts`
+- Current mitigation: `gateway_checked` posture requires fresh passing probes for credential custody, raw sibling blocking, MCP direct-call blocking, token passthrough blocking, wrapper drift, and failure-closed behavior.
+- Recommendations: Require provider/customer gateway proof before any live enforcement claim.
 
-**Hosted admission is a seam, not org auth:**
-- Risk: Local mode uses role-scoped bearer tokens. Hosted mode delegates to an injected `HostedCallerVerifier`, validates role/freshness/scope, and records identity evidence, but this repo does not implement orgs, projects, roles, revocation lookup, tenant policy administration, or audit-reader authorization.
-- Files: `src/http/admission/caller-auth.ts`, `src/http/admission/hosted-caller-identity.ts`, `src/http/admission/index.ts`, `src/http/routes/transition-scope-resolvers.ts`, `docs/internal/decisions.md`.
-- Current mitigation: Missing local tokens fail closed, hosted mode requires a verifier, and transition scope mismatch is hidden as not found for record-scoped routes.
-- Recommendations: Keep this as transport custody until Tier 3 adds real org RBAC, revocation, reader roles, tenant-scoped audit projections, and token/key rotation.
+**Bearer-token route admission is not hosted auth:**
+- Risk: Static role tokens protect local/reference route access but do not provide org RBAC, revocation, tenant policy, audit retention, or service-account lifecycle.
+- Files: `src/http/admission/caller-auth.ts`, `src/http/admission/hosted-caller-identity.ts`, `src/http/admission/index.ts`, `test/http/http.test.ts`
+- Current mitigation: Routes require explicit custody roles, hosted mode refuses lane-token-only admission before body parsing, and hosted identity schemas bind tenant/org scope.
+- Recommendations: Add real hosted verifier integration, revocation checks, and authorization policy before hosted claims.
 
-**Signatures are optional and not a portable verification model:**
-- Risk: `ActionContract.contractSignature` and `PolicyDecision.decisionSignature` are optional HMACs. Gateway checks rely on stored digests and records; they do not verify signatures from an external trust root.
-- Files: `src/protocol/areas/action-contract/contract-record.ts`, `src/protocol/areas/action-contract/schemas.ts`, `src/protocol/areas/policy-greenlight/policy-record/index.ts`, `src/protocol/areas/policy-greenlight/schemas.ts`, `src/protocol/foundation/canonical.ts`.
-- Current mitigation: Canonical digests bind records inside the store, and HMAC support exists for local signing.
-- Recommendations: Treat HMACs as local integrity helpers only. Tier 4 cross-org receipt verification needs explicit key identity, signature verification, rotation, revocation, and verifier policy.
+**Package-install supply-chain proof is parameter binding, not material attestation:**
+- Risk: The package gateway binds observed package manager, registry, manifest, lockfile, flags, lifecycle policy, and resolved material fields before mutation, but it does not independently verify registry tarballs or package-manager execution behavior.
+- Files: `src/adapters/package-install/gateway.ts`, `src/runtime/package-install/action-proposal.ts`, `test/adapters/package-install-gateway.test.ts`, `test/integration/package-install-end-to-end.test.ts`
+- Current mitigation: Observed parameters are gate-checked by digest and drift refuses before mutation.
+- Recommendations: Add a controlled installer or external material-verification gateway before claiming supply-chain enforcement.
 
-**Reference package install contracts under-specify production package consequence:**
-- Risk: `package.install` fixtures bind package name and version range, but production package installs also depend on package manager, registry, resolved tarball integrity, transitive dependency graph, lifecycle scripts, lockfile behavior, workspace scope, and install flags.
-- Files: `src/runtime/package-install/action-proposal.ts`, `src/adapters/package-install/gateway.ts`, `test/runtime/package-install-runtime.test.ts`, `test/adapters/package-install-gateway.test.ts`.
-- Current mitigation: The lane explicitly calls this a reference fixture, not provider-side enforcement.
-- Recommendations: Do not promote `package.install` beyond fixture status until the exact contract binds package manager, registry, lockfile diff, transitive/install-script posture, and workspace mutation bounds.
+**Raw record reads are intentionally restricted but evidence reads are projections:**
+- Risk: Consumers can mistake redacted projections for full audit/search product surfaces.
+- Files: `src/http/handlers/internal-record-read.ts`, `src/http/handlers/evidence-read.ts`, `src/protocol/areas/object-registry/index.ts`, `test/http/http.test.ts`
+- Current mitigation: Internal-only object types are hidden from generic raw reads, and evidence routes return purpose-built projections.
+- Recommendations: Keep raw internal records unavailable over generic HTTP reads and add reader authorization before hosted evidence navigation.
 
 ## Performance Bottlenecks
 
-**D1 storage is optimized for record reconstruction, not Tier 3 search:**
-- Problem: `protocol_records` stores typed payloads as JSON, and `listRecordsByType` returns all rows for an object type/scope. Tier 3 needs search across principals, agents, runs, contracts, gateways, refusals, proof gaps, receipts, drift, and isolation.
-- Files: `src/storage/d1/index.ts`, `src/storage/d1/statements.ts`, `migrations/0001_protocol_kernel.sql`, `.planning/strategy/tiered-product-doctrine.md`, `.planning/strategy/tier-3-strategy-findings.md`.
-- Cause: The reference schema has indexes for object type, stream partitions, greenlight consumption, current posture, current operation claims, and receipt-by-mutation. It does not materialize hosted query dimensions or pagination indexes.
-- Improvement path: Add read models/materialized indexes for Tier 3 query axes and explicit pagination APIs before building hosted receipt/search/alert surfaces.
+**Receipt timeline projection scans broad reconciliation sets:**
+- Problem: `handleEvidenceRead` loads all tenant/org `surface_operation_reconciliation` records and filters the target mutation in projection code.
+- Files: `src/http/handlers/evidence-read.ts`, `src/protocol/evidence-projections/projections.ts`, `src/storage/d1/index.ts`, `migrations/0001_protocol_kernel.sql`
+- Cause: The store prioritizes append-only correctness and authority indexes over read-optimized evidence timelines.
+- Improvement path: Add a reconciliation-by-mutation index or materialized read model after evidence semantics stabilize.
 
-**Isolation-state lookup uses JSON extraction:**
-- Problem: D1 isolation lookup filters `protocol_records.payload_json` with `json_extract` on `scopeType`, `scopeId`, and `clearedAt`.
-- Files: `src/storage/d1/index.ts`, `migrations/0001_protocol_kernel.sql`, `src/protocol/areas/object-registry/index.ts`.
-- Cause: Isolation fields are stored only inside JSON payloads, not in a dedicated indexed table.
-- Improvement path: Add an `isolation_state_current` index table keyed by tenant, org, scope type, scope id, state, expiry, and cleared status.
-
-**In-memory store is fixture-only and O(n) for core reads:**
-- Problem: `InMemoryProtocolStore` scans maps/arrays for `listRecordsByType`, `getStreamTail`, `getStreamEvent`, and `listIsolationStates`.
-- Files: `src/storage/memory/index.ts`, `src/storage/LANE.md`.
-- Cause: It is an invariant oracle/test fixture, not a production store.
-- Improvement path: Keep memory store fixture-only. Do not use it as evidence for production throughput or hosted operation.
+**Protocol records store JSON payloads behind generic indexes:**
+- Problem: D1 reads parse full JSON payloads for object records, stream events, isolation states, postures, and projections.
+- Files: `src/storage/d1/index.ts`, `src/storage/d1/statements.ts`, `migrations/0001_protocol_kernel.sql`, `src/protocol/evidence-projections/projections.ts`
+- Cause: The durable store is a reconstruction log and object store, not a query-optimized hosted audit backend.
+- Improvement path: Keep D1 as canonical reconstruction truth and add separate projection tables for hosted search/navigation.
 
 ## Fragile Areas
 
-**Generated execution evidence is an action-list fixture, not real runtime ingress:**
-- Files: `src/runtime/codemode-multi-action/generated-program-runner.ts`, `src/runtime/codemode-multi-action/generated-graph-evidence.ts`, `src/protocol/areas/generated-execution-graph/coverage.ts`, `.planning/strategy/0.3.0-agent-runtime-source-study.md`.
-- Why fragile: `buildRuntimeExecutionInput` hardcodes loop/retry/branch/dynamic-tool flags to false, and `CodemodeMultiActionProgramSchema` accepts a simple array of known action objects. Real runtimes stream partial arguments, loop, branch, retry, pause/resume, invoke hosted tools, attach MCP servers, and use browser/shell surfaces.
-- Safe modification: Add runtime ingress events, tool-call draft/finalization records, action groups, and MCP broker posture before treating generated execution evidence as production runtime coverage.
-- Test coverage: Current tests cover graph refusal and simple sibling refusal in `test/protocol/generated-execution-graph.test.ts` and `test/runtime/codemode-multi-action-runtime.test.ts`, not streamed tool input or real runtime event ingestion.
+**D1 atomicity depends on `db.batch` and constraint classification:**
+- Files: `src/storage/d1/index.ts`, `src/storage/d1/statements.ts`, `test/support/d1-http-harness.ts`, `test/protocol/protocol-store-atomicity-contract.test.ts`, `migrations/0001_protocol_kernel.sql`
+- Why fragile: Authority-bearing commits depend on D1 batch rollback plus constraint errors for greenlight issuance, idempotency reservation, greenlight consumption, operation claims, receipt indexes, and stream offsets.
+- Safe modification: Keep greenlight issuance, idempotency reservation, consumption, receipt indexes, operation claims, records, and stream events inside one store commit.
+- Test coverage: Memory and local D1 harness stores satisfy the atomicity contract. Production D1 behavior still needs provider-backed smoke coverage before hosted claims.
 
-**Conformance is too narrow for adapter certification:**
-- Files: `src/conformance/index.ts`, `src/conformance/LANE.md`, `test/conformance/protected-mutation-adapter-conformance.test.ts`.
-- Why fragile: The public conformance helper only checks that a caller-supplied probe does not mutate without a `VerifiedGatewayCheck`. It does not verify parameter binding, credential custody, gateway policy drift handling, provider finality evidence, raw sibling bypass, replay behavior, or idempotency semantics.
-- Safe modification: Add one conformance probe per invariant and keep the language as "reference conformance" until external gateways consume it.
-- Test coverage: Current conformance tests are local fixture tests, not independent runtime or provider integration evidence.
+**Gateway commit outcomes are status-rich and easy to collapse incorrectly:**
+- Files: `src/protocol/areas/gateway-gate/transitions.ts`, `src/protocol/areas/gateway-gate/artifacts.ts`, `src/protocol/areas/gateway-gate/replay-refusal/index.ts`, `test/protocol/protocol-store-atomicity-contract.test.ts`
+- Why fragile: `already_consumed`, `operation_claim_conflict`, `receipt_index_conflict`, `stream_conflict`, proof gap, and refusal each have different authority consequences.
+- Safe modification: Add every new gateway failure mode through `commitGatewayCheckPlan` and assert no partial mutation/receipt/index event survives failed commits.
+- Test coverage: Atomicity and replay tests exist, but every new gateway outcome needs explicit consumer/projection tests.
 
-**Recovery and operation lifecycle are cross-cutting and stateful:**
-- Files: `src/protocol/areas/recovery/recommendations.ts`, `src/protocol/areas/recovery/status.ts`, `src/protocol/areas/recovery/terminal/terminal-conflict-resolutions.ts`, `src/protocol/areas/operation-lifecycle/transitions.ts`, `test/protocol/kernel-receipt-recovery.test.ts`, `test/http/d1-http.test.ts`.
-- Why fragile: Recovery recommendations, terminal status transitions, proof-gap resolution, operation claims, isolation creation, receipt mutation, and stream events are coordinated across several protocol areas.
-- Safe modification: Change recovery only through focused invariant tests plus D1/HTTP slices. Preserve terminal-claim conflict behavior and proof-gap reconstruction.
-- Test coverage: Strong local coverage exists, but the D1 and HTTP test files are large (`test/http/d1-http.test.ts`, `test/http/http.test.ts`) and mix many workflows, making targeted future edits harder.
-
-**Review binding records evidence, not a renderer contract:**
-- Files: `src/protocol/areas/review-binding/artifacts.ts`, `src/protocol/areas/review-binding/decisions.ts`, `src/protocol/areas/review-binding/schemas.ts`, `test/protocol/kernel-policy-gateway.test.ts`.
-- Why fragile: Review artifacts bind digests correctly, but this repo does not implement the json-render-style renderer, component catalog, UI artifact storage, or reviewer authentication semantics.
-- Safe modification: Treat review binding as protocol evidence only. Build renderer/catalog guarantees separately and bind rendered artifacts to stored contract/policy digests.
-- Test coverage: Tests prove digest binding and review-approved greenlight behavior, not UI correctness or human review custody.
-
-## Tier 2 / Tier 3 / Tier 4 Architecture Risks
-
-**Tier 2 risk - self-hosted proof can be faked by fixtures:**
-- Issue: Tier 2 requires agent cannot hold mutation authority, exact contract before authority, local deterministic policy, gateway-owned credential, receipt timeline, bypass posture, and hostile conformance. The current proof lanes are reference fixtures and tests.
-- Files: `.planning/strategy/tiered-product-doctrine.md`, `.planning/strategy/tier-2-meta-requirements.md`, `src/runtime/LANE.md`, `src/adapters/LANE.md`, `src/conformance/LANE.md`.
-- Impact: A fixture receipt is not a self-hosted protected path. The product must not claim Tier 2 until a real gateway-owned credential or mutation authority exists outside the agent runtime.
-- Fix approach: Pick one protected action class and prove the credential cannot be reached through generated code, shell, browser, MCP sibling tool, SDK wrapper, or environment variables.
-
-**Tier 3 risk - Cloud can become hosted receipt search:**
-- Issue: Tier 3 strategy requires operated protection posture: protected surface map, protected action plans, simulation, gateway drift monitor, proof-gap queue, remediation queue, conformance library, search, alerts, retention, and org governance. The source has protocol routes, direct record reads, generated graph projection, and receipt export.
-- Files: `.planning/strategy/tier-3-strategy-findings.md`, `src/http/routes/transition-route-registry.ts`, `src/http/handlers/internal-record-read.ts`, `src/http/handlers/evidence-read.ts`, `src/sdk/client.ts`.
-- Impact: Hosted receipts without surface maps, drift detection, simulation, remediation, and install health are useful but not Tier 3 Handshake. That would be hosted evidence, not operated protection posture.
-- Fix approach: Define `ProtectedActionPlan` as the Tier 3 spine and derive read models from existing protocol records before adding dashboard surfaces.
-
-**Tier 3 risk - builder and consumer interfaces are not separated:**
-- Issue: Strategy requires separating builder surfaces that define protected surfaces/policies/gateways from consumer/action surfaces that propose candidates, request decisions, and consume greenlights. Current HTTP route roles split custody only into `control_plane`, `runtime_evidence`, `gateway_custody`, and `review_custody`.
-- Files: `.planning/strategy/tier-3-strategy-findings.md`, `src/http/admission/caller-auth.ts`, `src/http/routes/transition-route-registry.ts`, `src/http/admission/hosted-caller-identity.ts`.
-- Impact: If a future hosted caller can register gateways/policies and consume authority through the same operational interface, it becomes ambient authority wearing a badge.
-- Fix approach: Add distinct builder/admin and consumer/action admission models before Tier 3 hosted configuration surfaces.
-
-**Tier 4 risk - ecosystem/certification language has no independent evidence:**
-- Issue: Tier 4 includes runtime conformance marks, gateway conformance marks, third-party adapter certification, cross-org receipt verification, provider enforcement attestations, and portable receipt standards. The repo has a source-package conformance helper and optional local HMACs only.
-- Files: `.planning/strategy/tiered-product-doctrine.md`, `src/conformance/index.ts`, `src/conformance/LANE.md`, `src/protocol/foundation/canonical.ts`, `docs/internal/decisions.md`.
-- Impact: Any ecosystem or certification claim from this source tree would overstate the evidence. There are no independent runtime or gateway integrations in this checkout.
-- Fix approach: Keep Tier 4 as future-only until at least one external runtime and one external gateway consume conformance suites and produce independently verifiable receipts.
+**Root export curation is part of the safety boundary:**
+- Files: `src/index.ts`, `src/experimental.ts`, `src/conformance/index.ts`, `test/architecture/root-exports.test.ts`, `package.json`
+- Why fragile: Moving experimental gateways or conformance probes onto the root export surface can make reference fixtures look production-ready.
+- Safe modification: Keep mutation gateways under `./experimental` and conformance under `./conformance`; root exports stay schema/client/app/navigation oriented.
+- Test coverage: `test/architecture/root-exports.test.ts` enforces the current export boundary.
 
 ## Scaling Limits
 
-**Hosted operation has no retention, search, alert, or read-model layer:**
-- Current capacity: Direct record reads by object ID, generated graph evidence projection, receipt export, D1 record/event storage.
-- Limit: Tier 3 needs durable operated evidence across teams, projects, policies, gateways, refusals, proof gaps, isolation events, and drift.
-- Files: `src/http/handlers/internal-record-read.ts`, `src/http/handlers/evidence-read.ts`, `src/storage/d1/index.ts`, `migrations/0001_protocol_kernel.sql`, `.planning/strategy/tiered-product-doctrine.md`.
-- Scaling path: Add tenant-scoped read models, retention policy, audit-reader roles, search indexes, alert events, and proof-gap/drift queues.
+**x402 session/day limits have no capacity model:**
+- Current capacity: Per-call x402 amount refusal only.
+- Limit: Session/day/review thresholds cannot enforce volume, repeated calls, or portfolio exposure.
+- Files: `src/adapters/x402-payment/install-proposal.ts`, `src/adapters/x402-payment/action-proposal.ts`, `migrations/0001_protocol_kernel.sql`
+- Scaling path: Add spend accumulator state keyed by tenant/org/principal/agent/gateway/resource/time window with replay-safe reservation semantics.
 
-**Runtime pluralism is represented in docs, not source adapters:**
-- Current capacity: Runtime helpers for package install, repo write, preview deploy, and codemode action lists.
-- Limit: No adapters ingest Vercel AI SDK, OpenAI Agents SDK, LangGraph/LangSmith, Cloudflare Agents, MCP servers, browser tools, shell commands, or durable workflow resumes.
-- Files: `src/runtime/*`, `.planning/strategy/0.3.0-agent-runtime-source-study.md`, `README.md`.
-- Scaling path: Add `RuntimeIngressEvent`, `ToolCallDraft`, MCP broker schemas, and one real runtime fixture before expanding protected action families.
+**Memory store is a reference adapter:**
+- Current capacity: Local tests and fixture exercises.
+- Limit: `src/storage/memory/index.ts` stages maps and clones state for atomic commit simulation; it is not long-running multi-agent storage.
+- Files: `src/storage/memory/index.ts`, `test/protocol/protocol-store-atomicity-contract.test.ts`
+- Scaling path: Keep memory storage test-only and route long-running execution evidence through D1 or another durable store.
 
-**Provider-side enforcement is absent:**
-- Current capacity: Reference gateway fixtures for package install, repo write, and preview deploy.
-- Limit: No Vercel, Cloudflare, GitHub, npm, cloud, CI, database, or provider-side gateway owns a production mutation credential in this repo.
-- Files: `src/adapters/*/gateway.ts`, `src/adapters/LANE.md`, `.planning/strategy/tier-1-closeout.md`, `.planning/strategy/tiered-product-doctrine.md`.
-- Scaling path: Keep claims at local/reference proof until a production provider or customer gateway owns the credential and checks the exact greenlight before mutation.
+**Generated execution graphs are bounded but not streaming-scale infrastructure:**
+- Current capacity: Graph inputs have node, edge, depth, and byte limits.
+- Limit: Large real generated programs, browser automation traces, and MCP streams require chunking and backpressure beyond current fixture-shaped graph inputs.
+- Files: `src/protocol/areas/generated-execution-graph/inputs.ts`, `src/protocol/areas/generated-execution-graph/coverage.ts`, `test/protocol/generated-execution-graph.test.ts`
+- Scaling path: Add streaming ingestion and partial graph closure semantics that refuse or quarantine ambiguous tails instead of silently truncating authority evidence.
 
 ## Dependencies at Risk
 
-**Private package boundary is intentional but blocks public protocol assumptions:**
-- Risk: `package.json` is `"private": true`; package export checks validate source-package shape, not public distribution, semver, license, or external support posture.
-- Impact: Tier 1 can be a private protocol kernel, but public protocol/package claims require a release-boundary decision.
-- Files: `package.json`, `scripts/check-package-surface.mjs`, `docs/internal/decisions.md`, `.planning/strategy/tier-1-closeout.md`.
-- Migration plan: Open the release-boundary decision only when publishing, license, support policy, and external package compatibility are intentionally owned.
+**Cloudflare D1 behavior:**
+- Risk: D1 batch atomicity, uniqueness constraints, and error shapes underpin the local durable authority model.
+- Impact: Divergent production behavior can misclassify conflicts or produce proof gaps during gateway commits.
+- Files: `src/storage/d1/index.ts`, `src/storage/d1/statements.ts`, `test/support/d1-http-harness.ts`, `migrations/0001_protocol_kernel.sql`
+- Migration plan: Add Cloudflare-backed smoke tests for commit conflict classes before hosted operation claims.
 
-**Cloudflare D1/Worker shape is a reference deployment, not product hosting proof:**
-- Risk: `wrangler.toml` configures D1/KV bindings, and `src/worker.ts` wires `createApp()`, but docs explicitly avoid hosted-operation claims.
-- Impact: A deployed Worker would still need real token bindings, DB migration, hosted verifier, tenant RBAC, retention, incident posture, and gateway installation.
-- Files: `wrangler.toml`, `src/worker.ts`, `src/http/store/resolution.ts`, `docs/internal/decisions.md`.
-- Migration plan: Treat Cloudflare as reference transport/storage until Tier 3 hosted control-plane requirements are implemented.
+**Bun and package surface tooling:**
+- Risk: The command contract depends on Bun `1.3.9`, TypeScript, ESLint, Prettier, npm dry-run pack checks, and CI running `npm run check:repo`.
+- Impact: Toolchain drift can break type, test, package-surface, or architecture gates.
+- Files: `package.json`, `README.md`, `.github/workflows/check.yml`, `test/architecture/package-surface.test.ts`, `test/architecture/root-exports.test.ts`
+- Migration plan: Keep `packageManager` pinned and keep `npm run check:repo` as the single local/CI gate.
 
-**KV isolation cache is unused by current authority path:**
-- Risk: `KvIsolationCache` exists but no current source path reads it for policy or gateway decisions.
-- Impact: Future maintainers could mistake KV for authority-bearing isolation state. Docs say KV is cache only.
-- Files: `src/storage/kv/index.ts`, `src/storage/LANE.md`, `docs/internal/protocol-notes.md`.
-- Migration plan: Keep D1/store as authority. If KV is wired in later, add tests proving cache misses/stale entries cannot broaden authority.
+**Experimental adapter exports:**
+- Risk: `experimentalRunX402WalletGateway`, package install, repo write, preview deploy, and fixture probe executors are available through `./experimental`.
+- Impact: Early consumers can confuse reference gateway fixtures with production provider enforcement.
+- Files: `src/experimental.ts`, `src/adapters/*`, `test/architecture/root-exports.test.ts`
+- Migration plan: Keep experimental naming until external gateway custody and bypass posture are proven.
 
 ## Missing Critical Features
 
-**Runtime ingress and finalization barrier:**
-- Problem: No `RuntimeIngressEvent`, `ToolCallDraft`, input-finalization barrier, action group model, or durable resume handling exists in source.
-- Blocks: Real agent runtimes with streamed tool arguments, loops, retries, branches, nested agents, approvals, browser tools, shell, MCP, or hosted provider tools.
-- Files: `.planning/strategy/0.3.0-agent-runtime-source-study.md`, `src/runtime/codemode-multi-action/generated-program-runner.ts`, `src/protocol/areas/runtime-evidence/*`, `src/protocol/areas/generated-execution-graph/*`.
+**Live runtime ingress adapter:**
+- Problem: No live MCP, CLI, browser, shell, package-manager, network, or generated-tool-stream adapter feeds candidate attempts into the kernel.
+- Blocks: Public runtime-control claims.
+- Files: `src/runtime/codemode-multi-action/generated-program-runner.ts`, `src/protocol/areas/generated-execution-graph/`, `src/protocol/areas/tool-call-draft/`, `.planning/tier2/06-policy-agent-management-interface-map.md`, `.planning/tier2/08-external-adapter-plug-in-architecture.md`
 
-**MCP broker posture:**
-- Problem: No MCP tool-list ingestion, tool schema digesting, consequential/read-only classification, tool hiding/wrapping, raw-call refusal, or schema drift detection exists in source.
-- Blocks: The first strategic MCP/tool-dispatcher boundary named by tier doctrine.
-- Files: `.planning/strategy/tiered-product-doctrine.md`, `.planning/strategy/0.3.0-agent-runtime-source-study.md`, `src/runtime/LANE.md`.
+**Provider/customer gateway installation:**
+- Problem: No real provider or customer gateway owns mutation credentials and runs hostile bypass probes outside local fixtures.
+- Blocks: Provider enforcement and production protected-action claims.
+- Files: `src/adapters/x402-payment/wallet-gateway.ts`, `src/adapters/x402-payment/bypass-probes.ts`, `test/integration/x402-d1-http.test.ts`, `test/adapters/x402-bypass-probes.test.ts`
 
-**ProtectedActionPlan Tier 3 spine:**
-- Problem: No object or read model combines principal intent, runtime evidence, generated graph, candidate, contract, constraints, policy decision, review, greenlight, gateway check, mutation attempt, receipt/proof-gap state, remediation, and conformance links.
-- Blocks: Hosted Protected Decision Ops.
-- Files: `.planning/strategy/tier-3-strategy-findings.md`, `src/protocol/navigation/index.ts`, `src/http/routes/transition-route-registry.ts`.
+**Hosted evidence operation:**
+- Problem: There is no hosted reader authorization, retention policy, search, alerting, audit export, or operational dashboard.
+- Blocks: Hosted control-plane and audit-product claims.
+- Files: `src/http/handlers/evidence-read.ts`, `src/http/admission/hosted-caller-identity.ts`, `src/sdk/client.ts`, `.planning/tier2/06-policy-agent-management-interface-map.md`
 
-**Receipt timeline / contract viewer / install health:**
-- Problem: The protocol emits records and stream events, but there is no local human-readable reconstruction surface for Tier 2 activation.
-- Blocks: Developer activation without reading tests or raw records.
-- Files: `.planning/strategy/tiered-product-doctrine.md`, `src/protocol/events/*`, `src/protocol/areas/receipt-export/*`, `src/sdk/client.ts`.
+**Source-owned review renderer:**
+- Problem: Review binding exists at protocol level, but no renderer implementation creates human review artifacts from exact contracts and computes source-owned renderer/action-binding digests.
+- Blocks: Product claims that rendered reviews are trustworthy operational surfaces.
+- Files: `src/protocol/areas/review-binding/`, `test/protocol/kernel-policy-gateway.test.ts`, `.planning/tier2/06-policy-agent-management-interface-map.md`
+
+**External package-material attestation:**
+- Problem: Package install binds observed parameters locally but does not independently verify package manager behavior, lockfiles, registry material, or lifecycle scripts.
+- Blocks: Supply-chain enforcement claims.
+- Files: `src/adapters/package-install/gateway.ts`, `src/runtime/package-install/action-proposal.ts`, `test/adapters/package-install-gateway.test.ts`
 
 ## Test Coverage Gaps
 
-**Bypass posture probes are not tested because they do not exist:**
-- What's not tested: Raw credential reachability, shell/browser sibling mutation, direct MCP bypass, provider-hosted tool bypass, wrapper installation drift, and gateway credential custody probes.
-- Files: `src/protocol/areas/protected-path-posture/*`, `.planning/strategy/0.3.0-agent-runtime-source-study.md`, `.planning/strategy/tier-2-meta-requirements.md`.
-- Risk: A protected path can look installed because a posture record says so.
-- Priority: High.
+**Live runtime hostile trace ingestion:**
+- What's not tested: A real generated program using live MCP/browser/shell/package/network tools with dynamic tool construction and raw sibling bypass attempts.
+- Files: `src/runtime/codemode-multi-action/generated-program-runner.ts`, `src/protocol/areas/generated-execution-graph/coverage.ts`, `test/runtime/codemode-multi-action-runtime.test.ts`, `test/protocol/generated-execution-graph.test.ts`
+- Risk: Fixture graph evidence can pass while live runtime behavior escapes the contract boundary.
+- Priority: High
 
-**Duplicate idempotency across new contracts is not tested as a hard refusal:**
-- What's not tested: Two separate action contracts with the same idempotency key/resource/params receiving separate greenlights after terminal reconciliation.
-- Files: `src/protocol/areas/policy-greenlight/guards.ts`, `src/protocol/areas/operation-lifecycle/claims.ts`, `test/protocol/kernel-operation-lifecycle.test.ts`, `migrations/0001_protocol_kernel.sql`.
-- Risk: One-use greenlight protection is mistaken for end-to-end idempotent mutation protection.
-- Priority: High for Tier 2.
+**Provider-backed gateway custody:**
+- What's not tested: External wallet/provider/customer gateway custody proving credential isolation, direct-call blocking, token passthrough blocking, wrapper drift absence, and failure-closed behavior.
+- Files: `src/adapters/x402-payment/bypass-probes.ts`, `src/adapters/x402-payment/wallet-gateway.ts`, `test/adapters/x402-bypass-probes.test.ts`, `test/integration/x402-d1-http.test.ts`
+- Risk: Local hostile probes are mistaken for provider custody.
+- Priority: High
 
-**Hosted raw-read/RBAC boundaries are not tested as product authorization:**
-- What's not tested: Tenant-scoped audit reader roles, redacted read models, `rawReadPosture` enforcement, revocation checks, and control-plane/internal-only read separation.
-- Files: `src/http/handlers/internal-record-read.ts`, `src/protocol/areas/object-registry/index.ts`, `src/http/admission/*`, `test/http/http.test.ts`.
-- Risk: Tier 3 audit surfaces expose internal protocol evidence or cross-tenant records.
-- Priority: High before hosted operation.
+**Spend-window enforcement:**
+- What's not tested: Session/day/review threshold accumulation because no accumulator exists.
+- Files: `src/adapters/x402-payment/install-proposal.ts`, `src/adapters/x402-payment/action-proposal.ts`, `migrations/0001_protocol_kernel.sql`
+- Risk: Declared spend fields look enforceable while only per-call refusal is active.
+- Priority: Medium
 
-**Real runtime adapters are not tested:**
-- What's not tested: Vercel/OpenAI/LangGraph/Cloudflare/MCP streamed tool inputs, approvals, durable resume, hosted tools, browser/computer actions, or shell execution.
-- Files: `src/runtime/*`, `.planning/strategy/0.3.0-agent-runtime-source-study.md`, `test/runtime/*`.
-- Risk: Generated execution graph coverage works on curated action lists but misses real runtime bypass behavior.
-- Priority: High for 0.3 runtime-ingress work.
-
-**External gateway/provider conformance is absent:**
-- What's not tested: A production provider or customer gateway owning mutation credentials and consuming exact greenlights before mutation.
-- Files: `src/conformance/index.ts`, `test/conformance/protected-mutation-adapter-conformance.test.ts`, `src/adapters/*/gateway.ts`.
-- Risk: Reference fixture conformance is mistaken for provider-side enforcement or certification.
-- Priority: Medium until external integrations begin, then High.
+**Hosted authorization and evidence reads:**
+- What's not tested: Real hosted identity provider behavior, revocation, org RBAC, audit export retention, and multi-tenant evidence search.
+- Files: `src/http/admission/hosted-caller-identity.ts`, `src/http/admission/index.ts`, `src/http/handlers/evidence-read.ts`, `test/http/http.test.ts`
+- Risk: HTTP seams are mistaken for hosted operation.
+- Priority: Medium
 
 ---
 
-*Concerns audit: 2026-05-19*
+*Concerns audit: 2026-05-20*
