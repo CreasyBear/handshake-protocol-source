@@ -66,9 +66,12 @@ Tier 3 or Tier 4.
   protocol-facing metadata, challenges, requests, and evidence projections.
 - `07-agentic-economy-clearing-house-research.md`: current consolidated
   clearing-house research and kernel-now/kernel-needed map.
-- `surfaces/`: Tier 2 activation **constitution** (P1–P12 → MCP/CLI rules) plus
-  **doc 10 Agent Proof Slice** (Tier 1 product shapes, hostile traces, `prove:*` gates).
-  Not implementation; anchors doc 05; defers to runtime ingress until APS green.
+- `surfaces/`: Tier 2 activation **constitution** (P1–P12 -> MCP/CLI rules) plus
+  **doc 10 Agent Proof Slice** (Tier 2 activation proof over the landed authority
+  kernel, with x402 as the worked proof profile, hostile traces, and the next
+  product-level regression target). Not implementation; preserves runtime
+  ingress as proposal evidence and keeps policy/gateway authority out of the
+  agent surface.
 
 ## Current Kernel
 
