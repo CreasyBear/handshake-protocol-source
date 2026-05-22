@@ -1,428 +1,259 @@
 # Codebase Concerns
 
-**Analysis Date:** 2026-05-21
-**Evidence Rule:** tracked canon and source/tests outrank `.planning/` scratch. The named Tier 2 planning files are used only for tier boundaries and future-surface intent.
-
-**Focused verification during refresh:**
-
-```bash
-npm run quality:claims
-npm run test -- test/product/agent-proof-slice.test.ts test/runtime/runtime-ingress.test.ts test/adapters/x402-bypass-probes.test.ts test/protocol/authority-certificate.test.ts
-```
-
-Result: 31 focused tests passed, 0 failed.
-
-## Tier Classification
-
-| Concern | Tier | Verdict | Blocking now? | Primary files |
-| --- | --- | --- | --- | --- |
-| Review artifact provenance is caller-supplied even though review decisions can later satisfy review-required policy. | Tier 1 protocol/kernel | Narrow | No for the current APS proof; yes before review-surface authority claims. | `src/protocol/areas/review-binding/artifacts.ts`, `src/protocol/areas/review-binding/decisions.ts`, `src/protocol/areas/policy-greenlight/policy.ts` |
-| Gateway commit outcomes are authority-sensitive and easy to collapse into generic errors. | Tier 1 protocol/kernel | Keep | No, guarded locally; blocks new gateway outcomes until covered. | `src/protocol/areas/gateway-gate/transitions.ts`, `src/protocol/areas/gateway-gate/artifacts.ts`, `test/protocol/protocol-store-atomicity-contract.test.ts` |
-| Lifecycle/status meanings are spread across navigation, lifecycle, receipts, operation reconciliation, and projections. | Tier 1 protocol/kernel | Keep | No, source-owned metadata and tests exist; blocks careless transition additions. | `src/protocol/navigation/index.ts`, `src/protocol/areas/action-attempt-lifecycle/matrix.ts`, `src/protocol/areas/receipt-export/status.ts`, `src/protocol/evidence-projections/projections.ts` |
-| Root export and claim boundaries can make local fixtures look production-ready if they drift. | Tier 1 protocol/kernel | Keep | No, guarded by tests. | `src/index.ts`, `src/runtime/index.ts`, `src/experimental.ts`, `src/conformance/index.ts`, `test/architecture/root-exports.test.ts`, `test/architecture/claim-boundary.test.ts` |
-| Runtime ingress is bounded/local and ceremony-heavy. | Tier 2 activation/product | Keep | Yes for public runtime/MCP/CLI activation; no for local kernel foundation. | `src/runtime/ingress/index.ts`, `test/runtime/runtime-ingress.test.ts`, `.planning/tier2/06-policy-agent-management-interface-map.md` |
-| Public Metadata/Challenge/Request/EvidenceProjection, SDK, CLI, and MCP convenience surfaces are not built. | Tier 2 activation/product | Keep | Yes for first protected-action UX. | `src/protocol/areas/protected-action-representation/`, `src/sdk/client.ts`, `.planning/tier2/06-policy-agent-management-interface-map.md`, `.planning/tier2/08-external-adapter-plug-in-architecture.md` |
-| x402 can drift from proof profile into protocol center. | Tier 2 activation/product | Narrow | No for local proof; yes before any adapter-family protocol claim. | `src/adapters/x402-payment/`, `docs/internal/protocol-notes.md`, `test/product/agent-proof-slice.test.ts` |
-| Package install is parity/regression, not external supply-chain enforcement. | Tier 2 activation/product | Narrow | No for local parity; yes before supply-chain enforcement claims. | `src/adapters/package-install/gateway.ts`, `src/runtime/package-install/action-proposal.ts`, `test/integration/package-install-end-to-end.test.ts` |
-| Hosted operation is only a seam: RBAC, policy lifecycle, retention, search, alerts, audit export, hosted verifier/read model, and exposure counters are missing. | Tier 3 hosted operation | Keep | Yes for hosted product claims. | `src/http/admission/hosted-caller-identity.ts`, `src/http/handlers/evidence-read.ts`, `docs/internal/decisions.md` |
-| Evidence reads are redacted projections backed by broad record scans, not hosted audit/search surfaces. | Tier 3 hosted operation | Redesign later | No locally; yes before hosted scale/audit claims. | `src/http/handlers/evidence-read.ts`, `src/protocol/evidence-projections/projections.ts`, `src/storage/d1/index.ts`, `migrations/0001_protocol_kernel.sql` |
-| x402 session/day/review spend windows are metadata without a reservation ledger. | Tier 3 hosted operation | Narrow | No for per-call x402 proof; yes before spend-window enforcement. | `src/adapters/x402-payment/install-proposal.ts`, `src/adapters/x402-payment/action-proposal.ts`, `migrations/0001_protocol_kernel.sql` |
-| Production D1 behavior is not provider-smoked for every authority conflict class. | Tier 3 hosted operation | Keep | No locally; yes before hosted operation. | `src/storage/d1/index.ts`, `src/storage/d1/statements.ts`, `test/http/d1-http.test.ts`, `test/protocol/protocol-store-atomicity-contract.test.ts` |
-| Provider/customer gateway custody and independently witnessed bypass probes are unproven. | Tier 4 ecosystem/interoperability | Narrow | Yes before provider/customer custody claims. | `src/adapters/x402-payment/wallet-gateway.ts`, `src/adapters/x402-payment/bypass-probes.ts`, `src/protocol/areas/protected-path-posture/transitions.ts` |
-| AuthorityCertificate is local pinned-key terminal evidence, not cross-org trust, JWKS, revocation, marketplace certification, or hosted verification. | Tier 4 ecosystem/interoperability | Narrow | Yes before portable trust claims. | `src/protocol/areas/authority-certificate/verify.ts`, `src/protocol/areas/authority-certificate/transitions.ts`, `test/protocol/authority-certificate.test.ts` |
-| Conformance probes are not certification marks. | Tier 4 ecosystem/interoperability | Cut certification language | Yes before conformance/certification claims. | `src/conformance/index.ts`, `test/conformance/protected-mutation-adapter-conformance.test.ts`, `.planning/tier2/08-external-adapter-plug-in-architecture.md` |
-
-## Boundary Snapshot
-
-**LANDED local foundation:**
-
-- APS proof now exists: x402 runtime ingress composes through policy, gateway, redacted `AgentTransactionEnvelope`, and terminal `AuthorityCertificate` evidence in `test/product/agent-proof-slice.test.ts`.
-- `AuthorityCertificate` is landed locally as terminal evidence only, with offline pinned-key verification in `src/protocol/areas/authority-certificate/`, root export through `src/index.ts`, and coverage in `test/protocol/authority-certificate.test.ts`.
-- `projectAgentTransactionEnvelope()` is exposed through `src/http/handlers/evidence-read.ts` and derives redacted transaction evidence from contract, policy, greenlight, gate, mutation, receipt, refusal, proof gap, and ledger records.
-- x402 is a local proof profile, not the protocol center. `src/adapters/x402-payment/` proves one local payment profile; package install remains a parity/regression lane through `src/adapters/package-install/gateway.ts` and `test/integration/package-install-end-to-end.test.ts`.
-- Runtime ingress is bounded/local. `src/runtime/ingress/index.ts` supports local x402 and package-install dispatch boundaries and refuses dynamic, late-bound, raw sibling, and truncated traces in `test/runtime/runtime-ingress.test.ts`.
-- Claim-boundary tests keep current docs honest in `test/architecture/claim-boundary.test.ts`.
-
-**Not landed as external/provider/hosted/cross-org claims:**
-
-- No provider/customer gateway custody, live wallet custody, independently witnessed bypass probes, hosted operation, broad MCP/browser/shell/network interception, external package-material attestation, cross-org certificate trust, live JWKS/revocation, hosted verifier, or spend-window ledger is proven by this checkout.
-- Tier 2 activation surfaces may guide, propose, and project evidence. They must not inherit Tier 3 hosted or Tier 4 ecosystem claims.
+**Analysis Date:** 2026-05-22
 
 ## Tech Debt
 
-**Review artifact provenance:**
+**Product claim boundary is narrower than the available product vocabulary:**
+- Issue: The source proves a local protocol kernel, D1/HTTP reference path, runtime ingress evidence for installed lanes, and one buyer-side x402 `exact` per-call gateway path. It does not prove hosted operation, provider-side enforcement, broad agent governance, generic runtime/MCP interception, live package-material attestation, aggregate spend-window enforcement, cross-org certificate trust, seller middleware, facilitator operation, or broad x402 scheme support.
+- Files: `README.md`, `AGENTS.md`, `docs/internal/decisions.md`, `docs/internal/protocol-definition.md`, `docs/internal/protocol-kernel-architecture.md`, `docs/internal/protocol-notes.md`, `examples/x402-protected-spend/README.md`
+- Impact: Public docs, roadmap items, examples, or package surfaces can overclaim beyond the exact contract -> policy -> one-use greenlight -> gateway check -> receipt/refusal/proof-gap chain that the source enforces.
+- Fix approach: Keep claims tied to installed paths and explicit non-claims. Any new claim must add source-owned enforcement, invariant tests, package-surface posture tests, and docs updates in the canonical files above.
 
-- Tier: Tier 1 protocol/kernel.
-- Verdict: Narrow.
-- Blocking now: No for APS local proof; yes before claiming review surfaces are trustworthy authority inputs.
-- Issue: `createReviewArtifact()` records caller-supplied `rendererRef`, `renderedArtifactDigest`, `catalogDigest`, `rendererDigest`, and `actionBindingDigest`. `createReviewDecision()` checks those fields and safe hidden/secondary-action posture, but no source-owned renderer registry computes the review artifact from exact contract input.
-- Files: `src/protocol/areas/review-binding/artifacts.ts`, `src/protocol/areas/review-binding/decisions.ts`, `src/protocol/areas/review-binding/schemas.ts`, `src/protocol/areas/policy-greenlight/policy.ts`, `test/protocol/kernel-policy-gateway.test.ts`
-- Impact: A caller-controlled renderer can produce misleading human review artifacts while satisfying caller-provided digest fields. That is review theatre if used as an operational review product.
-- Fix approach: Add a source-owned renderer/generator registry that computes artifact, catalog, renderer, and action-binding digests from the exact `ActionContract` and policy input.
+**Root SDK client exposes an all-role transition token fallback:**
+- Issue: `HandshakeClient` accepts `transitionToken` and uses it as a fallback for every role when `transitionTokens?.[role]` is missing. That is convenient for local demos, but dangerous if passed into runtime or model-facing code.
+- Files: `src/sdk/client.ts`, `src/sdk/surface-clients/runtime-client.ts`, `src/sdk/surface-clients/evidence-client.ts`, `src/sdk/LANE.md`, `test/sdk/role-clients.test.ts`
+- Impact: A caller can accidentally hand ambient transition authority to code that should only have runtime-observer or evidence-reader capability.
+- Fix approach: Prefer role-scoped clients for model/runtime-facing integrations. Keep the fallback out of public examples and consider deprecating it once all first-party callers use `transitionTokens` or role-scoped clients.
 
-**Runtime ingress ceremony and narrow host coverage:**
+**MCP is source-owned but intentionally not a package authority surface:**
+- Issue: The MCP lane has a source-owned catalog and strict x402 proposal schema, but it is not exported from `package.json` and it does not start a server process, evaluate policy, greenlight, gate, sign, pay, mint authority, or write receipts.
+- Files: `src/mcp/LANE.md`, `src/mcp/index.ts`, `src/mcp/x402-proposal.ts`, `package.json`, `test/architecture/mcp-surface-posture.test.ts`, `test/architecture/root-exports.test.ts`, `test/mcp/mcp-schema-contract.test.ts`
+- Impact: Treating MCP as an installed authority surface would turn a proposal helper into an enforcement claim. This is advisory until an actual gateway-bound MCP host exists.
+- Fix approach: Keep MCP off root exports and package subpath exports until there is a process boundary, credential posture, exact gateway binding, and receipt path for any mutation-capable tool.
 
-- Tier: Tier 2 activation/product.
-- Verdict: Keep, but do not overclaim.
-- Blocking now: Yes for first protected-action UX and public runtime/MCP/CLI activation.
-- Issue: `proposeRuntimeIngressActionContracts()` expects normalized dispatch blocks, graph closure, evidence refs, tool-call parameters, and action-family config. It is a local adapter helper, not a live host interception layer.
-- Files: `src/runtime/ingress/index.ts`, `src/runtime/index.ts`, `src/runtime/LANE.md`, `test/runtime/runtime-ingress.test.ts`, `.planning/tier2/06-policy-agent-management-interface-map.md`
-- Impact: The authority boundary is correct, but the surface is easy to avoid or misuse. Future wrappers can accidentally treat caller-observed traces as complete host custody.
-- Fix approach: Build one runtime shim at a time. Each shim may normalize observed evidence only; it must not call policy, gateway, receipt, mutation, or protected-surface code.
+**Runtime ingress evidence is not universal host interception:**
+- Issue: Runtime ingress can normalize and refuse known dispatch families, but the canonical docs explicitly limit it to installed lanes. It cannot prove every raw sibling tool path in the host was intercepted.
+- Files: `src/runtime/ingress/index.ts`, `src/runtime/LANE.md`, `docs/internal/protocol-notes.md`, `docs/internal/protocol-kernel-architecture.md`, `test/runtime/runtime-ingress.test.ts`, `test/architecture/surface-boundary-posture.test.ts`
+- Impact: Claims that Handshake controls arbitrary browser, shell, MCP, package-manager, cloud, or network actions are false unless those paths are wrapped and gateway-bound.
+- Fix approach: For each runtime adapter, define the tool catalog, action catalog, raw/sibling bypass posture, protected mutation path, and evidence outcome before claiming control.
 
-**Public activation surfaces are missing:**
+**Spend-window policy is metadata, not enforcement:**
+- Issue: x402 install proposals store session/day/review spend limits, but `spendWindowEnforcementStatus` is `not_enforced_tier1_metadata`; runtime x402 checks enforce per-call atomic amount only.
+- Files: `src/adapters/x402-payment/install-proposal.ts`, `src/adapters/x402-payment/action-proposal.ts`, `docs/internal/decisions.md`, `README.md`, `examples/x402-protected-spend/README.md`, `test/integration/x402-d1-http.test.ts`
+- Impact: A product claim about session budgets, daily budgets, review-window budgets, or aggregate spend control would exceed source-owned enforcement.
+- Fix approach: Add a spend reservation ledger with atomic reserve/commit/release transitions before claiming aggregate budget enforcement.
 
-- Tier: Tier 2 activation/product.
-- Verdict: Keep.
-- Blocking now: Yes for the first protected-action UX.
-- Issue: Internal representation contracts exist, but public `ProtectedActionMetadata`, `ProtectedActionChallenge`, `ProtectedActionRequest`, `EvidenceProjection`, SDK/CLI/MCP proposal, and evidence conveniences are not source-complete.
-- Files: `src/protocol/areas/protected-action-representation/`, `src/sdk/client.ts`, `.planning/tier2/06-policy-agent-management-interface-map.md`, `.planning/tier2/08-external-adapter-plug-in-architecture.md`, `test/protocol/representation-contract.test.ts`
-- Impact: A serious implementer can assemble the chain from source/tests, but a first protected action still lacks a clean activation path.
-- Fix approach: Expose representation surfaces as guidance/proposal/evidence only, then add SDK or MCP wrappers that compile to existing runtime evidence and candidate paths.
-
-**x402 spend windows are declared but not enforced:**
-
-- Tier: Tier 3 hosted operation.
-- Verdict: Narrow.
-- Blocking now: No for per-call x402 proof; yes before spend-window claims.
-- Issue: `maxAtomicAmountPerCall` is enforced before compilation, while `maxAtomicAmountPerSession`, `maxAtomicAmountPerDay`, and `reviewThresholdAtomicAmount` carry `spendWindowEnforcementStatus: "not_enforced_tier1_metadata"`.
-- Files: `src/adapters/x402-payment/install-proposal.ts`, `src/adapters/x402-payment/action-proposal.ts`, `test/adapters/x402-install-proposal.test.ts`, `test/adapters/x402-payment-action-proposal.test.ts`, `migrations/0001_protocol_kernel.sql`
-- Impact: Current x402 authority is per-call only. Any session/day/review spend-window claim would be ambient policy theatre.
-- Fix approach: Add a replay-safe spend accumulator/reservation ledger keyed by tenant, organization, principal, agent, gateway, resource, and time window before enforcing broader spend bounds.
-
-**x402 proof profile can pull the protocol off-center:**
-
-- Tier: Tier 2 activation/product.
-- Verdict: Narrow.
-- Blocking now: No for local proof; yes before public framing.
-- Issue: x402 has the strongest concrete proof profile, but canon says no adapter family defines the protocol.
-- Files: `src/adapters/x402-payment/`, `test/product/agent-proof-slice.test.ts`, `docs/internal/protocol-definition.md`, `docs/internal/protocol-notes.md`, `.planning/tier2/07-agentic-economy-clearing-house-research.md`
-- Impact: Product language can accidentally make x402 the protocol center instead of one proof profile that consumes generic `ActionContract`, `Greenlight`, `GatewayCheck`, receipt/proof-gap, and `AuthorityCertificate` primitives.
-- Fix approach: Keep x402 examples explicitly profile-scoped. Treat package install as parity/regression and require any new adapter to consume the same kernel chain.
+**Generic adapter conformance is too small for provider-grade certification:**
+- Issue: The conformance probe only checks that a fixture does not mutate without a verified gateway check. It does not exercise real provider auth, lifecycle hooks, retry behavior, delayed side effects, network side channels, package-manager behavior, or browser/client-side bypass.
+- Files: `src/conformance/index.ts`, `src/adapters/x402-payment/bypass-probes.ts`, `test/conformance/protected-mutation-adapter-conformance.test.ts`, `test/adapters/x402-bypass-probes.test.ts`
+- Impact: Passing conformance proves a narrow fixture posture, not that an external adapter is safe to certify.
+- Fix approach: Keep "certification" language out of public claims until conformance includes provider-specific hostile probes and gateway-owned credential custody checks.
 
 ## Known Bugs
 
-**No confirmed local authority-path correctness bug detected:**
+**MCP x402 proposal uses caller-supplied idempotency keys:**
+- Symptoms: The MCP x402 proposal path accepts `idempotencyKey` directly from the tool caller and places it into the candidate action contract. The idempotency ledger treats a changed idempotency key as a different attempt even when the protected resource and payment parameters are the same.
+- Files: `src/mcp/x402-proposal.ts`, `src/protocol/areas/idempotency-ledger/entries.ts`, `test/mcp/mcp-x402-proposal.test.ts`, `test/mcp/mcp-schema-contract.test.ts`
+- Trigger: A model or tool caller proposes the same x402 payment twice with a different `idempotencyKey`.
+- Workaround: Do not expose MCP x402 proposal as an authority path. Treat it as a proposal-only surface until idempotency is derived from stable payment/request material or validated against a server-owned key derivation rule.
 
-- Tier: Tier 1 protocol/kernel.
-- Verdict: Keep current guard posture.
-- Blocking now: No.
-- Symptoms: Focused checks passed for claim boundaries, APS proof, runtime ingress refusal boundaries, x402 hostile probes, and AuthorityCertificate terminal verification.
-- Files: `test/architecture/claim-boundary.test.ts`, `test/product/agent-proof-slice.test.ts`, `test/runtime/runtime-ingress.test.ts`, `test/adapters/x402-bypass-probes.test.ts`, `test/protocol/authority-certificate.test.ts`
-- Trigger: Not applicable.
-- Workaround: Not applicable.
+**Gateway and storage conflict classification depends on SQLite/D1 error text:**
+- Symptoms: Storage conflict helpers inspect `error.message` strings to detect stream conflicts, duplicate terminal recovery outcomes, and pointer/constraint failures.
+- Files: `src/storage/d1/index.ts`, `test/http/d1-http.test.ts`, `test/protocol/protocol-store-atomicity-contract.test.ts`, `migrations/0001_protocol_kernel.sql`
+- Trigger: D1 or SQLite changes constraint error wording, table names, or driver message formats.
+- Workaround: Keep D1 conflict tests in the required gate and prefer structured error codes or explicit preflight reads where the storage driver supports them.
 
-**False posture injection remains a trust-boundary bug class:**
-
-- Tier: Tier 4 ecosystem/interoperability.
-- Verdict: Narrow.
-- Blocking now: Yes before provider/customer custody claims.
-- Symptoms: A gateway-custody caller can submit bypass probe and protected-path posture records. The kernel checks scope, freshness, source authority, required probe kinds, and pass/fail outcomes, but it cannot independently prove the probe actually ran.
-- Files: `src/protocol/areas/bypass-probe/transitions.ts`, `src/protocol/areas/protected-path-posture/transitions.ts`, `src/adapters/x402-payment/bypass-probes.ts`, `test/adapters/x402-bypass-probes.test.ts`
-- Trigger: A compromised or dishonest gateway-custody boundary records passing probe evidence without executing hostile checks.
-- Workaround: Treat gateway custody as the trust boundary. External/provider claims require independent attestation, monitored probe execution, or provider-side custody proof.
+**Certificate creation is kernel-level but not an HTTP authority route:**
+- Symptoms: Authority certificate creation exists in the protocol kernel, while HTTP route registration exposes certificate verification/read-style paths but not a create route.
+- Files: `src/protocol/kernel.ts`, `src/protocol/areas/authority-certificate/inputs.ts`, `src/protocol/areas/authority-certificate/verify.ts`, `src/http/routes/transition-route-registry.ts`, `src/http/app.ts`, `src/cli/certificate.ts`
+- Trigger: Product copy or examples imply hosted certificate minting through the HTTP surface.
+- Workaround: Keep certificate creation described as local/kernel-level unless an HTTP route with signer custody, tenant scope, and hosted verifier checks is added.
 
 ## Security Considerations
 
-**Gateway custody is the real authority holder:**
+**Local caller auth is role-token auth, not tenant-scoped authorization:**
+- Risk: In local mode, bearer tokens map to coarse roles. Tenant and organization scope checks apply when `hostedIdentity` exists, but local token auth does not bind every request to tenant/org scope.
+- Files: `src/http/admission/caller-auth.ts`, `src/http/admission/hosted-caller-identity.ts`, `src/http/admission/index.ts`, `src/http/app.ts`, `src/http/handlers/internal-record-read.ts`, `test/http/http.test.ts`
+- Current mitigation: Hosted identity verifier schemas include tenant/org, custody, scope, and freshness fields. Local docs keep the path framed as local foundation.
+- Recommendations: Do not use local role-token mode for hosted or multi-tenant claims. Keep hosted mode mandatory for tenant/org-scoped deployments and add tests that prove local tokens cannot be mistaken for hosted identity.
 
-- Tier: Tier 4 ecosystem/interoperability.
-- Verdict: Narrow.
-- Blocking now: Yes before provider/customer custody claims.
-- Risk: If mutation credentials remain reachable through raw sibling tools, shell paths, browser tools, MCP direct calls, token passthrough, wrapper drift, or generated-code side effects, the generated code escaped the contract boundary.
-- Files: `src/protocol/areas/protected-path-posture/transitions.ts`, `src/protocol/areas/bypass-probe/schemas.ts`, `src/adapters/x402-payment/bypass-probes.ts`, `test/adapters/x402-bypass-probes.test.ts`, `test/runtime/runtime-ingress.test.ts`
-- Current mitigation: `gateway_checked` posture requires fresh passing probes for credential custody, raw sibling blocking, MCP direct-call blocking, token passthrough blocking, wrapper drift, and failure-closed behavior.
-- Recommendations: Do not claim installed protection until a customer/provider gateway owns the mutation credential and the hostile probes run from the actual deployment boundary.
+**Internal raw record reads can expose audit-readable custody evidence to control-plane callers:**
+- Risk: `control_plane` callers can read raw records unless an object registry entry is `internal_only`. Credential reference and credential resolution evidence objects are `audit_read`, so local control-plane tokens can retrieve diagnostic custody evidence.
+- Files: `src/http/handlers/internal-record-read.ts`, `src/protocol/areas/object-registry/index.ts`, `src/protocol/areas/credential-custody/schemas.ts`, `test/http/http.test.ts`, `test/protocol/object-registry.test.ts`
+- Current mitigation: Credential schemas reject obvious raw secret patterns and evidence uses references/digests rather than provider payloads.
+- Recommendations: Treat raw record read as diagnostic, not operator-facing. For hosted use, require scoped hosted identity and review whether custody evidence should become redacted projection-only rather than raw-record readable.
 
-**Hosted admission is a seam, not hosted auth:**
+**Credential redaction is heuristic and typed, not provider-grade secret lifecycle:**
+- Risk: `CredentialSafeStringSchema` rejects obvious secret-like strings, but provider-specific credential formats, nested payloads, encoded secrets, and future x402/provider signatures can bypass simple pattern checks.
+- Files: `src/protocol/areas/credential-custody/schemas.ts`, `src/protocol/areas/credential-custody/transitions.ts`, `src/adapters/x402-payment/wallet-gateway.ts`, `docs/internal/protocol-notes.md`, `test/protocol/credential-custody.test.ts`
+- Current mitigation: The official x402 wallet gateway keeps raw `PaymentPayload` and `PAYMENT-SIGNATURE` creation inside the gateway-held signing surface and stores refs/digests.
+- Recommendations: Add provider-specific fuzz tests, encoded secret tests, and gateway custody fixtures before claiming provider-grade secret lifecycle or vault-backed custody.
 
-- Tier: Tier 3 hosted operation.
-- Verdict: Keep as a seam.
-- Blocking now: Yes before hosted operation claims.
-- Risk: `caller-auth.ts` supports role-scoped static bearer tokens, and `hosted-caller-identity.ts` defines a verifier seam. Neither implements real org auth, RBAC, policy lifecycle, retention, search, alerts, audit export, or hosted verifier operation.
-- Files: `src/http/admission/caller-auth.ts`, `src/http/admission/hosted-caller-identity.ts`, `src/http/admission/index.ts`, `test/http/http.test.ts`
-- Current mitigation: Hosted mode refuses lane-token-only admission, checks role/scope/freshness, rejects revoked identities from the configured verifier, and stores only digest/ref caller evidence.
-- Recommendations: Add a real hosted verifier, revocation model, tenant authorization policy, evidence-read authorization, retention, and audit export before hosted operation claims.
+**Authority certificate signing material is a dangerous local primitive if surfaced incorrectly:**
+- Risk: Certificate creation accepts signer material such as PKCS8 private keys or dev HMAC secrets. Verification rejects dev HMAC unless explicitly allowed, but an HTTP or MCP minting route would create a custody problem.
+- Files: `src/protocol/areas/authority-certificate/inputs.ts`, `src/protocol/areas/authority-certificate/transitions.ts`, `src/protocol/areas/authority-certificate/verify.ts`, `src/protocol/kernel.ts`, `test/protocol/authority-certificate.test.ts`
+- Current mitigation: The public HTTP surface does not expose certificate creation and CLI only verifies supplied terminal certificates.
+- Recommendations: Keep certificate minting out of model-facing and HTTP-facing surfaces until signer custody has a gateway-owned key store and scoped issuance policy.
 
-**AuthorityCertificate trust is local pinned-key evidence only:**
-
-- Tier: Tier 4 ecosystem/interoperability.
-- Verdict: Narrow.
-- Blocking now: Yes before cross-org trust, hosted verify, or marketplace/certification claims.
-- Risk: `AuthorityCertificate` can be overread as identity, settlement, execution authority, or portable cross-org trust.
-- Files: `src/protocol/areas/authority-certificate/transitions.ts`, `src/protocol/areas/authority-certificate/verify.ts`, `src/protocol/areas/authority-certificate/schemas.ts`, `test/protocol/authority-certificate.test.ts`, `docs/internal/decisions.md`
-- Current mitigation: `createAuthorityCertificate()` is terminal-only. `verifyAuthorityCertificate()` verifies canonical `signingInput`, rejects production HMAC unless `allowDevHmac` is enabled, and works without the protocol store using pinned trust material.
-- Recommendations: Keep certificate examples on Ed25519 pinned trust. Add explicit trust registry, JWKS/revocation, key rotation, and hosted verify semantics only as evidence verification, not execution authority.
-
-**Evidence reads are redacted projections, not audit product surfaces:**
-
-- Tier: Tier 3 hosted operation.
-- Verdict: Redesign later for hosted read models.
-- Blocking now: Yes before hosted audit/search claims.
-- Risk: Consumers can confuse redacted diagnostic projections with complete hosted audit/search.
-- Files: `src/http/handlers/evidence-read.ts`, `src/http/handlers/internal-record-read.ts`, `src/protocol/areas/object-registry/index.ts`, `test/http/http.test.ts`
-- Current mitigation: Internal-only objects such as `contract_stream_event`, `idempotency_ledger_entry`, `bypass_probe`, and `tool_call_draft` are hidden from generic raw reads.
-- Recommendations: Keep raw internal records unavailable over generic HTTP and add reader authorization, retention, search, alerts, and purpose-built projections before hosted audit claims.
-
-**Package-install proof is parameter binding, not material attestation:**
-
-- Tier: Tier 2 activation/product.
-- Verdict: Narrow.
-- Blocking now: No for parity/regression; yes before supply-chain enforcement claims.
-- Risk: The package gateway binds observed package manager, registry, manifest, lockfile, install flags, lifecycle-script policy, and resolved material fields, but it does not independently verify registry tarballs or package-manager behavior.
-- Files: `src/adapters/package-install/gateway.ts`, `src/runtime/package-install/action-proposal.ts`, `test/adapters/package-install-gateway.test.ts`, `test/integration/package-install-end-to-end.test.ts`
-- Current mitigation: Gateway-observed parameters must match the exact contract digest before mutation.
-- Recommendations: Add a controlled installer or external material-verification gateway before supply-chain enforcement claims.
+**Package exports intentionally hide mutation-capable experimental surfaces:**
+- Risk: `src/experimental.ts` exports reference gateway fixtures, including x402 wallet-gateway helpers, while `package.json` does not expose mutation-capable MCP/CLI subpaths. Incorrect package export changes could make internal authority helpers public.
+- Files: `package.json`, `src/experimental.ts`, `src/adapters/x402-payment/wallet-gateway.ts`, `test/architecture/root-exports.test.ts`, `test/architecture/import-posture.test.ts`, `scripts/check-package-surface.mjs`
+- Current mitigation: Architecture tests require curated root exports and prevent MCP from becoming a package export.
+- Recommendations: Treat package export changes as authority-surface changes. Run `npm run quality:architecture` and `npm run check:pack` after any package metadata edit.
 
 ## Performance Bottlenecks
 
-**Receipt and transaction projections scan broad tenant/org record sets:**
+**Evidence projections use tenant-wide scans and per-event reads:**
+- Problem: Receipt timelines and action envelopes list all records by object type in tenant/org scope, then filter in memory by action contract. Stream event loading loops over offsets and calls `getStreamEvent` one event at a time.
+- Files: `src/http/handlers/evidence-read.ts`, `src/storage/d1/index.ts`, `src/protocol/evidence-projections/projections.ts`, `migrations/0001_protocol_kernel.sql`, `test/http/http.test.ts`
+- Cause: Storage exposes broad `listRecordsByType` and offset readers rather than action-contract, receipt, and stream-range indexes.
+- Improvement path: Add paginated/indexed readers keyed by `tenantId`, `organizationId`, `actionContractId`, `receiptId`, and stream offset range before using evidence projections for high-volume tenants.
 
-- Tier: Tier 3 hosted operation.
-- Verdict: Redesign later.
-- Blocking now: No locally; yes before hosted evidence scale.
-- Problem: `handleEvidenceRead()` loads tenant/org-wide policy, greenlight, gateway, mutation, receipt, refusal, proof-gap, and reconciliation sets, then filters in projection logic.
-- Files: `src/http/handlers/evidence-read.ts`, `src/protocol/evidence-projections/projections.ts`, `src/storage/d1/index.ts`, `migrations/0001_protocol_kernel.sql`
-- Cause: The store prioritizes append-only reconstruction truth and current-state indexes over read-optimized hosted evidence views.
-- Improvement path: Add materialized read models or targeted indexes such as reconciliation-by-mutation and contract-linked evidence projections after semantics stabilize.
+**Runtime graph and JSON parsing can consume work before refusal:**
+- Problem: HTTP parsing accepts JSON bodies without a source-owned request-size cap. Runtime dispatch blocks and generated execution graph inputs allow unbounded array lengths and string lengths at schema parse time.
+- Files: `src/http/app.ts`, `src/runtime/ingress/index.ts`, `src/protocol/areas/generated-execution-graph/inputs.ts`, `src/protocol/areas/generated-execution-graph/coverage.ts`, `src/protocol/foundation/canonical.ts`, `src/protocol/foundation/schema-core.ts`
+- Cause: Limits are applied as protocol coverage/refusal metadata after parsing and digesting, not consistently as ingress parser caps.
+- Improvement path: Add request-size limits, schema `.max(...)` limits for dispatch arrays and graph arrays, and early refusal tests for oversized runtime evidence.
 
-**Protocol records are JSON payloads behind generic indexes:**
-
-- Tier: Tier 3 hosted operation.
-- Verdict: Keep for kernel, redesign for hosted search.
-- Blocking now: No locally.
-- Problem: D1 reads parse full JSON payloads for records, stream events, isolation state, protected path posture, and evidence projections.
-- Files: `src/storage/d1/index.ts`, `src/storage/d1/statements.ts`, `migrations/0001_protocol_kernel.sql`, `src/protocol/evidence-projections/projections.ts`
-- Cause: D1 is reconstruction truth, not a query-optimized hosted audit backend.
-- Improvement path: Keep D1 as canonical reconstruction storage and add projection tables for hosted search/navigation only after record semantics are stable.
-
-**Runtime ingress graph ingestion is block-oriented:**
-
-- Tier: Tier 2 activation/product.
-- Verdict: Keep for first proof, redesign before broad host claims.
-- Blocking now: Yes for broad runtime ingestion claims.
-- Problem: `RuntimeIngressDispatchBlockSchema` expects a bounded block with complete dispatches, graph nonce, truncation status, and observed dispatch details.
-- Files: `src/runtime/ingress/index.ts`, `src/protocol/areas/generated-execution-graph/inputs.ts`, `test/runtime/runtime-ingress.test.ts`
-- Cause: Current proof targets bounded local dispatches, not continuous browser/shell/MCP streams.
-- Improvement path: Add streaming chunk semantics with refusal/quarantine for ambiguous tails before claiming large generated-program ingestion.
+**Canonicalization recursively stringifies arbitrary JSON-shaped protocol data:**
+- Problem: Canonicalization sorts and serializes nested JSON values. Deep or wide caller-provided metadata can increase CPU and memory before a protocol refusal is emitted.
+- Files: `src/protocol/foundation/canonical.ts`, `src/protocol/foundation/schema-core.ts`, `src/runtime/ingress/index.ts`, `src/protocol/areas/generated-execution-graph/coverage.ts`, `test/protocol/canonical.test.ts`
+- Cause: Recursive `JsonValueSchema` and canonical byte-size checks do not enforce uniform depth and width limits at every external boundary.
+- Improvement path: Introduce shared bounded JSON schemas for external caller metadata and verify depth/width rejection before canonicalization.
 
 ## Fragile Areas
 
-**Gateway commit outcomes:**
+**Large protocol and runtime files concentrate unrelated invariants:**
+- Files: `src/runtime/ingress/index.ts`, `src/protocol/areas/action-attempt-lifecycle/matrix.ts`, `src/protocol/evidence-projections/projections.ts`, `src/mcp/x402-proposal.ts`, `src/adapters/x402-payment/wallet-gateway.ts`, `src/surfaces/boundary-manifest.ts`, `src/protocol/areas/credential-custody/transitions.ts`
+- Why fragile: These files combine schema normalization, refusal logic, evidence shaping, digesting, and policy boundary semantics. Small edits can change source-owned product claims.
+- Safe modification: Treat each edit as an invariant change. Add or update architecture posture tests and protocol invariant tests in the same patch.
+- Test coverage: Coverage exists, but it is distributed across `test/runtime`, `test/protocol`, `test/http`, `test/mcp`, `test/adapters`, and `test/architecture`; missing one suite can miss claim drift.
 
-- Tier: Tier 1 protocol/kernel.
-- Verdict: Keep.
-- Blocking now: No, but every new outcome needs tests.
-- Files: `src/protocol/areas/gateway-gate/transitions.ts`, `src/protocol/areas/gateway-gate/artifacts.ts`, `src/protocol/areas/gateway-gate/replay-refusal/index.ts`, `test/protocol/protocol-store-atomicity-contract.test.ts`
-- Why fragile: `already_consumed`, `operation_claim_conflict`, `receipt_index_conflict`, `stream_append_conflict`, gateway refusal, replay refusal, and downstream proof gap have different authority consequences.
-- Safe modification: Add every new gateway failure mode through `commitGatewayCheckPlan()` and assert no partial mutation, receipt, index, or event survives failed commits.
-- Test coverage: Replay and atomicity tests exist; every new gateway outcome needs projection and receipt assertions.
+**Surface boundary manifest is central source-owned doctrine:**
+- Files: `src/surfaces/boundary-manifest.ts`, `src/surfaces/LANE.md`, `test/architecture/surface-boundary-posture.test.ts`, `test/architecture/root-exports.test.ts`, `test/architecture/claim-boundary.test.ts`
+- Why fragile: The manifest defines active/deferred surfaces, forbidden route families, forbidden imports, forbidden credential shapes, and allowed claim labels. It is both source guardrail and product-claim evidence.
+- Safe modification: Any new surface must add a manifest entry, lane doc, package export decision, root-export test, claim-boundary test, and README/docs wording.
+- Test coverage: Tests catch many forbidden route/import/export shapes, but they do not prove live runtime host interception or provider custody.
 
-**D1 atomicity and conflict classification:**
+**HTTP route registry is an authority boundary:**
+- Files: `src/http/routes/transition-route-registry.ts`, `src/http/app.ts`, `src/http/admission/index.ts`, `src/http/handlers/internal-record-read.ts`, `test/http/http.test.ts`, `test/http/d1-http.test.ts`, `test/architecture/import-posture.test.ts`
+- Why fragile: Adding a route can silently turn a local kernel transition into a remote authority surface.
+- Safe modification: For any new route, specify caller role, hosted identity scope, object registry posture, receipt/proof-gap behavior, and whether the route is diagnostic or authority-bearing.
+- Test coverage: Route registry tests exist, but new route families need product-claim tests and import-posture tests.
 
-- Tier: Tier 3 hosted operation.
-- Verdict: Keep local contract, add provider smoke before hosted claims.
-- Blocking now: No locally; yes before hosted operation.
-- Files: `src/storage/d1/index.ts`, `src/storage/d1/statements.ts`, `migrations/0001_protocol_kernel.sql`, `test/support/d1-http-harness.ts`, `test/protocol/protocol-store-atomicity-contract.test.ts`
-- Why fragile: Authority-bearing commits depend on atomic records, stream events, greenlight issuance, idempotency reservations, greenlight consumption, operation claims, receipt indexes, and current-state indexes.
-- Safe modification: Keep every authority-affecting write inside the store commit boundary and preserve explicit conflict classes.
-- Test coverage: Memory and local D1 harness stores satisfy the atomicity contract. Production Cloudflare D1 behavior still needs provider-backed smoke coverage before hosted claims.
+**x402 official signing path is narrow and easy to overgeneralize:**
+- Files: `src/adapters/x402-payment/wallet-gateway.ts`, `src/adapters/x402-payment/upstream-evidence.ts`, `src/adapters/x402-payment/install-proposal.ts`, `src/adapters/x402-payment/action-proposal.ts`, `test/integration/x402-d1-http.test.ts`, `test/adapters/x402-bypass-probes.test.ts`
+- Why fragile: The official path is buyer-side `exact`, V2 PaymentRequired, gateway-held signing after `VerifiedGatewayCheck`, and digest/ref evidence only. Unsupported schemes, `upto`, batch settlement, seller middleware, facilitator custody, and aggregate budgets are non-claims.
+- Safe modification: Reject unsupported x402 variants explicitly and record proof gaps rather than adding partial support through permissive parsing.
+- Test coverage: Local hostile probes exist, but no live facilitator/seller/provider custody tests exist.
 
-**AuthorityCertificate terminal boundary:**
-
-- Tier: Tier 1 protocol/kernel locally; Tier 4 when framed as portable trust.
-- Verdict: Keep local terminal-only boundary; narrow external claims.
-- Blocking now: No locally.
-- Files: `src/protocol/areas/authority-certificate/transitions.ts`, `src/protocol/areas/authority-certificate/verify.ts`, `src/protocol/navigation/index.ts`, `test/protocol/authority-certificate.test.ts`
-- Why fragile: Certificate wording can drift into execution authority, identity, settlement, marketplace, certification, or hosted trust claims.
-- Safe modification: Keep `createAuthorityCertificate` terminal-only and evidence-only. Do not add policy, greenlight, gateway check, or mutation authority to certificate APIs.
-- Test coverage: Tests reject non-terminal minting, wrong keys, tampering, missing gateway signer, replay mismatch, and production HMAC trust.
-
-**Root export curation:**
-
-- Tier: Tier 1 protocol/kernel.
-- Verdict: Keep.
-- Blocking now: No.
-- Files: `src/index.ts`, `src/runtime/index.ts`, `src/experimental.ts`, `src/conformance/index.ts`, `package.json`, `test/architecture/root-exports.test.ts`, `test/architecture/claim-boundary.test.ts`
-- Why fragile: Moving runtime ingress, reference gateways, conformance probes, or experimental adapters onto the root surface can make local fixtures look production-ready.
-- Safe modification: Keep mutation gateways under `./experimental`, conformance under `./conformance`, runtime observer/compiler helpers under `./runtime`, and stable schema/client/app/navigation exports at root.
-- Test coverage: Root export and claim-boundary tests enforce current separation.
-
-**Lifecycle/status map drift:**
-
-- Tier: Tier 1 protocol/kernel.
-- Verdict: Keep.
-- Blocking now: No.
-- Files: `src/protocol/navigation/index.ts`, `src/protocol/areas/action-attempt-lifecycle/matrix.ts`, `src/protocol/areas/receipt-export/status.ts`, `src/protocol/areas/operation-lifecycle/lifecycle.ts`, `src/protocol/evidence-projections/projections.ts`, `test/protocol/action-attempt-lifecycle.test.ts`, `test/protocol/evidence-projections.test.ts`
-- Why fragile: A new transition or outcome can make one projection overstate authority while another records refusal or proof gap.
-- Safe modification: Keep protocol navigation and lifecycle matrix source-owned, then derive projection assertions from transition/outcome semantics.
-- Test coverage: Current lifecycle/projection tests exist, but new terminal states need explicit receipt and projection coverage.
+**`.planning/` is scratch but may look canonical to agents:**
+- Files: `.planning/codebase/CONCERNS.md`, `AGENTS.md`, `STRUCTURE.md`, `docs/internal/decisions.md`, `docs/internal/protocol-notes.md`
+- Why fragile: Mapper output is useful context, but repository doctrine says `.planning/` must not become repo-facing source paths, scripts, CI names, exported symbols, or canonical docs.
+- Safe modification: Use `.planning/` only to inform next work. Promote durable decisions into tracked canonical docs only after source/tests support them.
+- Test coverage: `scripts/check-package-surface.mjs` blocks `.planning/` from package output, but it cannot stop agents from copying scratch claims into public copy.
 
 ## Scaling Limits
 
-**Tier 3 hosted operation has no product-scale read model:**
+**Receipt store reads scale poorly with action volume:**
+- Current capacity: Suitable for local and small D1-backed reference flows where record counts remain low.
+- Limit: Tenant-wide `listRecordsByType` projections degrade as policy decisions, greenlights, gate attempts, receipts, proof gaps, and reconciliations accumulate.
+- Scaling path: Add query-level indexes and paginated projection APIs before positioning receipt reconstruction for high-volume hosted tenants.
 
-- Tier: Tier 3 hosted operation.
-- Verdict: Keep kernel storage, redesign hosted read side.
-- Blocking now: Yes for hosted evidence product.
-- Current capacity: Local HTTP/D1 evidence reads and redacted projections.
-- Limit: No org/project RBAC, retention, search, alerts, audit export, hosted verifier/read model, or exposure counters.
-- Files: `src/http/admission/hosted-caller-identity.ts`, `src/http/handlers/evidence-read.ts`, `src/storage/d1/index.ts`, `docs/internal/decisions.md`
-- Scaling path: Add hosted admission policy, reader authorization, retention rules, query indexes, alerting, and audit export without changing Tier 1 authority objects.
+**Spend control is per-call only:**
+- Current capacity: One x402 `exact` payment call can be bounded by `maxAtomicAmountPerCall` and exact gateway binding.
+- Limit: Session, day, review-window, and org-level budgets are recorded as metadata, not enforced reservations.
+- Scaling path: Implement a spend ledger with atomic reservation, commit, rollback, and reconciliation records keyed by tenant/org/principal/wallet/action class.
 
-**x402 spend windows have no capacity model:**
+**Runtime ingress catalog coverage is limited to known dispatch families:**
+- Current capacity: x402 payment dispatch and package install dispatch families have source-owned normalization and refusal behavior.
+- Limit: Browser-side tools, shell commands, network calls, cloud APIs, generic MCP tools, repository writes, and deploy systems are not automatically covered.
+- Scaling path: Add one protected action family at a time with tool catalog, action catalog, gateway registry, raw bypass posture, and conformance probes.
 
-- Tier: Tier 3 hosted operation.
-- Verdict: Narrow.
-- Blocking now: Yes before spend-window claims.
-- Current capacity: Per-call x402 amount refusal only.
-- Limit: Session/day/review threshold fields cannot enforce repeated calls, portfolio exposure, or review routing.
-- Files: `src/adapters/x402-payment/install-proposal.ts`, `src/adapters/x402-payment/action-proposal.ts`, `migrations/0001_protocol_kernel.sql`
-- Scaling path: Add spend-window reservation and reconciliation records before promoting spend windows from metadata to policy authority.
-
-**Runtime ingress cannot represent arbitrary generated programs yet:**
-
-- Tier: Tier 2 activation/product.
-- Verdict: Keep local scope.
-- Blocking now: Yes for generic MCP/runtime control claims.
-- Current capacity: Local x402 payment and package-install dispatch boundaries with explicit loop/retry/dynamic/raw-sibling/truncation handling.
-- Limit: Broad MCP/browser/shell/network/package-manager streams need streaming graph ingestion, host-level interception, and fail-closed adapters.
-- Files: `src/runtime/ingress/index.ts`, `src/protocol/areas/generated-execution-graph/`, `src/protocol/areas/tool-call-draft/`, `test/runtime/runtime-ingress.test.ts`, `test/protocol/generated-execution-graph.test.ts`
-- Scaling path: Add one host integration at a time and require hostile traces for raw sibling bypass, dynamic tool construction, late-bound params, graph truncation, replay, and stale drafts.
-
-**AuthorityCertificate verification is offline pinned-key only:**
-
-- Tier: Tier 4 ecosystem/interoperability.
-- Verdict: Narrow.
-- Blocking now: Yes before cross-org verification.
-- Current capacity: Local certificate minting and `verifyAuthorityCertificate()` with supplied trust material.
-- Limit: No live key discovery, revocation status, certificate transparency, hosted verify API, tenant trust policy, or cross-org verifier agreement.
-- Files: `src/protocol/areas/authority-certificate/verify.ts`, `src/protocol/areas/authority-certificate/schemas.ts`, `test/protocol/authority-certificate.test.ts`, `docs/internal/decisions.md`
-- Scaling path: Add explicit trust registry, JWKS/revocation semantics, verifier API, and consumer trust policy as evidence verification only.
+**Local D1/HTTP foundation is not hosted control-plane operation:**
+- Current capacity: Local D1/HTTP reference kernel with hosted identity verifier types and placeholder Worker config.
+- Limit: Live tenant provisioning, key rotation, JWKS/revocation, hosted verifier operation, provider custody, and operational monitoring are not implemented as a hosted product.
+- Scaling path: Treat hosted operation as a separate foundation phase with custody, identity, tenant isolation, migration, and observability tests.
 
 ## Dependencies at Risk
 
-**Cloudflare D1 behavior:**
+**x402 package APIs and header formats:**
+- Risk: The official wallet gateway and upstream evidence parser depend on `@x402/core`, `@x402/evm`, `@x402/fetch`, exact V2 PaymentRequired shape, and `PAYMENT-SIGNATURE` handling.
+- Impact: Upstream package or spec drift can break exact binding, selected-requirement digesting, or official payment payload creation.
+- Migration plan: Keep unsupported versions refusing closed. Add compatibility fixtures for every supported x402 version/scheme before broadening support.
 
-- Tier: Tier 3 hosted operation.
-- Verdict: Keep local contract, add provider smoke.
-- Blocking now: Yes before hosted operation.
-- Risk: Batch atomicity, uniqueness constraints, and error strings underpin local durable authority commits.
-- Impact: Divergent production D1 behavior can misclassify conflicts or produce ambiguous authority writes.
-- Files: `src/storage/d1/index.ts`, `src/storage/d1/statements.ts`, `migrations/0001_protocol_kernel.sql`, `test/support/d1-http-harness.ts`, `test/protocol/protocol-store-atomicity-contract.test.ts`
-- Migration plan: Add Cloudflare-backed smoke tests for each conflict class before hosted operation claims.
+**Cloudflare Worker and D1 runtime behavior:**
+- Risk: D1 storage semantics, SQLite conflict messages, Worker request behavior, and `wrangler.toml` bindings are part of the reference path.
+- Impact: Storage conflict detection, stream uniqueness, route behavior, and local-to-Worker parity can drift.
+- Migration plan: Add D1 integration checks for conflict classes, route auth, and receipt reconstruction whenever Worker/D1 dependencies change.
 
-**WebCrypto Ed25519 support:**
-
-- Tier: Tier 4 ecosystem/interoperability.
-- Verdict: Keep Ed25519, forbid production HMAC trust.
-- Blocking now: No locally.
-- Risk: `signAuthorityCertificateSigningInput()` and `verifyAuthorityCertificateSignature()` use `crypto.subtle` Ed25519 import/sign/verify behavior.
-- Impact: Runtime compatibility drift can break certificate verification or push consumers toward dev HMAC paths.
-- Files: `src/protocol/areas/authority-certificate/signing.ts`, `src/protocol/areas/authority-certificate/verify.ts`, `test/protocol/authority-certificate.test.ts`
-- Migration plan: Keep compatibility tests in target runtimes and keep HMAC disabled for production verification.
-
-**Experimental adapter exports:**
-
-- Tier: Tier 2 activation/product.
-- Verdict: Keep experimental label.
-- Blocking now: No.
-- Risk: Reference gateways and fixture probe executors are exposed through `./experimental`.
-- Impact: Early consumers can confuse local proof fixtures with provider/customer enforcement.
-- Files: `src/experimental.ts`, `src/adapters/package-install/gateway.ts`, `src/adapters/preview-deploy/gateway.ts`, `src/adapters/repo-write/gateway.ts`, `src/adapters/x402-payment/wallet-gateway.ts`, `test/architecture/root-exports.test.ts`
-- Migration plan: Keep experimental naming until external custody, bypass posture, and provider/customer gateway proof are source-tested.
+**Bun runtime and TypeScript package surface:**
+- Risk: Scripts and gates assume Bun-based test/build behavior while package checks also use Node scripts.
+- Impact: Runtime differences can hide type/export/package-surface issues across `bun test`, `tsc`, and npm pack output.
+- Migration plan: Keep `npm run check:repo`, `npm run quality:architecture`, and `npm run check:pack` as required package-surface gates.
 
 ## Missing Critical Features
 
-**Tier 2 first protected-action UX:**
+**Hosted authority control plane:**
+- Problem: Source includes hosted identity verifier types, but not a complete hosted deployment with live tenant provisioning, key rotation, hosted verifier, revocation, custody, and operational monitoring.
+- Blocks: Claims about hosted Handshake operation, managed enforcement, or cross-organization production trust.
+- Files: `src/http/admission/hosted-caller-identity.ts`, `src/worker.ts`, `wrangler.toml`, `README.md`, `docs/internal/decisions.md`
 
-- Tier: Tier 2 activation/product.
-- Verdict: Keep.
-- Blocking now: Yes for activation.
-- Problem: No public first protected-action loop combines runtime ingress, Metadata/Challenge/Request, evidence projection, SDK/CLI/MCP ergonomics, and refusal/proof-gap feedback.
-- Blocks: First-time developer activation and agent-runtime integration claims.
-- Files: `src/runtime/ingress/index.ts`, `src/protocol/areas/protected-action-representation/`, `src/sdk/client.ts`, `.planning/tier2/06-policy-agent-management-interface-map.md`
+**Provider-grade credential custody:**
+- Problem: Credential custody uses refs/digests and redaction heuristics, but not a live vault/key-management lifecycle.
+- Blocks: Claims about provider-owned wallet custody, hosted signer custody, automatic secret lifecycle, and production certificate minting.
+- Files: `src/protocol/areas/credential-custody/schemas.ts`, `src/protocol/areas/credential-custody/transitions.ts`, `src/adapters/x402-payment/wallet-gateway.ts`, `src/protocol/areas/authority-certificate/inputs.ts`
 
-**Tier 3 hosted evidence operation:**
+**Broad runtime and tool interception:**
+- Problem: Runtime ingress is an evidence/compilation lane, not a universal wrapper around host tool execution.
+- Blocks: Claims that Handshake governs arbitrary agent tool calls, browser tools, shell commands, network calls, MCP operations, repo writes, package manager calls, cloud APIs, or deploy systems.
+- Files: `src/runtime/ingress/index.ts`, `src/runtime/LANE.md`, `docs/internal/protocol-notes.md`, `src/surfaces/boundary-manifest.ts`
 
-- Tier: Tier 3 hosted operation.
-- Verdict: Keep separate from Tier 1.
-- Blocking now: Yes for hosted product.
-- Problem: No real hosted identity provider, org/project RBAC, policy lifecycle, retention/search/alerts/audit export, hosted verifier/read model, or exposure counters.
-- Blocks: Hosted operation and hosted audit-product claims.
-- Files: `src/http/admission/hosted-caller-identity.ts`, `src/http/admission/index.ts`, `src/http/handlers/evidence-read.ts`, `docs/internal/decisions.md`
+**MCP/CLI mutation tools:**
+- Problem: CLI and MCP surfaces are read/proposal/conformance surfaces only. They do not perform authority-bearing mutation.
+- Blocks: Claims that MCP clients or CLI commands can currently execute protected mutations through Handshake.
+- Files: `src/cli/LANE.md`, `src/cli/index.ts`, `src/mcp/LANE.md`, `src/mcp/catalog.ts`, `src/mcp/x402-proposal.ts`, `test/architecture/cli-command-posture.test.ts`, `test/architecture/mcp-surface-posture.test.ts`
 
-**Tier 4 external trust and custody:**
-
-- Tier: Tier 4 ecosystem/interoperability.
-- Verdict: Keep as future ecosystem layer.
-- Blocking now: Yes before ecosystem claims.
-- Problem: No provider/customer custody proof, external trust roots, cross-org AuthorityCertificate verification, certification/conformance marks, or market-consumer contracts.
-- Blocks: Ecosystem, marketplace, clearing-house portability, and certification claims.
-- Files: `src/adapters/x402-payment/wallet-gateway.ts`, `src/adapters/x402-payment/bypass-probes.ts`, `src/conformance/index.ts`, `src/protocol/areas/authority-certificate/verify.ts`, `.planning/tier2/07-agentic-economy-clearing-house-research.md`, `.planning/tier2/08-external-adapter-plug-in-architecture.md`
+**x402 seller/facilitator/aggregate support:**
+- Problem: The source-owned x402 path is buyer-side `exact` signing after gateway verification.
+- Blocks: Claims about seller middleware, facilitator custody, `upto`, batch settlement, aggregate spend windows, or broad x402 compatibility.
+- Files: `src/adapters/x402-payment/wallet-gateway.ts`, `src/adapters/x402-payment/upstream-evidence.ts`, `src/adapters/x402-payment/install-proposal.ts`, `README.md`, `examples/x402-protected-spend/README.md`
 
 ## Test Coverage Gaps
 
-**Source-owned review rendering:**
+**MCP idempotency drift:**
+- What's not tested: Duplicate x402 proposals for the same payment/request material with changed caller-supplied `idempotencyKey`.
+- Files: `src/mcp/x402-proposal.ts`, `src/protocol/areas/idempotency-ledger/entries.ts`, `test/mcp/mcp-x402-proposal.test.ts`
+- Risk: A model-facing MCP caller can create fresh proposed contracts for the same underlying spend by varying the idempotency key.
+- Priority: High
 
-- Tier: Tier 1 protocol/kernel.
-- Verdict: Narrow.
-- Blocking now: Yes before review-surface authority claims.
-- What's not tested: Renderer registry provenance and digest computation from source-owned review artifact generation.
-- Files: `src/protocol/areas/review-binding/artifacts.ts`, `src/protocol/areas/review-binding/decisions.ts`, `test/protocol/kernel-policy-gateway.test.ts`
-- Risk: Review theatre can satisfy protocol binding fields if the renderer itself is caller-controlled.
-- Priority: High before review-mediated greenlights.
+**Oversized runtime and HTTP payloads:**
+- What's not tested: Early rejection of large JSON bodies, deeply nested metadata, very large dispatch arrays, and huge generated execution graphs before canonicalization/digesting.
+- Files: `src/http/app.ts`, `src/runtime/ingress/index.ts`, `src/protocol/areas/generated-execution-graph/inputs.ts`, `src/protocol/foundation/canonical.ts`, `test/runtime/runtime-ingress.test.ts`, `test/http/http.test.ts`
+- Risk: Malicious or accidental large inputs can consume CPU and memory before a protocol refusal is produced.
+- Priority: High
 
-**Provider-backed x402 custody:**
+**Provider-specific credential fuzzing:**
+- What's not tested: Encoded secrets, unfamiliar provider key formats, nested wallet payloads, certificate material variants, and future x402 signature formats against `CredentialSafeStringSchema`.
+- Files: `src/protocol/areas/credential-custody/schemas.ts`, `src/adapters/x402-payment/wallet-gateway.ts`, `src/protocol/areas/authority-certificate/inputs.ts`, `test/protocol/credential-custody.test.ts`
+- Risk: Custody evidence can accidentally store secret-bearing strings that pass heuristic redaction.
+- Priority: High
 
-- Tier: Tier 4 ecosystem/interoperability.
-- Verdict: Narrow.
-- Blocking now: Yes before provider/customer custody claims.
-- What's not tested: External wallet/provider/customer gateway custody proving credential isolation, direct-call blocking, token passthrough blocking, wrapper drift absence, and failure-closed behavior.
-- Files: `src/adapters/x402-payment/bypass-probes.ts`, `src/adapters/x402-payment/wallet-gateway.ts`, `test/adapters/x402-bypass-probes.test.ts`, `test/integration/x402-d1-http.test.ts`
-- Risk: Local hostile probes are mistaken for provider custody.
-- Priority: High before provider/customer custody claims.
+**Hosted authorization scope boundaries:**
+- What's not tested: Full hosted-vs-local tenant/org isolation across every transition route and evidence route under realistic hosted identity claims.
+- Files: `src/http/admission/index.ts`, `src/http/app.ts`, `src/http/handlers/evidence-read.ts`, `src/http/handlers/internal-record-read.ts`, `test/http/http.test.ts`, `test/http/d1-http.test.ts`
+- Risk: A route can appear tenant-scoped in hosted mode while remaining globally readable or writable under local token assumptions.
+- Priority: Medium
 
-**Real runtime hostile trace ingestion:**
+**Evidence projection pagination and scale:**
+- What's not tested: Large receipt stores, high stream offsets, paginated action timelines, and action-contract-indexed reads.
+- Files: `src/http/handlers/evidence-read.ts`, `src/storage/d1/index.ts`, `src/protocol/evidence-projections/projections.ts`, `test/http/http.test.ts`
+- Risk: Reconstruction paths can become slow or memory-heavy exactly when audit volume matters.
+- Priority: Medium
 
-- Tier: Tier 2 activation/product.
-- Verdict: Keep local scope until covered.
-- Blocking now: Yes before broad runtime control claims.
-- What's not tested: Live generated programs using MCP, browser, shell, package-manager, network, filesystem, CI, cloud, or database tools with dynamic tool construction and raw sibling bypass attempts.
-- Files: `src/runtime/ingress/index.ts`, `src/runtime/codemode-multi-action/generated-program-runner.ts`, `src/protocol/areas/generated-execution-graph/coverage.ts`, `test/runtime/runtime-ingress.test.ts`, `test/runtime/codemode-multi-action-runtime.test.ts`
-- Risk: Caller-observed fixture evidence can pass while live runtime behavior escapes the contract boundary.
-- Priority: High before broad runtime control claims.
+**Live x402 provider/facilitator behavior:**
+- What's not tested: Live provider PaymentRequired variations, facilitator responses, seller middleware, network failures, replay behavior, delayed settlement, and unsupported scheme drift.
+- Files: `src/adapters/x402-payment/wallet-gateway.ts`, `src/adapters/x402-payment/upstream-evidence.ts`, `test/integration/x402-d1-http.test.ts`, `test/adapters/x402-bypass-probes.test.ts`
+- Risk: Local exact-path proof can be mistaken for production x402 compatibility.
+- Priority: Medium
 
-**Cross-org certificate verification:**
-
-- Tier: Tier 4 ecosystem/interoperability.
-- Verdict: Narrow.
-- Blocking now: Yes before portable trust claims.
-- What's not tested: JWKS retrieval, revocation, key rotation, tenant trust policies, verifier service behavior, and consumer-binding trust semantics.
-- Files: `src/protocol/areas/authority-certificate/verify.ts`, `src/protocol/areas/authority-certificate/schemas.ts`, `test/protocol/authority-certificate.test.ts`
-- Risk: Local offline verification is overread as portable cross-org trust.
-- Priority: High before cross-org certificate trust claims.
-
-**Spend-window enforcement:**
-
-- Tier: Tier 3 hosted operation.
-- Verdict: Narrow.
-- Blocking now: Yes before spend-window enforcement.
-- What's not tested: Session/day/review threshold accumulation because no accumulator exists.
-- Files: `src/adapters/x402-payment/install-proposal.ts`, `src/adapters/x402-payment/action-proposal.ts`, `migrations/0001_protocol_kernel.sql`
-- Risk: Declared spend fields look enforceable while only per-call refusal is active.
-- Priority: Medium before spend-window enforcement claims.
-
-**Production D1 commit behavior:**
-
-- Tier: Tier 3 hosted operation.
-- Verdict: Keep local contract, add provider smoke.
-- Blocking now: Yes before hosted operation.
-- What's not tested: Cloudflare-backed D1 batch rollback and error classification for each authority-bearing conflict class.
-- Files: `src/storage/d1/index.ts`, `src/storage/d1/statements.ts`, `test/support/d1-http-harness.ts`, `test/protocol/protocol-store-atomicity-contract.test.ts`
-- Risk: Local D1 harness parity hides provider-specific ambiguity during greenlight, gateway, stream, receipt, or idempotency commits.
-- Priority: Medium before hosted operation claims.
+**Spend-window ledger enforcement:**
+- What's not tested: Atomic reservation, commit, release, retry, concurrent spend attempts, daily/session/review-window depletion, and proof-gap reconciliation for aggregate budgets.
+- Files: `src/adapters/x402-payment/install-proposal.ts`, `src/adapters/x402-payment/action-proposal.ts`, `test/integration/x402-d1-http.test.ts`
+- Risk: Aggregate spend claims can emerge before the ledger exists.
+- Priority: High
 
 ---
 
-*Concerns audit: 2026-05-21*
+*Concerns audit: 2026-05-22*
