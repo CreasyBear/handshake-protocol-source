@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { ClearingEvidenceRefsSchema, JsonValueSchema } from "../../foundation/schema-core";
+import { GatewayCredentialBindingSchema } from "../credential-custody/schemas";
 
 export const CompileIntentInputSchema = z.strictObject({
   tenantId: z.string().min(1),
@@ -33,6 +34,7 @@ export const CompileIntentInputSchema = z.strictObject({
     parameters: z.record(z.string(), JsonValueSchema),
     nonSecretParamsSummary: z.record(z.string(), JsonValueSchema),
     secretRefs: z.record(z.string(), z.string().min(1)).default({}),
+    gatewayCredentialRefs: z.array(GatewayCredentialBindingSchema).default([]),
     purposeCode: z.string().min(1),
     expectedSideEffectCodes: z.array(z.string().min(1)),
     evidenceRefs: z.array(z.string()).default([]),

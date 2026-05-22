@@ -4,8 +4,16 @@ import {
   type X402InstallProposal,
   type X402InstallProposalInput,
 } from "../../src/adapters/x402-payment/install-proposal";
-import { proposeX402PaymentActionContract } from "../../src/adapters/x402-payment/action-proposal";
-import { runX402WalletGateway, type X402PaymentParameters } from "../../src/adapters/x402-payment/wallet-gateway";
+import {
+  buildX402PaymentAttemptFromRequiredEvidence,
+  proposeX402PaymentActionContract,
+} from "../../src/adapters/x402-payment/action-proposal";
+import { decodeX402PaymentRequiredEvidence } from "../../src/adapters/x402-payment/upstream-evidence";
+import {
+  createOfficialExactX402SigningSurface,
+  runX402WalletGateway,
+  type X402PaymentParameters,
+} from "../../src/adapters/x402-payment/wallet-gateway";
 import { x402PaymentHostileBypassProbeExecutors } from "../../src/adapters/x402-payment/bypass-probes";
 import { runBypassProbeExecutors } from "../../src/adapters/protected-path-probes";
 import { digestCanonical } from "../../src/protocol/foundation/canonical";
@@ -25,6 +33,69 @@ type CountRow = {
 };
 
 const digest = `sha256:${"d".repeat(64)}` as const;
+const officialSelectedHeadersDigest = `sha256:${"a".repeat(64)}` as const;
+const officialSignerAddress = "0x1111111111111111111111111111111111111111" as const;
+const officialPaymentIdentifier = "pay_handshake_exact_fixture_0001";
+
+const officialX402SourceBasis = {
+  repository: "https://github.com/x402-foundation/x402",
+  docs: {
+    http402: "https://docs.x402.org/core-concepts/http-402",
+    exact: "https://docs.x402.org/schemes/exact",
+    clientServer: "https://docs.x402.org/core-concepts/client-server",
+    facilitator: "https://docs.x402.org/core-concepts/facilitator",
+  },
+  packages: {
+    "@x402/core": "2.12.0",
+    "@x402/evm": "2.12.0",
+    "@x402/fetch": "2.12.0",
+  },
+  firstSlice: {
+    role: "buyer",
+    scheme: "exact",
+    network: "eip155:84532",
+    sdkSurface: ["@x402/core/types", "@x402/core/schemas", "@x402/evm/exact/client", "@x402/fetch"],
+    unsupportedFirstSliceSurfaces: [
+      "upto",
+      "batch-settlement",
+      "lifecycle-hooks",
+      "mcp-auto-pay",
+      "signed-offers",
+      "signed-receipts",
+      "seller-middleware",
+      "facilitator-operation",
+    ],
+  },
+} as const;
+
+const officialPaymentRequired = {
+  x402Version: 2,
+  resource: {
+    url: "https://api.example.com/mcp/premium-context",
+    description: "Premium context for one generated engineering-agent request",
+    mimeType: "application/json",
+  },
+  accepts: [
+    {
+      scheme: "exact",
+      network: "eip155:84532",
+      asset: "0x036CbD53842c5426634e7929541eC2318f3dCF7e",
+      amount: "2500",
+      payTo: "0x209693Bc6afc0C5328bA36FaF03C514EF312287C",
+      maxTimeoutSeconds: 60,
+      extra: {
+        assetTransferMethod: "eip3009",
+        name: "USDC",
+        version: "2",
+      },
+    },
+  ],
+  extensions: {
+    "payment-identifier": {
+      required: false,
+    },
+  },
+} as const;
 
 describe("x402 Hono/D1 wallet gateway establishment path", () => {
   it("creates x402 payment signature evidence only after D1-backed policy and gateway admission", async () => {
@@ -53,7 +124,14 @@ describe("x402 Hono/D1 wallet gateway establishment path", () => {
 
       expect(gatewayResult.outcome).toBe("payment_signature_reconciled");
       expect(gatewayResult.gatewayCheck.gateAttempt.gateDecision).toBe("passed");
-      expect(gatewayResult.signatureEvidence?.paymentSignature).toStartWith("PAYMENT-SIGNATURE:fake:");
+      expect(gatewayResult.signatureEvidence).toMatchObject({
+        paymentSignatureHeaderName: "PAYMENT-SIGNATURE",
+        paymentPayloadShape: "local_fixture_payment_signature",
+        credentialMaterialPosture: "local_fixture",
+      });
+      expect(gatewayResult.signatureEvidence?.paymentSignatureHeaderRef).toStartWith(
+        "credential:x402-local-fixture-signature:",
+      );
       expect(gatewayResult.reconciliation?.observedDownstreamStatus).toBe("succeeded");
       expect(gatewayResult.reconciliation?.finalityStatus).toBe("final");
       expect(surface.signatureCount()).toBe(1);
@@ -79,6 +157,221 @@ describe("x402 Hono/D1 wallet gateway establishment path", () => {
       expect(await recordCount(harness, "mutation_attempt")).toBe(1);
       expect(await recordCount(harness, "surface_operation_reconciliation")).toBe(1);
       expect(await recordCount(harness, "proof_gap")).toBe(0);
+    } finally {
+      await harness.dispose();
+    }
+  });
+
+  it("records official exact PaymentPayload evidence through D1/HTTP without leaking signer material", async () => {
+    const harness = await createD1HttpHarness();
+    try {
+      const { actionContract, client, evidence, greenlight } = await createOfficialX402Contract(harness, {
+        paymentIdentifier: officialPaymentIdentifier,
+      });
+      const signer = trackedOfficialSigner();
+      const surface = createOfficialExactX402SigningSurface({
+        signer: signer.surfaceSigner,
+        paymentRequired: officialPaymentRequired,
+        selectedPaymentRequirementIndex: evidence.selectedPaymentRequirementIndex,
+        selectedPaymentRequirementDigest: evidence.selectedPaymentRequirementDigest,
+        paymentIdentifier: officialPaymentIdentifier,
+        downstreamPaymentStatus: "succeeded",
+        paymentResponseEvidenceRef: "evidence:x402-payment-response:official-d1",
+        providerRequestRef: "provider-request:x402:official-d1",
+        providerOperationRef: "provider-operation:x402:official-d1",
+      });
+
+      expect(actionContract.parameters).toMatchObject({
+        intendedHttpMethod: "GET",
+        intendedRequestUrl: officialPaymentRequired.resource.url,
+        selectedHeadersDigest: officialSelectedHeadersDigest,
+        x402Version: 2,
+        x402Scheme: "exact",
+        asset: officialPaymentRequired.accepts[0].asset,
+        payTo: officialPaymentRequired.accepts[0].payTo,
+        selectedPaymentRequirementDigest: evidence.selectedPaymentRequirementDigest,
+        paymentIdentifierPosture: "bound",
+      });
+
+      const gatewayResult = await runX402WalletGateway({
+        protocol: client,
+        surface,
+        actionContractId: actionContract.actionContractId,
+        greenlightId: greenlight.greenlightId,
+        observedParameters: actionContract.parameters as X402PaymentParameters,
+        surfaceOperationRef: "surface-op:d1-http-x402-official",
+      });
+
+      expect(gatewayResult.outcome).toBe("payment_signature_reconciled");
+      expect(gatewayResult.gatewayCheck.gateAttempt.gateDecision).toBe("passed");
+      expect(signer.signatureCount()).toBe(1);
+      expect(gatewayResult.signatureEvidence).toMatchObject({
+        paymentSignatureHeaderName: "PAYMENT-SIGNATURE",
+        paymentPayloadShape: "official_x402_payment_payload_v2",
+        credentialMaterialPosture: "gateway_held_redacted",
+        paymentResponseEvidenceRef: "evidence:x402-payment-response:official-d1",
+      });
+      expect(gatewayResult.signatureEvidence?.paymentPayloadRef).toStartWith("credential:x402-payment-payload:");
+      expect(gatewayResult.signatureEvidence?.paymentSignatureHeaderRef).toStartWith(
+        "credential:x402-payment-signature:",
+      );
+      const paymentIdentifierDigest = (actionContract.parameters as X402PaymentParameters).paymentIdentifierDigest as
+        | `sha256:${string}`
+        | null;
+      if (!paymentIdentifierDigest) throw new Error("expected bound payment identifier digest");
+      expect(gatewayResult.signatureEvidence?.paymentIdentifierDigest).toBe(paymentIdentifierDigest);
+      expect(gatewayResult.reconciliation?.evidenceRefs).toContain("evidence:x402-payment-response:official-d1");
+      expect(gatewayResult.reconciliation?.providerRequestRef).toBe("provider-request:x402:official-d1");
+      expect(gatewayResult.reconciliation?.providerOperationRef).toBe("provider-operation:x402:official-d1");
+      expect(JSON.stringify(gatewayResult)).not.toContain("secretref");
+      expect(JSON.stringify(gatewayResult)).not.toContain(`0x${"a".repeat(130)}`);
+      if (!gatewayResult.signatureEvidence) throw new Error("expected official signature evidence");
+      const paymentPayloadRef = gatewayResult.signatureEvidence.paymentPayloadRef;
+      const paymentPayloadDigest = gatewayResult.signatureEvidence.paymentPayloadDigest;
+      if (!paymentPayloadRef || !paymentPayloadDigest) throw new Error("expected official payment payload evidence");
+
+      const envelope = await client.getAgentTransactionEnvelopeProjection(
+        actionContract.actionContractId,
+        "runtime_evidence",
+      );
+      expect(envelope.surfaceOperationRef).toBe("surface-op:d1-http-x402-official");
+      expect(envelope.surfaceOperationReconciliationRef).toBe(gatewayResult.reconciliation?.reconciliationId);
+      expect(envelope.surfaceOperationEvidenceLabels).toEqual([
+        "local_gateway_check",
+        "payment_payload_created",
+        "paid_retry_attempted",
+        "payment_response_received",
+      ]);
+      expect(envelope.surfaceOperationEvidenceRefs).toContain(gatewayResult.signatureEvidence.evidenceRef);
+      expect(envelope.surfaceOperationEvidenceRefs).toContain(
+        gatewayResult.signatureEvidence.paymentSignatureHeaderRef,
+      );
+      expect(envelope.surfaceOperationEvidenceRefs).toContain(
+        `digest:${gatewayResult.signatureEvidence.paymentSignatureDigest}`,
+      );
+      expect(envelope.surfaceOperationEvidenceRefs).toContain(paymentPayloadRef);
+      expect(envelope.surfaceOperationEvidenceRefs).toContain(`digest:${paymentPayloadDigest}`);
+      expect(envelope.surfaceOperationEvidenceRefs).toContain("evidence:x402-payment-response:official-d1");
+      expect(envelope.gatewayCredentialEvidenceRefs).toContain(
+        gatewayResult.signatureEvidence.paymentSignatureHeaderRef,
+      );
+      expect(envelope.gatewayCredentialEvidenceRefs).toContain(paymentPayloadRef);
+      expect(envelope.downstreamEvidenceRefs).toEqual(["evidence:x402-payment-response:official-d1"]);
+      expect(envelope.providerRequestRef).toBe("provider-request:x402:official-d1");
+      expect(envelope.providerOperationRef).toBe("provider-operation:x402:official-d1");
+      expect(envelope.downstreamRetryability).toBe("non_retryable");
+      expect(envelope.reconciliationFinalityStatus).toBe("final");
+      const envelopeJson = JSON.stringify(envelope);
+      expect(envelopeJson).not.toContain("secretref");
+      expect(envelopeJson).not.toContain(officialSignerAddress);
+      expect(envelopeJson).not.toContain(`0x${"a".repeat(130)}`);
+      expect(envelopeJson).not.toContain("PaymentPayload");
+      expect(envelopeJson).not.toContain("PAYMENT-SIGNATURE:");
+
+      const receiptTimeline = await client.getReceiptTimelineProjection(
+        gatewayResult.gatewayCheck.receipt.receiptId,
+        "runtime_evidence",
+      );
+      expect(receiptTimeline.failureEvidence?.providerRequestRef).toBe("provider-request:x402:official-d1");
+      expect(receiptTimeline.failureEvidence?.providerOperationRef).toBe("provider-operation:x402:official-d1");
+      expect(JSON.stringify(receiptTimeline)).not.toContain(`0x${"a".repeat(130)}`);
+
+      const events = await actionEvents(harness, actionContract.actionContractId);
+      expect(events.map((event) => event.event_type)).toEqual([
+        "action_proposed",
+        "policy_decision_recorded",
+        "action_greenlit",
+        "idempotency_ledger_recorded",
+        "gateway_checked",
+        "mutation_attempted",
+        "protected_surface_operation_claimed",
+        "receipt_emitted",
+        "surface_operation_reconciled",
+        "protected_surface_operation_released",
+      ]);
+      expect(await recordCount(harness, "mutation_attempt")).toBe(1);
+      expect(await recordCount(harness, "surface_operation_reconciliation")).toBe(1);
+      expect(await recordCount(harness, "proof_gap")).toBe(0);
+    } finally {
+      await harness.dispose();
+    }
+  });
+
+  it("refuses official exact parameter drift before invoking the signer through D1/HTTP", async () => {
+    const harness = await createD1HttpHarness();
+    try {
+      const { actionContract, client, evidence, greenlight } = await createOfficialX402Contract(harness);
+      const signer = trackedOfficialSigner();
+      const surface = createOfficialExactX402SigningSurface({
+        signer: signer.surfaceSigner,
+        paymentRequired: officialPaymentRequired,
+        selectedPaymentRequirementIndex: evidence.selectedPaymentRequirementIndex,
+        selectedPaymentRequirementDigest: evidence.selectedPaymentRequirementDigest,
+        downstreamPaymentStatus: "succeeded",
+      });
+
+      const gatewayResult = await runX402WalletGateway({
+        protocol: client,
+        surface,
+        actionContractId: actionContract.actionContractId,
+        greenlightId: greenlight.greenlightId,
+        observedParameters: {
+          ...(actionContract.parameters as X402PaymentParameters),
+          atomicAmount: "2501",
+        },
+        surfaceOperationRef: "surface-op:d1-http-x402-official-mismatch",
+      });
+
+      expect(gatewayResult.outcome).toBe("gateway_check_refused");
+      expect(gatewayResult.gatewayCheck.gateAttempt.gateDecisionReasonCode).toBe("params_mismatch");
+      expect(gatewayResult.signatureEvidence).toBeNull();
+      expect(signer.signatureCount()).toBe(0);
+      expect(await recordCount(harness, "mutation_attempt")).toBe(0);
+      expect(await recordCount(harness, "gateway_check_attempt")).toBe(1);
+      expect(await recordCount(harness, "refusal")).toBe(1);
+    } finally {
+      await harness.dispose();
+    }
+  });
+
+  it("refuses official exact replay before creating another PaymentPayload through D1/HTTP", async () => {
+    const harness = await createD1HttpHarness();
+    try {
+      const { actionContract, client, evidence, greenlight } = await createOfficialX402Contract(harness);
+      const signer = trackedOfficialSigner();
+      const surface = createOfficialExactX402SigningSurface({
+        signer: signer.surfaceSigner,
+        paymentRequired: officialPaymentRequired,
+        selectedPaymentRequirementIndex: evidence.selectedPaymentRequirementIndex,
+        selectedPaymentRequirementDigest: evidence.selectedPaymentRequirementDigest,
+        downstreamPaymentStatus: "unknown",
+      });
+      const input = {
+        protocol: client,
+        surface,
+        actionContractId: actionContract.actionContractId,
+        greenlightId: greenlight.greenlightId,
+        observedParameters: actionContract.parameters as X402PaymentParameters,
+      };
+
+      const first = await runX402WalletGateway({
+        ...input,
+        surfaceOperationRef: "surface-op:d1-http-x402-official-first",
+      });
+      const replay = await runX402WalletGateway({
+        ...input,
+        surfaceOperationRef: "surface-op:d1-http-x402-official-replay",
+      });
+
+      expect(first.outcome).toBe("payment_signature_proof_gap");
+      expect(replay.outcome).toBe("gateway_check_refused");
+      expect(replay.gatewayCheck.gateAttempt.gateDecisionReasonCode).toBe("already_consumed");
+      expect(replay.signatureEvidence).toBeNull();
+      expect(signer.signatureCount()).toBe(1);
+      expect(await recordCount(harness, "mutation_attempt")).toBe(1);
+      expect(await recordCount(harness, "proof_gap")).toBe(1);
+      expect(await recordCount(harness, "refusal")).toBe(1);
+      expect(await recordCount(harness, "receipt")).toBe(2);
     } finally {
       await harness.dispose();
     }
@@ -213,6 +506,60 @@ async function createX402Contract(harness: D1HttpHarness) {
   return { actionContract: runtimeResult.actionContract, client, greenlight: policy.greenlight, proposal, records };
 }
 
+async function createOfficialX402Contract(harness: D1HttpHarness, options: { paymentIdentifier?: string | null } = {}) {
+  const client = new HandshakeClient("http://handshake.test", harness.fetch, {
+    transitionTokens: D1_HARNESS_CALLER_AUTH_TOKENS,
+  });
+  const evidence = await decodeX402PaymentRequiredEvidence({
+    source: officialX402SourceBasis,
+    paymentRequiredHeader: base64Json(officialPaymentRequired),
+    selectedPaymentRequirementIndex: 0,
+    intendedRequest: {
+      method: "GET",
+      url: officialPaymentRequired.resource.url,
+      bodyDigest: null,
+      selectedHeadersDigest: officialSelectedHeadersDigest,
+    },
+  });
+  const proposal = await compileX402InstallProposal(officialInstallInput(evidence.selectedPaymentRequirementDigest));
+  const records = requireCompiledRecords(proposal);
+  await client.registerToolCapability(records.toolCapability);
+  await client.registerActionType(records.actionType);
+  await client.registerGatewayRegistryEntry(records.gatewayRegistryEntry);
+  await client.registerOperatingEnvelope(records.operatingEnvelope);
+  await recordGatewayCheckedPosture(client, proposal, records);
+
+  const runtimeResult = await proposeX402PaymentActionContract(
+    client,
+    runtimeConfig(proposal, records),
+    await buildX402PaymentAttemptFromRequiredEvidence({
+      evidence,
+      principalIntentRef: "intent:fetch paid context",
+      generatedCodeOrSpecRef: "code:official-x402-fetch-wrapper",
+      paymentIdentifier: options.paymentIdentifier ?? null,
+    }),
+  );
+  if (runtimeResult.outcome !== "action_contract_proposed") {
+    throw new Error("expected official x402 action contract proposal");
+  }
+
+  const policy = await client.evaluatePolicy({
+    actionContractId: runtimeResult.actionContract.actionContractId,
+    envelopeId: records.operatingEnvelope.envelopeId,
+    signingSecret: "test-secret",
+  });
+  if (!policy.greenlight)
+    throw new Error(`expected official x402 greenlight, got ${policy.decision.decisionReasonCode}`);
+  return {
+    actionContract: runtimeResult.actionContract,
+    client,
+    evidence,
+    greenlight: policy.greenlight,
+    proposal,
+    records,
+  };
+}
+
 async function recordGatewayCheckedPosture(
   client: HandshakeClient,
   proposal: X402InstallProposal,
@@ -235,6 +582,10 @@ async function recordGatewayCheckedPosture(
         return {
           signerCustodyStatus: "gateway_held",
           rawPrivateKeyEnvStatus: "absent",
+          directCoreClientSigningStatus: "blocked",
+          paidFetchClientStatus: "blocked",
+          paidAxiosClientStatus: "absent",
+          rawPaymentSignatureHeaderStatus: "blocked",
           siblingX402WrapperStatus: "blocked",
           mcpDirectPaymentStatus: "blocked",
           tokenPassthroughStatus: "blocked",
@@ -280,8 +631,11 @@ function fakeSigningSurface(downstreamPaymentStatus: "succeeded" | "unknown") {
       return {
         evidenceRef: `evidence:x402-payment-signature:${command.verifiedGate.gateAttemptId}`,
         surfaceOperationRef: command.verifiedGate.surfaceOperationRef,
-        paymentSignature,
+        paymentSignatureHeaderName: "PAYMENT-SIGNATURE" as const,
+        paymentSignatureHeaderRef: `credential:x402-local-fixture-signature:${command.verifiedGate.gateAttemptId}`,
         paymentSignatureDigest,
+        paymentPayloadShape: "local_fixture_payment_signature" as const,
+        credentialMaterialPosture: "local_fixture" as const,
         downstreamPaymentStatus,
         paymentResponseEvidenceRef:
           downstreamPaymentStatus === "succeeded"
@@ -290,6 +644,20 @@ function fakeSigningSurface(downstreamPaymentStatus: "succeeded" | "unknown") {
         providerRequestRef: `provider-request:x402:${command.verifiedGate.gateAttemptId}`,
         providerOperationRef: `provider-operation:x402:${command.verifiedGate.gateAttemptId}`,
       };
+    },
+  };
+}
+
+function trackedOfficialSigner() {
+  let signatures = 0;
+  return {
+    signatureCount: () => signatures,
+    surfaceSigner: {
+      address: officialSignerAddress,
+      async signTypedData() {
+        signatures += 1;
+        return `0x${"a".repeat(130)}` as const;
+      },
     },
   };
 }
@@ -365,6 +733,50 @@ function validInstallInput(): X402InstallProposalInput {
   };
 }
 
+function officialInstallInput(paymentRequirementsDigest: `sha256:${string}`): X402InstallProposalInput {
+  const createdAt = nowIso();
+  return {
+    tenantId: "tenant_demo",
+    organizationId: "org_demo",
+    createdAt,
+    endpointEvidence: {
+      endpointUrl: officialPaymentRequired.resource.url,
+      payee: officialPaymentRequired.accepts[0].payTo,
+      network: officialPaymentRequired.accepts[0].network,
+      token: officialPaymentRequired.accepts[0].asset,
+      maxAtomicAmount: officialPaymentRequired.accepts[0].amount,
+      paymentRequirementsDigest,
+      facilitatorRef: "facilitator:local",
+      evidenceRefs: ["evidence:x402-payment-required"],
+    },
+    walletGatewayProfile: {
+      walletGatewayId: "wallet_gateway_local",
+      gatewayId: "gateway_x402_wallet",
+      signerCustodyStatus: "gateway_held",
+      signerRef: "secretref:x402-wallet-gateway",
+      authorityHolderRef: "gateway-authority:x402-wallet",
+      supportedNetworks: [officialPaymentRequired.accepts[0].network],
+      supportedTokens: [officialPaymentRequired.accepts[0].asset],
+    },
+    spendBounds: {
+      principalId: "principal_demo",
+      agentId: "agent_demo",
+      runtimeAdapterId: "runtime_codex",
+      objectiveRef: "intent:fetch paid context",
+      allowedDomains: ["api.example.com"],
+      allowedPayees: [officialPaymentRequired.accepts[0].payTo],
+      allowedNetworks: [officialPaymentRequired.accepts[0].network],
+      allowedTokens: [officialPaymentRequired.accepts[0].asset],
+      maxAtomicAmountPerCall: officialPaymentRequired.accepts[0].amount,
+      maxAtomicAmountPerSession: "10000",
+      maxAtomicAmountPerDay: "20000",
+      reviewThresholdAtomicAmount: officialPaymentRequired.accepts[0].amount,
+      issuedAt: createdAt,
+      expiresAt: futureIso(),
+    },
+  };
+}
+
 async function actionEvents(harness: D1HttpHarness, actionContractId: string): Promise<StreamEventRow[]> {
   return harness.query<StreamEventRow>(
     `SELECT "offset" AS offset, event_type, previous_event_digest, event_digest
@@ -381,4 +793,8 @@ async function recordCount(harness: D1HttpHarness, objectType: string): Promise<
     objectType,
   );
   return rows[0]?.count ?? 0;
+}
+
+function base64Json(value: unknown): string {
+  return btoa(JSON.stringify(value));
 }

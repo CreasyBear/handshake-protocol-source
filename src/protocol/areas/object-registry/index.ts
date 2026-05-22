@@ -8,6 +8,7 @@ import {
   OperatingEnvelopeSchema,
   ToolCapabilitySchema,
 } from "../catalog-envelope/schemas";
+import { CredentialResolutionEvidenceSchema, GatewayCredentialRefSchema } from "../credential-custody/schemas";
 import { ContractStreamEventSchema } from "../../events/schemas";
 import { GatewayCheckAttemptSchema, MutationAttemptSchema } from "../gateway-gate/schemas";
 import { GeneratedExecutionGraphSchema } from "../generated-execution-graph/schemas";
@@ -77,6 +78,20 @@ export const protocolObjectRegistry = {
     (record) => record.payload.envelopeId,
     "catalog_public",
     "control_plane_read",
+  ),
+  gateway_credential_ref: entry(
+    "gateway_credential_ref",
+    GatewayCredentialRefSchema,
+    (record) => record.payload.gatewayCredentialRefId,
+    "transition_evidence",
+    "audit_read",
+  ),
+  credential_resolution_evidence: entry(
+    "credential_resolution_evidence",
+    CredentialResolutionEvidenceSchema,
+    (record) => record.payload.credentialResolutionEvidenceId,
+    "transition_evidence",
+    "audit_read",
   ),
   transition_request_context: entry(
     "transition_request_context",
@@ -274,6 +289,9 @@ export function isolationScopeRefsForContract(contract: ActionContract): Isolati
     isolationScopeRef(contract, "envelope", contract.envelopeId),
     isolationScopeRef(contract, "action_class", contract.actionClass),
     isolationScopeRef(contract, "gateway", contract.gatewayId),
+    ...contract.gatewayCredentialRefs.map((ref) =>
+      isolationScopeRef(contract, "credential_ref", ref.gatewayCredentialRefId),
+    ),
     isolationScopeRef(contract, "resource", contract.resourceRef),
   ]);
 }

@@ -21,6 +21,7 @@ export function gateRefusalReason(
   isolationStates: IsolationState[],
   now: string,
   gatewayPolicyDriftReasonCode: string | null,
+  gatewayCredentialBindingReasonCode: string | null,
   protectedPathReasonCode: string | null,
   sequenceDependencyReasonCode: string | null,
 ): string | null {
@@ -39,6 +40,7 @@ export function gateRefusalReason(
   if (Date.parse(greenlight.expiresAt) <= Date.parse(now)) return "greenlight_expired";
   if (greenlight.consumedAt !== null) return "already_consumed";
   if (gatewayPolicyDriftReasonCode) return gatewayPolicyDriftReasonCode;
+  if (gatewayCredentialBindingReasonCode) return gatewayCredentialBindingReasonCode;
   if (protectedPathReasonCode) return protectedPathReasonCode;
   const blockingIsolation = isolationStates.find((state) =>
     ["review_only", "quarantined", "halted", "revoked", "state_suspect"].includes(state.state),

@@ -9,7 +9,11 @@ import {
   ResourceRefSchema,
   SignaturePostureSchema,
 } from "../foundation/schema-core";
-import { RequiredProtectedPathStateSchema } from "../areas/catalog-envelope/schemas";
+import {
+  CredentialCustodyStatusSchema,
+  ParticipantIdentityBindingSchema,
+  RequiredProtectedPathStateSchema,
+} from "../areas/catalog-envelope/schemas";
 import { GateDecisionSchema } from "../areas/gateway-gate/schemas";
 import { IdempotencyLedgerStateSchema } from "../areas/idempotency-ledger/schemas";
 import {
@@ -23,7 +27,7 @@ import {
   ProtectedPathStateSchema,
   RawSiblingToolStatusSchema,
 } from "../areas/protected-path-posture/schemas";
-import { CredentialCustodyStatusSchema } from "../areas/catalog-envelope/schemas";
+import { GatewayCredentialBindingSchema } from "../areas/credential-custody/schemas";
 import {
   DownstreamOutcomeStatusSchema,
   GatewayAdmissionStatusSchema,
@@ -40,6 +44,7 @@ export const ContractEvidenceProjectionSchema = z.strictObject({
   envelopeRef: IdSchema,
   principalRef: IdSchema,
   agentRef: IdSchema,
+  participantIdentityBindings: z.array(ParticipantIdentityBindingSchema).default([]),
   runId: IdSchema,
   runtimeAdapterRef: IdSchema,
   actionClass: z.string().min(1),
@@ -51,6 +56,7 @@ export const ContractEvidenceProjectionSchema = z.strictObject({
   idempotencyKey: IdSchema,
   paramsDigest: DigestSchema,
   nonSecretParamsSummary: z.record(z.string(), JsonValueSchema),
+  gatewayCredentialRefs: z.array(GatewayCredentialBindingSchema).default([]),
   evidenceRefs: z.array(z.string()).default([]),
   clearingEvidenceRefs: ClearingEvidenceRefsSchema,
   signaturePosture: SignaturePostureSchema,
@@ -157,6 +163,7 @@ export const AgentTransactionEnvelopeProjectionSchema = z.strictObject({
   receiptRef: IdSchema.nullable(),
   principalRef: IdSchema,
   agentRef: IdSchema,
+  participantIdentityBindings: z.array(ParticipantIdentityBindingSchema).default([]),
   runId: IdSchema,
   runtimeAdapterRef: IdSchema,
   actionClass: z.string().min(1),
@@ -168,6 +175,17 @@ export const AgentTransactionEnvelopeProjectionSchema = z.strictObject({
   paramsDigest: DigestSchema,
   nonSecretParamsSummary: z.record(z.string(), JsonValueSchema),
   clearingEvidenceRefs: ClearingEvidenceRefsSchema,
+  surfaceOperationRef: z.string().min(1).nullable(),
+  surfaceOperationReconciliationRef: IdSchema.nullable(),
+  surfaceOperationEvidenceLabels: z.array(z.string().min(1)).default([]),
+  surfaceOperationEvidenceRefs: z.array(z.string().min(1)).default([]),
+  gatewayCredentialEvidenceRefs: z.array(z.string().min(1)).default([]),
+  credentialResolutionEvidenceRefs: z.array(z.string().min(1)).default([]),
+  downstreamEvidenceRefs: z.array(z.string().min(1)).default([]),
+  providerRequestRef: z.string().min(1).nullable(),
+  providerOperationRef: z.string().min(1).nullable(),
+  downstreamRetryability: DownstreamRetryabilitySchema.nullable(),
+  reconciliationFinalityStatus: z.enum(["final", "pending", "suspect", "unknown"]).nullable(),
   gatewayAdmissionStatus: GatewayAdmissionStatusSchema,
   greenlightConsumptionStatus: z.enum(["not_applicable", "not_consumed", "consumed", "replayed"]).nullable(),
   downstreamOutcomeStatus: DownstreamOutcomeStatusSchema,
@@ -181,6 +199,7 @@ export const AgentTransactionEnvelopeProjectionSchema = z.strictObject({
   idempotencyReasonCodes: z.array(ReasonCodeSchema).default([]),
   recoveryRefs: z.array(z.string().min(1)).default([]),
   isolationRefs: z.array(z.string().min(1)).default([]),
+  authorityCertificateRefs: z.array(IdSchema).default([]),
   evidenceRefs: z.array(z.string().min(1)).default([]),
   streamOffsets: z.array(ReceiptStreamReferenceSchema).default([]),
   receiptDigest: DigestSchema.nullable(),

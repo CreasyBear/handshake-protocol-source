@@ -104,6 +104,7 @@ export function makeRepoWriteFixtureObjects(
     envelopeId: "env_repo_write_demo",
     principalId: "principal_demo",
     agentId: "agent_demo",
+    participantIdentityBindings: [],
     objectiveRef: "intent:write-one-repo-file",
     allowedActionClasses: ["repo.write"],
     allowedGateways: ["gateway_repo_write"],

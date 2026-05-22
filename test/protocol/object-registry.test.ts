@@ -18,6 +18,8 @@ const idFields = {
   action_type: "actionTypeId",
   gateway_registry_entry: "gatewayRegistryEntryId",
   operating_envelope: "envelopeId",
+  gateway_credential_ref: "gatewayCredentialRefId",
+  credential_resolution_evidence: "credentialResolutionEvidenceId",
   transition_request_context: "transitionRequestContextId",
   runtime_execution: "runtimeExecutionId",
   generated_execution_graph: "generatedExecutionGraphId",

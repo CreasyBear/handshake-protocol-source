@@ -2,6 +2,7 @@ export * from "./action-contract";
 export * from "./action-attempt-lifecycle";
 export * from "./authority-certificate";
 export * from "./catalog-envelope";
+export * from "./credential-custody";
 export * from "./gateway-gate";
 export * from "./generated-execution-graph";
 export * from "./intent-compilation";

@@ -22,6 +22,7 @@ export const ActionAttemptLifecycleStateSchema = z.enum([
   "runtime_observed",
   "generated_graph_recorded",
   "bypass_risk_recorded",
+  "credential_custody_recorded",
   "draft_recorded",
   "draft_refused",
   "protected_path_posture_recorded",

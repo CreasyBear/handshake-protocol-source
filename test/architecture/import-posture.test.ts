@@ -76,13 +76,24 @@ describe("protocol module import posture", () => {
   });
 
   it("keeps transports and clients off protocol area internals", () => {
-    const areaPattern = protocolAreas.join("|");
-    const violations = importViolations(
-      ["src/http", "src/sdk"],
-      [new RegExp(`from\\s+["'][^"']*protocol/areas/(?:${areaPattern})/(?!index(?:["']|/))[^"']+["']`)],
-    );
+    const violations: string[] = [];
+    for (const file of ["src/http", "src/sdk"].flatMap((root) => walkTs(root))) {
+      const rel = relative(process.cwd(), file);
+      for (const specifier of importsFrom(readFileSync(file, "utf8"))) {
+        const areaInternalImport = protocolAreas.some(
+          (area) =>
+            specifier.includes(`protocol/areas/${area}/`) && !specifier.endsWith(`protocol/areas/${area}/index`),
+        );
+        const allowedCertificateVerifyImport =
+          rel === "src/sdk/surface-clients/evidence-client.ts" &&
+          specifier.endsWith("protocol/areas/authority-certificate/verify");
+        if (areaInternalImport && !allowedCertificateVerifyImport) {
+          violations.push(`${rel} imports ${specifier}`);
+        }
+      }
+    }
 
-    expect(violations).toEqual([]);
+    expect(violations.sort()).toEqual([]);
   });
 
   it("keeps HTTP route metadata separate from dispatch and response schema definitions", () => {
@@ -241,6 +252,75 @@ describe("protocol module import posture", () => {
     expect(violations.sort()).toEqual([]);
   });
 
+  it("keeps observer and representation helpers off authority behavior imports", () => {
+    const violations = importViolations(
+      ["src/runtime", "src/protocol/areas/protected-action-representation", "src/protocol/evidence-projections"],
+      [
+        /from\s+["'][^"']*protocol\/kernel(?:["']|\/)/,
+        /from\s+["'][^"']*protocol\/areas\/policy-greenlight\/(?:guards|policy|policy-record|sequence-dependencies|transitions)(?:["']|\/)/,
+        /from\s+["'][^"']*protocol\/areas\/gateway-gate\/(?:artifacts|gateway-policy|guards|replay-refusal|transitions)(?:["']|\/)/,
+        /from\s+["'][^"']*protocol\/areas\/receipt-export\/transitions(?:["']|\/)/,
+        /from\s+["'][^"']*protocol\/areas\/authority-certificate\/(?:signing|transitions)(?:["']|\/)/,
+        /from\s+["'][^"']*adapters\/(?:package-install\/gateway|preview-deploy\/gateway|repo-write\/gateway|x402-payment\/wallet-gateway)(?:["']|\/)/,
+      ],
+    );
+
+    expect(violations).toEqual([]);
+  });
+
+  it("keeps official x402 signer and paid-client imports inside the wallet gateway", () => {
+    const allowedOfficialSignerImportFile = "src/adapters/x402-payment/wallet-gateway.ts";
+    const forbiddenOutsideGateway = new Set(["@x402/core/client", "@x402/fetch", "@x402/axios"]);
+    const violations: string[] = [];
+
+    for (const file of walkTs("src")) {
+      const rel = relative(process.cwd(), file);
+      if (rel === allowedOfficialSignerImportFile) continue;
+      for (const specifier of importsFrom(readFileSync(file, "utf8"))) {
+        if (forbiddenOutsideGateway.has(specifier) || specifier.startsWith("@x402/evm")) {
+          violations.push(`${rel} imports ${specifier}`);
+        }
+      }
+    }
+
+    expect(violations.sort()).toEqual([]);
+  });
+
+  it("keeps vault provider clients and secret retrieval APIs out of foundation protocol surfaces", () => {
+    const tierOneRoots = ["src/protocol", "src/http", "src/runtime", "src/sdk"];
+    const providerImportViolations = importViolations(tierOneRoots, [
+      /from\s+["'][^"']*(?:infisical|vault)(?:\/|["'])/i,
+    ]);
+    const retrievalApiViolations: string[] = [];
+
+    for (const file of tierOneRoots.flatMap((root) => walkTs(root))) {
+      const rel = relative(process.cwd(), file);
+      const text = readFileSync(file, "utf8");
+      if (/\b(?:getSecret|retrieveSecret|secretPath)\b/.test(text)) {
+        retrievalApiViolations.push(rel);
+      }
+    }
+
+    expect(providerImportViolations).toEqual([]);
+    expect(retrievalApiViolations.sort()).toEqual([]);
+  });
+
+  it("keeps the official x402 signing factory off adapter barrels and public surfaces", () => {
+    const adapterBarrel = readFileSync("src/adapters/x402-payment/index.ts", "utf8");
+    const publicSurfaces = [
+      "src/index.ts",
+      "src/runtime/index.ts",
+      "src/conformance/index.ts",
+      "src/adapters/x402-payment/index.ts",
+      "src/experimental.ts",
+    ];
+
+    expect(adapterBarrel).not.toContain("./wallet-gateway");
+    for (const surface of publicSurfaces) {
+      expect(readFileSync(surface, "utf8")).not.toContain("createOfficialExactX402SigningSurface");
+    }
+  });
+
   it("keeps area types faces local-only", () => {
     const violations: string[] = [];
     const allowedLines = new Set([
@@ -273,6 +353,7 @@ describe("protocol module import posture", () => {
       "../authority-certificate/schemas",
       "../bypass-probe/schemas",
       "../catalog-envelope/schemas",
+      "../credential-custody/schemas",
       "../gateway-gate/schemas",
       "../generated-execution-graph/schemas",
       "../idempotency-ledger/schemas",

@@ -25,6 +25,13 @@ import { futureIso, makeKernelFixture, registerFixtureObjects } from "../support
 
 const ED25519_ALGORITHM = { name: "Ed25519" } as Algorithm;
 const x402Digest = `sha256:${"a".repeat(64)}` as const;
+const x402SelectedHeadersDigest = `sha256:${"8".repeat(64)}` as const;
+const x402SelectedPaymentRequirementDigest = `sha256:${"7".repeat(64)}` as const;
+const x402SdkPackageVersions = {
+  "@x402/core": "2.12.0",
+  "@x402/evm": "2.12.0",
+  "@x402/fetch": "2.12.0",
+} as const;
 const tokens = {
   control_plane: "aps_control_plane_token",
   runtime_evidence: "aps_runtime_evidence_token",
@@ -58,6 +65,18 @@ describe("adapter-backed APS proof spine", () => {
             atomicAmount: "2500",
             paymentRequirementsDigest: x402.proposal.endpointEvidence.paymentRequirementsDigest,
             paymentRequiredEvidenceRef: "evidence:x402-payment-required",
+            intendedHttpMethod: "GET",
+            intendedRequestUrl: x402.proposal.endpointEvidence.endpointUrl,
+            intendedRequestBodyDigest: null,
+            selectedHeadersDigest: x402SelectedHeadersDigest,
+            x402Version: 2,
+            x402Scheme: "exact",
+            asset: x402.proposal.endpointEvidence.token,
+            payTo: x402.proposal.endpointEvidence.payee,
+            maxTimeoutSeconds: 60,
+            selectedPaymentRequirementDigest: x402SelectedPaymentRequirementDigest,
+            sdkPackageVersions: x402SdkPackageVersions,
+            extensionKeys: ["payment-identifier"],
           },
         ],
       },
@@ -71,6 +90,19 @@ describe("adapter-backed APS proof spine", () => {
     expect(contract.runtimeExecutionId).toBe(runtime.runtimeExecution.runtimeExecutionId);
     expect(contract.generatedExecutionGraphId).toBe(runtime.generatedExecutionGraph.generatedExecutionGraphId);
     expect(contract.generatedExecutionNodeId).toBe("runtime_dispatch_1");
+    expect(contract.parameters).toMatchObject({
+      intendedHttpMethod: "GET",
+      intendedRequestUrl: x402.proposal.endpointEvidence.endpointUrl,
+      selectedHeadersDigest: x402SelectedHeadersDigest,
+      x402Version: 2,
+      x402Scheme: "exact",
+      selectedPaymentRequirementDigest: x402SelectedPaymentRequirementDigest,
+      sdkPackageVersions: x402SdkPackageVersions,
+      extensionKeys: ["payment-identifier"],
+    });
+    expect(runtime.runtimeExecution.evidenceRefs).toContain("evidence:x402-payment-required");
+    expect(JSON.stringify(runtime)).not.toContain("PAYMENT-SIGNATURE");
+    expect(JSON.stringify(runtime)).not.toContain("PaymentPayload");
     expect(await recordCount(fixture.store, "policy_decision")).toBe(0);
     expect(await recordCount(fixture.store, "greenlight")).toBe(0);
     expect(await recordCount(fixture.store, "gateway_check_attempt")).toBe(0);
@@ -105,7 +137,14 @@ describe("adapter-backed APS proof spine", () => {
     expect(gatewayResult.outcome).toBe("payment_signature_reconciled");
     expect(surface.signatureCount()).toBe(1);
     expect(gatewayResult.gatewayCheck.gateAttempt.gateDecision).toBe("passed");
-    expect(gatewayResult.signatureEvidence?.paymentSignature).toStartWith("PAYMENT-SIGNATURE:fake:");
+    expect(gatewayResult.signatureEvidence).toMatchObject({
+      paymentSignatureHeaderName: "PAYMENT-SIGNATURE",
+      paymentPayloadShape: "local_fixture_payment_signature",
+      credentialMaterialPosture: "local_fixture",
+    });
+    expect(gatewayResult.signatureEvidence?.paymentSignatureHeaderRef).toStartWith(
+      "credential:x402-local-fixture-signature:",
+    );
 
     const envelope = await client.getAgentTransactionEnvelopeProjection(contract.actionContractId, "runtime_evidence");
     expect(envelope.actionClass).toBe("x402_payment.exact");
@@ -113,8 +152,19 @@ describe("adapter-backed APS proof spine", () => {
     expect(envelope.downstreamOutcomeStatus).toBe("pending");
     expect(envelope.redactionProfileRef).toBe("agent-transaction-envelope:v0.2-redacted");
     expect(envelope.omittedFields).toContain("actionContract.parameters");
+    expect(envelope.policyDecisionRef).toBe(policy.decision.policyDecisionId);
+    expect(envelope.greenlightRef).toBe(policy.greenlight.greenlightId);
+    expect(envelope.gateAttemptRef).toBe(gatewayResult.gatewayCheck.gateAttempt.gateAttemptId);
+    expect(gatewayResult.gatewayCheck.mutationAttempt).not.toBeNull();
+    if (!gatewayResult.gatewayCheck.mutationAttempt) throw new Error("expected x402 mutation attempt");
+    expect(envelope.mutationAttemptRef).toBe(gatewayResult.gatewayCheck.mutationAttempt.mutationAttemptId);
     expect(envelope.idempotencyLedgerState).toBe("terminal_succeeded");
     expect(envelope.receiptRef).toBe(gatewayResult.gatewayCheck.receipt.receiptId);
+    expect(envelope.refusalRefs).toEqual([]);
+    expect(envelope.proofGapRefs).toEqual([]);
+    expect(envelope.recoveryRefs).toEqual([]);
+    expect(envelope.isolationRefs).toEqual([]);
+    expect(envelope.authorityCertificateRefs).toEqual([]);
     expect(JSON.stringify(envelope)).not.toContain("PAYMENT-SIGNATURE:fake:");
     expect(JSON.stringify(envelope)).not.toContain("secretref:x402-wallet-gateway");
 
@@ -127,6 +177,15 @@ describe("adapter-backed APS proof spine", () => {
     expect(certificate.terminal.terminalKind).toBe("receipt");
     expect(certificate.envelope.actionClass).toBe("x402_payment.exact");
     expect(verification.valid).toBe(true);
+    const certifiedEnvelope = await client.getAgentTransactionEnvelopeProjection(
+      contract.actionContractId,
+      "runtime_evidence",
+    );
+    expect(certifiedEnvelope.authorityCertificateRefs).toContain(certificate.authorityCertificateId);
+    expect(certifiedEnvelope.gatewayAdmissionStatus).toBe("admitted");
+    expect(certifiedEnvelope.downstreamOutcomeStatus).toBe("pending");
+    expect(JSON.stringify(certifiedEnvelope)).not.toContain("PAYMENT-SIGNATURE:fake:");
+    expect(JSON.stringify(certifiedEnvelope)).not.toContain("secretref:x402-wallet-gateway");
   });
 
   it("keeps x402 hostile branches as refusal or proof-gap evidence instead of authority", async () => {
@@ -260,6 +319,13 @@ describe("adapter-backed APS proof spine", () => {
     expect(runtime.outcome).toBe("action_contracts_proposed");
     const proposed = runtime.proposals[0];
     if (!proposed || proposed.outcome !== "action_contract_proposed") throw new Error("expected package contract");
+    expect(proposed.actionContract.actionClass).toBe("package.install");
+    expect(proposed.actionContract.parameters).toMatchObject({
+      package: "hono",
+      versionRange: "^4.12.19",
+      resolvedMaterialDigest: null,
+      resolvedMaterialEvidenceRefs: [],
+    });
 
     const policy = await fixture.kernel.evaluatePolicy({
       actionContractId: proposed.actionContract.actionContractId,
@@ -276,6 +342,9 @@ describe("adapter-backed APS proof spine", () => {
       surfaceOperationRef: "surface-op:aps-package-install",
     });
     expect(gatewayResult.outcome).toBe("mutation_reconciled");
+    expect(gatewayResult.gatewayCheck.gateAttempt.gateDecision).toBe("passed");
+    expect(gatewayResult.gatewayCheck.mutationAttempt).not.toBeNull();
+    if (!gatewayResult.gatewayCheck.mutationAttempt) throw new Error("expected package mutation attempt");
 
     const envelope = await httpClientForStore(fixture.store).getAgentTransactionEnvelopeProjection(
       proposed.actionContract.actionContractId,
@@ -283,9 +352,23 @@ describe("adapter-backed APS proof spine", () => {
     );
     expect(envelope.actionClass).toBe("package.install");
     expect(envelope.protectedSurfaceKind).toBe("package_manager");
+    expect(envelope.policyDecisionRef).toBe(policy.decision.policyDecisionId);
+    expect(envelope.greenlightRef).toBe(policy.greenlight.greenlightId);
+    expect(envelope.gateAttemptRef).toBe(gatewayResult.gatewayCheck.gateAttempt.gateAttemptId);
+    expect(envelope.mutationAttemptRef).toBe(gatewayResult.gatewayCheck.mutationAttempt.mutationAttemptId);
+    expect(envelope.receiptRef).toBe(gatewayResult.gatewayCheck.receipt.receiptId);
     expect(envelope.gatewayAdmissionStatus).toBe("admitted");
+    expect(envelope.idempotencyLedgerState).toBe("terminal_succeeded");
     expect(envelope.redactionProfileRef).toBe("agent-transaction-envelope:v0.2-redacted");
     expect(envelope.omittedFields).toContain("actionContract.parameters");
+    expect(envelope.nonSecretParamsSummary).toMatchObject({
+      package: "hono",
+      resolvedMaterialDigest: null,
+      resolvedMaterialEvidenceRefs: [],
+    });
+    expect(envelope.refusalRefs).toEqual([]);
+    expect(envelope.proofGapRefs).toEqual([]);
+    expect(envelope.authorityCertificateRefs).toEqual([]);
     expect(envelope.envelopeDigest).toMatch(/^sha256:/);
   });
 });
@@ -384,6 +467,10 @@ async function recordGatewayCheckedX402Posture(
         return {
           signerCustodyStatus: "gateway_held",
           rawPrivateKeyEnvStatus: "absent",
+          directCoreClientSigningStatus: "blocked",
+          paidFetchClientStatus: "blocked",
+          paidAxiosClientStatus: "absent",
+          rawPaymentSignatureHeaderStatus: "blocked",
           siblingX402WrapperStatus: "blocked",
           mcpDirectPaymentStatus: "blocked",
           tokenPassthroughStatus: "blocked",
@@ -458,8 +545,11 @@ function fakeSigningSurface(downstreamPaymentStatus: "succeeded" | "unknown") {
       return {
         evidenceRef: `evidence:x402-payment-signature:${command.verifiedGate.gateAttemptId}`,
         surfaceOperationRef: command.verifiedGate.surfaceOperationRef,
-        paymentSignature,
+        paymentSignatureHeaderName: "PAYMENT-SIGNATURE" as const,
+        paymentSignatureHeaderRef: `credential:x402-local-fixture-signature:${command.verifiedGate.gateAttemptId}`,
         paymentSignatureDigest,
+        paymentPayloadShape: "local_fixture_payment_signature" as const,
+        credentialMaterialPosture: "local_fixture" as const,
         downstreamPaymentStatus,
         paymentResponseEvidenceRef:
           downstreamPaymentStatus === "succeeded"

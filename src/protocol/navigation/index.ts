@@ -6,6 +6,8 @@ export type KernelTransitionMethod =
   | "compileIntent"
   | "createRuntimeExecution"
   | "createGeneratedExecutionGraph"
+  | "registerGatewayCredentialRef"
+  | "recordCredentialResolutionEvidence"
   | "createBypassProbe"
   | "createToolCallDraft"
   | "transitionToolCallDraft"
@@ -32,6 +34,8 @@ export type ProtocolTransitionId =
   | "compileIntent"
   | "createRuntimeExecution"
   | "createGeneratedExecutionGraph"
+  | "registerGatewayCredentialRef"
+  | "recordCredentialResolutionEvidence"
   | "createBypassProbe"
   | "createToolCallDraft"
   | "transitionToolCallDraft"
@@ -55,6 +59,7 @@ export type ProtocolTransitionPhase =
   | "intent_compilation"
   | "runtime_evidence"
   | "generated_execution_graph"
+  | "credential_custody"
   | "protected_path_posture"
   | "action_contract"
   | "authority_certificate"
@@ -123,6 +128,27 @@ export const protocolNavigation = [
     eventsEmitted: ["runtime_execution_recorded"],
     authorityBoundary: "runtime evidence only",
     evidenceObligation: "record execution-block shape without issuing policy, greenlight, gate, or mutation authority",
+  },
+  {
+    transitionId: "registerGatewayCredentialRef",
+    kernelMethod: "registerGatewayCredentialRef",
+    phase: "credential_custody",
+    outcomeClasses: ["recorded"],
+    recordsWritten: ["gateway_credential_ref", "contract_stream_event"],
+    eventsEmitted: ["gateway_credential_ref_registered"],
+    authorityBoundary: "gateway credential custody evidence only",
+    evidenceObligation: "record opaque gateway credential ref without exposing secret material or minting authority",
+  },
+  {
+    transitionId: "recordCredentialResolutionEvidence",
+    kernelMethod: "recordCredentialResolutionEvidence",
+    phase: "credential_custody",
+    outcomeClasses: ["recorded", "refusal", "proof_gap"],
+    recordsWritten: ["credential_resolution_evidence", "contract_stream_event"],
+    eventsEmitted: ["credential_resolution_recorded"],
+    authorityBoundary: "post-gate credential resolution evidence only",
+    evidenceObligation:
+      "bind credential resolution/use evidence to exact contract, greenlight, and passed gateway check without exposing secret material",
   },
   {
     transitionId: "createBypassProbe",

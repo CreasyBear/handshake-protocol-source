@@ -23,6 +23,25 @@ export async function digestCanonical(value: JsonValue): Promise<`sha256:${strin
   return `sha256:${toHex(digest)}`;
 }
 
+export type ProtectedActionParamsDigestInput = {
+  parameters: Record<string, unknown>;
+  secretRefs?: Record<string, string> | undefined;
+  gatewayCredentialRefs?: unknown[] | undefined;
+};
+
+export async function protectedActionParamsDigest(
+  input: ProtectedActionParamsDigestInput,
+): Promise<`sha256:${string}`> {
+  const material: Record<string, JsonValue> = {
+    parameters: JSON.parse(JSON.stringify(input.parameters)) as JsonValue,
+    secretRefs: input.secretRefs ?? {},
+  };
+  if (input.gatewayCredentialRefs && input.gatewayCredentialRefs.length > 0) {
+    material.gatewayCredentialRefs = JSON.parse(JSON.stringify(input.gatewayCredentialRefs)) as JsonValue;
+  }
+  return digestCanonical(material);
+}
+
 export async function signCanonicalHmac(value: JsonValue, secret: string): Promise<`hmac-sha256:${string}`> {
   const key = await crypto.subtle.importKey(
     "raw",

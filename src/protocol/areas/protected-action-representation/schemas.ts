@@ -12,11 +12,19 @@ import { ProtectedPathStateSchema } from "../protected-path-posture/schemas";
 import { RefusalPhaseSchema } from "../refusal/schemas";
 
 const NonAuthorityBoundaryShape = {
-  authorityCreated: z.literal(false),
-  greenlightRef: z.null(),
-  gatewayCheckRef: z.null(),
-  mutationAttemptRef: z.null(),
+  authorityCreated: z.literal(false).default(false),
+  policyDecisionRef: z.null().default(null),
+  approvalDecisionRef: z.null().default(null),
+  greenlightRef: z.null().default(null),
+  gatewayCheckRef: z.null().default(null),
+  mutationAttemptRef: z.null().default(null),
+  credentialMaterialIncluded: z.literal(false).default(false),
+  mutationCommandIncluded: z.literal(false).default(false),
+  receiptAssertionCreated: z.literal(false).default(false),
+  authorityCertificateMintRequested: z.literal(false).default(false),
 };
+
+const EmptySecretRefsSchema = z.record(z.string(), z.never()).default({});
 
 export const ProtectedActionMetadataSchema = ProtocolBaseSchema.extend({
   metadataId: IdSchema,
@@ -56,7 +64,7 @@ export const ProtectedActionChallengeSchema = ProtocolBaseSchema.extend({
   reasonCode: ReasonCodeSchema,
   retryability: z.enum(["terminal", "retryable", "recoverable", "review_required", "ambiguous"]),
   commitState: z.enum(["not_started", "committed", "ambiguous"]),
-  mutationAttempted: z.literal(false),
+  mutationAttempted: z.boolean().default(false),
   rawInternalRecordIncluded: z.literal(false),
   evidenceRefs: z.array(z.string().min(1)).default([]),
   nextStepKind: z.enum(["read_evidence", "recraft_request", "request_review", "stop"]).default("read_evidence"),
@@ -77,7 +85,7 @@ export const ProtectedActionRequestSchema = ProtocolBaseSchema.extend({
   resourceRef: ResourceRefSchema,
   parameters: z.record(z.string(), JsonValueSchema),
   nonSecretParamsSummary: z.record(z.string(), JsonValueSchema),
-  secretRefs: z.record(z.string(), z.string().min(1)).default({}),
+  secretRefs: EmptySecretRefsSchema,
   idempotencyKey: z.string().min(1),
   evidenceRefs: z.array(z.string().min(1)).default([]),
   requestedAt: IsoDateSchema,
@@ -89,7 +97,19 @@ export const ProtectedActionEvidenceProjectionSchema = ProtocolBaseSchema.extend
   projectionId: IdSchema,
   projectionKind: z.enum([
     "generated_graph",
+    "runtime_proposal",
     "contract",
+    "policy_decision",
+    "greenlight_state",
+    "gateway_admission",
+    "mutation_attempt",
+    "receipt",
+    "durable_refusal",
+    "proof_gap",
+    "replay_refusal",
+    "recovery",
+    "isolation",
+    "authority_certificate",
     "transaction_envelope",
     "receipt_timeline",
     "idempotency_recovery",
@@ -98,7 +118,6 @@ export const ProtectedActionEvidenceProjectionSchema = ProtocolBaseSchema.extend
   sourceRef: z.string().min(1),
   redactionProfileRef: z.string().min(1),
   rawInternalRecordIncluded: z.literal(false),
-  mutationCommandIncluded: z.literal(false),
   omittedFields: z.array(z.string().min(1)).default([]),
   evidenceRefs: z.array(z.string().min(1)).default([]),
   ...NonAuthorityBoundaryShape,

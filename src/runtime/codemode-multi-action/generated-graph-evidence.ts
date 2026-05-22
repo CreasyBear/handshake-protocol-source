@@ -7,7 +7,7 @@ import {
   buildPreviewDeployCompileIntentInput,
   type PreviewDeployRuntimeConfig,
 } from "../preview-deploy/action-proposal";
-import { digestCanonical } from "../../protocol/foundation/canonical";
+import { digestCanonical, protectedActionParamsDigest } from "../../protocol/foundation/canonical";
 import type {
   CreateGeneratedExecutionGraphInput,
   GeneratedExecutionNodeInput,
@@ -161,10 +161,11 @@ async function buildGeneratedExecutionNode(
 ): Promise<GeneratedExecutionNodeInput> {
   const compileInput = await buildCompileIntentInputForAction(config, program, action, sequenceNumber, []);
   const candidate = compileInput.candidate;
-  const paramsDigest = await digestCanonical({
+  const paramsDigest = await protectedActionParamsDigest({
     parameters: candidate.parameters,
     secretRefs: candidate.secretRefs,
-  } as JsonValue);
+    gatewayCredentialRefs: candidate.gatewayCredentialRefs,
+  });
   const nodeGatewayBindingDigest = await digestCanonical({
     actionClass: candidate.actionClass,
     toolCapabilityId: candidate.toolCapabilityId,

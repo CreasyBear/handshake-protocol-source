@@ -55,6 +55,9 @@ describe("root package exports", () => {
       "CreateRuntimeExecutionInputSchema",
       "CreateToolCallDraftInputSchema",
       "CredentialCustodyStatusSchema",
+      "CredentialResolutionEvidenceSchema",
+      "CredentialResolutionRedactionStatusSchema",
+      "CredentialResolutionResultClassSchema",
       "DigestSchema",
       "DownstreamDiagnosticsRedactionPostureSchema",
       "DownstreamOutcomeStatusSchema",
@@ -64,6 +67,8 @@ describe("root package exports", () => {
       "GatewayAdmissionStatusSchema",
       "GatewayCheckAttemptSchema",
       "GatewayCheckInputSchema",
+      "GatewayCredentialBindingSchema",
+      "GatewayCredentialRefSchema",
       "GatewayEnforcementModeSchema",
       "GatewayRegistryEntrySchema",
       "GeneratedExecutionCoverageStatusSchema",
@@ -98,11 +103,17 @@ describe("root package exports", () => {
       "MutationAttemptSchema",
       "OperatingEnvelopeSchema",
       "PROTOCOL_VERSION",
+      "ParticipantIdentityBindingSchema",
+      "ParticipantIdentityRoleSchema",
       "PolicyDecisionSchema",
       "PolicyDecisionValueSchema",
       "PostureSourceAuthoritySchema",
       "ProofGapSchema",
       "ProposeActionContractInputSchema",
+      "ProtectedActionChallengeSchema",
+      "ProtectedActionEvidenceProjectionSchema",
+      "ProtectedActionMetadataSchema",
+      "ProtectedActionRequestSchema",
       "ProtectedPathBypassProbeCoverageSchema",
       "ProtectedPathInstallHealthProjectionSchema",
       "ProtectedPathInstallHealthStatusSchema",
@@ -122,6 +133,7 @@ describe("root package exports", () => {
       "ReceiptTimelineFailureEvidenceProjectionSchema",
       "ReceiptTimelineProjectionSchema",
       "ReconcileSurfaceOperationInputSchema",
+      "RecordCredentialResolutionEvidenceInputSchema",
       "RecoveryRecommendationSchema",
       "RecoveryRecommendationStatusSchema",
       "RecoveryRecommendationStatusTransitionSchema",
@@ -129,6 +141,7 @@ describe("root package exports", () => {
       "RecoveryRecommendedPathSchema",
       "RefusalPhaseSchema",
       "RefusalSchema",
+      "RegisterGatewayCredentialRefInputSchema",
       "RequiredProtectedPathStateSchema",
       "ResolveRecoveryTerminalConflictInputSchema",
       "ResourceRefSchema",
@@ -182,6 +195,7 @@ describe("root package exports", () => {
     expect(root.HandshakeClient).toBeFunction();
     expect(root.ActionContractSchema).toBeDefined();
     expect(root.GatewayCheckInputSchema).toBeDefined();
+    expect(root.ProtectedActionRequestSchema).toBeDefined();
     expect(root.RefusalSchema).toBeDefined();
     expect(root.verifiedGatewayCheckFromResult).toBeFunction();
     expect(root.verifyAuthorityCertificate).toBeFunction();
@@ -213,11 +227,16 @@ describe("root package exports", () => {
 
     expect(Object.keys(root)).not.toContain("checkProtectedMutationAdapterConformance");
     expect(exportNames).toEqual([
+      "X402FirstWedgeEvidenceLabelSchema",
+      "X402FirstWedgeSurfaceSchema",
+      "X402FirstWedgeUnsupportedSurfaceSchema",
       "X402PaymentConformancePostureSchema",
       "assertProtectedMutationAdapterConformance",
       "assertX402PaymentInstallConformance",
       "checkProtectedMutationAdapterConformance",
       "checkX402PaymentInstallConformance",
+      "classifyX402FirstWedgeEvidenceLabel",
+      "classifyX402FirstWedgeSurface",
     ]);
     expect(conformance.checkProtectedMutationAdapterConformance).toBeFunction();
   });

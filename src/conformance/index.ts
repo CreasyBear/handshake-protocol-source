@@ -39,9 +39,20 @@ export async function assertProtectedMutationAdapterConformance(
 }
 
 export {
+  X402FirstWedgeSurfaceSchema,
+  X402FirstWedgeEvidenceLabelSchema,
+  X402FirstWedgeUnsupportedSurfaceSchema,
   X402PaymentConformancePostureSchema,
   assertX402PaymentInstallConformance,
   checkX402PaymentInstallConformance,
+  classifyX402FirstWedgeEvidenceLabel,
+  classifyX402FirstWedgeSurface,
+  type X402FirstWedgeEvidenceLabel,
+  type X402FirstWedgeEvidenceLabelClassification,
+  type X402FirstWedgeSurface,
+  type X402FirstWedgeSurfaceClassification,
+  type X402FirstWedgeUnsupportedSurface,
+  type X402FirstWedgeUnsupportedSurfaceReasonCode,
   type X402PaymentConformancePosture,
   type X402PaymentConformanceResult,
 } from "../adapters/x402-payment/conformance";

@@ -1,4 +1,4 @@
-import { digestCanonical } from "../../foundation/canonical";
+import { digestCanonical, protectedActionParamsDigest } from "../../foundation/canonical";
 import type { ActionType, GatewayRegistryEntry, OperatingEnvelope, ToolCapability } from "../catalog-envelope";
 import type { GeneratedExecutionGraph } from "../generated-execution-graph";
 import { createId, nowIso } from "../../foundation/ids";
@@ -90,9 +90,10 @@ async function getIntentCompilationContext(
   const runtimeExecution = runtimeExecutionRecord?.payload ?? null;
   const generatedExecutionGraph = generatedExecutionGraphRecord?.payload ?? null;
   const toolCallDraft = toolCallDraftRecord?.payload ?? null;
-  const paramsDigest = await digestCanonical({
+  const paramsDigest = await protectedActionParamsDigest({
     parameters: input.candidate.parameters,
     secretRefs: input.candidate.secretRefs,
+    gatewayCredentialRefs: input.candidate.gatewayCredentialRefs,
   });
   return {
     input,
@@ -150,6 +151,7 @@ async function buildCandidateAction(
     paramsDigest,
     nonSecretParamsSummary: input.candidate.nonSecretParamsSummary,
     secretRefs: input.candidate.secretRefs,
+    gatewayCredentialRefs: input.candidate.gatewayCredentialRefs,
     purposeCode: input.candidate.purposeCode,
     expectedSideEffectCodes: input.candidate.expectedSideEffectCodes,
     evidenceRefs: input.candidate.evidenceRefs,

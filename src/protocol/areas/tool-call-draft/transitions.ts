@@ -1,4 +1,4 @@
-import { digestCanonical } from "../../foundation/canonical";
+import { digestCanonical, protectedActionParamsDigest } from "../../foundation/canonical";
 import { createId, nowIso } from "../../foundation/ids";
 import { HandshakeProtocolError } from "../../foundation/errors";
 import type { EventDescriptor } from "../../events/chains";
@@ -33,7 +33,11 @@ export async function createToolCallDraft(
   const context = {
     input,
     createdAt: nowIso(),
-    paramsDigest: await digestCanonical({ parameters: input.parameters, secretRefs: input.secretRefs }),
+    paramsDigest: await protectedActionParamsDigest({
+      parameters: input.parameters,
+      secretRefs: input.secretRefs,
+      gatewayCredentialRefs: input.gatewayCredentialRefs,
+    }),
   };
   const draft = await buildToolCallDraft(context);
   await recorder.commitRecordsWithEvents(toolCallDraftRecords(draft), toolCallDraftEvents(draft));
@@ -83,6 +87,7 @@ async function buildToolCallDraft(context: ToolCallDraftContext): Promise<ToolCa
     parameters: input.parameters,
     nonSecretParamsSummary: input.nonSecretParamsSummary,
     secretRefs: input.secretRefs,
+    gatewayCredentialRefs: input.gatewayCredentialRefs,
     paramsDigest,
     finalizedAt: null,
     expiresAt: input.expiresAt,
@@ -108,6 +113,7 @@ function toolCallDraftDigestMaterial(context: ToolCallDraftContext, toolCallDraf
     draftState: input.draftState,
     paramsDigest,
     nonSecretParamsSummary: input.nonSecretParamsSummary,
+    gatewayCredentialRefs: input.gatewayCredentialRefs,
     invalidReasonCodes: input.invalidReasonCodes,
     evidenceRefs: input.evidenceRefs,
     finalizedAt: null,
@@ -144,7 +150,8 @@ async function buildTransitionedToolCallDraft(
   const parameters = input.parameters ?? current.parameters;
   const nonSecretParamsSummary = input.nonSecretParamsSummary ?? current.nonSecretParamsSummary;
   const secretRefs = input.secretRefs ?? current.secretRefs;
-  const paramsDigest = await digestCanonical({ parameters, secretRefs });
+  const gatewayCredentialRefs = input.gatewayCredentialRefs ?? current.gatewayCredentialRefs;
+  const paramsDigest = await protectedActionParamsDigest({ parameters, secretRefs, gatewayCredentialRefs });
   const finalizedAt =
     input.nextDraftState === "finalized" ? (input.finalizedAt ?? nowIso()) : (input.finalizedAt ?? current.finalizedAt);
   const next = ToolCallDraftSchema.parse({
@@ -153,6 +160,7 @@ async function buildTransitionedToolCallDraft(
     parameters,
     nonSecretParamsSummary,
     secretRefs,
+    gatewayCredentialRefs,
     paramsDigest,
     finalizedAt,
     expiresAt: input.expiresAt ?? current.expiresAt,
@@ -174,6 +182,7 @@ async function buildTransitionedToolCallDraft(
     draftState: next.draftState,
     paramsDigest: next.paramsDigest,
     nonSecretParamsSummary: next.nonSecretParamsSummary,
+    gatewayCredentialRefs: next.gatewayCredentialRefs,
     invalidReasonCodes: next.invalidReasonCodes,
     evidenceRefs: next.evidenceRefs,
     finalizedAt: next.finalizedAt,

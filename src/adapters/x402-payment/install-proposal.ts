@@ -266,6 +266,7 @@ function buildCompiledKernelRecords(
       envelopeId: `env_x402_payment_${suffix}`,
       principalId: bounds.principalId,
       agentId: bounds.agentId,
+      participantIdentityBindings: [],
       objectiveRef: bounds.objectiveRef,
       allowedActionClasses: ["x402_payment.exact"],
       allowedGateways: [gateway.gatewayId],

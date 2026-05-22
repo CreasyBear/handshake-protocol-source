@@ -177,6 +177,42 @@ export const actionAttemptLifecycleMatrix: Partial<Record<ActionAttemptLifecycle
     },
     "unsafe generated graph evidence terminates as refusal or proof gap before contract",
   ),
+  "registerGatewayCredentialRef:recorded": entry(
+    {
+      phase: "observation",
+      state: "credential_custody_recorded",
+      authorityEffect: "evidence_only",
+      terminalOutcome: "evidence_only",
+    },
+    "gateway credential ref records custody evidence only and cannot expose credential material",
+  ),
+  "recordCredentialResolutionEvidence:recorded": entry(
+    {
+      phase: "gateway",
+      state: "credential_custody_recorded",
+      authorityEffect: "evidence_only",
+      terminalOutcome: "open",
+    },
+    "credential resolution evidence binds to a passed gateway check without minting new authority",
+  ),
+  "recordCredentialResolutionEvidence:refusal": entry(
+    {
+      phase: "gateway",
+      state: "gateway_conflict",
+      authorityEffect: "none",
+      terminalOutcome: "refusal",
+    },
+    "credential resolution evidence that cannot bind to the exact passed gate is refused",
+  ),
+  "recordCredentialResolutionEvidence:proof_gap": entry(
+    {
+      phase: "gateway",
+      state: "gateway_proof_gap",
+      authorityEffect: "evidence_only",
+      terminalOutcome: "proof_gap",
+    },
+    "credential resolution uncertainty remains proof-gap evidence instead of execution proof",
+  ),
   "createBypassProbe:recorded": entry(
     {
       phase: "observation",

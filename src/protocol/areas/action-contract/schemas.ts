@@ -13,9 +13,11 @@ import {
 import {
   CredentialCustodyStatusSchema,
   GatewayEnforcementModeSchema,
+  ParticipantIdentityBindingSchema,
   RequiredProtectedPathStateSchema,
 } from "../catalog-envelope/schemas";
 import { GeneratedExecutionCoverageStatusSchema } from "../generated-execution-graph/schemas";
+import { GatewayCredentialBindingSchema } from "../credential-custody/schemas";
 
 export const ActionContractSchema = ProtocolBaseSchema.extend({
   actionContractId: IdSchema,
@@ -26,6 +28,7 @@ export const ActionContractSchema = ProtocolBaseSchema.extend({
   operatingEnvelopeDigest: DigestSchema,
   agentId: IdSchema,
   principalId: IdSchema,
+  participantIdentityBindings: z.array(ParticipantIdentityBindingSchema).default([]),
   runId: IdSchema,
   runtimeAdapterId: IdSchema,
   sequenceNumber: z.number().int().nonnegative(),
@@ -68,6 +71,7 @@ export const ActionContractSchema = ProtocolBaseSchema.extend({
   paramsDigest: DigestSchema,
   nonSecretParamsSummary: z.record(z.string(), JsonValueSchema),
   secretRefs: z.record(z.string(), z.string().min(1)).default({}),
+  gatewayCredentialRefs: z.array(GatewayCredentialBindingSchema).default([]),
   purposeCode: z.string().min(1),
   expectedSideEffectCodes: z.array(z.string().min(1)),
   evidenceRefs: z.array(z.string()).default([]),

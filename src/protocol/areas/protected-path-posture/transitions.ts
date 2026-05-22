@@ -8,6 +8,7 @@ import type { ProtocolRecorder } from "../../events/records";
 import { HandshakeProtocolError } from "../../foundation/errors";
 import type { ProtocolRecord } from "../object-registry";
 import { PROTOCOL_VERSION, ProtectedPathPostureSchema, type JsonValue, type ProtectedPathPosture } from "./types";
+import { credentialCustodyCanSatisfyGatewayChecked } from "../credential-custody";
 import type { ProtocolStore, StoredProtocolRecord } from "../../store/port";
 import { protectedPathPostureScopeKey, protectedPathPostureScopeKeyForContract } from "./scope";
 import type { BypassProbe, BypassProbeKind } from "../bypass-probe";
@@ -361,12 +362,6 @@ function gatewayCanSatisfyGatewayChecked(
     credentialCustodyCanSatisfyGatewayChecked(gateway.credentialCustodyStatus) &&
     ["reference_fixture", "customer_gateway_adapter", "provider_gateway"].includes(gateway.enforcementMode)
   );
-}
-
-function credentialCustodyCanSatisfyGatewayChecked(
-  credentialCustodyStatus: GatewayRegistryEntry["credentialCustodyStatus"],
-): boolean {
-  return credentialCustodyStatus === "gateway_held" || credentialCustodyStatus === "fixture_gateway_held";
 }
 
 function sourceAuthorityCanSatisfyGatewayChecked(sourceAuthority: ProtectedPathPosture["sourceAuthority"]): boolean {

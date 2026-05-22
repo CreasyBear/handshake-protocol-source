@@ -1,4 +1,4 @@
-import { digestCanonical } from "../../foundation/canonical";
+import { digestCanonical, protectedActionParamsDigest } from "../../foundation/canonical";
 import type { ActionContract } from "../action-contract";
 import type { GatewayRegistryEntry } from "../catalog-envelope";
 import { actionLifecycleStreamRefs, buildEventChain, type EventDescriptor } from "../../events/chains";
@@ -28,6 +28,7 @@ import { buildActiveProtectedSurfaceOperationClaim } from "../operation-lifecycl
 import type { ProtectedSurfaceOperationClaim } from "../operation-lifecycle";
 import { evaluateRequiredProtectedPathPosture, loadCurrentPostureForContract } from "../protected-path-posture";
 import type { ProtectedPathPosture } from "../protected-path-posture";
+import { evaluateGatewayCredentialBindings, type GatewayCredentialBindingEvaluation } from "../credential-custody";
 import { type JsonValue } from "./types";
 import {
   loadGatewayCheckSequenceDependencyStates,
@@ -67,6 +68,7 @@ type GatewayConstraintEvaluation = {
   isolationStates: IsolationState[];
   gatewayPolicyDrift: GatewayPolicyDriftCheck;
   protectedPathPosture: StoredProtocolRecord<ProtectedPathPosture> | null;
+  gatewayCredentialBindingEvaluation: GatewayCredentialBindingEvaluation;
   idempotencyLedgerEntry: StoredProtocolRecord<IdempotencyLedgerEntry> | null;
   refusal: string | null;
 };
@@ -129,9 +131,10 @@ async function deriveGatewayConstraintEvaluation(
   const greenlight = context.greenlightRecord.payload;
   const now = nowIso();
   const gatewayPolicyDrift = await currentGatewayPolicyDrift(store, contract, greenlight);
-  const observedParamsDigest = await digestCanonical({
+  const observedParamsDigest = await protectedActionParamsDigest({
     parameters: context.input.observedParameters,
     secretRefs: contract.secretRefs,
+    gatewayCredentialRefs: contract.gatewayCredentialRefs,
   });
   const greenlightDigestSeen = await digestCanonical(greenlight as unknown as JsonValue);
   const isolationStates = await store.listIsolationStates([
@@ -148,6 +151,7 @@ async function deriveGatewayConstraintEvaluation(
     posture: protectedPathPosture,
     now,
   });
+  const gatewayCredentialBindingEvaluation = await evaluateGatewayCredentialBindings(store, contract, now);
   const sequenceDependencyStates = await loadGatewayCheckSequenceDependencyStates(store, contract);
   const sequenceDependencyReasonCode = gatewayCheckSequenceDependencyRefusalReason(sequenceDependencyStates);
   const gateAttemptId = createId("gat");
@@ -158,6 +162,7 @@ async function deriveGatewayConstraintEvaluation(
     isolationStates,
     now,
     gatewayPolicyDrift.reasonCode,
+    gatewayCredentialBindingEvaluation.ok ? null : gatewayCredentialBindingEvaluation.reasonCode,
     protectedPathEvaluation.ok ? null : protectedPathEvaluation.reasonCode,
     sequenceDependencyReasonCode,
   );
@@ -172,6 +177,7 @@ async function deriveGatewayConstraintEvaluation(
     isolationStates,
     gatewayPolicyDrift,
     protectedPathPosture,
+    gatewayCredentialBindingEvaluation,
     idempotencyLedgerEntry,
     refusal,
   };

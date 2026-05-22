@@ -51,6 +51,7 @@ export const BreakerDecisionSchema = ProtocolBaseSchema.extend({
     "envelope",
     "action_class",
     "gateway",
+    "credential_ref",
     "resource",
   ]),
   targetScopeId: IdSchema,
@@ -73,7 +74,17 @@ export type BreakerDecision = z.infer<typeof BreakerDecisionSchema>;
 
 export const IsolationStateSchema = ProtocolBaseSchema.extend({
   isolationStateId: IdSchema,
-  scopeType: z.enum(["tenant", "organization", "agent", "run", "envelope", "action_class", "gateway", "resource"]),
+  scopeType: z.enum([
+    "tenant",
+    "organization",
+    "agent",
+    "run",
+    "envelope",
+    "action_class",
+    "gateway",
+    "credential_ref",
+    "resource",
+  ]),
   scopeId: IdSchema,
   state: z.enum(["active", "review_only", "rate_limited", "quarantined", "halted", "revoked", "state_suspect"]),
   reasonCode: ReasonCodeSchema,

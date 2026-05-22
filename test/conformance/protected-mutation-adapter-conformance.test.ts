@@ -332,6 +332,7 @@ function makePreviewDeployObjects(): {
     envelopeId: "env_preview_deploy",
     principalId: "principal_demo",
     agentId: "agent_demo",
+    participantIdentityBindings: [],
     objectiveRef: "intent:create local preview",
     allowedActionClasses: ["preview_deploy.create"],
     allowedGateways: ["gateway_preview_deploy_local"],

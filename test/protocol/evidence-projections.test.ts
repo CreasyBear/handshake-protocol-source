@@ -223,6 +223,126 @@ describe("protocol evidence projections", () => {
     expect(proofGapEnvelope.idempotencyRecoveryDisposition).toBe("terminal_unknown_requires_recovery");
   });
 
+  it("redacts raw x402 payment credential evidence while exposing digest and response refs", async () => {
+    const fixture = await createGreenlitContract();
+    const gate = await fixture.kernel.gatewayCheck({
+      actionContractId: fixture.contract.actionContractId,
+      greenlightId: fixture.greenlight.greenlightId,
+      observedParameters: fixture.contract.parameters,
+      surfaceOperationRef: "surface-op:x402-redaction",
+    });
+    if (!gate.mutationAttempt) throw new Error("expected mutation attempt before x402 redaction reconciliation");
+
+    const safeRefs = [
+      "evidence:x402-official-payment-signature:redaction",
+      "credential:x402-payment-signature:redaction",
+      `digest:sha256:${"a".repeat(64)}`,
+      "credential:x402-payment-payload:redaction",
+      `digest:sha256:${"b".repeat(64)}`,
+      "evidence:x402-payment-response:redaction",
+    ];
+    const rawCredentialRefs = [
+      "PAYMENT-SIGNATURE:raw-header-must-not-project",
+      'PaymentPayload:{"payload":{"signature":"0xraw"}}',
+      "secretref:x402-wallet-gateway",
+      "token_passthrough:raw-bearer",
+      "facilitator_secret:raw",
+    ];
+
+    const reconciliation = await fixture.kernel.reconcileSurfaceOperation({
+      mutationAttemptId: gate.mutationAttempt.mutationAttemptId,
+      idempotencyKey: fixture.contract.idempotencyKey,
+      observedSurfaceOperationRef: "surface-op:x402-redaction",
+      observedDownstreamStatus: "succeeded",
+      downstreamRetryability: "non_retryable",
+      providerRequestRef: "provider-request:x402:redaction",
+      providerOperationRef: "provider-operation:x402:redaction",
+      diagnosticsRedactionPosture: "redacted",
+      evidenceRefs: [...safeRefs, ...rawCredentialRefs],
+      resolvedProofGapIds: [],
+    });
+
+    const projection = await projectAgentTransactionEnvelope({
+      contract: fixture.contract,
+      policyDecision: fixture.decision,
+      greenlight: fixture.greenlight,
+      gateAttempt: gate.gateAttempt,
+      mutationAttempt: gate.mutationAttempt,
+      receipt: gate.receipt,
+      proofGaps: (await fixture.store.listRecordsByType<ProofGap>("proof_gap")).map((record) => record.payload),
+      ledger: await currentLedgerForContract(fixture),
+      reconciliations: [reconciliation.reconciliation],
+    });
+
+    expect(projection.surfaceOperationRef).toBe("surface-op:x402-redaction");
+    expect(projection.surfaceOperationReconciliationRef).toBe(reconciliation.reconciliation.reconciliationId);
+    expect(projection.surfaceOperationEvidenceLabels).toEqual([
+      "local_gateway_check",
+      "payment_payload_created",
+      "paid_retry_attempted",
+      "payment_response_received",
+    ]);
+    for (const ref of safeRefs) expect(projection.surfaceOperationEvidenceRefs).toContain(ref);
+    for (const ref of rawCredentialRefs) expect(JSON.stringify(projection)).not.toContain(ref);
+    expect(projection.gatewayCredentialEvidenceRefs).toEqual([
+      "credential:x402-payment-signature:redaction",
+      `digest:sha256:${"a".repeat(64)}`,
+      "credential:x402-payment-payload:redaction",
+      `digest:sha256:${"b".repeat(64)}`,
+    ]);
+    expect(projection.downstreamEvidenceRefs).toEqual(["evidence:x402-payment-response:redaction"]);
+    expect(projection.providerRequestRef).toBe("provider-request:x402:redaction");
+    expect(projection.providerOperationRef).toBe("provider-operation:x402:redaction");
+    expect(projection.downstreamRetryability).toBe("non_retryable");
+    expect(projection.reconciliationFinalityStatus).toBe("final");
+  });
+
+  it("keeps facilitator verify evidence distinct from settlement finality", async () => {
+    const fixture = await createGreenlitContract();
+    const gate = await fixture.kernel.gatewayCheck({
+      actionContractId: fixture.contract.actionContractId,
+      greenlightId: fixture.greenlight.greenlightId,
+      observedParameters: fixture.contract.parameters,
+      surfaceOperationRef: "surface-op:x402-facilitator-verify",
+    });
+    if (!gate.mutationAttempt) throw new Error("expected mutation attempt before facilitator verify reconciliation");
+
+    const reconciliation = await fixture.kernel.reconcileSurfaceOperation({
+      mutationAttemptId: gate.mutationAttempt.mutationAttemptId,
+      idempotencyKey: fixture.contract.idempotencyKey,
+      observedSurfaceOperationRef: "surface-op:x402-facilitator-verify",
+      observedDownstreamStatus: "unknown",
+      downstreamRetryability: "unknown",
+      providerRequestRef: "provider-request:x402:verify-only",
+      providerOperationRef: "provider-operation:x402:verify-only",
+      diagnosticsRedactionPosture: "redacted",
+      evidenceRefs: ["evidence:x402-facilitator-verify:succeeded:verify-only"],
+      resolvedProofGapIds: [],
+    });
+
+    const projection = await projectAgentTransactionEnvelope({
+      contract: { ...fixture.contract, actionClass: "x402_payment.exact" },
+      policyDecision: fixture.decision,
+      greenlight: fixture.greenlight,
+      gateAttempt: gate.gateAttempt,
+      mutationAttempt: gate.mutationAttempt,
+      receipt: gate.receipt,
+      ledger: await currentLedgerForContract(fixture),
+      reconciliations: [reconciliation.reconciliation],
+    });
+
+    expect(projection.surfaceOperationEvidenceLabels).toEqual([
+      "local_gateway_check",
+      "paid_retry_attempted",
+      "payment_response_missing",
+      "facilitator_verify_succeeded",
+    ]);
+    expect(projection.downstreamOutcomeStatus).toBe("pending");
+    expect(projection.reconciliationFinalityStatus).toBe("unknown");
+    expect(projection.downstreamEvidenceRefs).toEqual([]);
+    expect(projection.surfaceOperationEvidenceLabels).not.toContain("settlement_succeeded");
+  });
+
   it("generalizes protected-path health beyond package install action classes", async () => {
     const fixture = await createGreenlitContract();
     const x402LikeContract = {

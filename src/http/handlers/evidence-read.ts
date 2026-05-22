@@ -3,6 +3,7 @@ import { HandshakeProtocolError } from "../../protocol/foundation/errors";
 import { projectGeneratedGraphEvidence } from "../../protocol/areas/generated-execution-graph";
 import type {
   ActionContract,
+  AuthorityCertificate,
   ContractStreamEvent,
   GatewayRegistryEntry,
   GatewayCheckAttempt,
@@ -160,14 +161,23 @@ function callerCanReadRecord(
 
 async function agentTransactionEnvelopeInput(store: ProtocolStore, contract: ActionContract) {
   const scope = { tenantId: contract.tenantId, organizationId: contract.organizationId };
-  const [policyDecisionRecords, greenlightRecords, gateAttemptRecords, mutationAttemptRecords, receiptRecords] =
-    await Promise.all([
-      store.listRecordsByType<PolicyDecision>("policy_decision", scope),
-      store.listRecordsByType<Greenlight>("greenlight", scope),
-      store.listRecordsByType<GatewayCheckAttempt>("gateway_check_attempt", scope),
-      store.listRecordsByType<MutationAttempt>("mutation_attempt", scope),
-      store.listRecordsByType<Receipt>("receipt", scope),
-    ]);
+  const [
+    policyDecisionRecords,
+    greenlightRecords,
+    gateAttemptRecords,
+    mutationAttemptRecords,
+    receiptRecords,
+    reconciliationRecords,
+    authorityCertificateRecords,
+  ] = await Promise.all([
+    store.listRecordsByType<PolicyDecision>("policy_decision", scope),
+    store.listRecordsByType<Greenlight>("greenlight", scope),
+    store.listRecordsByType<GatewayCheckAttempt>("gateway_check_attempt", scope),
+    store.listRecordsByType<MutationAttempt>("mutation_attempt", scope),
+    store.listRecordsByType<Receipt>("receipt", scope),
+    store.listRecordsByType<SurfaceOperationReconciliation>("surface_operation_reconciliation", scope),
+    store.listRecordsByType<AuthorityCertificate>("authority_certificate", scope),
+  ]);
 
   const receipts = latestFirst(receiptRecords.map((record) => record.payload)).filter(
     (receipt) => receipt.actionContractId === contract.actionContractId,
@@ -226,7 +236,9 @@ async function agentTransactionEnvelopeInput(store: ProtocolStore, contract: Act
     receipt,
     proofGaps,
     refusals,
+    reconciliations: reconciliationRecords.map((record) => record.payload),
     ledger: ledger?.payload ?? null,
+    authorityCertificates: authorityCertificateRecords.map((record) => record.payload),
   };
 }
 

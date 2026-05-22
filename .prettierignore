@@ -6,3 +6,4 @@ coverage
 .agents
 .planning
 docs/internal/archive
+examples/x402-protected-spend/output

@@ -22,6 +22,7 @@ import {
   loadCurrentPostureForContract,
   protectedPathPolicyInput,
 } from "../protected-path-posture";
+import { evaluateGatewayCredentialBindings, type GatewayCredentialBindingEvaluation } from "../credential-custody";
 import type { ProtectedPathPosture } from "../protected-path-posture";
 import type { ProtocolRecorder } from "../../events/records";
 import type { ReviewDecision } from "../review-binding";
@@ -54,6 +55,7 @@ type PolicyConstraintEvaluation = PolicyEvaluationContext & {
   protectedPathPosture: StoredProtocolRecord<ProtectedPathPosture> | null;
   idempotencyLedgerEntry: StoredProtocolRecord<IdempotencyLedgerEntry> | null;
   protectedPathEvaluation: ReturnType<typeof evaluateRequiredProtectedPathPosture>;
+  gatewayCredentialBindingEvaluation: GatewayCredentialBindingEvaluation;
   policyInput: {
     contractDigest: string;
     envelopeId: string;
@@ -63,6 +65,7 @@ type PolicyConstraintEvaluation = PolicyEvaluationContext & {
     requiredProtectedPathState: ActionContract["requiredProtectedPathState"];
     gatewayEnforcementMode: ActionContract["enforcementMode"];
     credentialCustodyStatus: ActionContract["credentialCustodyStatus"];
+    gatewayCredentialRefs: GatewayCredentialBindingEvaluation["policyInput"];
     protectedPathPosture: ReturnType<typeof protectedPathPolicyInput>;
     idempotencyLedger: {
       ledgerKeyDigest: `sha256:${string}`;
@@ -153,6 +156,11 @@ async function derivePolicyConstraintEvaluation(
     posture: protectedPathPosture,
     now: context.now,
   });
+  const gatewayCredentialBindingEvaluation = await evaluateGatewayCredentialBindings(
+    store,
+    context.contract,
+    context.now,
+  );
   const policyInput = buildPolicyInput(
     context,
     isolationStates,
@@ -160,6 +168,7 @@ async function derivePolicyConstraintEvaluation(
     protectedPathPosture,
     ledgerKeyDigest,
     idempotencyLedgerEntry,
+    gatewayCredentialBindingEvaluation,
   );
   const policyInputDigest = await digestCanonical(policyInput);
   return {
@@ -169,6 +178,7 @@ async function derivePolicyConstraintEvaluation(
     protectedPathPosture,
     idempotencyLedgerEntry,
     protectedPathEvaluation,
+    gatewayCredentialBindingEvaluation,
     policyInput,
     policyInputDigest,
     isolationSnapshot: isolationSnapshotRef(isolationStates),
@@ -182,6 +192,7 @@ function buildPolicyInput(
   protectedPathPosture: StoredProtocolRecord<ProtectedPathPosture> | null,
   ledgerKeyDigest: `sha256:${string}`,
   idempotencyLedgerEntry: StoredProtocolRecord<IdempotencyLedgerEntry> | null,
+  gatewayCredentialBindingEvaluation: GatewayCredentialBindingEvaluation,
 ): PolicyConstraintEvaluation["policyInput"] {
   return {
     contractDigest: context.contract.actionContractDigest,
@@ -192,6 +203,7 @@ function buildPolicyInput(
     requiredProtectedPathState: context.contract.requiredProtectedPathState,
     gatewayEnforcementMode: context.contract.enforcementMode,
     credentialCustodyStatus: context.contract.credentialCustodyStatus,
+    gatewayCredentialRefs: gatewayCredentialBindingEvaluation.policyInput,
     protectedPathPosture: protectedPathPolicyInput(protectedPathPosture, context.now),
     idempotencyLedger: {
       ledgerKeyDigest,
@@ -218,6 +230,7 @@ async function resolvePolicyDecisionValue(
     decisionValue = evaluateSequenceDependencies(constraints.sequenceDependencyStates) ?? decisionValue;
   }
   decisionValue = applyProtectedPathPolicy(decisionValue, constraints);
+  decisionValue = applyGatewayCredentialRefPolicy(decisionValue, constraints);
   decisionValue = applyIdempotencyLedgerPolicy(decisionValue, constraints);
   if (decisionValue.decision === "review_required" && constraints.input.reviewDecisionId) {
     const reviewDecision = await recorder.requiredRecord<ReviewDecision>(
@@ -244,6 +257,7 @@ async function resolvePolicyDecisionValue(
           matchedRuleIds: ["review_decision_binding"],
         };
     decisionValue = applyProtectedPathPolicy(decisionValue, constraints);
+    decisionValue = applyGatewayCredentialRefPolicy(decisionValue, constraints);
     decisionValue = applyIdempotencyLedgerPolicy(decisionValue, constraints);
   }
   return decisionValue;
@@ -302,6 +316,21 @@ function applyProtectedPathPolicy(
     reasonCode: constraints.protectedPathEvaluation.reasonCode,
     reason: constraints.protectedPathEvaluation.reason,
     matchedRuleIds: ["protected_path_posture_required"],
+  };
+}
+
+function applyGatewayCredentialRefPolicy(
+  decisionValue: PolicyEvaluationResult,
+  constraints: PolicyConstraintEvaluation,
+): PolicyEvaluationResult {
+  if (decisionValue.decision !== "greenlight" || constraints.gatewayCredentialBindingEvaluation.ok) {
+    return decisionValue;
+  }
+  return {
+    decision: "refuse",
+    reasonCode: constraints.gatewayCredentialBindingEvaluation.reasonCode,
+    reason: constraints.gatewayCredentialBindingEvaluation.reason,
+    matchedRuleIds: ["gateway_credential_ref_required"],
   };
 }
 

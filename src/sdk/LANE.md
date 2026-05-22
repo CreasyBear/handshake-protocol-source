@@ -18,7 +18,7 @@ The client is outside the authority boundary. It may submit evidence or requests
 
 ## Core components
 
-`client.ts`, typed client options, role token routing, transition methods, error parsing, and diagnostic evidence reads.
+`client.ts`, `surface-clients/`, typed client options, role-scoped transport, transition methods, error parsing, and diagnostic evidence reads.
 
 ## Failure and scale posture
 
@@ -38,11 +38,11 @@ Protocol primitive internals, storage implementations, Hono app internals, runti
 
 ## Guarding tests
 
-`test/http/http.test.ts`, `test/architecture/root-exports.test.ts`, and `test/architecture/import-posture.test.ts`.
+`test/http/http.test.ts`, `test/sdk/role-clients.test.ts`, `test/architecture/surface-boundary-posture.test.ts`, `test/architecture/root-exports.test.ts`, and `test/architecture/import-posture.test.ts`.
 
 ## Public surface
 
-`HandshakeClient`, `HandshakeClientError`, client options, fetch adapter types, transition methods, and redacted diagnostic evidence projection reads.
+Root exports remain `HandshakeClient`, `HandshakeClientError`, client options, fetch adapter types, transition methods, and redacted diagnostic evidence projection reads. Role-scoped surface clients are internal until their public package boundary is explicitly designed.
 
 ## Extraction trigger
 

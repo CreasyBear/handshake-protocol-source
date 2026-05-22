@@ -7,7 +7,7 @@ export type X402PaymentHostileProbeSurface = {
 
 type X402ProbeEvaluation = {
   passed: boolean;
-  evidenceDetail: string;
+  evidenceDetails: string[];
 };
 
 type X402ProbeSpec = {
@@ -21,18 +21,59 @@ const x402ProbeSpecs: X402ProbeSpec[] = [
     evaluate(posture) {
       return {
         passed: posture.signerCustodyStatus === "gateway_held",
-        evidenceDetail:
+        evidenceDetails: [
           posture.signerCustodyStatus === "gateway_held" ? "signer_gateway_held" : "signer_not_real_gateway_held",
+        ],
       };
     },
   },
   {
     probeKind: "raw_sibling_blocking",
     evaluate(posture) {
+      const checks = [
+        ["raw_private_key_env", posture.rawPrivateKeyEnvStatus === "absent", posture.rawPrivateKeyEnvStatus],
+        [
+          "direct_core_client_signing",
+          ["blocked", "absent"].includes(posture.directCoreClientSigningStatus),
+          posture.directCoreClientSigningStatus,
+        ],
+        [
+          "paid_fetch_client",
+          ["blocked", "absent"].includes(posture.paidFetchClientStatus),
+          posture.paidFetchClientStatus,
+        ],
+        [
+          "paid_axios_client",
+          ["blocked", "absent"].includes(posture.paidAxiosClientStatus),
+          posture.paidAxiosClientStatus,
+        ],
+        [
+          "raw_payment_signature_header",
+          ["blocked", "absent"].includes(posture.rawPaymentSignatureHeaderStatus),
+          posture.rawPaymentSignatureHeaderStatus,
+        ],
+        [
+          "sibling_x402_wrapper",
+          ["blocked", "absent"].includes(posture.siblingX402WrapperStatus),
+          posture.siblingX402WrapperStatus,
+        ],
+      ] as const;
+      const failedDetails = checks
+        .filter(([, passed]) => !passed)
+        .map(([name, , status]) => `${name}_${status}_reachable`);
       return {
-        passed: posture.rawPrivateKeyEnvStatus === "absent",
-        evidenceDetail:
-          posture.rawPrivateKeyEnvStatus === "absent" ? "raw_private_key_env_absent" : "raw_private_key_env_reachable",
+        passed: failedDetails.length === 0,
+        evidenceDetails:
+          failedDetails.length === 0
+            ? [
+                "raw_private_key_env_absent",
+                "direct_core_client_signing_blocked",
+                "paid_fetch_client_blocked",
+                "paid_axios_client_absent",
+                "raw_payment_signature_header_blocked",
+                "sibling_x402_wrapper_blocked",
+              ]
+            : failedDetails,
       };
     },
   },
@@ -41,9 +82,11 @@ const x402ProbeSpecs: X402ProbeSpec[] = [
     evaluate(posture) {
       return {
         passed: ["blocked", "absent"].includes(posture.mcpDirectPaymentStatus),
-        evidenceDetail: ["blocked", "absent"].includes(posture.mcpDirectPaymentStatus)
-          ? "mcp_direct_payment_blocked"
-          : "mcp_direct_payment_reachable",
+        evidenceDetails: [
+          ["blocked", "absent"].includes(posture.mcpDirectPaymentStatus)
+            ? "mcp_direct_payment_blocked"
+            : "mcp_direct_payment_reachable",
+        ],
       };
     },
   },
@@ -52,9 +95,11 @@ const x402ProbeSpecs: X402ProbeSpec[] = [
     evaluate(posture) {
       return {
         passed: ["blocked", "absent"].includes(posture.tokenPassthroughStatus),
-        evidenceDetail: ["blocked", "absent"].includes(posture.tokenPassthroughStatus)
-          ? "token_passthrough_blocked"
-          : "token_passthrough_reachable",
+        evidenceDetails: [
+          ["blocked", "absent"].includes(posture.tokenPassthroughStatus)
+            ? "token_passthrough_blocked"
+            : "token_passthrough_reachable",
+        ],
       };
     },
   },
@@ -63,7 +108,7 @@ const x402ProbeSpecs: X402ProbeSpec[] = [
     evaluate(posture) {
       return {
         passed: posture.wrapperDriftStatus === "absent",
-        evidenceDetail: posture.wrapperDriftStatus === "absent" ? "wrapper_drift_absent" : "wrapper_drift_present",
+        evidenceDetails: [posture.wrapperDriftStatus === "absent" ? "wrapper_drift_absent" : "wrapper_drift_present"],
       };
     },
   },
@@ -72,7 +117,7 @@ const x402ProbeSpecs: X402ProbeSpec[] = [
     evaluate(posture) {
       return {
         passed: posture.failureClosedStatus === "passed",
-        evidenceDetail: posture.failureClosedStatus === "passed" ? "failure_closed_passed" : "failure_closed_failed",
+        evidenceDetails: [posture.failureClosedStatus === "passed" ? "failure_closed_passed" : "failure_closed_failed"],
       };
     },
   },
@@ -89,7 +134,9 @@ export function x402PaymentHostileBypassProbeExecutors(surface: X402PaymentHosti
         probeOutcome,
         sourceAuthority: "gateway_probe" as const,
         reasonCodes: [evaluation.passed ? "bypass_probe_passed" : "protected_path_probe_failed"],
-        evidenceRefs: [`evidence:x402-hostile-probe:${spec.probeKind}:${evaluation.evidenceDetail}`],
+        evidenceRefs: evaluation.evidenceDetails.map(
+          (detail) => `evidence:x402-hostile-probe:${spec.probeKind}:${detail}`,
+        ),
       };
     },
   }));

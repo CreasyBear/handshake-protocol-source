@@ -1,0 +1,456 @@
+export const surfaceBoundaryManifestVersion = "surface-boundary.v0.1" as const;
+
+export const surfaceIds = [
+  "sdk.runtime",
+  "sdk.evidence",
+  "sdk.install",
+  "sdk.gateway",
+  "cli.operator",
+  "cli.evidence",
+  "cli.process",
+  "mcp.runtime",
+] as const;
+
+export type SurfaceId = (typeof surfaceIds)[number];
+
+export const surfaceRouteFamilies = [
+  "action_contract_proposal_write",
+  "bypass_probe_write",
+  "catalog_install_write",
+  "certificate_mint_write",
+  "certificate_verify_local",
+  "evidence_projection_read",
+  "gateway_check_write",
+  "install_health_read",
+  "isolation_write",
+  "local_process_supervision",
+  "policy_decision_write",
+  "protected_path_posture_write",
+  "raw_record_read",
+  "receipt_export_write",
+  "recovery_write",
+  "runtime_evidence_write",
+  "surface_reconciliation_write",
+  "tool_call_draft_write",
+] as const;
+
+export type SurfaceRouteFamily = (typeof surfaceRouteFamilies)[number];
+
+export const surfaceCustodyRoles = [
+  "control_plane",
+  "gateway_custody",
+  "review_custody",
+  "runtime_evidence",
+  "none",
+] as const;
+
+export type SurfaceCustodyRole = (typeof surfaceCustodyRoles)[number];
+
+export const surfacePlanes = ["runtime", "evidence", "operator", "gateway", "process"] as const;
+
+export type SurfacePlane = (typeof surfacePlanes)[number];
+
+export const surfaceImplementationStatuses = ["active", "deferred"] as const;
+
+export type SurfaceImplementationStatus = (typeof surfaceImplementationStatuses)[number];
+
+export const surfaceAuthorityPostures = ["proposal_only", "evidence_only", "setup_only", "transport_only"] as const;
+
+export type SurfaceAuthorityPosture = (typeof surfaceAuthorityPostures)[number];
+
+export const surfaceNonAuthorityFlags = [
+  "authorityCreated",
+  "credentialMaterialIncluded",
+  "gatewayCheckPerformed",
+  "greenlightCreated",
+  "mutationAttempted",
+  "mutationCommandIncluded",
+  "rawInternalRecordIncluded",
+  "receiptExportCreated",
+  "authorityCertificateMinted",
+] as const;
+
+export type SurfaceNonAuthorityFlag = (typeof surfaceNonAuthorityFlags)[number];
+
+export type SurfaceBoundary = {
+  readonly id: SurfaceId;
+  readonly status: SurfaceImplementationStatus;
+  readonly plane: SurfacePlane;
+  readonly custodyRole: SurfaceCustodyRole;
+  readonly authorityPosture: SurfaceAuthorityPosture;
+  readonly sourceRoots: readonly string[];
+  readonly allowedRouteFamilies: readonly SurfaceRouteFamily[];
+  readonly forbiddenRouteFamilies: readonly SurfaceRouteFamily[];
+  readonly allowedImportRoots: readonly string[];
+  readonly forbiddenImportFragments: readonly string[];
+  readonly forbiddenCredentialShapes: readonly string[];
+  readonly forbiddenOutputFields: readonly string[];
+  readonly requiredNonAuthorityFlags: Readonly<Partial<Record<SurfaceNonAuthorityFlag, false>>>;
+  readonly claimBoundaryLabels: readonly string[];
+};
+
+const forbiddenAuthorityRouteFamilies = [
+  "certificate_mint_write",
+  "isolation_write",
+  "policy_decision_write",
+  "raw_record_read",
+  "receipt_export_write",
+  "recovery_write",
+] as const satisfies readonly SurfaceRouteFamily[];
+
+const forbiddenAuthorityImports = [
+  "protocol/kernel",
+  "protocol/areas/policy-greenlight/guards",
+  "protocol/areas/policy-greenlight/policy",
+  "protocol/areas/policy-greenlight/policy-record",
+  "protocol/areas/policy-greenlight/sequence-dependencies",
+  "protocol/areas/policy-greenlight/transitions",
+  "protocol/areas/gateway-gate/artifacts",
+  "protocol/areas/gateway-gate/gateway-policy",
+  "protocol/areas/gateway-gate/guards",
+  "protocol/areas/gateway-gate/replay-refusal",
+  "protocol/areas/gateway-gate/transitions",
+  "protocol/areas/receipt-export/transitions",
+  "protocol/areas/authority-certificate/signing",
+  "protocol/areas/authority-certificate/transitions",
+  "storage/",
+  "adapters/x402-payment/wallet-gateway",
+  "experimental",
+] as const;
+
+const authorityCredentialShapes = [
+  "allRoles",
+  "CallerAuthTokens",
+  "transitionToken",
+  "transitionTokens",
+  "control_plane_token",
+  "gateway_custody_token",
+  "private_key",
+  "signer",
+  "wallet",
+] as const;
+
+const authorityOutputFields = [
+  "PaymentPayload",
+  "PAYMENT-SIGNATURE",
+  "authorityCertificateMint",
+  "gatewayCheckInput",
+  "mutationCommand",
+  "privateKey",
+  "rawCredentialMaterial",
+  "rawInternalRecord",
+  "receiptExport",
+  "signer",
+] as const;
+
+const cliAuthorityOutputFields = authorityOutputFields.filter((field) => !["privateKey", "signer"].includes(field));
+
+const proposalNonAuthorityFlags = {
+  authorityCreated: false,
+  authorityCertificateMinted: false,
+  credentialMaterialIncluded: false,
+  gatewayCheckPerformed: false,
+  greenlightCreated: false,
+  mutationAttempted: false,
+  mutationCommandIncluded: false,
+  rawInternalRecordIncluded: false,
+  receiptExportCreated: false,
+} as const;
+
+const evidenceNonAuthorityFlags = {
+  authorityCreated: false,
+  authorityCertificateMinted: false,
+  credentialMaterialIncluded: false,
+  gatewayCheckPerformed: false,
+  greenlightCreated: false,
+  mutationAttempted: false,
+  mutationCommandIncluded: false,
+  rawInternalRecordIncluded: false,
+  receiptExportCreated: false,
+} as const;
+
+const sharedClaimBoundaries = [
+  "local_or_self_hosted_only",
+  "no_broad_runtime_control",
+  "no_clearing_house_operation",
+  "no_cross_org_trust",
+  "no_hosted_operation",
+  "no_provider_custody",
+  "no_settlement_claim",
+] as const;
+
+export const surfaceBoundaryManifest = {
+  "sdk.runtime": {
+    id: "sdk.runtime",
+    status: "active",
+    plane: "runtime",
+    custodyRole: "runtime_evidence",
+    authorityPosture: "proposal_only",
+    sourceRoots: ["src/sdk/surface-clients/runtime-client.ts", "src/sdk/surface-clients/transport.ts"],
+    allowedRouteFamilies: ["runtime_evidence_write", "tool_call_draft_write", "action_contract_proposal_write"],
+    forbiddenRouteFamilies: [
+      ...forbiddenAuthorityRouteFamilies,
+      "bypass_probe_write",
+      "catalog_install_write",
+      "gateway_check_write",
+      "protected_path_posture_write",
+      "surface_reconciliation_write",
+    ],
+    allowedImportRoots: ["src/sdk", "src/protocol/public", "src/http/errors", "src/http/admission/request-context"],
+    forbiddenImportFragments: [...forbiddenAuthorityImports, "adapters/", "protocol/areas/gateway-gate/"],
+    forbiddenCredentialShapes: [...authorityCredentialShapes, "review_custody_token"],
+    forbiddenOutputFields: [...cliAuthorityOutputFields, "greenlightId", "greenlightRef", "gatewayCheckInput"],
+    requiredNonAuthorityFlags: proposalNonAuthorityFlags,
+    claimBoundaryLabels: [...sharedClaimBoundaries, "runtime_evidence_is_not_authority"],
+  },
+  "sdk.evidence": {
+    id: "sdk.evidence",
+    status: "active",
+    plane: "evidence",
+    custodyRole: "review_custody",
+    authorityPosture: "evidence_only",
+    sourceRoots: ["src/sdk/surface-clients/evidence-client.ts", "src/sdk/surface-clients/transport.ts"],
+    allowedRouteFamilies: ["evidence_projection_read", "install_health_read", "certificate_verify_local"],
+    forbiddenRouteFamilies: [
+      ...forbiddenAuthorityRouteFamilies,
+      "action_contract_proposal_write",
+      "bypass_probe_write",
+      "catalog_install_write",
+      "gateway_check_write",
+      "protected_path_posture_write",
+      "runtime_evidence_write",
+      "surface_reconciliation_write",
+      "tool_call_draft_write",
+    ],
+    allowedImportRoots: ["src/sdk", "src/protocol/public", "src/http/errors", "src/http/admission/request-context"],
+    forbiddenImportFragments: [...forbiddenAuthorityImports, "adapters/", "protocol/store"],
+    forbiddenCredentialShapes: [
+      ...authorityCredentialShapes.filter((shape) => shape !== "control_plane_token"),
+      "runtime_evidence_write_token",
+    ],
+    forbiddenOutputFields: [...cliAuthorityOutputFields, "downstreamSuccess"],
+    requiredNonAuthorityFlags: evidenceNonAuthorityFlags,
+    claimBoundaryLabels: [...sharedClaimBoundaries, "evidence_is_not_downstream_success"],
+  },
+  "sdk.install": {
+    id: "sdk.install",
+    status: "deferred",
+    plane: "operator",
+    custodyRole: "control_plane",
+    authorityPosture: "setup_only",
+    sourceRoots: ["src/sdk/install-client.ts", "src/sdk/install"],
+    allowedRouteFamilies: ["catalog_install_write", "install_health_read"],
+    forbiddenRouteFamilies: [
+      ...forbiddenAuthorityRouteFamilies,
+      "action_contract_proposal_write",
+      "bypass_probe_write",
+      "gateway_check_write",
+      "protected_path_posture_write",
+      "runtime_evidence_write",
+      "surface_reconciliation_write",
+      "tool_call_draft_write",
+    ],
+    allowedImportRoots: ["src/sdk", "src/protocol/public", "src/http/errors", "src/http/admission/request-context"],
+    forbiddenImportFragments: [...forbiddenAuthorityImports, "adapters/", "storage/"],
+    forbiddenCredentialShapes: [
+      "allRoles",
+      "CallerAuthTokens",
+      "gateway_custody_token",
+      "private_key",
+      "runtime_evidence_token",
+      "signer",
+      "transitionTokens",
+      "wallet",
+    ],
+    forbiddenOutputFields: authorityOutputFields,
+    requiredNonAuthorityFlags: {
+      authorityCreated: false,
+      authorityCertificateMinted: false,
+      credentialMaterialIncluded: false,
+      gatewayCheckPerformed: false,
+      mutationAttempted: false,
+      mutationCommandIncluded: false,
+      rawInternalRecordIncluded: false,
+      receiptExportCreated: false,
+    },
+    claimBoundaryLabels: [...sharedClaimBoundaries, "install_is_not_permission"],
+  },
+  "sdk.gateway": {
+    id: "sdk.gateway",
+    status: "deferred",
+    plane: "gateway",
+    custodyRole: "gateway_custody",
+    authorityPosture: "transport_only",
+    sourceRoots: ["src/sdk/gateway-client.ts", "src/sdk/gateway"],
+    allowedRouteFamilies: [
+      "bypass_probe_write",
+      "gateway_check_write",
+      "protected_path_posture_write",
+      "surface_reconciliation_write",
+    ],
+    forbiddenRouteFamilies: [
+      ...forbiddenAuthorityRouteFamilies,
+      "action_contract_proposal_write",
+      "catalog_install_write",
+      "runtime_evidence_write",
+      "tool_call_draft_write",
+    ],
+    allowedImportRoots: ["src/sdk", "src/protocol/public", "src/http/errors", "src/http/admission/request-context"],
+    forbiddenImportFragments: [
+      "adapters/x402-payment/wallet-gateway",
+      "experimental",
+      "protocol/areas/authority-certificate/signing",
+      "protocol/areas/authority-certificate/transitions",
+      "protocol/areas/policy-greenlight/",
+      "storage/",
+    ],
+    forbiddenCredentialShapes: [
+      "allRoles",
+      "CallerAuthTokens",
+      "control_plane_token",
+      "private_key",
+      "runtime_evidence_token",
+      "signer_factory",
+      "transitionTokens",
+    ],
+    forbiddenOutputFields: [
+      "PaymentPayload",
+      "PAYMENT-SIGNATURE",
+      "privateKey",
+      "rawCredentialMaterial",
+      "rawInternalRecord",
+      "signerFactory",
+    ],
+    requiredNonAuthorityFlags: {
+      authorityCertificateMinted: false,
+      credentialMaterialIncluded: false,
+      rawInternalRecordIncluded: false,
+      receiptExportCreated: false,
+    },
+    claimBoundaryLabels: [...sharedClaimBoundaries, "gateway_transport_is_not_signer_custody"],
+  },
+  "cli.operator": {
+    id: "cli.operator",
+    status: "active",
+    plane: "operator",
+    custodyRole: "control_plane",
+    authorityPosture: "setup_only",
+    sourceRoots: ["src/cli/command-manifest.ts", "src/cli/conformance.ts", "src/cli/main.ts", "src/cli/output.ts"],
+    allowedRouteFamilies: ["catalog_install_write", "install_health_read"],
+    forbiddenRouteFamilies: [
+      ...forbiddenAuthorityRouteFamilies,
+      "action_contract_proposal_write",
+      "gateway_check_write",
+      "runtime_evidence_write",
+      "surface_reconciliation_write",
+      "tool_call_draft_write",
+    ],
+    allowedImportRoots: ["src/sdk", "src/surfaces"],
+    forbiddenImportFragments: [...forbiddenAuthorityImports, "adapters/", "storage/"],
+    forbiddenCredentialShapes: [
+      "allRoles",
+      "CallerAuthTokens",
+      "gateway_custody_token",
+      "runtime_evidence_token",
+      "transitionTokens",
+    ],
+    forbiddenOutputFields: [...cliAuthorityOutputFields, "greenlightId", "greenlightRef", "gatewayCheckInput"],
+    requiredNonAuthorityFlags: proposalNonAuthorityFlags,
+    claimBoundaryLabels: [...sharedClaimBoundaries, "operator_setup_is_not_authorization"],
+  },
+  "cli.evidence": {
+    id: "cli.evidence",
+    status: "active",
+    plane: "evidence",
+    custodyRole: "review_custody",
+    authorityPosture: "evidence_only",
+    sourceRoots: [
+      "src/cli/aps-report.ts",
+      "src/cli/certificate.ts",
+      "src/cli/command-manifest.ts",
+      "src/cli/main.ts",
+      "src/cli/output.ts",
+    ],
+    allowedRouteFamilies: ["certificate_verify_local", "evidence_projection_read", "install_health_read"],
+    forbiddenRouteFamilies: [
+      ...forbiddenAuthorityRouteFamilies,
+      "action_contract_proposal_write",
+      "catalog_install_write",
+      "gateway_check_write",
+      "runtime_evidence_write",
+      "surface_reconciliation_write",
+      "tool_call_draft_write",
+    ],
+    allowedImportRoots: ["src/sdk", "src/surfaces"],
+    forbiddenImportFragments: [...forbiddenAuthorityImports, "adapters/", "storage/"],
+    forbiddenCredentialShapes: [
+      "allRoles",
+      "CallerAuthTokens",
+      "control_plane_token",
+      "gateway_custody_token",
+      "transitionTokens",
+    ],
+    forbiddenOutputFields: [...cliAuthorityOutputFields, "downstreamSuccess"],
+    requiredNonAuthorityFlags: evidenceNonAuthorityFlags,
+    claimBoundaryLabels: [...sharedClaimBoundaries, "cli_evidence_is_not_clearance"],
+  },
+  "cli.process": {
+    id: "cli.process",
+    status: "deferred",
+    plane: "process",
+    custodyRole: "none",
+    authorityPosture: "transport_only",
+    sourceRoots: ["src/cli/process"],
+    allowedRouteFamilies: ["local_process_supervision"],
+    forbiddenRouteFamilies: [
+      ...forbiddenAuthorityRouteFamilies,
+      "action_contract_proposal_write",
+      "catalog_install_write",
+      "gateway_check_write",
+      "runtime_evidence_write",
+      "surface_reconciliation_write",
+      "tool_call_draft_write",
+    ],
+    allowedImportRoots: ["src/sdk", "src/surfaces"],
+    forbiddenImportFragments: [...forbiddenAuthorityImports, "adapters/", "storage/"],
+    forbiddenCredentialShapes: [...authorityCredentialShapes],
+    forbiddenOutputFields: [...cliAuthorityOutputFields, "greenlightId", "greenlightRef", "gatewayCheckInput"],
+    requiredNonAuthorityFlags: proposalNonAuthorityFlags,
+    claimBoundaryLabels: [...sharedClaimBoundaries, "process_start_is_not_gateway_custody"],
+  },
+  "mcp.runtime": {
+    id: "mcp.runtime",
+    status: "active",
+    plane: "runtime",
+    custodyRole: "runtime_evidence",
+    authorityPosture: "proposal_only",
+    sourceRoots: ["src/mcp"],
+    allowedRouteFamilies: [
+      "action_contract_proposal_write",
+      "evidence_projection_read",
+      "install_health_read",
+      "runtime_evidence_write",
+      "tool_call_draft_write",
+    ],
+    forbiddenRouteFamilies: [
+      ...forbiddenAuthorityRouteFamilies,
+      "bypass_probe_write",
+      "catalog_install_write",
+      "gateway_check_write",
+      "protected_path_posture_write",
+      "surface_reconciliation_write",
+    ],
+    allowedImportRoots: ["src/sdk", "src/surfaces"],
+    forbiddenImportFragments: [...forbiddenAuthorityImports, "adapters/", "storage/"],
+    forbiddenCredentialShapes: [...authorityCredentialShapes, "review_custody_token"],
+    forbiddenOutputFields: [
+      ...authorityOutputFields,
+      "greenlightId",
+      "gatewayCheckInput",
+      "mutationCommand",
+      "mutationAttemptId",
+    ],
+    requiredNonAuthorityFlags: proposalNonAuthorityFlags,
+    claimBoundaryLabels: [...sharedClaimBoundaries, "tool_visibility_is_not_authorization"],
+  },
+} as const satisfies Record<SurfaceId, SurfaceBoundary>;

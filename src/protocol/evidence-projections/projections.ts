@@ -1,7 +1,8 @@
 import { digestCanonical } from "../foundation/canonical";
 import type { ActionContract } from "../areas/action-contract";
 import type { GatewayRegistryEntry } from "../areas/catalog-envelope";
-import type { GatewayCheckAttempt, MutationAttempt } from "../areas/gateway-gate";
+import type { CredentialResolutionEvidence } from "../areas/credential-custody";
+import type { GatewayCheckAttempt, MutationAttempt } from "../areas/gateway-gate/schemas";
 import {
   idempotencyLedgerKey,
   idempotencyLedgerKeyDigest,
@@ -13,11 +14,11 @@ import {
   protectedPathPostureScopeKeyForContract,
 } from "../areas/protected-path-posture";
 import type { ProtectedPathPosture } from "../areas/protected-path-posture";
-import type { Greenlight, PolicyDecision } from "../areas/policy-greenlight";
+import type { Greenlight, PolicyDecision } from "../areas/policy-greenlight/schemas";
 import type { ProofGap } from "../areas/proof-gap";
 import { protocolObjectRef, type Refusal } from "../areas/refusal";
-import type { Receipt } from "../areas/receipt-export";
-import { deriveDownstreamOutcomeStatus, deriveGatewayAdmissionStatus } from "../areas/receipt-export";
+import type { Receipt } from "../areas/receipt-export/schemas";
+import { deriveDownstreamOutcomeStatus, deriveGatewayAdmissionStatus } from "../areas/receipt-export/status";
 import type { ContractStreamEvent } from "../events/schemas";
 import type { StoredProtocolRecord } from "../store/port";
 import {
@@ -45,6 +46,7 @@ export function projectContractEvidence(contract: ActionContract): ContractEvide
     envelopeRef: contract.envelopeId,
     principalRef: contract.principalId,
     agentRef: contract.agentId,
+    participantIdentityBindings: contract.participantIdentityBindings,
     runId: contract.runId,
     runtimeAdapterRef: contract.runtimeAdapterId,
     actionClass: contract.actionClass,
@@ -56,6 +58,7 @@ export function projectContractEvidence(contract: ActionContract): ContractEvide
     idempotencyKey: contract.idempotencyKey,
     paramsDigest: contract.paramsDigest,
     nonSecretParamsSummary: contract.nonSecretParamsSummary,
+    gatewayCredentialRefs: contract.gatewayCredentialRefs,
     evidenceRefs: contract.evidenceRefs,
     clearingEvidenceRefs: contract.clearingEvidenceRefs,
     signaturePosture: contract.signaturePosture,
@@ -77,9 +80,15 @@ export async function projectAgentTransactionEnvelope(input: {
   receipt?: Receipt | null;
   proofGaps?: ProofGap[];
   refusals?: Refusal[];
+  reconciliations?: SurfaceOperationReconciliation[];
+  credentialResolutionEvidence?: CredentialResolutionEvidence[];
   ledger?: IdempotencyLedgerEntry | null;
   recoveryRefs?: string[];
   isolationRefs?: string[];
+  authorityCertificates?: Array<{
+    authorityCertificateId: string;
+    terminal: { actionContractId: string };
+  }>;
   receiptExportRef?: string | null;
 }): Promise<AgentTransactionEnvelopeProjection> {
   const proofGaps = input.proofGaps ?? [];
@@ -90,6 +99,26 @@ export async function projectAgentTransactionEnvelope(input: {
   const idempotencyReasonCodes = idempotencyRecoveryDispositionValue
     ? idempotencyRecoveryReasonCodes(idempotencyRecoveryDispositionValue)
     : [];
+  const reconciliations = scopedReconciliations(input.reconciliations ?? [], input.contract);
+  const latestReconciliation = latestReconciliationFor(reconciliations);
+  const surfaceOperationEvidenceRefs = redactedProjectionRefs(
+    reconciliations.flatMap((reconciliation) => reconciliation.evidenceRefs),
+  );
+  const credentialResolutionEvidence = scopedCredentialResolutionEvidence(
+    input.credentialResolutionEvidence ?? [],
+    input.contract,
+  );
+  const credentialResolutionEvidenceRefs = credentialResolutionEvidence
+    .map((evidence) => protocolObjectRef("credential_resolution_evidence", evidence.credentialResolutionEvidenceId))
+    .filter(unique);
+  const gatewayCredentialRefs = gatewayCredentialEvidenceRefs([
+    ...surfaceOperationEvidenceRefs,
+    ...input.contract.gatewayCredentialRefs.map((ref) =>
+      protocolObjectRef("gateway_credential_ref", ref.gatewayCredentialRefId),
+    ),
+    ...credentialResolutionEvidenceRefs,
+  ]);
+  const downstreamRefs = downstreamEvidenceRefs(surfaceOperationEvidenceRefs);
   const envelopeSeed = {
     actionContractRef: input.contract.actionContractId,
     contractDigest: input.contract.actionContractDigest,
@@ -101,6 +130,7 @@ export async function projectAgentTransactionEnvelope(input: {
     receiptRef: input.receipt?.receiptId ?? null,
     principalRef: input.contract.principalId,
     agentRef: input.contract.agentId,
+    participantIdentityBindings: input.contract.participantIdentityBindings,
     runId: input.contract.runId,
     runtimeAdapterRef: input.contract.runtimeAdapterId,
     actionClass: input.contract.actionClass,
@@ -112,6 +142,26 @@ export async function projectAgentTransactionEnvelope(input: {
     paramsDigest: input.contract.paramsDigest,
     nonSecretParamsSummary: input.contract.nonSecretParamsSummary,
     clearingEvidenceRefs: clearingEvidenceRefsJson(input.contract.clearingEvidenceRefs),
+    surfaceOperationRef:
+      latestReconciliation?.surfaceOperationRef ?? input.mutationAttempt?.surfaceOperationRef ?? null,
+    surfaceOperationReconciliationRef: latestReconciliation?.reconciliationId ?? null,
+    surfaceOperationEvidenceLabels: surfaceOperationEvidenceLabels({
+      contract: input.contract,
+      gateAttempt: input.gateAttempt ?? null,
+      latestReconciliation,
+      mutationAttempt: input.mutationAttempt ?? null,
+      surfaceOperationEvidenceRefs,
+      gatewayCredentialEvidenceRefs: gatewayCredentialRefs,
+      downstreamEvidenceRefs: downstreamRefs,
+    }),
+    surfaceOperationEvidenceRefs,
+    gatewayCredentialEvidenceRefs: gatewayCredentialRefs,
+    credentialResolutionEvidenceRefs,
+    downstreamEvidenceRefs: downstreamRefs,
+    providerRequestRef: latestReconciliation?.providerRequestRef ?? null,
+    providerOperationRef: latestReconciliation?.providerOperationRef ?? null,
+    downstreamRetryability: latestReconciliation?.downstreamRetryability ?? null,
+    reconciliationFinalityStatus: latestReconciliation?.finalityStatus ?? null,
     gatewayAdmissionStatus: agentTransactionGatewayAdmissionStatus(input),
     greenlightConsumptionStatus: input.receipt?.greenlightConsumptionStatus ?? null,
     downstreamOutcomeStatus: agentTransactionDownstreamOutcomeStatus(input),
@@ -127,12 +177,19 @@ export async function projectAgentTransactionEnvelope(input: {
     idempotencyReasonCodes,
     recoveryRefs: input.recoveryRefs ?? [],
     isolationRefs: input.isolationRefs ?? [],
+    authorityCertificateRefs: (input.authorityCertificates ?? [])
+      .filter((certificate) => certificate.terminal.actionContractId === input.contract.actionContractId)
+      .map((certificate) => certificate.authorityCertificateId)
+      .filter(unique),
     evidenceRefs: [
-      ...input.contract.evidenceRefs,
-      ...(input.receipt?.evidenceRefs ?? []),
-      ...proofGaps.flatMap((proofGap) => proofGap.affectedObjectRefs),
-      ...refusals.flatMap((refusal) => refusal.evidenceRefs),
-      ...(input.ledger?.evidenceRefs ?? []),
+      ...redactedProjectionRefs(input.contract.evidenceRefs),
+      ...redactedProjectionRefs(input.receipt?.evidenceRefs ?? []),
+      ...redactedProjectionRefs(proofGaps.flatMap((proofGap) => proofGap.affectedObjectRefs)),
+      ...redactedProjectionRefs(refusals.flatMap((refusal) => refusal.evidenceRefs)),
+      ...redactedProjectionRefs(input.ledger?.evidenceRefs ?? []),
+      ...surfaceOperationEvidenceRefs,
+      ...credentialResolutionEvidenceRefs,
+      ...redactedProjectionRefs(credentialResolutionEvidence.flatMap((evidence) => evidence.evidenceRefs)),
     ].filter(unique),
     streamOffsets: input.receipt?.streamOffsets ?? [],
     receiptDigest: input.receipt?.receiptDigest ?? null,
@@ -148,6 +205,28 @@ export async function projectAgentTransactionEnvelope(input: {
 
 function scopedRefusals(refusals: Refusal[], contract: ActionContract): Refusal[] {
   return refusals.filter((refusal) => refusal.actionContractId === contract.actionContractId);
+}
+
+function scopedReconciliations(
+  reconciliations: SurfaceOperationReconciliation[],
+  contract: ActionContract,
+): SurfaceOperationReconciliation[] {
+  return reconciliations.filter((reconciliation) => reconciliation.actionContractId === contract.actionContractId);
+}
+
+function scopedCredentialResolutionEvidence(
+  records: CredentialResolutionEvidence[],
+  contract: ActionContract,
+): CredentialResolutionEvidence[] {
+  return records.filter((record) => record.actionContractId === contract.actionContractId);
+}
+
+function latestReconciliationFor(
+  reconciliations: SurfaceOperationReconciliation[],
+): SurfaceOperationReconciliation | null {
+  return (
+    [...reconciliations].sort((left, right) => Date.parse(right.observedAt) - Date.parse(left.observedAt))[0] ?? null
+  );
 }
 
 export async function projectIdempotencyRecovery(input: {
@@ -369,4 +448,102 @@ function clearingEvidenceRefsJson(refs: {
   if (refs.obligationRef !== undefined) json.obligationRef = refs.obligationRef;
   if (refs.counterpartyRef !== undefined) json.counterpartyRef = refs.counterpartyRef;
   return json;
+}
+
+function redactedProjectionRefs(refs: readonly string[]): string[] {
+  return refs.filter((ref) => !looksLikeRawPaymentCredential(ref)).filter(unique);
+}
+
+function looksLikeRawPaymentCredential(value: string): boolean {
+  return [
+    /BEGIN\s+(?:RSA\s+|EC\s+|OPENSSH\s+)?PRIVATE KEY/i,
+    /secretref:/i,
+    /private[_-]?key/i,
+    /api[_-]?key\s*=/i,
+    /access[_-]?token\s*=/i,
+    /secret\s*=/i,
+    /password\s*=/i,
+    /vault:\/\/.*\/secret/i,
+    /infisical:\/\/.*\/secret/i,
+    /PAYMENT-SIGNATURE\s*:/,
+    /PaymentPayload/,
+    /raw_payment_signature/i,
+    /token[_-]?passthrough/i,
+    /facilitator[_-]?secret/i,
+  ].some((pattern) => pattern.test(value));
+}
+
+function gatewayCredentialEvidenceRefs(refs: readonly string[]): string[] {
+  return refs
+    .filter(
+      (ref) =>
+        (ref.startsWith("credential:") && ref.includes("payment")) ||
+        (ref.startsWith("credential:") && ref.includes("signature")) ||
+        ref.startsWith("gateway_credential_ref:") ||
+        ref.startsWith("credential_resolution_evidence:") ||
+        ref.startsWith("digest:sha256:"),
+    )
+    .filter(unique);
+}
+
+function downstreamEvidenceRefs(refs: readonly string[]): string[] {
+  return refs.filter((ref) => ref.startsWith("evidence:") && ref.includes("payment-response")).filter(unique);
+}
+
+function surfaceOperationEvidenceLabels(input: {
+  contract: ActionContract;
+  gateAttempt: GatewayCheckAttempt | null;
+  latestReconciliation: SurfaceOperationReconciliation | null;
+  mutationAttempt: MutationAttempt | null;
+  surfaceOperationEvidenceRefs: readonly string[];
+  gatewayCredentialEvidenceRefs: readonly string[];
+  downstreamEvidenceRefs: readonly string[];
+}): string[] {
+  const labels: string[] = [];
+  if (input.gateAttempt) labels.push("local_gateway_check");
+  if (input.gatewayCredentialEvidenceRefs.length > 0) {
+    labels.push(
+      hasPaymentCredentialEvidence(input.surfaceOperationEvidenceRefs)
+        ? "payment_payload_created"
+        : "gateway_credential_evidence",
+    );
+  }
+  if (input.mutationAttempt && input.latestReconciliation) labels.push("paid_retry_attempted");
+  if (input.downstreamEvidenceRefs.length > 0) {
+    labels.push("payment_response_received");
+  } else if (input.latestReconciliation?.observedDownstreamStatus === "unknown") {
+    labels.push("payment_response_missing");
+  }
+  labels.push(...facilitatorEvidenceLabels(input.surfaceOperationEvidenceRefs));
+  return labels.filter(unique);
+}
+
+function hasPaymentCredentialEvidence(refs: readonly string[]): boolean {
+  return refs.some((ref) => /payment/i.test(ref));
+}
+
+function facilitatorEvidenceLabels(refs: readonly string[]): string[] {
+  const labels: string[] = [];
+  if (refs.some((ref) => ref.startsWith("evidence:") && ref.includes("facilitator-verify:attempt"))) {
+    labels.push("facilitator_verify_attempted");
+  }
+  if (refs.some((ref) => ref.startsWith("evidence:") && ref.includes("facilitator-verify:succeeded"))) {
+    labels.push("facilitator_verify_succeeded");
+  }
+  if (refs.some((ref) => ref.startsWith("evidence:") && ref.includes("facilitator-verify:failed"))) {
+    labels.push("facilitator_verify_failed");
+  }
+  if (refs.some((ref) => ref.startsWith("evidence:") && ref.includes("facilitator-settle:attempt"))) {
+    labels.push("facilitator_settle_attempted");
+  }
+  if (refs.some((ref) => ref.startsWith("evidence:") && ref.includes("settlement:succeeded"))) {
+    labels.push("settlement_succeeded");
+  }
+  if (refs.some((ref) => ref.startsWith("evidence:") && ref.includes("settlement:failed"))) {
+    labels.push("settlement_failed");
+  }
+  if (refs.some((ref) => ref.startsWith("evidence:") && ref.includes("settlement:unknown"))) {
+    labels.push("settlement_unknown");
+  }
+  return labels;
 }

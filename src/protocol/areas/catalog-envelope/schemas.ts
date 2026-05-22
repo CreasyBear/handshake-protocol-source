@@ -1,5 +1,11 @@
 import { z } from "zod";
-import { IdSchema, IsoDateSchema, ProtocolBaseSchema, ResourceRefSchema } from "../../foundation/schema-core";
+import {
+  DigestSchema,
+  IdSchema,
+  IsoDateSchema,
+  ProtocolBaseSchema,
+  ResourceRefSchema,
+} from "../../foundation/schema-core";
 
 export const RequiredProtectedPathStateSchema = z.enum(["not_required", "gateway_checked"]);
 export type RequiredProtectedPathState = z.infer<typeof RequiredProtectedPathStateSchema>;
@@ -7,6 +13,11 @@ export type RequiredProtectedPathState = z.infer<typeof RequiredProtectedPathSta
 export const CredentialCustodyStatusSchema = z.enum([
   "gateway_held",
   "fixture_gateway_held",
+  "gateway_resolved_from_vault",
+  "provider_gateway_held",
+  "unknown",
+  "unsafe_agent_visible",
+  "unsafe_runtime_visible",
   "agent_has_raw_credential",
   "shared_or_unknown",
   "no_mutation_credential",
@@ -21,6 +32,34 @@ export const GatewayEnforcementModeSchema = z.enum([
   "unknown",
 ]);
 export type GatewayEnforcementMode = z.infer<typeof GatewayEnforcementModeSchema>;
+
+export const ParticipantIdentityRoleSchema = z.enum(["principal", "agent"]);
+export type ParticipantIdentityRole = z.infer<typeof ParticipantIdentityRoleSchema>;
+
+export const ParticipantIdentityBindingSchema = z
+  .strictObject({
+    participantRole: ParticipantIdentityRoleSchema,
+    participantRef: IdSchema,
+    identityProviderRef: ResourceRefSchema,
+    subjectRef: ResourceRefSchema.nullable().default(null),
+    subjectDigest: DigestSchema.nullable().default(null),
+    claimsDigest: DigestSchema.nullable().default(null),
+    verificationEvidenceRef: ResourceRefSchema,
+    bindingEvidenceRef: ResourceRefSchema.nullable().default(null),
+    issuedAt: IsoDateSchema.nullable().default(null),
+    expiresAt: IsoDateSchema.nullable().default(null),
+    authorityPosture: z.literal("evidence_only").default("evidence_only"),
+  })
+  .superRefine((binding, ctx) => {
+    if (!binding.subjectRef && !binding.subjectDigest) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["subjectRef"],
+        message: "Participant identity bindings require either subjectRef or subjectDigest.",
+      });
+    }
+  });
+export type ParticipantIdentityBinding = z.infer<typeof ParticipantIdentityBindingSchema>;
 
 export const ToolCapabilitySchema = ProtocolBaseSchema.extend({
   toolCapabilityId: IdSchema,
@@ -87,6 +126,7 @@ export const OperatingEnvelopeSchema = ProtocolBaseSchema.extend({
   envelopeId: IdSchema,
   principalId: IdSchema,
   agentId: IdSchema,
+  participantIdentityBindings: z.array(ParticipantIdentityBindingSchema).default([]),
   objectiveRef: z.string().min(1),
   allowedActionClasses: z.array(z.string().min(1)),
   allowedGateways: z.array(IdSchema),
@@ -98,5 +138,16 @@ export const OperatingEnvelopeSchema = ProtocolBaseSchema.extend({
   issuedAt: IsoDateSchema,
   expiresAt: IsoDateSchema,
   revokedAt: IsoDateSchema.nullable(),
+}).superRefine((envelope, ctx) => {
+  for (const [index, binding] of envelope.participantIdentityBindings.entries()) {
+    const expectedParticipantRef = binding.participantRole === "principal" ? envelope.principalId : envelope.agentId;
+    if (binding.participantRef !== expectedParticipantRef) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["participantIdentityBindings", index, "participantRef"],
+        message: `${binding.participantRole} identity binding must match the envelope participant ref.`,
+      });
+    }
+  }
 });
 export type OperatingEnvelope = z.infer<typeof OperatingEnvelopeSchema>;

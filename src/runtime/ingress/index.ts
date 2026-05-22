@@ -13,7 +13,7 @@ import type {
   ToolCallDraft,
   TransitionToolCallDraftInput,
 } from "../../protocol/areas/tool-call-draft";
-import { digestCanonical } from "../../protocol/foundation/canonical";
+import { digestCanonical, protectedActionParamsDigest } from "../../protocol/foundation/canonical";
 import type { JsonValue } from "../../protocol/foundation/schema-core";
 import {
   buildPackageInstallCompileIntentInput,
@@ -52,9 +52,35 @@ const X402PaymentDispatchParameterFields = {
   network: z.string().min(1),
   token: z.string().min(1),
   atomicAmount: z.string().regex(/^(?:0|[1-9]\d*)$/),
+  x402EvidenceProfile: z.enum(["official_payment_required", "local_digest_profile"]).default("local_digest_profile"),
   paymentRequirementsDigest: z.string().regex(/^sha256:[a-f0-9]{64}$/),
   paymentRequiredEvidenceRef: z.string().min(1).optional(),
   facilitatorRef: z.string().min(1).nullable().default(null),
+  intendedHttpMethod: z.string().min(1).nullable().default(null),
+  intendedRequestUrl: z.string().url().nullable().default(null),
+  intendedRequestBodyDigest: z
+    .string()
+    .regex(/^sha256:[a-f0-9]{64}$/)
+    .nullable()
+    .default(null),
+  selectedHeadersDigest: z
+    .string()
+    .regex(/^sha256:[a-f0-9]{64}$/)
+    .nullable()
+    .default(null),
+  x402Version: z.number().int().positive().nullable().default(null),
+  x402Scheme: z.string().min(1).nullable().default(null),
+  asset: z.string().min(1).nullable().default(null),
+  payTo: z.string().min(1).nullable().default(null),
+  maxTimeoutSeconds: z.number().positive().nullable().default(null),
+  selectedPaymentRequirementDigest: z
+    .string()
+    .regex(/^sha256:[a-f0-9]{64}$/)
+    .nullable()
+    .default(null),
+  selectedPaymentRequirementIndex: z.number().int().nonnegative().nullable().default(null),
+  sdkPackageVersions: z.record(z.string(), z.string().min(1)).default({}),
+  extensionKeys: z.array(z.string().min(1)).default([]),
 } as const;
 
 const RuntimeIngressDispatchCommonFields = {
@@ -294,11 +320,7 @@ async function buildRuntimeIngressExecutionInput(
     accessPosture: "controlled_outbound",
     uncertaintyMarkers: [],
     refusalReasonCodes: [],
-    evidenceRefs: unique([
-      block.dispatchBoundaryRef,
-      ...block.evidenceRefs,
-      ...block.dispatches.flatMap((d) => d.evidenceRefs),
-    ]),
+    evidenceRefs: runtimeIngressEvidenceRefs(block),
   };
 }
 
@@ -382,10 +404,11 @@ async function buildRuntimeIngressGraphNode(
     generatedExecutionGraphId: "generated_execution_graph_pending",
   });
   const candidate = compileInput.candidate;
-  const paramsDigest = await digestCanonical({
+  const paramsDigest = await protectedActionParamsDigest({
     parameters: candidate.parameters,
     secretRefs: candidate.secretRefs,
-  } as JsonValue);
+    gatewayCredentialRefs: candidate.gatewayCredentialRefs,
+  });
   const classification = nodeClassificationForDispatch(dispatch);
   const nodeGatewayBindingDigest =
     classification === "candidate_action_eligible"
@@ -548,12 +571,39 @@ function x402PaymentAttemptForDispatch(
     network: dispatch.network,
     token: dispatch.token,
     atomicAmount: dispatch.atomicAmount,
+    x402EvidenceProfile: dispatch.x402EvidenceProfile,
     paymentRequirementsDigest: dispatch.paymentRequirementsDigest,
     paymentRequiredEvidenceRef: dispatch.paymentRequiredEvidenceRef,
     facilitatorRef: dispatch.facilitatorRef,
+    intendedHttpMethod: dispatch.intendedHttpMethod,
+    intendedRequestUrl: dispatch.intendedRequestUrl,
+    intendedRequestBodyDigest: dispatch.intendedRequestBodyDigest,
+    selectedHeadersDigest: dispatch.selectedHeadersDigest,
+    x402Version: dispatch.x402Version,
+    x402Scheme: dispatch.x402Scheme,
+    asset: dispatch.asset,
+    payTo: dispatch.payTo,
+    maxTimeoutSeconds: dispatch.maxTimeoutSeconds,
+    selectedPaymentRequirementIndex: dispatch.selectedPaymentRequirementIndex,
+    selectedPaymentRequirementDigest: dispatch.selectedPaymentRequirementDigest,
+    sdkPackageVersions: dispatch.sdkPackageVersions,
+    extensionKeys: dispatch.extensionKeys,
     sequenceNumber,
     requiredPriorActionContractIds,
   };
+}
+
+function runtimeIngressEvidenceRefs(block: ParsedRuntimeIngressDispatchBlock): string[] {
+  return unique(
+    [
+      block.dispatchBoundaryRef,
+      ...block.evidenceRefs,
+      ...block.dispatches.flatMap((dispatch) => [
+        ...dispatch.evidenceRefs,
+        isX402PaymentDispatch(dispatch) ? dispatch.paymentRequiredEvidenceRef : null,
+      ]),
+    ].filter((value): value is string => Boolean(value)),
+  );
 }
 
 async function createFinalizedToolCallDraft(
@@ -572,6 +622,7 @@ async function createFinalizedToolCallDraft(
     actionClass: compileInput.candidate.actionClass,
     gatewayId: compileInput.candidate.gatewayId,
     resourceRef: compileInput.candidate.resourceRef,
+    gatewayCredentialRefs: compileInput.candidate.gatewayCredentialRefs,
     expiresAt: compileInput.candidate.expiresAt,
     evidenceRefs: compileInput.requiredEvidenceRefs,
   });
@@ -581,6 +632,7 @@ async function createFinalizedToolCallDraft(
     parameters: compileInput.candidate.parameters,
     nonSecretParamsSummary: compileInput.candidate.nonSecretParamsSummary,
     secretRefs: compileInput.candidate.secretRefs,
+    gatewayCredentialRefs: compileInput.candidate.gatewayCredentialRefs,
     finalizedAt: new Date().toISOString(),
     expiresAt: compileInput.candidate.expiresAt,
     evidenceRefs: compileInput.requiredEvidenceRefs,
@@ -638,6 +690,10 @@ function isPackageInstallDispatch(
   dispatch: ParsedRuntimeIngressObservedDispatch,
 ): dispatch is ParsedPackageInstallDispatch {
   return dispatch.dispatchKind.endsWith("_package_install");
+}
+
+function isX402PaymentDispatch(dispatch: ParsedRuntimeIngressObservedDispatch): dispatch is ParsedX402PaymentDispatch {
+  return dispatch.dispatchKind.endsWith("_x402_payment");
 }
 
 function isRawSiblingDispatch(

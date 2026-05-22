@@ -1,6 +1,7 @@
 export * from "../areas/runtime-evidence/inputs";
 export * from "../areas/generated-execution-graph/inputs";
 export * from "../areas/bypass-probe/inputs";
+export * from "../areas/credential-custody/inputs";
 export * from "../areas/tool-call-draft/inputs";
 export * from "../areas/protected-path-posture/inputs";
 export * from "../areas/review-binding/inputs";

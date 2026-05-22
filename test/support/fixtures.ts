@@ -111,6 +111,7 @@ export function makeKernelFixture() {
     envelopeId: "env_demo",
     principalId: "principal_demo",
     agentId: "agent_demo",
+    participantIdentityBindings: [],
     objectiveRef: "intent:install-approved-package",
     allowedActionClasses: ["package.install"],
     allowedGateways: ["gateway_package_manager"],

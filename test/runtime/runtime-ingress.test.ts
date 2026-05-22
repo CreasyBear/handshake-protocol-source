@@ -6,11 +6,22 @@ import {
 } from "../../src/adapters/x402-payment/install-proposal";
 import type { ProtocolObjectType, ProtocolStore } from "../../src/protocol/store/port";
 import { nowIso } from "../../src/protocol/foundation/ids";
-import { proposeRuntimeIngressActionContracts, runtimeIngressDispatchNodeId } from "../../src/runtime";
+import {
+  proposeRuntimeIngressActionContracts,
+  runtimeIngressDispatchNodeId,
+  type RuntimeIngressObservedDispatch,
+} from "../../src/runtime";
 import { futureIso, makeKernelFixture, registerFixtureObjects } from "../support/fixtures";
 import { packageInstallRuntimeConfig } from "../support/package-install-flow";
 
 const x402Digest = `sha256:${"9".repeat(64)}` as const;
+const x402SelectedHeadersDigest = `sha256:${"8".repeat(64)}` as const;
+const x402SelectedPaymentRequirementDigest = `sha256:${"7".repeat(64)}` as const;
+const x402SdkPackageVersions = {
+  "@x402/core": "2.12.0",
+  "@x402/evm": "2.12.0",
+  "@x402/fetch": "2.12.0",
+} as const;
 
 describe("runtime ingress adapter", () => {
   it("observes supported dispatch and proposes a contract without policy or gateway authority", async () => {
@@ -241,19 +252,7 @@ describe("runtime ingress adapter", () => {
         principalIntentRef: "intent:fetch paid context through x402",
         generatedCodeOrSpecRef: "runtime:dispatch-block-x402",
         dispatchBoundaryRef: "dispatch-boundary:x402-fetch",
-        dispatches: [
-          {
-            dispatchKind: "wrapped_x402_payment",
-            dispatchRef: "dispatch:x402-payment:1",
-            endpointUrl: proposal.endpointEvidence.endpointUrl,
-            payee: proposal.endpointEvidence.payee,
-            network: proposal.endpointEvidence.network,
-            token: proposal.endpointEvidence.token,
-            atomicAmount: "2500",
-            paymentRequirementsDigest: proposal.endpointEvidence.paymentRequirementsDigest,
-            paymentRequiredEvidenceRef: "evidence:x402-payment-required",
-          },
-        ],
+        dispatches: [x402Dispatch(proposal, "dispatch:x402-payment:1", upstreamX402DispatchBinding(proposal))],
       },
     );
 
@@ -269,14 +268,28 @@ describe("runtime ingress adapter", () => {
       network: "base-sepolia",
       token: "USDC",
       atomicAmount: "2500",
+      intendedHttpMethod: "GET",
+      intendedRequestUrl: proposal.endpointEvidence.endpointUrl,
+      intendedRequestBodyDigest: null,
+      selectedHeadersDigest: x402SelectedHeadersDigest,
+      x402Version: 2,
+      x402Scheme: "exact",
+      asset: "USDC",
+      payTo: "0xpayee",
+      maxTimeoutSeconds: 60,
+      selectedPaymentRequirementDigest: x402SelectedPaymentRequirementDigest,
+      sdkPackageVersions: x402SdkPackageVersions,
+      extensionKeys: ["payment-identifier"],
     });
+    expect(result.runtimeExecution.evidenceRefs).toContain("evidence:x402-payment-required");
+    expect(result.proposals[0]?.toolCallDraft.evidenceRefs).toContain("evidence:x402-payment-required");
+    expect(JSON.stringify(result)).not.toContain("PAYMENT-SIGNATURE");
+    expect(JSON.stringify(result)).not.toContain("PaymentPayload");
     expect(await recordCount(fixture.store, "runtime_execution")).toBe(1);
     expect(await recordCount(fixture.store, "generated_execution_graph")).toBe(1);
     expect(await recordCount(fixture.store, "tool_call_draft")).toBe(1);
     expect(await recordCount(fixture.store, "action_contract")).toBe(1);
-    expect(await recordCount(fixture.store, "greenlight")).toBe(0);
-    expect(await recordCount(fixture.store, "gateway_check_attempt")).toBe(0);
-    expect(await recordCount(fixture.store, "mutation_attempt")).toBe(0);
+    await expectNoRuntimeAuthorityRecords(fixture.store);
   });
 
   it("refuses dynamic x402 payment dispatch before contract proposal", async () => {
@@ -314,7 +327,46 @@ describe("runtime ingress adapter", () => {
     expect(proposalResult.refusalReasonCodes).toContain("runtime_unobserved_regions_present");
     expect(proposalResult.refusalReasonCodes).toContain("generated_execution_graph_not_contractable");
     expect(await recordCount(fixture.store, "action_contract")).toBe(0);
-    expect(await recordCount(fixture.store, "greenlight")).toBe(0);
+    await expectNoRuntimeAuthorityRecords(fixture.store);
+  });
+
+  it("refuses ambiguous x402 payment dispatch as unknown consequential behavior", async () => {
+    const { fixture, runtimeConfig, proposal } = await installedX402IngressFixture();
+
+    const result = await proposeRuntimeIngressActionContracts(
+      fixture.kernel,
+      { x402Payment: runtimeConfig },
+      {
+        principalIntentRef: "intent:pay through unresolved x402 helper",
+        generatedCodeOrSpecRef: "runtime:dispatch-block-x402-ambiguous",
+        dispatchBoundaryRef: "dispatch-boundary:x402-ambiguous",
+        dispatches: [
+          {
+            dispatchKind: "ambiguous_x402_payment",
+            dispatchRef: "dispatch:x402-payment:ambiguous",
+            ambiguousReasonCodes: ["runtime_ingress_unknown_consequential_dispatch"],
+            endpointUrl: proposal.endpointEvidence.endpointUrl,
+            payee: proposal.endpointEvidence.payee,
+            network: proposal.endpointEvidence.network,
+            token: proposal.endpointEvidence.token,
+            atomicAmount: "2500",
+            paymentRequirementsDigest: proposal.endpointEvidence.paymentRequirementsDigest,
+          },
+        ],
+      },
+    );
+
+    expect(result.outcome).toBe("one_or_more_dispatches_refused");
+    expect(result.generatedExecutionGraph.coverageStatus).toBe("unsupported_or_ambiguous");
+    expect(result.generatedExecutionGraph.nodes[0]?.unsupportedReasonCodes).toContain(
+      "runtime_ingress_unknown_consequential_dispatch",
+    );
+    const proposalResult = result.proposals[0];
+    if (!proposalResult || proposalResult.outcome !== "intent_compilation_refused") throw new Error("expected refusal");
+    expect(proposalResult.refusalReasonCodes).toContain("generated_execution_graph_not_contractable");
+    expect(proposalResult.refusalReasonCodes).toContain("generated_execution_node_not_contractable");
+    expect(await recordCount(fixture.store, "action_contract")).toBe(0);
+    await expectNoRuntimeAuthorityRecords(fixture.store);
   });
 
   it("records raw sibling x402 payment bypass evidence without gateway-checked posture", async () => {
@@ -352,8 +404,45 @@ describe("runtime ingress adapter", () => {
     expect(proposalResult.refusalReasonCodes).toContain("generated_execution_graph_not_contractable");
     expect(await recordCount(fixture.store, "action_contract")).toBe(0);
     expect(await recordCount(fixture.store, "protected_path_posture")).toBe(0);
-    expect(await recordCount(fixture.store, "gateway_check_attempt")).toBe(0);
-    expect(await recordCount(fixture.store, "mutation_attempt")).toBe(0);
+    await expectNoRuntimeAuthorityRecords(fixture.store);
+  });
+
+  it("records direct MCP x402 mutation attempts as bypass evidence", async () => {
+    const { fixture, runtimeConfig, proposal } = await installedX402IngressFixture();
+
+    const result = await proposeRuntimeIngressActionContracts(
+      fixture.kernel,
+      { x402Payment: runtimeConfig },
+      {
+        principalIntentRef: "intent:pay through direct MCP route",
+        generatedCodeOrSpecRef: "runtime:dispatch-block-x402-direct-mcp",
+        dispatchBoundaryRef: "dispatch-boundary:x402-direct-mcp",
+        dispatches: [
+          {
+            dispatchKind: "raw_sibling_x402_payment",
+            dispatchRef: "dispatch:x402-payment:mcp-direct",
+            rawCommandRef: "mcp:x402.directPayment",
+            rawCommandSummary: ["mcp.invoke", "x402.directPayment", "https://api.example.com/mcp/premium-context"],
+            endpointUrl: proposal.endpointEvidence.endpointUrl,
+            payee: proposal.endpointEvidence.payee,
+            network: proposal.endpointEvidence.network,
+            token: proposal.endpointEvidence.token,
+            atomicAmount: "2500",
+            paymentRequirementsDigest: proposal.endpointEvidence.paymentRequirementsDigest,
+          },
+        ],
+      },
+    );
+
+    expect(result.outcome).toBe("one_or_more_dispatches_refused");
+    expect(result.generatedExecutionGraph.coverageStatus).toBe("contains_bypass_risk");
+    expect(result.generatedExecutionGraph.nodes[0]?.commandRiskBypassRefs).toContain("mcp:x402.directPayment");
+    expect(result.generatedExecutionGraph.terminalReasonCodes).toContain("runtime_ingress_raw_sibling_bypass");
+    const proposalResult = result.proposals[0];
+    if (!proposalResult || proposalResult.outcome !== "intent_compilation_refused") throw new Error("expected refusal");
+    expect(proposalResult.refusalReasonCodes).toContain("generated_execution_graph_not_contractable");
+    expect(await recordCount(fixture.store, "action_contract")).toBe(0);
+    await expectNoRuntimeAuthorityRecords(fixture.store);
   });
 
   it("records x402 retry attempts with distinct sequence and idempotency evidence", async () => {
@@ -389,7 +478,42 @@ describe("runtime ingress adapter", () => {
     expect(second.idempotencyKey).not.toBe(first.idempotencyKey);
     expect(second.requiredPriorActionContractIds).toEqual([first.actionContractId]);
     expect(await recordCount(fixture.store, "action_contract")).toBe(2);
-    expect(await recordCount(fixture.store, "greenlight")).toBe(0);
+    await expectNoRuntimeAuthorityRecords(fixture.store);
+  });
+
+  it("records changed-parameter x402 retries as separate per-call attempts, not aggregate spend authority", async () => {
+    const { fixture, runtimeConfig, proposal } = await installedX402IngressFixture();
+
+    const result = await proposeRuntimeIngressActionContracts(
+      fixture.kernel,
+      { x402Payment: runtimeConfig },
+      {
+        principalIntentRef: "intent:retry x402 payment with changed amount",
+        generatedCodeOrSpecRef: "runtime:dispatch-block-x402-changed-retry",
+        dispatchBoundaryRef: "dispatch-boundary:x402-changed-retry",
+        dispatches: [
+          x402Dispatch(proposal, "dispatch:x402-payment:changed-1", { atomicAmount: "2000" }),
+          x402Dispatch(proposal, "dispatch:x402-payment:changed-2", {
+            atomicAmount: "2500",
+            retryOfDispatchRef: "dispatch:x402-payment:changed-1",
+            loopIteration: 1,
+          }),
+        ],
+      },
+    );
+
+    expect(result.outcome).toBe("action_contracts_proposed");
+    expect(result.runtimeExecution.loopDetected).toBe(true);
+    expect(result.runtimeExecution.retryDetected).toBe(true);
+    const first = result.proposals[0]?.actionContract;
+    const second = result.proposals[1]?.actionContract;
+    if (!first || !second) throw new Error("expected two x402 contracts");
+    expect(first.parameters).toMatchObject({ atomicAmount: "2000" });
+    expect(second.parameters).toMatchObject({ atomicAmount: "2500" });
+    expect(second.idempotencyKey).not.toBe(first.idempotencyKey);
+    expect(second.requiredPriorActionContractIds).toEqual([first.actionContractId]);
+    expect(await recordCount(fixture.store, "action_contract")).toBe(2);
+    await expectNoRuntimeAuthorityRecords(fixture.store);
   });
 
   it("turns truncated x402 graph coverage into refusal", async () => {
@@ -414,11 +538,25 @@ describe("runtime ingress adapter", () => {
     if (!proposalResult || proposalResult.outcome !== "intent_compilation_refused") throw new Error("expected refusal");
     expect(proposalResult.refusalReasonCodes).toContain("generated_execution_graph_not_contractable");
     expect(await recordCount(fixture.store, "action_contract")).toBe(0);
+    await expectNoRuntimeAuthorityRecords(fixture.store);
   });
 });
 
 async function recordCount(store: ProtocolStore, objectType: ProtocolObjectType): Promise<number> {
   return (await store.listRecordsByType(objectType)).length;
+}
+
+async function expectNoRuntimeAuthorityRecords(store: ProtocolStore): Promise<void> {
+  for (const objectType of [
+    "policy_decision",
+    "greenlight",
+    "gateway_check_attempt",
+    "mutation_attempt",
+    "receipt",
+    "authority_certificate",
+  ] as const) {
+    expect(await recordCount(store, objectType)).toBe(0);
+  }
 }
 
 async function installedX402IngressFixture() {
@@ -458,7 +596,13 @@ async function installedX402IngressFixture() {
   };
 }
 
-function x402Dispatch(proposal: X402InstallProposal, dispatchRef: string) {
+type WrappedX402Dispatch = Extract<RuntimeIngressObservedDispatch, { dispatchKind: "wrapped_x402_payment" }>;
+
+function x402Dispatch(
+  proposal: X402InstallProposal,
+  dispatchRef: string,
+  overrides: Partial<WrappedX402Dispatch> = {},
+): WrappedX402Dispatch {
   return {
     dispatchKind: "wrapped_x402_payment" as const,
     dispatchRef,
@@ -469,6 +613,25 @@ function x402Dispatch(proposal: X402InstallProposal, dispatchRef: string) {
     atomicAmount: "2500",
     paymentRequirementsDigest: proposal.endpointEvidence.paymentRequirementsDigest,
     paymentRequiredEvidenceRef: "evidence:x402-payment-required",
+    ...overrides,
+  };
+}
+
+function upstreamX402DispatchBinding(proposal: X402InstallProposal): Partial<WrappedX402Dispatch> {
+  return {
+    intendedHttpMethod: "GET",
+    intendedRequestUrl: proposal.endpointEvidence.endpointUrl,
+    intendedRequestBodyDigest: null,
+    selectedHeadersDigest: x402SelectedHeadersDigest,
+    x402Version: 2,
+    x402Scheme: "exact",
+    asset: proposal.endpointEvidence.token,
+    payTo: proposal.endpointEvidence.payee,
+    maxTimeoutSeconds: 60,
+    selectedPaymentRequirementDigest: x402SelectedPaymentRequirementDigest,
+    sdkPackageVersions: x402SdkPackageVersions,
+    extensionKeys: ["payment-identifier"],
+    evidenceRefs: ["evidence:x402-payment-required"],
   };
 }
 

@@ -7,6 +7,7 @@ import {
   OperatingEnvelopeSchema,
   ToolCapabilitySchema,
 } from "../catalog-envelope/schemas";
+import { CredentialResolutionEvidenceSchema, GatewayCredentialRefSchema } from "../credential-custody/schemas";
 import { ContractStreamEventSchema } from "../../events/schemas";
 import { GatewayCheckAttemptSchema, MutationAttemptSchema } from "../gateway-gate/schemas";
 import { GeneratedExecutionGraphSchema } from "../generated-execution-graph/schemas";
@@ -34,6 +35,8 @@ export const ProtocolObjectTypeSchema = z.enum([
   "action_type",
   "gateway_registry_entry",
   "operating_envelope",
+  "gateway_credential_ref",
+  "credential_resolution_evidence",
   "transition_request_context",
   "runtime_execution",
   "generated_execution_graph",
@@ -69,6 +72,11 @@ export const ProtocolRecordSchema = z.discriminatedUnion("objectType", [
   z.strictObject({ objectType: z.literal("action_type"), payload: ActionTypeSchema }),
   z.strictObject({ objectType: z.literal("gateway_registry_entry"), payload: GatewayRegistryEntrySchema }),
   z.strictObject({ objectType: z.literal("operating_envelope"), payload: OperatingEnvelopeSchema }),
+  z.strictObject({ objectType: z.literal("gateway_credential_ref"), payload: GatewayCredentialRefSchema }),
+  z.strictObject({
+    objectType: z.literal("credential_resolution_evidence"),
+    payload: CredentialResolutionEvidenceSchema,
+  }),
   z.strictObject({ objectType: z.literal("transition_request_context"), payload: TransitionRequestContextSchema }),
   z.strictObject({ objectType: z.literal("runtime_execution"), payload: RuntimeExecutionRecordSchema }),
   z.strictObject({ objectType: z.literal("generated_execution_graph"), payload: GeneratedExecutionGraphSchema }),

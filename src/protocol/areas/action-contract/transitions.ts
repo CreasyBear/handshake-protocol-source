@@ -1,4 +1,4 @@
-import { digestCanonical } from "../../foundation/canonical";
+import { protectedActionParamsDigest } from "../../foundation/canonical";
 import type { ActionType, GatewayRegistryEntry, OperatingEnvelope, ToolCapability } from "../catalog-envelope";
 import { HandshakeProtocolError } from "../../foundation/errors";
 import { actionLifecycleStreamRefs } from "../../events/chains";
@@ -6,6 +6,7 @@ import type { GeneratedExecutionGraph } from "../generated-execution-graph";
 import type { CandidateAction, IntentCompilationRecord } from "../intent-compilation";
 import { ProposeActionContractInputSchema, type ProposeActionContractInput } from "./types";
 import type { ProtocolRecorder } from "../../events/records";
+import { evaluateGatewayCredentialBindings } from "../credential-custody";
 import { loadRecoveryActionLinkage } from "../recovery";
 import type { RuntimeExecutionRecord } from "../runtime-evidence";
 import {
@@ -17,7 +18,7 @@ import {
 import type { ActionContract, JsonValue } from "./types";
 import { guardActionProposal } from "./guards";
 import type { TransitionGuardResult } from "../../foundation/transition-guards";
-import type { StoredProtocolRecord } from "../../store/port";
+import type { ProtocolStore, StoredProtocolRecord } from "../../store/port";
 import { buildActionContractRecord } from "./contract-record";
 
 type ParsedProposeActionContractInput = ReturnType<typeof ProposeActionContractInputSchema.parse>;
@@ -49,6 +50,7 @@ type ActionContractCommitPlan = ActionContractBuildPlan & {
 };
 
 export async function proposeActionContract(
+  store: ProtocolStore,
   recorder: ProtocolRecorder,
   inputValue: ProposeActionContractInput,
 ): Promise<ActionContract> {
@@ -56,9 +58,17 @@ export async function proposeActionContract(
   const context = await getActionContractProposalContext(recorder, input);
   await assertActionContractProposalContext(context);
   const buildPlan = await buildActionContractPlan(input, context);
+  await assertGatewayCredentialBindings(store, buildPlan.contract);
   const commitPlan = await buildActionContractCommitPlan(buildPlan);
   await commitActionContractPlan(recorder, commitPlan);
   return buildPlan.contract;
+}
+
+async function assertGatewayCredentialBindings(store: ProtocolStore, contract: ActionContract): Promise<void> {
+  const evaluation = await evaluateGatewayCredentialBindings(store, contract, contract.issuedAt);
+  if (!evaluation.ok) {
+    throw new HandshakeProtocolError(evaluation.reasonCode, evaluation.reason, 409);
+  }
 }
 
 async function getActionContractProposalContext(
@@ -126,9 +136,10 @@ async function assertActionContractProposalContext(context: ActionContractPropos
   assertPinnedDigest("action_type", actionTypeRecord.canonicalDigest, candidate.actionTypeDigest);
   assertRuntimeExecutionPinned(candidate, context.runtimeExecutionRecord);
   assertGeneratedExecutionGraphRecordPinned(candidate, context.generatedExecutionGraphRecord);
-  const recomputedParamsDigest = await digestCanonical({
+  const recomputedParamsDigest = await protectedActionParamsDigest({
     parameters: candidate.parameters,
     secretRefs: candidate.secretRefs,
+    gatewayCredentialRefs: candidate.gatewayCredentialRefs,
   });
   if (recomputedParamsDigest !== candidate.paramsDigest) {
     throw new HandshakeProtocolError(

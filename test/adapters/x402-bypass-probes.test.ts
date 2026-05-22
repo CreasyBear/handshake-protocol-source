@@ -65,6 +65,75 @@ describe("x402 hostile bypass probe executors", () => {
     expect(policy.greenlight).toBeNull();
   });
 
+  it("records official SDK signer side channels as raw sibling bypass evidence", async () => {
+    const fixture = await createX402PolicyFixture("gateway_held");
+    const probes = await runX402HostileProbes(fixture, {
+      ...safePosture(),
+      rawPrivateKeyEnvStatus: "present",
+      directCoreClientSigningStatus: "present",
+      paidFetchClientStatus: "present",
+      rawPaymentSignatureHeaderStatus: "present",
+      siblingX402WrapperStatus: "present",
+    });
+    await recordX402Posture(fixture, probes, "gateway_held", "gateway_probe");
+
+    const rawSiblingProbe = probes.find((probe) => probe.probeKind === "raw_sibling_blocking");
+    expect(rawSiblingProbe?.probeOutcome).toBe("failed");
+    expect(rawSiblingProbe?.evidenceRefs.sort()).toEqual([
+      "evidence:x402-hostile-probe:raw_sibling_blocking:direct_core_client_signing_present_reachable",
+      "evidence:x402-hostile-probe:raw_sibling_blocking:paid_fetch_client_present_reachable",
+      "evidence:x402-hostile-probe:raw_sibling_blocking:raw_payment_signature_header_present_reachable",
+      "evidence:x402-hostile-probe:raw_sibling_blocking:raw_private_key_env_present_reachable",
+      "evidence:x402-hostile-probe:raw_sibling_blocking:sibling_x402_wrapper_present_reachable",
+    ]);
+
+    const policy = await fixture.kernel.evaluatePolicy({
+      actionContractId: fixture.actionContract.actionContractId,
+      envelopeId: fixture.records.operatingEnvelope.envelopeId,
+      signingSecret: "test-secret",
+    });
+
+    expect(policy.decision.decision).toBe("refuse");
+    expect(policy.decision.decisionReasonCode).toBe("protected_path_probe_failed");
+    expect(policy.greenlight).toBeNull();
+  });
+
+  it("records direct payment, token passthrough, wrapper drift, and failure-open probes distinctly", async () => {
+    const fixture = await createX402PolicyFixture("gateway_held");
+    const probes = await runX402HostileProbes(fixture, {
+      ...safePosture(),
+      mcpDirectPaymentStatus: "present",
+      tokenPassthroughStatus: "present",
+      wrapperDriftStatus: "present",
+      failureClosedStatus: "failed",
+    });
+    await recordX402Posture(fixture, probes, "gateway_held", "gateway_probe");
+
+    const failedProbeKinds = probes
+      .filter((probe) => probe.probeOutcome === "failed")
+      .map((probe) => probe.probeKind)
+      .sort();
+    expect(failedProbeKinds).toEqual([
+      "failure_closed",
+      "mcp_direct_call_blocking",
+      "token_passthrough_blocking",
+      "wrapper_drift",
+    ]);
+    expect(probes.flatMap((probe) => probe.evidenceRefs).sort()).toContain(
+      "evidence:x402-hostile-probe:failure_closed:failure_closed_failed",
+    );
+
+    const policy = await fixture.kernel.evaluatePolicy({
+      actionContractId: fixture.actionContract.actionContractId,
+      envelopeId: fixture.records.operatingEnvelope.envelopeId,
+      signingSecret: "test-secret",
+    });
+
+    expect(policy.decision.decision).toBe("refuse");
+    expect(policy.decision.decisionReasonCode).toBe("protected_path_probe_failed");
+    expect(policy.greenlight).toBeNull();
+  });
+
   it("does not let conformance fixture probes manufacture x402 gateway-checked posture", async () => {
     const fixture = await createX402PolicyFixture("gateway_held");
     const probes = await runBypassProbeExecutors(
@@ -178,6 +247,10 @@ function safePosture(): X402PaymentConformancePosture {
   return {
     signerCustodyStatus: "gateway_held",
     rawPrivateKeyEnvStatus: "absent",
+    directCoreClientSigningStatus: "blocked",
+    paidFetchClientStatus: "blocked",
+    paidAxiosClientStatus: "absent",
+    rawPaymentSignatureHeaderStatus: "blocked",
     siblingX402WrapperStatus: "blocked",
     mcpDirectPaymentStatus: "blocked",
     tokenPassthroughStatus: "blocked",

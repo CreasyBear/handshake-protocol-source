@@ -3,6 +3,16 @@ import type { ActionContract, ProposeActionContractInput } from "./areas/action-
 import { createAuthorityCertificate as createAuthorityCertificateTransition } from "./areas/authority-certificate";
 import type { AuthorityCertificate, CreateAuthorityCertificateInput } from "./areas/authority-certificate";
 import { guardCatalogRegistration } from "./areas/catalog-envelope";
+import {
+  recordCredentialResolutionEvidence as recordCredentialResolutionEvidenceTransition,
+  registerGatewayCredentialRef as registerGatewayCredentialRefTransition,
+} from "./areas/credential-custody";
+import type {
+  CredentialResolutionEvidence,
+  GatewayCredentialRef,
+  RecordCredentialResolutionEvidenceInput,
+  RegisterGatewayCredentialRefInput,
+} from "./areas/credential-custody";
 import { HandshakeProtocolError } from "./foundation/errors";
 import { gatewayCheck as gatewayCheckTransition, type GatewayCheckResult } from "./areas/gateway-gate";
 import type { GatewayCheckInput } from "./areas/gateway-gate";
@@ -27,7 +37,7 @@ import {
   type BreakerDecisionResult,
 } from "./areas/isolation-breaker";
 import type { CreateBreakerDecisionInput, CreateIsolationInput, IsolationState } from "./areas/isolation-breaker";
-import type { ProtocolRecord } from "./areas/object-registry";
+import { ProtocolRecordSchema, type ProtocolRecord } from "./areas/object-registry";
 import { evaluatePolicy as evaluatePolicyTransition } from "./areas/policy-greenlight";
 import type { EvaluatePolicyInput, Greenlight, PolicyDecision } from "./areas/policy-greenlight";
 import { createProtectedPathPosture as createProtectedPathPostureTransition } from "./areas/protected-path-posture";
@@ -80,8 +90,9 @@ export class HandshakeKernel {
   }
 
   async putCatalogObject(record: ProtocolRecord): Promise<void> {
-    this.assertTransition(guardCatalogRegistration(record));
-    const result = await this.recorder.persistRecordIfAbsentOrSame(record);
+    const parsedRecord = ProtocolRecordSchema.parse(record);
+    this.assertTransition(guardCatalogRegistration(parsedRecord));
+    const result = await this.recorder.persistRecordIfAbsentOrSame(parsedRecord);
     if (result === "conflict") {
       throw new HandshakeProtocolError(
         "bootstrap_record_digest_conflict",
@@ -123,7 +134,17 @@ export class HandshakeKernel {
   }
 
   proposeActionContract(input: ProposeActionContractInput): Promise<ActionContract> {
-    return proposeActionContractTransition(this.recorder, input);
+    return proposeActionContractTransition(this.store, this.recorder, input);
+  }
+
+  registerGatewayCredentialRef(input: RegisterGatewayCredentialRefInput): Promise<GatewayCredentialRef> {
+    return registerGatewayCredentialRefTransition(this.recorder, input);
+  }
+
+  recordCredentialResolutionEvidence(
+    input: RecordCredentialResolutionEvidenceInput,
+  ): Promise<CredentialResolutionEvidence> {
+    return recordCredentialResolutionEvidenceTransition(this.recorder, input);
   }
 
   createAuthorityCertificate(input: CreateAuthorityCertificateInput): Promise<AuthorityCertificate> {
