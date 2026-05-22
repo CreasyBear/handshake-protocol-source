@@ -1,6 +1,6 @@
 # Tier 2 Protocol Usability And Clearing-House Research Packet
 
-Status: planning scratch, revised 2026-05-20.
+Status: planning scratch, revised 2026-05-21 after gsd-map-codebase refresh.
 
 This packet records the current Tier 2/Tier 3 architecture thinking around
 protocol-facing usability and the longer clearing-house thesis. It is scratch,
@@ -25,14 +25,14 @@ The clearing-house thesis extends that same loop into a future evidence layer:
 ```text
 protected action path
 -> gateway-checked authority evidence
--> terminal AuthorityCertificate (TARGET — K-D9–K-D12)
+-> local terminal AuthorityCertificate evidence
 -> hosted evidence navigation and policy operation
 -> cross-org verification and ecosystem clearing
 ```
 
-Doctrine realignment (autoreason pass_02): [tiered-product-doctrine.md](../strategy/tiered-product-doctrine.md) v0.3.0 — protocol remains Layer 8 authority proof; adapter profiles do not become the product center.
+Doctrine realignment (autoreason pass_02): [tiered-product-doctrine.md](../strategy/tiered-product-doctrine.md) v0.3.1 — protocol remains Layer 8 authority proof; adapter profiles do not become the product center.
 
-Crypto / signing (autoreason pass_03): [authority-certificate-foundation.md](../strategy/authority-certificate-foundation.md) — Ed25519 over `signingInput`; docs 05–09 aligned; implement K-D9-K-D12 in `src/` before canon promotion. Docs **06–09** incorporation is complete when four-terminal mint scope and adapter-proof-profile language are consistent across the suite.
+Crypto / signing (autoreason pass_03): [authority-certificate-foundation.md](../strategy/authority-certificate-foundation.md) — Ed25519 over `signingInput`; local `AuthorityCertificate` minting and offline pinned-key verification are now landed source behavior. Older docs **06–09** target language is historical planning context only. Do not reschedule K-D9-K-D12 as unfinished local foundation work, and do not convert local certificate verification into hosted trust, provider custody, marketplace certification, or cross-org clearing.
 
 Files under `.planning/` are scratch. They are not active repo canon.
 
@@ -68,8 +68,8 @@ Tier 3 or Tier 4.
   clearing-house research and kernel-now/kernel-needed map.
 - `surfaces/`: Tier 2 activation **constitution** (P1–P12 -> MCP/CLI rules) plus
   **doc 10 Agent Proof Slice** (Tier 2 activation proof over the landed authority
-  kernel, with x402 as the worked proof profile, hostile traces, and the next
-  product-level regression target). Not implementation; preserves runtime
+  kernel, with x402 as the worked proof profile, hostile traces, and the current
+  product-level regression). Not implementation; preserves runtime
   ingress as proposal evidence and keeps policy/gateway authority out of the
   agent surface.
 
@@ -131,6 +131,11 @@ generated runtime dispatch
 x402 is the worked proof profile; package install is the non-x402 parity check.
 The envelope is read-only, redacted, and unable to mint policy decisions,
 greenlights, gateway checks, receipts, exports, certificates, or mutations.
+The x402 lane is the official buyer-side `exact` path only: gateway-held
+`PaymentPayload` / `PAYMENT-SIGNATURE` creation after `VerifiedGatewayCheck`,
+with per-call spend authority and explicit cut lines around hosted/provider
+custody, facilitator/seller operation, spend-window ledgers, certification, and
+cross-org trust.
 
 ## Smallest next mechanism
 

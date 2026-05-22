@@ -1,6 +1,6 @@
 # Protocol Notes
 
-Last protocol audit: 2026-05-20.
+Last protocol audit: 2026-05-21.
 
 For the canonical definition, see `docs/internal/protocol-definition.md`. For the architecture and schema map, see `docs/internal/protocol-kernel-architecture.md`. For the plain-English translation, see `docs/internal/protocol-layman.md`. This file keeps implementation-facing protocol notes compact.
 
@@ -30,6 +30,7 @@ runtime execution evidence
 -> policy decision
 -> greenlight or refusal
 -> gateway check attempt
+-> credential resolution evidence when gateway-side credential use is required
 -> mutation attempt, refusal, receipt, or proof gap
 ```
 
@@ -79,7 +80,7 @@ Missing or ambiguous evidence is recorded explicitly as a `ProofGap`.
 
 ## Implementation Map
 
-- `src/protocol/foundation`: canonicalization, ids, errors, reason codes, core schemas, transition guards.
+- `src/protocol/foundation`: canonicalization, ids, errors, reason codes, core schemas, protected-action parameter digests, transition guards.
 - `src/protocol/public`: public schema and input aggregators.
 - `src/protocol/events`: stream event schemas, digest chains, record commits.
 - `src/protocol/context`: transition request context schemas and records.
@@ -93,7 +94,8 @@ Protocol areas may depend on foundation/events/context/store and other area publ
 
 ## Protocol Areas
 
-- `catalog-envelope`: declared tool, action, gateway, and envelope records; catalog presence is not authorization.
+- `catalog-envelope`: declared tool, action, gateway, and envelope records; catalog presence is not authorization. Envelopes may carry provider-neutral participant identity bindings, but those bindings are evidence-only links to the opaque principal/agent refs.
+- `credential-custody`: opaque gateway credential refs and post-gate resolution evidence; no provider clients or secret retrieval API.
 - `runtime-evidence`: generated execution evidence; evidence can propose but cannot authorize.
 - `generated-execution-graph`: normalized generated-code/spec evidence and action candidates.
 - `tool-call-draft`: opened, streaming, finalized, invalid, or abandoned generated tool-call input state.
@@ -139,6 +141,13 @@ Protocol areas may depend on foundation/events/context/store and other area publ
   MCP/CLI/browser/shell/network interception remains future integration work.
 - HTTP and SDK evidence reads expose redacted contract, receipt timeline, generated graph, and install-health projections.
 - D1 and memory stores prove reconstruction and atomicity mechanics for the reference implementation.
+- Provider-neutral gateway credential ref and credential-resolution evidence records
+  are landed as foundation kernel primitives. They bind vault-backed custody into
+  contracts, policy/gateway checks, isolation, and redacted projections without
+  importing provider SDKs or exposing `getSecret`-style APIs.
+- Credential resolution is post-gate evidence. It cannot retrieve secrets through
+  the protocol API, issue authority, or turn provider resolution failure into
+  downstream success.
 
 These are proof lanes, not provider-side enforcement claims.
 
@@ -167,6 +176,9 @@ debt edges remain intentionally visible:
 - Runtime evidence is caller-observed evidence. It can refuse ambiguous or
   bypass-shaped traces, but it cannot prove that every raw sibling path in a
   host was actually intercepted.
+- Credential custody redaction is typed but still not provider-grade secret
+  lifecycle proof. Unknown provider credential formats need fuzzing and
+  provider-specific gateway tests before live custody claims.
 - Frustration risk is highest at the adapter boundary: callers must supply a
   normalized dispatch block, graph closure, and evidence references. A future
   SDK/shim should reduce this ceremony without moving authority into the

@@ -1,6 +1,6 @@
 # Protocol Kernel Architecture And Schema
 
-Last protocol architecture audit: 2026-05-20.
+Last protocol architecture audit: 2026-05-21.
 
 This document is the canonical architecture and schema map for the Handshake
 protocol kernel. It expands `docs/internal/protocol-definition.md` without
@@ -38,10 +38,10 @@ The current foundation is locally established for source and test
 purposes. It covers the protocol state machine, memory and D1 persistence,
 reference gateways, `x402_payment.exact` as one proof profile, local x402 payment
 D1/HTTP establishment, local hostile x402 bypass/custody probe records,
-package-install supply-chain regression binding,
-idempotency recovery projection, non-authority representation schemas, and
-public runtime ingress surfaces for local x402 payment and package-install
-dispatch boundaries.
+package-install supply-chain parameter binding, provider-neutral credential
+custody records, idempotency recovery projection, non-authority representation
+schemas, codemode/runtime generated-execution proposal paths, and public runtime
+ingress surfaces for local x402 payment and package-install dispatch boundaries.
 
 It is not an external establishment claim. Live provider custody, hosted
 operation, broad MCP/CLI/browser/shell/network runtime ingestion, independent
@@ -54,23 +54,26 @@ until a ledger exists.
 
 ## Source Ownership
 
-| Path                                | Owns                                                                                      |
-| ----------------------------------- | ----------------------------------------------------------------------------------------- |
-| `src/protocol/kernel.ts`            | Transition facade over protocol areas.                                                    |
-| `src/protocol/public`               | Public schema and input aggregation.                                                      |
-| `src/protocol/foundation`           | Canonicalization, IDs, reason codes, errors, base schemas, transition guards.             |
-| `src/protocol/events`               | Stream event schemas, digest chains, and record commit helpers.                           |
-| `src/protocol/context`              | Transition request context records.                                                       |
-| `src/protocol/navigation`           | Transition metadata, phase, records written, authority boundary, and evidence obligation. |
-| `src/protocol/evidence-projections` | Redacted diagnostic projections derived from protocol records.                            |
-| `src/protocol/store`                | Store port and atomic commit contracts.                                                   |
-| `src/protocol/areas`                | Owned protocol primitives and state transitions.                                          |
-| `src/http`                          | Hono/Worker transport and route dispatch.                                                 |
-| `src/runtime`                       | Runtime ingress and proposal helpers; observer/compiler evidence, not authority.          |
-| `src/adapters`                      | Reference gateway fixtures that mutate only after verified gateway checks.                |
-| `src/conformance`                   | Reference conformance probes, not standards certification.                                |
-| `src/storage`                       | D1, memory, KV, and store plumbing.                                                       |
-| `src/sdk`                           | Typed HTTP client ergonomics.                                                             |
+| Path                                | Owns                                                                                        |
+| ----------------------------------- | ------------------------------------------------------------------------------------------- |
+| `src/protocol/kernel.ts`            | Transition facade over protocol areas.                                                      |
+| `src/protocol/public`               | Public schema and input aggregation.                                                        |
+| `src/protocol/foundation`           | Canonicalization, IDs, reason codes, errors, base schemas, transition guards.               |
+| `src/protocol/events`               | Stream event schemas, digest chains, and record commit helpers.                             |
+| `src/protocol/context`              | Transition request context records.                                                         |
+| `src/protocol/navigation`           | Transition metadata, phase, records written, authority boundary, and evidence obligation.   |
+| `src/protocol/evidence-projections` | Redacted diagnostic projections derived from protocol records.                              |
+| `src/protocol/store`                | Store port and atomic commit contracts.                                                     |
+| `src/protocol/areas`                | Owned protocol primitives and state transitions.                                            |
+| `src/http`                          | Hono/Worker transport and route dispatch.                                                   |
+| `src/runtime`                       | Runtime ingress and proposal helpers; observer/compiler evidence, not authority.            |
+| `src/adapters`                      | Reference gateway fixtures that mutate only after verified gateway checks.                  |
+| `src/conformance`                   | Reference conformance probes, not standards certification.                                  |
+| `src/storage`                       | D1, memory, KV, and store plumbing.                                                         |
+| `src/sdk`                           | Typed HTTP client ergonomics.                                                               |
+| `src/cli`                           | Local command manifest, APS evidence rendering, conformance status, and cert verification.  |
+| `src/mcp`                           | Model-facing proposal/evidence schema and resource mapping; not authority or process start. |
+| `src/surfaces`                      | Non-authority boundary manifests for SDK, CLI, MCP, and other product surfaces.             |
 
 ## Kernel Transition Surface
 
@@ -82,6 +85,8 @@ surface:
 | `putCatalogObject`                        | catalog                   | Registers immutable catalog/envelope records; catalog presence is not authorization.                  |
 | `createRuntimeExecution`                  | runtime evidence          | Records execution-block shape without authority.                                                      |
 | `createGeneratedExecutionGraph`           | generated execution graph | Records generated-code/spec graph evidence and coverage posture.                                      |
+| `registerGatewayCredentialRef`            | credential custody        | Records opaque gateway-side credential custody evidence without secret material.                      |
+| `recordCredentialResolutionEvidence`      | credential custody        | Records post-gate credential resolution/use evidence; it does not retrieve secrets or mint authority. |
 | `createBypassProbe`                       | bypass probe              | Records protected-path bypass evidence without creating posture or authority.                         |
 | `createToolCallDraft`                     | tool-call draft           | Records streamed/generated tool-call input state before candidate construction.                       |
 | `createProtectedPathPosture`              | protected path posture    | Records probe-backed current installation, bypass, and drift posture.                                 |
@@ -111,6 +116,8 @@ Every durable object is stored as a `ProtocolRecord` discriminated by
 | `action_type`                               | `catalog-envelope`          | Declared consequential action type.                                         |
 | `gateway_registry_entry`                    | `catalog-envelope`          | Gateway adapter, policy version, credential custody, and enforcement mode.  |
 | `operating_envelope`                        | `catalog-envelope`          | Attempt bounds for principal, agent, resources, gateways, and policy pack.  |
+| `gateway_credential_ref`                    | `credential-custody`        | Opaque gateway-side credential ref bound into exact contracts.              |
+| `credential_resolution_evidence`            | `credential-custody`        | Redacted post-gate credential resolution/use evidence.                      |
 | `transition_request_context`                | `context`                   | Caller and request context evidence.                                        |
 | `runtime_execution`                         | `runtime-evidence`          | Runtime execution-block evidence.                                           |
 | `generated_execution_graph`                 | `generated-execution-graph` | Generated-code/spec evidence and coverage posture.                          |
@@ -155,11 +162,15 @@ The protocol schemas are strict Zod objects. The core schema groups are:
   contract/version, drift mode, accepted action catalog versions, receipt and
   isolation capabilities, credential custody, enforcement mode, authority
   holder.
-- `OperatingEnvelope`: principal, agent, objective, allowed action classes,
-  gateways, resources, required protected path state, policy pack/version,
-  issue/expiry/revocation.
+- `OperatingEnvelope`: principal, agent, optional provider-neutral participant
+  identity bindings, objective, allowed action classes, gateways, resources,
+  required protected path state, policy pack/version, issue/expiry/revocation.
 
 Catalogs define what can be proposed. They do not authorize mutation.
+Participant identity bindings are evidence-only links from the opaque
+`principalId` or `agentId` to an external provider or trust-plane ref. They may
+carry Clerk/OIDC/service-account/agent-registry evidence digests, but they do
+not mint a greenlight, widen envelope scope, or replace gateway enforcement.
 
 ### Runtime And Compilation
 
@@ -177,8 +188,8 @@ Catalogs define what can be proposed. They do not authorize mutation.
   required evidence, compiler version, and one `CandidateAction`.
 - `CandidateAction` includes catalog refs, gateway refs, action class, resource,
   sequence number, required prior contracts, params digest, non-secret summary,
-  secret refs, expected side effects, bounds, idempotency key, expiry, generated
-  execution refs, and candidate digest.
+  secret refs, gateway credential ref bindings, expected side effects, bounds,
+  idempotency key, expiry, generated execution refs, and candidate digest.
 
 The compiler may produce a contractable candidate or a rejected candidate. It
 does not produce authority.
@@ -201,11 +212,30 @@ does not produce authority.
 - required protected path state;
 - generated execution graph/node binding digests;
 - parameters, params digest, non-secret summary, secret refs;
+- gateway credential ref bindings when gateway-side credential use is required;
 - purpose, expected side effects, evidence refs, bounds;
 - idempotency key, rollback hint, canonicalizer version;
 - contract digest and optional signature.
 
 The contract is exact proposed commitment. It is not execution authority.
+
+### Credential Custody
+
+- `GatewayCredentialRef` is an opaque provider-neutral record. It binds
+  credential custody posture to tenant/org, optional principal, gateway,
+  gateway registry entry, protected surface kind, allowed action classes,
+  resources, provider registry ref/digest, resolver ref/version, and evidence
+  expectations. It includes no raw credential material and creates no
+  permission.
+- `CredentialResolutionEvidence` is recorded only after a passed
+  `GatewayCheckAttempt`. It binds credential use to the exact contract,
+  greenlight, gate attempt, mutation attempt, gateway credential ref digest,
+  resolver metadata, request digest, redaction status, and result class.
+
+Candidate params digest, action contract digest, policy input, gateway check,
+and isolation scope evaluation all include credential ref bindings. Missing,
+stale, unsafe, drifted, or isolated credential refs refuse before protected
+mutation proceeds.
 
 ### Policy, Review, And Greenlight
 
@@ -244,8 +274,9 @@ Review may inform policy. Review is not authority by itself.
   status, proof gaps, evidence refs, stream refs, receipt digest, audit chain
   digest, finality status, and emission time.
 
-The gateway check is the enforcement point. The receipt is reconstruction
-evidence, not business success.
+The gateway check is the enforcement point. Credential resolution evidence is
+gateway-side post-gate evidence only. The receipt is reconstruction evidence,
+not business success.
 
 ### Idempotency Ledger
 
@@ -279,6 +310,8 @@ probe coverage is fresh, scope-bound, and passing.
   evidence tied to the affected objects.
 - `IsolationState` records a future policy/gateway block or authority
   reduction.
+- `credential_ref` isolation can block a compromised, stale, or unsafe
+  credential ref without isolating an entire gateway.
 - `RecoveryRecommendation` records follow-up after refusal, gap, or ambiguous
   downstream state. Follow-up mutation requires a new action contract.
 
@@ -305,6 +338,10 @@ stateDiagram-v2
   ReviewArtifactRecorded --> ReviewDecisionRecorded
   ReviewDecisionRecorded --> PolicyDecisionRecorded
   GreenlightRecorded --> GatewayCheckRecorded
+  GatewayCheckRecorded --> CredentialResolutionRecorded
+  CredentialResolutionRecorded --> MutationAttemptRecorded
+  CredentialResolutionRecorded --> RefusalRecorded
+  CredentialResolutionRecorded --> ProofGapRecorded
   GatewayCheckRecorded --> MutationAttemptRecorded
   GatewayCheckRecorded --> RefusalRecorded
   GatewayCheckRecorded --> ProofGapRecorded
@@ -368,6 +405,8 @@ Conflicts narrow authority:
 - policy mismatch: policy refusal;
 - review rejection or expiry: review refusal or policy refusal;
 - active isolation: policy or gateway refusal;
+- missing, stale, unsafe, drifted, scope-mismatched, or isolated credential ref:
+  contract, policy, gateway, or resolution refusal;
 - replayed greenlight: gateway replay refusal;
 - duplicate idempotency scope: policy refusal without a second greenlight;
 - params/resource/idempotency drift: gateway refusal;
@@ -383,10 +422,11 @@ mutation-attempted flag.
 ## Redacted Evidence Projections
 
 HTTP and SDK evidence reads expose redacted diagnostic projections for generated
-graphs, action contracts, agent transaction envelopes, idempotency recovery,
-receipt timelines, and protected-path health. These projections are read-only
-and diagnostic. They do not create transition request context records, issue
-authority, export receipts, prove downstream business success, or expose raw
+graphs, action contracts, agent transaction envelopes, credential refs,
+credential resolution evidence, idempotency recovery, receipt timelines, and
+protected-path health. These projections are read-only and diagnostic. They do
+not create transition request context records, issue authority, export receipts,
+prove downstream business success, expose provider secret paths, or expose raw
 `internal_only` protocol records.
 
 The generic raw record route enforces `rawReadPosture`. Internal records such

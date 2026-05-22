@@ -15,6 +15,9 @@ Last structural audit: 2026-05-19.
 | `src/conformance/`    | Reference checks for protocol and gateway posture.                                                                   | Hosted operation, standards claims, provider certification, mutation attempts.                                    |
 | `src/storage/`        | Atomic record commits, stream offsets, D1, memory fixtures, KV cache plumbing.                                       | Protocol meaning, route handling, SDK behavior.                                                                   |
 | `src/sdk/`            | Typed client calls and response parsing.                                                                             | Authority inference, mutation, storage, runtime wrappers.                                                         |
+| `src/cli/`            | Local command manifests, APS evidence rendering, conformance status, and certificate verification wrappers.          | Process startup, policy evaluation, gateway checks, mutation commands, raw records, or credential custody.        |
+| `src/mcp/`            | Model-facing proposal/evidence schemas, resource mappings, and pure runtime-client proposal bridge.                  | Process startup, policy evaluation, gateway checks, mutation commands, raw records, or credential custody.        |
+| `src/surfaces/`       | Source-owned boundary manifests and shared non-authority outcomes for non-kernel product surfaces.                   | Protocol meaning, policy interpretation, route behavior, gateway authority, or public product claims.             |
 | `src/index.ts`        | Curated package export surface.                                                                                      | Internal kernel/store objects or compatibility shims.                                                             |
 | `src/experimental.ts` | Explicit reference gateway fixture exports.                                                                          | Stable public API claims or provider enforcement claims.                                                          |
 | `src/worker.ts`       | Cloudflare Worker entrypoint wiring.                                                                                 | Protocol meaning, route behavior, or deployment policy.                                                           |
@@ -61,6 +64,20 @@ src/
     store.ts
   sdk/
     client.ts
+    surface-clients/
+  cli/
+    command-manifest.ts
+    index.ts
+    main.ts
+  mcp/
+    catalog.ts
+    index.ts
+    output.ts
+    resources.ts
+    x402-proposal.ts
+  surfaces/
+    boundary-manifest.ts
+    outcome.ts
   index.ts
   experimental.ts
   worker.ts
@@ -73,9 +90,11 @@ migrations/
 ```text
 test/
   architecture/
+  cli/
   protocol/
   http/
   runtime/
+  mcp/
   adapters/
   integration/
   support/

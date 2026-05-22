@@ -1,6 +1,6 @@
 # Plain-English Protocol Guide
 
-Last plain-language protocol audit: 2026-05-20.
+Last plain-language protocol audit: 2026-05-21.
 
 This document translates `docs/internal/protocol-definition.md` and
 `docs/internal/protocol-kernel-architecture.md` into plain language. If this
@@ -80,6 +80,30 @@ For cloud config, the gateway controls the cloud mutation credential.
 If the gateway cannot block the change, Handshake can observe or record, but it
 cannot protect that path.
 
+## The Credential
+
+Some protected actions need a credential: a wallet signer, deploy token, cloud
+key, database credential, or future vault-backed secret.
+
+Handshake does not give that credential to the agent. The action contract can
+carry an opaque credential reference that says, in effect:
+
+```text
+this gateway may use this gateway-held credential reference
+for this protected action shape
+against this resource
+if policy and the gateway check both pass
+```
+
+That reference is not the secret. It is not permission. It is evidence that the
+gateway knows which credential posture it is expected to hold.
+
+If the ref is missing, stale, unsafe, scope-mismatched, isolated, or points at a
+changed provider registry entry, Handshake refuses before protected mutation.
+If the gateway resolves or uses the credential after a passed gateway check, it
+records redacted credential-resolution evidence. Raw secret material and
+provider secret paths must not appear in protocol records or projections.
+
 ## The Record
 
 After the check, Handshake records what happened:
@@ -103,14 +127,16 @@ safe, profitable, or successful everywhere downstream.
 This repo proves the local kernel mechanics: exact work orders, one-use passes,
 gateway checks, refusals, proof gaps, idempotency duplicate handling, local D1
 reconstruction, x402 payment runtime ingress, local payment gateway fixture
-coverage, package-install regression binding, and representation shapes that
-cannot create permission.
+coverage, package-install parameter binding, provider-neutral credential refs
+and redacted resolution evidence, and representation shapes that cannot create
+permission.
 
-It does not prove a live hosted service, a real external payment provider gateway,
-generic MCP/runtime control, x402 spend-window ledger enforcement, or independent
-package-material verification. It does include local AuthorityCertificate
-minting and offline pinned-key verification, but not cross-org trust, live key
-revocation, hosted verify APIs, marketplace certification, or provider custody.
+It does not prove a live hosted service, a real external payment provider
+gateway, live vault-provider custody, generic MCP/runtime control, x402
+spend-window ledger enforcement, or independent package-material verification.
+It does include local AuthorityCertificate minting and offline pinned-key
+verification, but not cross-org trust, live key revocation, hosted verify APIs,
+marketplace certification, or provider custody.
 
 ## The Whole Flow
 
@@ -253,6 +279,8 @@ side's own action contract and gateway check.
 | The rule check           | Policy decision                                 |
 | The one-use pass         | Greenlight                                      |
 | The real gate            | Gateway check                                   |
+| Gateway-held credential  | Gateway credential ref                          |
+| Credential use evidence  | Credential resolution evidence                  |
 | The change attempt       | Mutation attempt                                |
 | The record               | Receipt                                         |
 | The no                   | Refusal                                         |

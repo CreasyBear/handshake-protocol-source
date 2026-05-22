@@ -22,7 +22,7 @@ vague principal intent
 
 The kernel does not claim hosted operation, provider-side enforcement, broad agent governance, or downstream business success. A path is protected only when the gateway owns the mutation credential and verifies the exact greenlight before mutation.
 
-Current local foundation status: source and tests cover the protected-action kernel chain, derived lifecycle evidence, idempotency ledger, redacted evidence projections including agent transaction envelopes, terminal AuthorityCertificate minting and offline pinned-key verification, package-install supply-chain gate binding, the local x402 payment D1/HTTP durable path, local hostile x402 bypass/custody probes, and public runtime ingress for local x402 payment and package-install dispatch boundaries. x402 is a local proof profile; package install remains a regression fixture. No adapter family defines the protocol. This is local kernel foundation, not live provider custody, hosted operation, generic MCP/runtime control, external package-material attestation, cross-org AuthorityCertificate trust, live JWKS/revocation, hosted verifier operation, or spend-window ledger enforcement. Runtime ingress is observer/compiler evidence and current x402 spend enforcement is per-call only; session/day/review spend windows are metadata until a ledger exists.
+Current local foundation status: source and tests cover the protected-action kernel chain, derived lifecycle evidence, idempotency ledger, redacted evidence projections including agent transaction envelopes, terminal AuthorityCertificate minting and offline pinned-key verification, package-install supply-chain gate binding, the narrow official x402 exact buyer-side proof path through D1/HTTP durable evidence, official x402 SDK signer-custody/bypass probes, and public runtime ingress for local x402 payment and package-install dispatch boundaries. x402 coverage is one official buyer-side `exact` per-call path with gateway-held `PaymentPayload` / `PAYMENT-SIGNATURE` creation after `VerifiedGatewayCheck`; package install remains a regression fixture. No adapter family defines the protocol. This is local kernel foundation, not broad x402 compatibility, not live provider custody, hosted operation, generic MCP/runtime control, external package-material attestation, cross-org AuthorityCertificate trust, live JWKS/revocation, hosted verifier operation, facilitator operation, seller middleware, unsupported x402 schemes, marketplace/certification, or spend-window ledger enforcement. Runtime ingress is observer/compiler evidence and current x402 spend enforcement is per-call only; session/day/review spend windows are metadata until a ledger exists.
 
 ## Repo Truth
 
@@ -87,6 +87,9 @@ src/
   conformance/       reference conformance checks
   storage/           D1, memory, KV, and store plumbing
   sdk/               typed HTTP client
+  cli/               local evidence and command-manifest wrappers
+  mcp/               model-facing proposal/evidence schema and resource mappings
+  surfaces/          non-authority surface boundary manifests and shared outcomes
   index.ts           curated package export surface
   experimental.ts    explicit experimental reference gateway surface
   worker.ts          Cloudflare Worker entrypoint
@@ -107,6 +110,7 @@ test/
   conformance/       reference conformance checks
   http/              transport and D1-over-HTTP behavior
   runtime/           generated-execution proposal helpers
+  mcp/               model-facing proposal/evidence surface contracts
   adapters/          reference gateway fixtures
   integration/       end-to-end protected action paths
   support/           test fixtures and harnesses

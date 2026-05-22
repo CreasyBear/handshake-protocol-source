@@ -356,15 +356,16 @@ implementation uses existing tests underneath.
 
 ## Plan-eng review
 
-Brutal verdict: keep the slice, narrow the claim, and make the next work a
-single product-level proof test before any CLI/MCP surface.
+Brutal verdict: keep the slice and narrow the claim. The product-level proof now
+exists; the next work is a walkthrough over that proof before any CLI/MCP
+surface.
 
 Execution concerns:
 
 - Do not build a new control plane for APS.
 - Do not add a second x402 adapter path.
-- Do not invent `prove:*` scripts until there is a real product-level test to
-  wrap.
+- Do not invent `prove:*` scripts that create new authority. A wrapper may only
+  run or explain the existing product proof.
 - Do not expose policy, gateway, install, receipt export, or internal store
   APIs to the agent.
 - Do not let `ProtectedActionRequest` bypass runtime evidence or intent
@@ -375,17 +376,18 @@ Execution concerns:
 - Do not claim hosted gateway custody, provider custody, JWKS, revocation, or
   cross-org clearing.
 
-Minimum implementation path:
+Completed implementation path:
 
-1. Add one product-level APS regression that stitches existing x402 runtime
-   ingress, proposal, policy, gateway, evidence projection, and terminal
-   certificate verification.
-2. Assert that the runtime token can propose and read redacted evidence only.
-3. Assert that gateway/policy/wallet authority remains outside runtime custody.
-4. Assert that mismatch, replay, raw sibling dispatch, and proof gap produce
-   refusal/challenge/evidence, not fake receipts.
-5. Only after that test is green, consider a tiny developer command that runs
-   the same proof.
+1. `test/product/agent-proof-slice.test.ts` stitches x402 runtime ingress,
+   proposal, policy, gateway, evidence projection, and terminal certificate
+   verification.
+2. Runtime custody can propose and read redacted evidence only.
+3. Gateway, policy, wallet, and certificate authority remain outside runtime
+   custody.
+4. Mismatch, replay, raw sibling dispatch, and proof gap produce refusal,
+   challenge, or evidence, not fake receipts.
+5. The next implementation surface may wrap that proof for developer
+   understanding, but it must not create a new mutation path.
 
 ## Plan-devex review
 
@@ -394,9 +396,9 @@ Brutal verdict: APS is understandable only if the first developer experience is
 
 Developer-facing assets should be ordered like this:
 
-1. One-page local proof walkthrough.
-2. One source-owned product regression.
-3. One minimal command wrapping that regression.
+1. Existing source-owned product regression.
+2. One-page local proof walkthrough over that regression.
+3. One minimal read-only command wrapping that regression.
 4. Optional MCP/SDK convenience after the proof is already stable.
 
 The first screen or walkthrough must show:
@@ -422,19 +424,19 @@ The walkthrough must not hide:
 The APS implementation should not duplicate every low-level invariant. It should
 compose the source-owned tests into one product story.
 
-| Layer | Existing proof | APS gap |
+| Layer | Existing proof | APS status |
 | --- | --- | --- |
-| Route custody | `test/http/http.test.ts` | Product-level assertion that runtime custody cannot cross into policy/gateway. |
-| Runtime ingress | `test/runtime/runtime-ingress.test.ts` | Product-level x402 graph from generated dispatch to contract/challenge. |
-| x402 D1/HTTP | `test/integration/x402-d1-http.test.ts` | Product-level proof that wallet signature appears only after gateway check. |
-| Representation | `test/protocol/representation-contract.test.ts` | Product-level proof that metadata/request/challenge/projection never mint authority. |
-| Authority certificate | `test/protocol/authority-certificate.test.ts` | Product-level proof that terminal evidence can be verified offline without hosted claims. |
-| Adapter-backed APS | `test/product/agent-proof-slice.test.ts` | Product-level proof that x402 plus one non-x402 adapter share the same generic authority/evidence spine. |
-| Claim boundary | `test/architecture/claim-boundary.test.ts` | Product-level proof that runtime ingress stays curated, not root-exported as broad protocol. |
+| Route custody | `test/http/http.test.ts` | Covered for role boundaries; APS product proof additionally asserts runtime cannot use authority. |
+| Runtime ingress | `test/runtime/runtime-ingress.test.ts` | Covered directly and composed through product proof. |
+| x402 D1/HTTP | `test/integration/x402-d1-http.test.ts` | Covered directly; product proof shows signer evidence only after gateway check. |
+| Representation | `test/protocol/representation-contract.test.ts` | Covered as non-authority shape; product proof uses redacted envelope projection. |
+| Authority certificate | `test/protocol/authority-certificate.test.ts` | Covered directly and composed through product proof as local terminal evidence only. |
+| Adapter-backed APS | `test/product/agent-proof-slice.test.ts` | Current product proof: x402 plus package-install parity share the same generic authority/evidence spine. |
+| Claim boundary | `test/architecture/claim-boundary.test.ts` | Covered for local/per-call x402 and non-hosted, non-provider, non-cross-org language. |
 
 ## Evidence requirements
 
-APS is not green until the product-level proof leaves these reconstructable
+APS remains green only while the product-level proof leaves these reconstructable
 references:
 
 - runtime execution id;
@@ -473,7 +475,7 @@ APS must explicitly refuse these claims:
 
 ## Future surfaces after APS
 
-Only after the product-level APS proof is green:
+Only after the product-level APS proof remains green:
 
 - SDK wrapper for `ProtectedActionMetadata`, `ProtectedActionRequest`,
   `ProtectedActionChallenge`, and redacted evidence projections.

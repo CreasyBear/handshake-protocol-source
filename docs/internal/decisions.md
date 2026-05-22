@@ -1,6 +1,6 @@
 # Decisions
 
-Last canonical audit: 2026-05-20.
+Last canonical audit: 2026-05-21.
 
 ## Canonical Source Set
 
@@ -65,6 +65,9 @@ The local foundation includes:
 - idempotency ledger reservation before greenlight issuance, duplicate refusal,
   and read-only prior-evidence projection;
 - probe-backed protected-path posture, with local hostile bypass/custody probes;
+- provider-neutral `GatewayCredentialRef` and `CredentialResolutionEvidence`
+  records bound into candidate/contract digest, policy/gateway evaluation,
+  credential-ref isolation, and redacted projections;
 - package-install observed supply-chain parameters bound at the gateway before
   mutation;
 - local x402 payment D1/HTTP establishment path through install, runtime
@@ -109,6 +112,7 @@ JSON without the protocol store.
 The local foundation does not prove:
 
 - live/provider payment custody;
+- live vault-provider custody or provider-side secret lifecycle operation;
 - hosted org auth, policy operation, RBAC, retention, or search;
 - external package-manager material attestation;
 - broad MCP, CLI, browser, shell, network, package-manager, or generated-tool-stream
@@ -200,13 +204,16 @@ A hosted claim requires a real deployment boundary, credential custody model, cu
 
 Accepted: local HTTP and SDK evidence reads are redacted diagnostic projections,
 not hosted audit/search product surfaces. The active projections are generated
-graph evidence, contract view, receipt timeline, and package-install
+graph evidence, contract view, agent transaction envelope, receipt timeline,
+idempotency recovery, credential custody/resolution evidence refs, and
 protected-path health.
 
 The generic raw record route must enforce protocol-object `rawReadPosture`.
 `internal_only` objects remain unavailable through raw HTTP reads even to
-control-plane bearer custody. Any future audit surface must use purpose-built
-redacted projections and a real reader authorization model.
+control-plane bearer custody. Credential projections must expose opaque refs and
+digests, never raw secret material or provider secret paths. Any future audit
+surface must use purpose-built redacted projections and a real reader
+authorization model.
 
 ## Tooling Decision
 

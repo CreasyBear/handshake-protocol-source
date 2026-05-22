@@ -1,6 +1,6 @@
 # Protocol Definition
 
-Last protocol definition audit: 2026-05-20.
+Last protocol definition audit: 2026-05-21.
 
 This is the canonical protocol definition for this checkout.
 
@@ -51,8 +51,13 @@ Execution authority exists only when all of these are true:
 6. The `Greenlight` is unexpired, unconsumed, and has `maxUses: 1`.
 7. No active `IsolationState` blocks policy or gateway execution.
 8. Required protected-path posture is current and probe-backed.
-9. The gateway owns or controls the mutation credential.
-10. The gateway checks the exact greenlight before mutation.
+9. Any vault-backed or provider-held mutation credential is represented only as
+   a gateway-side `GatewayCredentialRef` binding.
+10. The credential ref digest, provider registry ref/digest, and custody
+    posture still match at contract, policy, and gateway time.
+11. The gateway owns or controls the mutation credential and records redacted
+    `CredentialResolutionEvidence` only after a passed gateway check.
+12. The gateway checks the exact greenlight before mutation.
 
 If the gateway cannot block the mutation, the system is advisory, not
 Handshake.
@@ -85,6 +90,7 @@ runtime execution evidence
 -> policy decision
 -> greenlight, refusal, review, halt, or quarantine
 -> gateway check attempt
+-> credential resolution evidence when gateway-side credential use is required
 -> mutation attempt, refusal, receipt, or proof gap
 -> operation lifecycle reconciliation
 -> recovery or isolation when required
@@ -98,6 +104,8 @@ Core objects:
 - `ActionType`
 - `GatewayRegistryEntry`
 - `OperatingEnvelope`
+- `GatewayCredentialRef`
+- `CredentialResolutionEvidence`
 - `RuntimeExecution`
 - `GeneratedExecutionGraph`
 - `ToolCallDraft`
@@ -120,6 +128,12 @@ Core objects:
 
 The schema map and owned source files are defined in
 `docs/internal/protocol-kernel-architecture.md`.
+
+`OperatingEnvelope` may include provider-neutral participant identity bindings
+for the opaque `principalId` and `agentId`. These bindings let adapters carry
+Clerk/OIDC/service-account or ERC-8004-style identity evidence into contracts
+and terminal projections, but they are evidence only. They do not mint
+greenlights, widen envelope scope, or replace the gateway check.
 
 ## Gateway Policy
 
@@ -175,6 +189,8 @@ Conflicts narrow authority.
   fresh authority; same params may point to prior evidence, different params
   refuse.
 - Gateway policy drift is incompatible: gateway refusal; do not mutate.
+- Gateway credential ref is missing, stale, unsafe, drifted, scope-mismatched,
+  or isolated: refuse before protected mutation proceeds.
 - Downstream finality is missing or contradictory: record `ProofGap`.
 - Recovery needs follow-up mutation: require a new `ActionContract`.
 - Divergence affects future authority: record `IsolationState` or breaker
@@ -189,22 +205,28 @@ Handshake protects only installed protected paths.
 A path is protected only when the gateway owns or controls the mutation
 credential, checks the exact one-use greenlight before consequence, records the
 check, and refuses drift, replay, missing posture, or active isolation.
+Vault-backed credential use is protected only when the action contract carries
+opaque credential-ref bindings and the gateway records redacted resolution/use
+evidence after a passed gateway check.
 
 Outside that installed path, Handshake may collect evidence, but it does not
 have enforcement.
 
 The current implementation proves this boundary locally with `x402_payment.exact`
-as one proof profile, reference gateways, memory/D1 stores, redacted projections
-including agent transaction envelopes, local payment D1/HTTP harness coverage,
-hostile local payment bypass/custody probes, package-install supply-chain
-regression binding, internal non-authority representation contracts, and public
-runtime ingress surfaces for local x402 payment and package-install dispatch
-boundaries. It enforces x402 per-call spend only. It does not prove live provider
-custody, broad MCP/CLI/browser/shell/network runtime interception, hosted
-operation, external package-material verification, x402 spend-window ledger
-enforcement, cross-org AuthorityCertificate trust, live JWKS/revocation, or
-hosted verifier operation. The local source foundation does include
-AuthorityCertificate minting and offline pinned-key verification.
+as one proof profile, reference package-install, repo-write, and preview-deploy
+gateways, memory/D1 stores, redacted projections including agent transaction
+envelopes, local payment D1/HTTP harness coverage, hostile local payment
+bypass/custody probes, package-install supply-chain parameter binding,
+codemode/runtime generated-execution proposal paths, internal non-authority
+representation contracts, public runtime ingress surfaces for local x402 payment
+and package-install dispatch boundaries, and provider-neutral gateway credential
+ref/resolution evidence records. It enforces x402 per-call spend only. It does
+not prove live provider custody, live vault-provider operation, broad
+MCP/CLI/browser/shell/network runtime interception, hosted operation, external
+package-material verification, x402 spend-window ledger enforcement, cross-org
+AuthorityCertificate trust, live JWKS/revocation, or hosted verifier operation.
+The local source foundation does include AuthorityCertificate minting and
+offline pinned-key verification.
 
 ## Extension Boundary
 
