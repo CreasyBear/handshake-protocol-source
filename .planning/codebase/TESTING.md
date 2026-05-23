@@ -33,7 +33,10 @@ npm run demo:mcp-transcript   # Generate source-owned MCP x402 reference transcr
 - `package.json` defines `npm run quality:claims` as `test/architecture/active-vocabulary.test.ts` plus `test/architecture/claim-boundary.test.ts`.
 - `package.json` defines `npm run quality:storage` as `test/http/d1-http.test.ts`, `test/protocol/kernel-*.test.ts`, `test/protocol/transition-matrix.test.ts`, `test/protocol/model-based-invariants.test.ts`, `test/protocol/action-attempt-lifecycle.test.ts`, `test/protocol/evidence-projections.test.ts`, `test/protocol/protocol-store-atomicity-contract.test.ts`, and `test/protocol/authority-certificate.test.ts`.
 - `.github/workflows/check.yml` runs `npm run check:repo`.
-- This mapper refresh did not execute gates. Treat the above as available gate composition from source, not as a fresh pass/fail result.
+- This mapper refresh executed the focused auth.md dirty expansion slice:
+  `npm run test -- test/adapters/auth-md-adapter.test.ts test/adapters/auth-md-gateway.test.ts test/adapters/auth-md-bypass-probes.test.ts test/adapters/auth-md-revocation.test.ts test/adapters/auth-md-gateway-pressure.test.ts test/adapters/auth-md-serialization-redaction.test.ts test/runtime/auth-md-candidate-compilation.test.ts test/protocol/policy-auth-md.test.ts test/integration/auth-md-protected-call.test.ts test/integration/auth-md-receipt-reconstruction.test.ts`
+  returned 34 pass / 0 fail / 459 expects.
+- This mapper refresh did not execute the full repo gate. Treat `npm run check:repo` as still required before committing the dirty auth.md expansion.
 
 ## Test File Organization
 
@@ -212,19 +215,28 @@ export function makeKernelFixture() {
 - CLI readiness can hide operator frustration because `doctor` remains `not_ready` even after a local x402 probe passes; this is correct while `trustedReadiness` is false, but tests should preserve the exact reason-code path so future UI/help text can explain the next mechanism instead of reporting generic failure.
 - Model/developer frustration can hide behind fake clients: SDK and MCP unit tests prove surface method shape and headers, not a real network-backed activation path. Any quickstart or support workflow needs an HTTP/D1 route test before treating the surface as adoptable.
 
-## Visible Dirty Auth.md Adapter Coverage
+## Auth.md Adapter Coverage
 
-**Local dirty tests:**
-- `test/adapters/auth-md-adapter.test.ts` is untracked local state. It is visible and should be treated as dirty adapter coverage, not committed baseline.
-- `test/adapters/auth-md-adapter.test.ts` covers PRM `agent_auth` normalization, auth.md document digest as supporting evidence, credential intake redaction, exact `auth_md_protected_api_call.exact` contract proposal, no greenlight/gateway/mutation from the proposal helper, and pre-compilation refusal for raw authorization headers, dynamic endpoints, read-only methods, cross-origin endpoints, and unsafe custody.
-- `test/architecture/root-exports.test.ts` is modified local state. The dirty expectation adds auth.md profile/proposal helpers to the explicit `./experimental` surface through `src/experimental.ts`, while keeping them off the package root.
-- `STRUCTURE.md`, `docs/internal/protocol-notes.md`, and `src/adapters/LANE.md` are modified local state documenting auth.md as an experimental/reference adapter profile, not a standards claim or provider integration.
+**Committed auth.md protected-call tests:**
+- `test/adapters/auth-md-adapter.test.ts` covers PRM and authorization-server `agent_auth` normalization, auth.md document digest as supporting evidence, credential intake redaction, ID-JAG audience checks, exact `auth_md_protected_api_call.exact` proposal, no greenlight/gateway/mutation from proposal helpers, and pre-compilation refusal for raw authorization headers, dynamic endpoints, read-only methods, cross-origin endpoints, and unsafe custody.
+- `test/adapters/auth-md-gateway.test.ts` covers credential use only after `VerifiedGatewayCheck`, parameter drift refusal before credential resolution, replay refusal before credential resolution, downstream proof-gap recording, non-authoritative gateway posture, and fail-closed behavior when downstream evidence tries to leak auth material.
+- `test/runtime/auth-md-candidate-compilation.test.ts` covers runtime-ingress auth.md compilation into `CandidateAction` without authority, unsafe generated shapes, raw sibling bypass evidence, and graph coverage refusal.
+- `test/architecture/root-exports.test.ts` keeps auth.md off the package root and exposes only explicit experimental fixture exports.
 
-**How to validate if auth.md is intentionally landed:**
-- Run `npm run check:types` first because `src/adapters/auth-md/*` is untracked TypeScript source and root export expectations reference it.
-- Run `npm run test -- test/adapters/auth-md-adapter.test.ts test/architecture/root-exports.test.ts` for the dirty adapter slice.
-- Run `npm run quality:architecture` after staging/landing because architecture tests include root export curation and adapter conformance, but the auth.md adapter test itself is not listed in the current `quality:architecture` script.
-- Run `npm run check:repo` before closeout because `npm run test` will pick up `test/adapters/auth-md-adapter.test.ts` once it exists in the working tree and `git diff --check` will check the tracked auth.md documentation/export diffs.
+**Dirty auth.md lifecycle/bypass/reconstruction tests:**
+- `test/adapters/auth-md-bypass-probes.test.ts` covers prevented, detected, and proof-gap hostile posture for raw bearer passthrough, direct HTTP, sibling MCP, browser tool, raw network, token replay, stale metadata, unsafe retry loop, gateway wrapper drift, and failure-closed behavior.
+- `test/adapters/auth-md-revocation.test.ts` covers lifecycle evidence mapping to credential-ref isolation and verifies future policy and stale unconsumed greenlights are blocked after isolation.
+- `test/adapters/auth-md-gateway-pressure.test.ts` covers scope, metadata, credential-ref drift, incompatible gateway policy drift, stale greenlights after credential isolation, and gateway-observed unsafe parameters before credential resolution.
+- `test/adapters/auth-md-serialization-redaction.test.ts` verifies raw credentials, claim tokens, JWTs, and PII stay out of adapter, policy, gateway, probe, and projection output.
+- `test/protocol/policy-auth-md.test.ts` covers exact greenlight binding, duplicate idempotency refusal, and non-authority posture for registration, ID-JAG, claim, scopes, and revocation evidence.
+- `test/integration/auth-md-protected-call.test.ts` covers the local twelve-workflow transcript for discovery, registration, proposal, policy, gateway, replay, refusal, proof gap, bypass, lifecycle, redaction, and reconstruction posture.
+- `test/integration/auth-md-receipt-reconstruction.test.ts` separates auth.md provenance from Handshake enforcement and downstream proof gaps, and projects policy refusal without implying gateway admission or credential use.
+
+**How to validate the dirty auth.md expansion before landing:**
+- Run the focused auth.md slice listed above.
+- Run `npm run quality:architecture` because the expansion touches exports, adapter posture, architecture guards, and runtime ingress.
+- Run `npm run quality:claims` because auth.md language can easily drift into auth-provider, OAuth-server, provider-custody, or hosted-operation claims.
+- Run `npm run check:repo` before closeout because the dirty expansion touches source, tests, architecture docs, and generated evidence projection shapes.
 
 ## Demo Script Tests
 

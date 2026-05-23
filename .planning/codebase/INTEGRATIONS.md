@@ -4,7 +4,7 @@
 
 ## Scope
 
-This map covers external APIs, storage, auth, telemetry, deployment, and evidence surfaces for Handshake v0.0.2. It is grounded in committed source and tests, with the visible dirty auth.md adapter state documented separately.
+This map covers external APIs, storage, auth, telemetry, deployment, and evidence surfaces for Handshake v0.0.2. It separates committed auth.md protected-call support from the newer dirty auth.md lifecycle/bypass/reconstruction expansion.
 
 `.planning/` is scratch. Do not treat this mapper output as canon without re-validating against `AGENTS.md`, `README.md`, `QUALITY.md`, `STRUCTURE.md`, `docs/internal/decisions.md`, `docs/internal/protocol-notes.md`, `package.json`, source, and tests.
 
@@ -63,11 +63,15 @@ This map covers external APIs, storage, auth, telemetry, deployment, and evidenc
   - SDK/Client: `src/adapters/preview-deploy/gateway.ts`.
   - Auth: protocol gateway check, not provider deployment-token custody.
 
-**Visible dirty auth.md adapter state:**
-- auth.md adapter profile - visible working-tree adapter for OAuth Protected Resource Metadata `agent_auth` provenance, auth.md supporting evidence, gateway credential intake, and exact protected API-call proposals.
-  - SDK/Client: untracked `src/adapters/auth-md/index.ts`, `src/adapters/auth-md/profiles.ts`, `src/adapters/auth-md/action-proposal.ts`; dirty export wiring in `src/experimental.ts`; untracked tests in `test/adapters/auth-md-adapter.test.ts`.
-  - Auth: accepts credential material only as gateway custody intake input and emits redacted registration evidence plus `GatewayCredentialRef` inputs; it refuses raw authorization headers and unsafe custody before compilation.
-  - Boundary: not committed source; not an auth provider, OAuth server, WorkOS alternative, certification body, provider custody claim, or generic API gateway.
+**auth.md protected API-call profile:**
+- Committed auth.md adapter - OAuth Protected Resource Metadata plus authorization-server `agent_auth` provenance, auth.md supporting document digest, redacted gateway credential intake, exact protected API-call proposals, and a reference gateway fixture.
+  - SDK/Client: `src/adapters/auth-md/index.ts`, `src/adapters/auth-md/profiles.ts`, `src/adapters/auth-md/action-proposal.ts`, `src/adapters/auth-md/gateway.ts`, explicit `src/experimental.ts` exports, and tests in `test/adapters/auth-md-adapter.test.ts`, `test/adapters/auth-md-gateway.test.ts`, and `test/runtime/auth-md-candidate-compilation.test.ts`.
+  - Auth: accepts credential material only at gateway custody intake, emits redacted registration/identity/claim/revocation evidence, binds `GatewayCredentialRef` inputs into action contracts, resolves credentials only after `VerifiedGatewayCheck`, and records `CredentialResolutionEvidence` after the gate.
+  - Boundary: not an auth provider, OAuth server, WorkOS alternative, certification body, provider custody claim, hosted identity system, or generic API gateway.
+- Dirty auth.md lifecycle/bypass expansion - user-owned working-tree additions for revocation-to-isolation, hostile bypass probes, auth.md evidence labels in transaction envelopes, and integration/reconstruction tests.
+  - Files: `src/adapters/auth-md/revocation.ts`, `src/adapters/auth-md/bypass-probes.ts`, dirty `src/protocol/evidence-projections/projections.ts`, dirty `src/protocol/evidence-projections/schemas.ts`, and untracked tests under `test/adapters/auth-md-*`, `test/integration/auth-md-*`, and `test/protocol/policy-auth-md.test.ts`.
+  - Auth: lifecycle evidence can isolate a gateway credential ref for future policy/gateway use; bypass probes classify raw bearer passthrough, direct HTTP, sibling MCP, browser, raw network, token replay, metadata staleness, wrapper drift, unsafe retry loops, and failure-closed posture.
+  - Boundary: focused auth.md tests pass, but the expansion is not yet full-gated or committed.
 
 ## Data Storage
 
@@ -173,7 +177,7 @@ This map covers external APIs, storage, auth, telemetry, deployment, and evidenc
 - No repository-root `.env*` files were detected.
 - Role token values must be external to source; CLI project state stores refs, not token values, in `src/cli/local-project/index.ts`.
 - x402 signer material is represented as gateway-held custody/evidence refs; raw signer material is not projected by `src/protocol/evidence-projections/projections.ts`.
-- Dirty auth.md intake accepts raw credential material as input to build redacted gateway custody refs, but visible output schemas and tests assert that raw credential material is not serialized.
+- auth.md intake accepts raw credential material only as input to build redacted gateway custody refs; adapter/gateway/projection tests assert that raw bearer credentials, claim tokens, JWTs, email PII, and provider secrets are not serialized.
 
 ## Webhooks & Callbacks
 

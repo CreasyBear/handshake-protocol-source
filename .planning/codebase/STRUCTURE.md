@@ -39,7 +39,7 @@ src/
 |-- protocol/                          # Protocol meaning, response objects, events, store port
 |-- http/                              # Hono/Worker transport, envelopes, routes, evidence reads
 |-- runtime/                           # Generated-execution proposal helpers and ingress subpath
-|-- adapters/                          # Reference gateway fixtures, x402 proof profile, visible dirty auth.md work
+|-- adapters/                          # Reference gateway fixtures, x402 proof profile, auth.md protected-call profile
 |-- install/                           # Generic protected-action install proposal contracts
 |-- storage/                           # D1, memory, KV, and store implementation plumbing
 |-- sdk/                               # Low-level HTTP client and role-scoped Tier 2 clients
@@ -72,10 +72,15 @@ test/
 - Tier 2 surfaces live in `src/runtime/*`, `src/sdk/surface-clients/*`, `src/cli/*`, `src/mcp/*`, and `src/surfaces/*`. They propose, render, read redacted evidence, or report readiness; they do not authorize, gateway-check, mutate, settle, clear, certify, or prove provider custody.
 - Committed transition-budget telemetry hardening lives in `test/support/transition-budget-recorder.ts` and `test/protocol/transition-budget-recorder.test.ts`.
 
-**Visible dirty auth.md adapter state:**
-- Tracked dirty docs/export/test changes mention auth.md in `STRUCTURE.md`, `docs/internal/protocol-notes.md`, `src/adapters/LANE.md`, `src/experimental.ts`, and `test/architecture/root-exports.test.ts`.
-- Untracked implementation/test files exist under `src/adapters/auth-md/index.ts`, `src/adapters/auth-md/profiles.ts`, `src/adapters/auth-md/action-proposal.ts`, and `test/adapters/auth-md-adapter.test.ts`.
-- Treat auth.md as observed working-tree adapter work only. It is not committed architecture, not Tier 1 kernel, not a stable package surface, and not a hosted/auth-provider/provider-custody/generic-API-gateway claim.
+**Committed auth.md protected-call profile:**
+- Commit `7bba365` added `src/adapters/auth-md/index.ts`, `src/adapters/auth-md/profiles.ts`, `src/adapters/auth-md/action-proposal.ts`, `src/adapters/auth-md/gateway.ts`, tests, docs, runtime-ingress binding, and explicit experimental exports.
+- Treat auth.md as an experimental/reference adapter profile: discovery and registration are provenance; `GatewayCredentialRef` is custody evidence; `auth_md_protected_api_call.exact` is an action contract; `runAuthMdProtectedApiCallGateway()` mutates only after `VerifiedGatewayCheck`.
+- It is not Tier 1 kernel, not an auth provider, not an OAuth server, not WorkOS replacement, not provider custody, not hosted operation, and not a generic API gateway.
+
+**Current dirty auth.md expansion:**
+- Dirty tracked/untracked files add lifecycle isolation, bypass probes, auth.md transaction-envelope evidence labels, shared flow fixtures, policy tests, gateway pressure tests, serialization redaction tests, and local integration/reconstruction tests.
+- Key files: `src/adapters/auth-md/revocation.ts`, `src/adapters/auth-md/bypass-probes.ts`, `test/support/auth-md-flow.ts`, `test/protocol/policy-auth-md.test.ts`, `test/integration/auth-md-protected-call.test.ts`, and `test/integration/auth-md-receipt-reconstruction.test.ts`.
+- Treat these as user-owned working-tree state until full-gated and committed.
 
 ## Directory Purposes
 
@@ -131,7 +136,7 @@ test/
 
 **`src/adapters`:**
 - Purpose: Reference gateway fixtures and adapter proof profiles.
-- Contains: committed package-install, repo-write, preview-deploy, protected-path probes, x402 payment proof profile, downstream failure evidence; visible dirty auth.md adapter files are working-tree state only.
+- Contains: committed package-install, repo-write, preview-deploy, protected-path probes, x402 payment proof profile, downstream failure evidence, and auth.md protected-call adapter profile; current dirty auth.md lifecycle/bypass files are working-tree state.
 - Key files: `src/adapters/package-install/gateway.ts`, `src/adapters/repo-write/gateway.ts`, `src/adapters/preview-deploy/gateway.ts`, `src/adapters/x402-payment/wallet-gateway.ts`, `src/adapters/x402-payment/install-proposal.ts`, `src/adapters/x402-payment/action-proposal.ts`, `src/adapters/x402-payment/upstream-evidence.ts`, `src/adapters/x402-payment/conformance.ts`, `src/adapters/x402-payment/bypass-probes.ts`.
 
 **`src/install`:**
@@ -352,11 +357,11 @@ test/
 - Tests: `test/adapters/<family>.test.ts`, `test/conformance/<family>.test.ts`, `test/architecture/import-posture.test.ts`, `test/architecture/root-exports.test.ts`.
 - Guardrail: Mutation must happen only after `VerifiedGatewayCheck`; adapters must not import storage internals or use SDK/runtime as authority.
 
-**New auth.md Adapter Work:**
-- Current working-tree files: `src/adapters/auth-md/index.ts`, `src/adapters/auth-md/profiles.ts`, `src/adapters/auth-md/action-proposal.ts`, `test/adapters/auth-md-adapter.test.ts`.
-- Tracked dirty export/doc guards: `src/experimental.ts`, `src/adapters/LANE.md`, `STRUCTURE.md`, `docs/internal/protocol-notes.md`, `test/architecture/root-exports.test.ts`.
-- Placement: keep auth.md under `src/adapters/auth-md/` as an experimental/reference adapter profile until committed and guarded.
-- Guardrail: It may normalize Protected Resource Metadata, prepare opaque `GatewayCredentialRef` intake, and propose exact service-call contracts. It must not issue policy, greenlight, gateway check, receipt, credential material, hosted identity, auth-provider, OAuth-server, certification, provider-custody, or generic API-gateway claims.
+**auth.md Adapter Work:**
+- Committed files: `src/adapters/auth-md/profiles.ts`, `src/adapters/auth-md/action-proposal.ts`, `src/adapters/auth-md/gateway.ts`, `src/adapters/auth-md/index.ts`, `test/adapters/auth-md-adapter.test.ts`, `test/adapters/auth-md-gateway.test.ts`, and `test/runtime/auth-md-candidate-compilation.test.ts`.
+- Dirty expansion files: `src/adapters/auth-md/revocation.ts`, `src/adapters/auth-md/bypass-probes.ts`, `test/support/auth-md-flow.ts`, `test/adapters/auth-md-bypass-probes.test.ts`, `test/adapters/auth-md-revocation.test.ts`, `test/adapters/auth-md-gateway-pressure.test.ts`, `test/adapters/auth-md-serialization-redaction.test.ts`, `test/protocol/policy-auth-md.test.ts`, `test/integration/auth-md-protected-call.test.ts`, and `test/integration/auth-md-receipt-reconstruction.test.ts`.
+- Placement: keep auth.md under `src/adapters/auth-md/` and explicit `src/experimental.ts` exports. Do not move it to root, runtime, SDK, CLI, MCP, or conformance package surfaces unless a future source-owned boundary explicitly proves that move.
+- Guardrail: It may normalize Protected Resource Metadata, prepare opaque `GatewayCredentialRef` intake, propose exact service-call contracts, and run a reference gateway only after `VerifiedGatewayCheck`. It must not issue policy by itself, create ambient greenlights, leak credential material, claim hosted identity, become an auth provider or OAuth server, certify providers, or act as a generic API gateway.
 
 **New Storage Evidence Or Index:**
 - Store contract: `src/protocol/store/port.ts`.
@@ -436,7 +441,7 @@ test/
 **Adapter and x402 surfaces:**
 - Reference gateways: `src/adapters/package-install/gateway.ts`, `src/adapters/repo-write/gateway.ts`, `src/adapters/preview-deploy/gateway.ts`.
 - x402 proof profile: `src/adapters/x402-payment/*`.
-- Visible dirty auth.md profile: `src/adapters/auth-md/*` and `test/adapters/auth-md-adapter.test.ts`, not committed architecture.
+- Committed auth.md profile: `src/adapters/auth-md/*` proposal/gateway/runtime-ingress slice is experimental/reference architecture; current revocation/bypass/reconstruction additions are dirty working-tree state.
 - Conformance subpath: `src/conformance/index.ts`.
 - Experimental subpath: `src/experimental.ts`.
 - Tests: `test/adapters/*`, `test/conformance/*`, `test/integration/x402-d1-http.test.ts`.

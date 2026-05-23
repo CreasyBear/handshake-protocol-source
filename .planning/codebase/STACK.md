@@ -14,11 +14,12 @@
 - The committed telemetry hardening is source-backed by redacted evidence projections in `src/protocol/evidence-projections/schemas.ts`, projection assembly in `src/protocol/evidence-projections/projections.ts`, transaction-envelope assembly in `src/protocol/evidence-projections/assembly.ts`, CLI non-authority envelopes in `src/cli/output.ts`, support-bundle redaction in `src/cli/support-bundle.ts`, MCP non-authority outcomes in `src/mcp/output.ts`, and surface boundary flags in `src/surfaces/boundary-manifest.ts`.
 - Tests proving the telemetry boundary include `test/protocol/evidence-projections.test.ts`, `test/http/http.test.ts`, `test/cli/cli-support-bundle.test.ts`, `test/mcp/mcp-resource-redaction.test.ts`, and `test/product/agent-proof-slice.test.ts`.
 
-**Visible dirty working-tree state:**
-- `git status --short` shows user-owned dirty files: `STRUCTURE.md`, `docs/internal/protocol-notes.md`, `src/adapters/LANE.md`, `src/experimental.ts`, `test/architecture/root-exports.test.ts`, untracked `src/adapters/auth-md/`, and untracked `test/adapters/auth-md-adapter.test.ts`.
-- The dirty auth.md adapter is not committed source. Its visible state adds untracked `src/adapters/auth-md/index.ts`, `src/adapters/auth-md/profiles.ts`, `src/adapters/auth-md/action-proposal.ts`, and `test/adapters/auth-md-adapter.test.ts`, plus tracked edits that export it through `src/experimental.ts` and document it in `src/adapters/LANE.md`, `STRUCTURE.md`, `docs/internal/protocol-notes.md`, and `test/architecture/root-exports.test.ts`.
-- The dirty auth.md adapter treats OAuth Protected Resource Metadata `agent_auth` and auth.md prose as provenance, creates redacted `GatewayCredentialRef` intake inputs, proposes `auth_md_protected_api_call.exact` contracts, and refuses raw authorization headers, dynamic endpoints, read-only methods, wrong origins, and unsafe custody in `src/adapters/auth-md/action-proposal.ts`.
-- Keep the committed stack and visible auth.md adapter state separate until those source and test files are intentionally committed.
+**Current source state after auth.md promotion:**
+- Commit `7bba365` promoted the first `src/adapters/auth-md/` slice: `profiles.ts`, `action-proposal.ts`, `gateway.ts`, `index.ts`, adapter tests, gateway tests, runtime-ingress candidate-compilation tests, export posture, and compact docs.
+- The committed auth.md adapter treats OAuth Protected Resource Metadata plus authorization-server `agent_auth` metadata as machine provenance, treats `/auth.md` prose as supporting evidence only, imports issued credentials into `GatewayCredentialRef` custody, proposes `auth_md_protected_api_call.exact` contracts, and runs protected API calls only after `VerifiedGatewayCheck`.
+- The current working tree has additional user-owned dirty auth.md expansion beyond that commit: `src/adapters/auth-md/bypass-probes.ts`, `src/adapters/auth-md/revocation.ts`, dirty evidence-projection labels, dirty runtime/test fixture refactors, and untracked auth.md pressure, redaction, integration, policy, reconstruction, bypass, and revocation tests.
+- Focused verification for the dirty auth.md expansion passed during this remap: the auth.md slice returned 34 pass / 0 fail.
+- Keep committed auth.md protected-call support separate from the dirty lifecycle/bypass/reconstruction expansion until the expansion is reviewed, staged, full-gated, and committed.
 
 ## Languages
 
@@ -83,7 +84,7 @@
 - `./runtime` -> `src/runtime/index.ts` and `dist/runtime/index.d.ts`; runtime ingress proposal helpers only.
 - `./sdk/role-clients` -> `src/sdk/surface-clients/index.ts` and `dist/sdk/surface-clients/index.d.ts`; runtime and evidence role clients.
 - `./conformance` -> `src/conformance/index.ts` and `dist/conformance/index.d.ts`; reference conformance helpers.
-- `./experimental` -> `src/experimental.ts` and `dist/experimental.d.ts`; committed reference gateway fixture exports. The dirty working tree additionally adds auth.md exports here.
+- `./experimental` -> `src/experimental.ts` and `dist/experimental.d.ts`; committed reference gateway fixture exports, including explicit auth.md profile/proposal/gateway fixture exports. The current dirty tree adds auth.md lifecycle and bypass-probe exports here.
 
 **Package guard:**
 - `scripts/check-package-surface.mjs` requires source, generated declarations, README, quality/structure docs, and compact `docs/internal/*` canon; it rejects `.planning/`, `.agents/`, tests, deleted docs trees, `.DS_Store`, and `skills-lock.json`.

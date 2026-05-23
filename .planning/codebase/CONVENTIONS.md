@@ -170,20 +170,21 @@
 - Use `src/surfaces/boundary-manifest.ts` as the source-owned contract for SDK, CLI, MCP, and other non-kernel surface posture.
 - Treat `.planning/` as scratch only. Repo-facing source, tests, exports, scripts, and canonical docs must use `AGENTS.md`, `README.md`, `QUALITY.md`, `STRUCTURE.md`, `docs/internal/decisions.md`, and `docs/internal/protocol-notes.md` as evidence.
 
-## Visible Dirty Working Tree Posture
+## Auth.md Adapter Posture
 
-**Preserve as user-owned state:**
-- The visible dirty working tree contains tracked edits in `STRUCTURE.md`, `docs/internal/protocol-notes.md`, `src/adapters/LANE.md`, `src/experimental.ts`, and `test/architecture/root-exports.test.ts`.
-- The visible dirty working tree also contains untracked auth.md adapter files: `src/adapters/auth-md/profiles.ts`, `src/adapters/auth-md/action-proposal.ts`, `src/adapters/auth-md/index.ts`, and `test/adapters/auth-md-adapter.test.ts`.
-- Do not treat the auth.md adapter as committed baseline until it is intentionally landed. It is visible local adapter state layered on top of committed source.
-
-**Dirty auth.md adapter conventions to preserve if landed:**
-- Keep auth.md under the experimental/reference adapter boundary. `src/adapters/auth-md/index.ts` only re-exports `./profiles` and `./action-proposal`; `src/experimental.ts` currently has dirty exports prefixed with `experimental` or `Experimental`.
-- Treat OAuth Protected Resource Metadata `agent_auth` as the machine source of truth and auth.md prose as supporting evidence. `buildAuthMdDiscoveryEvidence()` in `src/adapters/auth-md/profiles.ts` normalizes PRM fields, sorts list values, records `authMdDocumentDigest` only as support, and emits `authorityCreated: false`.
+**Committed conventions:**
+- Keep auth.md under the experimental/reference adapter boundary. The committed `src/adapters/auth-md/index.ts` re-exports adapter-local profiles, proposal, and gateway helpers; the current dirty index also re-exports lifecycle/probe helpers. `src/experimental.ts` keeps the surface explicit and off the package root.
+- Treat OAuth Protected Resource Metadata plus authorization-server `agent_auth` as machine provenance and `/auth.md` prose as supporting evidence. `buildAuthMdDiscoveryEvidence()` in `src/adapters/auth-md/profiles.ts` normalizes PRM and authorization-server metadata, sorts list values, records `authMdDocumentDigest` only as support, and emits `authorityCreated: false`.
 - Import issued credentials into gateway custody only as opaque refs. `buildAuthMdGatewayCredentialIntake()` returns redacted `AuthMdRegistrationEvidence` plus `RegisterGatewayCredentialRefInput`; it must not return `credentialMaterial`, ID subject values, bearer tokens, access tokens, API keys, JWTs, private keys, or provider secrets.
-- Keep raw credential leak detection close to auth.md parsing. `assertNoLeakedAuthMdCredentialMaterial()` in `src/adapters/auth-md/profiles.ts` scans plain strings, URL-decoded variants, and base64-like decoded variants for bearer tokens, private keys, token/secret assignments, and JWT-like material.
-- Proposed auth.md service calls are contracts only. `proposeAuthMdProtectedApiCallActionContract()` in `src/adapters/auth-md/action-proposal.ts` can compile/propose `auth_md_protected_api_call.exact` with gateway credential bindings, but it does not evaluate policy, issue greenlights, perform gateway checks, create receipts, or mutate the downstream API.
-- Refuse auth.md bypass and overreach before compilation. `authMdProtectedApiCallRefusalReasonCodes()` rejects non-consequential methods, endpoint origin mismatch, raw authorization headers, dynamic endpoint construction, and unsafe runtime-visible credential custody.
+- Keep raw credential leak detection close to auth.md parsing and downstream evidence. `assertNoLeakedAuthMdCredentialMaterial()` in `src/adapters/auth-md/profiles.ts` scans plain strings, URL-decoded variants, and base64-like decoded variants for bearer tokens, private keys, token/secret assignments, and JWT-like material.
+- Proposed auth.md service calls are contracts only. `proposeAuthMdProtectedApiCallActionContract()` can compile/propose `auth_md_protected_api_call.exact` with gateway credential bindings, but it does not evaluate policy, issue greenlights, perform gateway checks, create receipts, or mutate the downstream API.
+- The auth.md gateway is the consequence holder. `runAuthMdProtectedApiCallGateway()` must call `gatewayCheck()`, require `VerifiedGatewayCheck`, record `CredentialResolutionEvidence` only after the gate, refuse drift/replay/non-authoritative gates before service execution, and reconcile success/refusal/proof-gap/failure without leaking raw auth material.
+- Refuse auth.md bypass and overreach before compilation or before gateway execution. `authMdProtectedApiCallRefusalReasonCodes()` rejects non-consequential methods, endpoint origin mismatch, raw authorization headers, dynamic endpoint/host construction, wildcard scopes, stale metadata, stale/revoked/expired credential refs, missing idempotency material, retry authority reuse, and unsafe runtime-visible credential custody.
+
+**Current dirty expansion conventions:**
+- `applyAuthMdCredentialLifecycleIsolation()` in `src/adapters/auth-md/revocation.ts` maps logout, explicit revocation, credential expiry, downstream 401, metadata drift, and ambiguous lifecycle events to credential-ref isolation. It records evidence and isolation, not authority.
+- `authMdProtectedApiCallBypassProbeExecutors()` in `src/adapters/auth-md/bypass-probes.ts` classifies hostile paths as prevented, detected, or proof gap. Probe outputs must stay redacted and cannot create protected-path authority by themselves.
+- Dirty auth.md evidence labels in `src/protocol/evidence-projections/projections.ts` are buyer-readable reconstruction aids. They must not imply provider custody, gateway admission, or downstream success without the matching Handshake policy/gate/reconciliation records.
 
 ## Active Tier 2 SDK/CLI/MCP Surface Posture
 
