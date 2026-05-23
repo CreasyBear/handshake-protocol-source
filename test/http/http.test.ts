@@ -199,6 +199,33 @@ describe("Hono protocol surface", () => {
     });
   });
 
+  it("rejects oversized transition bodies before schema parsing or record commits", async () => {
+    const store = new InMemoryProtocolStore();
+    const app = createApp({
+      store,
+      callerAuthTokens: TEST_CALLER_AUTH_TOKENS,
+    });
+
+    const response = await app.request("/v0.2/runtime-executions", {
+      method: "POST",
+      headers: jsonHeaders("runtime_evidence"),
+      body: JSON.stringify({ oversized: "x".repeat(300_000) }),
+    });
+
+    expect(response.status).toBe(413);
+    expect(await response.json()).toMatchObject({
+      error: {
+        code: "transition_request_body_too_large",
+        transitionName: "createRuntimeExecution",
+        callerCustodyRole: "runtime_evidence",
+        commitState: "not_started",
+        requestIdentity: "test-request-runtime_evidence",
+      },
+    });
+    expect(store.countRecordsOfType("runtime_execution")).toBe(0);
+    expect(store.countRecordsOfType("transition_request_context")).toBe(0);
+  });
+
   it("keeps action contract proposal on runtime-evidence custody", async () => {
     const app = createApp({
       store: new InMemoryProtocolStore(),

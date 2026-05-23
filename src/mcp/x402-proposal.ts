@@ -4,69 +4,80 @@ import { mcpActionContractProposedOutcome, mcpNonContractOutcome, mcpToolResult,
 import { digestMcp, type McpJsonValue } from "./digest";
 
 const DigestSchema = z.string().regex(/^sha256:[a-f0-9]{64}$/);
-const AtomicAmountSchema = z.string().regex(/^(?:0|[1-9]\d*)$/);
+const AtomicAmountSchema = z
+  .string()
+  .max(78)
+  .regex(/^(?:0|[1-9]\d*)$/);
 const IsoDateSchema = z.string().datetime({ offset: true });
+const McpIdSchema = z.string().min(1).max(160);
+const McpRefSchema = z.string().min(1).max(500);
+const McpUrlSchema = z.string().url().max(2_048);
+const McpSmallListSchema = <T extends z.ZodTypeAny>(schema: T) => z.array(schema).max(32);
 
 export const McpInstallPostureSchema = z.enum(["ready", "missing", "stale", "unsafe", "unknown"]);
 export const McpGatewayPostureSchema = z.enum(["online", "offline", "unknown"]);
 
 export const McpX402PaymentProposalInputSchema = z.strictObject({
-  requestId: z.string().min(1),
-  tenantId: z.string().min(1),
-  organizationId: z.string().min(1),
-  principalId: z.string().min(1),
-  agentId: z.string().min(1),
-  principalIntentRef: z.string().min(1),
-  generatedCodeOrSpecRef: z.string().min(1),
-  runtimeAdapterRef: z.string().min(1),
-  runId: z.string().min(1),
-  dispatchBoundaryRef: z.string().min(1),
-  dispatchRef: z.string().min(1),
-  metadataRef: z.string().min(1),
+  requestId: McpIdSchema,
+  tenantId: McpIdSchema,
+  organizationId: McpIdSchema,
+  principalId: McpIdSchema,
+  agentId: McpIdSchema,
+  principalIntentRef: McpRefSchema,
+  generatedCodeOrSpecRef: McpRefSchema,
+  runtimeAdapterRef: McpRefSchema,
+  runId: McpIdSchema,
+  dispatchBoundaryRef: McpRefSchema,
+  dispatchRef: McpRefSchema,
+  metadataRef: McpRefSchema,
   metadataDigest: DigestSchema,
-  toolCatalogRef: z.string().min(1),
+  toolCatalogRef: McpRefSchema,
   toolCatalogDigest: DigestSchema,
-  actionCatalogRef: z.string().min(1),
-  gatewayRegistryRef: z.string().min(1),
+  actionCatalogRef: McpRefSchema,
+  gatewayRegistryRef: McpRefSchema,
   gatewayRegistryDigest: DigestSchema,
-  operatingEnvelopeId: z.string().min(1),
-  toolCapabilityId: z.string().min(1),
-  actionTypeId: z.string().min(1),
-  gatewayRegistryEntryId: z.string().min(1),
-  gatewayId: z.string().min(1),
+  operatingEnvelopeId: McpIdSchema,
+  toolCapabilityId: McpIdSchema,
+  actionTypeId: McpIdSchema,
+  gatewayRegistryEntryId: McpIdSchema,
+  gatewayId: McpIdSchema,
   contractExpiresAt: IsoDateSchema,
-  idempotencyKey: z.string().min(1),
-  endpointUrl: z.string().url(),
-  intendedHttpMethod: z.string().min(1),
-  intendedRequestUrl: z.string().url(),
+  idempotencyKey: McpIdSchema,
+  endpointUrl: McpUrlSchema,
+  intendedHttpMethod: McpIdSchema,
+  intendedRequestUrl: McpUrlSchema,
   intendedRequestBodyDigest: DigestSchema.nullable(),
   selectedHeadersDigest: DigestSchema,
-  payee: z.string().min(1),
-  payTo: z.string().min(1),
-  network: z.string().min(1),
-  token: z.string().min(1),
-  asset: z.string().min(1),
+  payee: McpRefSchema,
+  payTo: McpRefSchema,
+  network: McpIdSchema,
+  token: McpIdSchema,
+  asset: McpIdSchema,
   atomicAmount: AtomicAmountSchema,
-  maxAtomicAmountPerCall: AtomicAmountSchema,
   x402EvidenceProfile: z.literal("official_payment_required"),
   x402Version: z.number().int().positive(),
   x402Scheme: z.literal("exact"),
   maxTimeoutSeconds: z.number().positive(),
   paymentRequirementsDigest: DigestSchema,
-  paymentRequiredEvidenceRef: z.string().min(1),
+  paymentRequiredEvidenceRef: McpRefSchema,
   selectedPaymentRequirementIndex: z.number().int().nonnegative(),
   selectedPaymentRequirementDigest: DigestSchema,
-  sdkPackageVersions: z.record(z.string(), z.string().min(1)).refine((value) => Object.keys(value).length > 0, {
-    message: "official x402 evidence requires SDK package versions",
-  }),
-  extensionKeys: z.array(z.string().min(1)).default([]),
-  facilitatorRef: z.string().min(1).nullable().default(null),
-  requiredPriorActionContractIds: z.array(z.string().min(1)).default([]),
+  sdkPackageVersions: z
+    .record(McpIdSchema, McpIdSchema)
+    .refine((value) => Object.keys(value).length > 0, {
+      message: "official x402 evidence requires SDK package versions",
+    })
+    .refine((value) => Object.keys(value).length <= 16, {
+      message: "official x402 evidence must keep SDK package version evidence bounded",
+    }),
+  extensionKeys: McpSmallListSchema(McpIdSchema).default([]),
+  facilitatorRef: McpRefSchema.nullable().default(null),
+  requiredPriorActionContractIds: McpSmallListSchema(McpIdSchema).default([]),
   sequenceNumber: z.number().int().positive().default(1),
   loopDetected: z.boolean().default(false),
   retryDetected: z.boolean().default(false),
   branchDetected: z.boolean().default(false),
-  correlationRef: z.string().min(1).nullable().default(null),
+  correlationRef: McpRefSchema.nullable().default(null),
 });
 
 export type McpX402PaymentProposalInput = z.input<typeof McpX402PaymentProposalInputSchema>;
@@ -84,8 +95,10 @@ export type McpRuntimeProposalClient = Pick<
 export type ProposeMcpX402PaymentOptions = {
   runtimeClient: McpRuntimeProposalClient;
   currentMetadataDigest?: `sha256:${string}`;
+  toolsListChanged?: boolean;
   installPosture?: z.infer<typeof McpInstallPostureSchema>;
   gatewayPosture?: z.infer<typeof McpGatewayPostureSchema>;
+  trustedMaxAtomicAmountPerCall?: `${number}` | string;
 };
 
 export async function proposeMcpX402Payment(
@@ -103,6 +116,21 @@ export async function proposeMcpX402Payment(
     });
   }
   const input = parsed.data;
+  const idempotencyKey = await deriveMcpX402IdempotencyKey(input);
+
+  if (options.toolsListChanged) {
+    return mcpNonContractOutcome({
+      outcome: "tools_list_changed",
+      phase: "freshness",
+      reasonCodes: ["mcp_tools_list_changed"],
+      nextAction: "reload_metadata",
+      retryability: "retryable_after_reload",
+      metadataRef: input.metadataRef,
+      challengeRef: `handshake://challenges/tools-list-changed/${encodeURIComponent(input.requestId)}`,
+      correlationRef: input.correlationRef,
+      idempotencyKey,
+    });
+  }
 
   if (options.currentMetadataDigest && options.currentMetadataDigest !== input.metadataDigest) {
     return mcpNonContractOutcome({
@@ -114,7 +142,7 @@ export async function proposeMcpX402Payment(
       metadataRef: input.metadataRef,
       challengeRef: `handshake://challenges/metadata-stale/${encodeURIComponent(input.requestId)}`,
       correlationRef: input.correlationRef,
-      idempotencyKey: input.idempotencyKey,
+      idempotencyKey,
     });
   }
 
@@ -125,9 +153,24 @@ export async function proposeMcpX402Payment(
       reasonCodes: [`mcp_install_${options.installPosture ?? "unknown"}`],
       nextAction: "fix_install",
       metadataRef: input.metadataRef,
+      evidenceRefs: [preContractInstallHealthRef(input.requestId)],
       challengeRef: `handshake://challenges/install-not-ready/${encodeURIComponent(input.requestId)}`,
       correlationRef: input.correlationRef,
-      idempotencyKey: input.idempotencyKey,
+      idempotencyKey,
+    });
+  }
+
+  if (!options.trustedMaxAtomicAmountPerCall) {
+    return mcpNonContractOutcome({
+      outcome: "install_not_ready",
+      phase: "readiness",
+      reasonCodes: ["mcp_trusted_spend_bound_missing"],
+      nextAction: "fix_install",
+      metadataRef: input.metadataRef,
+      evidenceRefs: [preContractInstallHealthRef(input.requestId)],
+      challengeRef: `handshake://challenges/install-not-ready/${encodeURIComponent(input.requestId)}`,
+      correlationRef: input.correlationRef,
+      idempotencyKey,
     });
   }
 
@@ -139,13 +182,27 @@ export async function proposeMcpX402Payment(
       nextAction: "wait_for_gateway",
       retryability: "retryable_after_reload",
       metadataRef: input.metadataRef,
+      evidenceRefs: [preContractInstallHealthRef(input.requestId)],
       challengeRef: `handshake://challenges/gateway-offline/${encodeURIComponent(input.requestId)}`,
       correlationRef: input.correlationRef,
-      idempotencyKey: input.idempotencyKey,
+      idempotencyKey,
     });
   }
 
-  if (compareAtomic(input.atomicAmount, input.maxAtomicAmountPerCall) > 0) {
+  if ((options.gatewayPosture ?? "online") === "unknown") {
+    return mcpNonContractOutcome({
+      outcome: "tool_execution_error",
+      phase: "tool_execution",
+      reasonCodes: ["mcp_gateway_posture_unknown"],
+      nextAction: "stop",
+      metadataRef: input.metadataRef,
+      evidenceRefs: [preContractInstallHealthRef(input.requestId)],
+      correlationRef: input.correlationRef,
+      idempotencyKey,
+    });
+  }
+
+  if (compareAtomic(input.atomicAmount, options.trustedMaxAtomicAmountPerCall) > 0) {
     return mcpNonContractOutcome({
       outcome: "refused",
       phase: "proposal",
@@ -155,30 +212,61 @@ export async function proposeMcpX402Payment(
       metadataRef: input.metadataRef,
       challengeRef: `handshake://challenges/x402-amount/${encodeURIComponent(input.requestId)}`,
       correlationRef: input.correlationRef,
-      idempotencyKey: input.idempotencyKey,
+      idempotencyKey,
     });
   }
 
   try {
-    return await proposeContract(input, options.runtimeClient);
+    return await proposeContract(input, idempotencyKey, options.runtimeClient, options.trustedMaxAtomicAmountPerCall);
   } catch (error) {
+    const code = errorCode(error);
+    if (code === "already_consumed" || code === "idempotency_duplicate_authority") {
+      return mcpNonContractOutcome({
+        outcome: "replay_refused",
+        phase: "replay",
+        reasonCodes: [code],
+        nextAction: "read_evidence",
+        commitState: errorCommitState(error),
+        metadataRef: input.metadataRef,
+        evidenceRefs: [input.paymentRequiredEvidenceRef],
+        challengeRef: `handshake://challenges/replay-refused/${encodeURIComponent(input.requestId)}`,
+        correlationRef: input.correlationRef,
+        idempotencyKey,
+      });
+    }
+    if (code === "idempotency_key_params_mismatch") {
+      return mcpNonContractOutcome({
+        outcome: "refused",
+        phase: "proposal",
+        reasonCodes: [code],
+        nextAction: "recraft_request",
+        commitState: errorCommitState(error),
+        metadataRef: input.metadataRef,
+        evidenceRefs: [input.paymentRequiredEvidenceRef],
+        challengeRef: `handshake://challenges/idempotency-params-mismatch/${encodeURIComponent(input.requestId)}`,
+        correlationRef: input.correlationRef,
+        idempotencyKey,
+      });
+    }
     return mcpNonContractOutcome({
       outcome: "tool_execution_error",
       phase: "tool_execution",
-      reasonCodes: [errorCode(error)],
+      reasonCodes: [code],
       nextAction: "stop",
       commitState: errorCommitState(error),
       metadataRef: input.metadataRef,
       evidenceRefs: [input.paymentRequiredEvidenceRef],
       correlationRef: input.correlationRef,
-      idempotencyKey: input.idempotencyKey,
+      idempotencyKey,
     });
   }
 }
 
 async function proposeContract(
   input: ParsedMcpX402PaymentProposalInput,
+  idempotencyKey: string,
   runtimeClient: McpRuntimeProposalClient,
+  trustedMaxAtomicAmountPerCall: string,
 ): Promise<McpToolResult> {
   const resourceRef = x402ResourceRef(input);
   const parameters = x402Parameters(input);
@@ -287,9 +375,9 @@ async function proposeContract(
         network: input.network,
         token: input.token,
         asset: input.asset,
-        maxAtomicAmountPerCall: input.maxAtomicAmountPerCall,
+        maxAtomicAmountPerCall: trustedMaxAtomicAmountPerCall,
       },
-      idempotencyKey: input.idempotencyKey,
+      idempotencyKey,
       rollbackHint: "recover through payment response or facilitator evidence; do not reuse prior authority",
       expiresAt: input.contractExpiresAt,
     },
@@ -312,7 +400,7 @@ async function proposeContract(
       evidenceRefs: [input.paymentRequiredEvidenceRef],
       challengeRef: `handshake://challenges/proposal-refused/${encodeURIComponent(input.requestId)}`,
       correlationRef: input.correlationRef,
-      idempotencyKey: input.idempotencyKey,
+      idempotencyKey,
     });
   }
 
@@ -328,7 +416,7 @@ async function proposeContract(
       evidenceRefs: [input.paymentRequiredEvidenceRef],
       challengeRef: `handshake://challenges/proposal-digest-missing/${encodeURIComponent(input.requestId)}`,
       correlationRef: input.correlationRef,
-      idempotencyKey: input.idempotencyKey,
+      idempotencyKey,
     });
   }
 
@@ -366,7 +454,7 @@ async function proposeContract(
       ],
       challengeRef: null,
       correlationRef: input.correlationRef,
-      idempotencyKey: input.idempotencyKey,
+      idempotencyKey,
       actionContractId: actionContract.actionContractId,
       contractDigest: actionContract.actionContractDigest,
       paramsDigest: actionContract.paramsDigest,
@@ -377,6 +465,38 @@ async function proposeContract(
       generatedExecutionGraphPosture: "not_exposed_by_role_scoped_runtime_surface",
     }),
   );
+}
+
+async function deriveMcpX402IdempotencyKey(input: ParsedMcpX402PaymentProposalInput): Promise<string> {
+  const digest = await digestMcp({
+    schemaVersion: "handshake.mcp.x402.idempotency.v1",
+    tenantId: input.tenantId,
+    organizationId: input.organizationId,
+    principalId: input.principalId,
+    agentId: input.agentId,
+    operatingEnvelopeId: input.operatingEnvelopeId,
+    gatewayId: input.gatewayId,
+    actionClass: "x402_payment.exact",
+    endpointUrl: input.endpointUrl,
+    intendedHttpMethod: input.intendedHttpMethod,
+    intendedRequestUrl: input.intendedRequestUrl,
+    intendedRequestBodyDigest: input.intendedRequestBodyDigest,
+    selectedHeadersDigest: input.selectedHeadersDigest,
+    x402Version: input.x402Version,
+    x402Scheme: input.x402Scheme,
+    payee: input.payee,
+    payTo: input.payTo,
+    network: input.network,
+    token: input.token,
+    asset: input.asset,
+    atomicAmount: input.atomicAmount,
+    paymentRequirementsDigest: input.paymentRequirementsDigest,
+    selectedPaymentRequirementIndex: input.selectedPaymentRequirementIndex,
+    selectedPaymentRequirementDigest: input.selectedPaymentRequirementDigest,
+    sequenceNumber: input.sequenceNumber,
+    requiredPriorActionContractIds: input.requiredPriorActionContractIds,
+  });
+  return `mcp-x402:${digest.slice("sha256:".length)}`;
 }
 
 function x402Parameters(input: ParsedMcpX402PaymentProposalInput): Record<string, McpJsonValue> {
@@ -415,6 +535,10 @@ function x402ResourceRef(input: ParsedMcpX402PaymentProposalInput): string {
   return `x402://${encodeURIComponent(input.network)}/${encodeURIComponent(input.payee)}/${encodeURIComponent(
     endpointDomain,
   )}`;
+}
+
+function preContractInstallHealthRef(requestId: string): string {
+  return `handshake://health/install/pre-contract/${encodeURIComponent(requestId)}`;
 }
 
 function compareAtomic(left: string, right: string): number {

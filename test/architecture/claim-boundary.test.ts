@@ -90,4 +90,26 @@ describe("claim boundary", () => {
       /x402Client|privateKeyToAccount|SIGNING_PRIVATE_KEY|provider custody claim|hosted dashboard|cross-org certificate trust/i,
     );
   });
+
+  it("requires MCP docs to stay proposal/evidence only", () => {
+    const mcpLane = readFileSync("src/mcp/LANE.md", "utf8");
+
+    expect(mcpLane).toContain("proposal and evidence transport only");
+    expect(mcpLane).toContain("It does not start an MCP process, evaluate policy, create greenlights");
+    expect(mcpLane).toContain("Gateway custody, control-plane install, signer material");
+    expect(mcpLane).toContain("certificate resources as local terminal evidence references only");
+    expect(mcpLane).toContain("MCP can propose and display evidence. It cannot authorize");
+    expect(mcpLane).toContain(
+      "does not claim sibling MCP, terminal, browser, cloud, package-manager, repo, or network paths are protected",
+    );
+    expect(mcpLane).not.toMatch(/MCP (?:controls|secures|protects) (?:all|every|broad)/i);
+    expect(mcpLane).not.toMatch(
+      /hosted operation|provider custody|settlement|aggregate spend|spend-window enforcement/i,
+    );
+    expect(mcpLane).not.toMatch(/marketplace|certification|clearing house|clearing-house|broad x402 compatibility/i);
+    expect(mcpLane).not.toMatch(
+      /MCP (?:mints|creates|publishes) (?:authority certificates|cross-org certificate trust)/i,
+    );
+    expect(mcpLane).not.toMatch(/MCP exports receipts/i);
+  });
 });

@@ -7,7 +7,7 @@ describe("MCP x402 proposal bridge", () => {
     const calls: Array<{ name: string; input: unknown }> = [];
     const client = fakeRuntimeClient(calls);
 
-    const result = await proposeMcpX402Payment(validProposalInput(), { runtimeClient: client });
+    const result = await proposeMcpX402Payment(validProposalInput(), trustedOptions(client));
 
     expect(calls.map((call) => call.name)).toEqual([
       "createRuntimeExecution",
@@ -48,16 +48,21 @@ describe("MCP x402 proposal bridge", () => {
     expect(JSON.stringify(calls)).not.toContain("PAYMENT-SIGNATURE");
   });
 
-  it("refuses stale metadata, not-ready install, offline gateway, and amount overrun before runtime calls", async () => {
+  it("refuses stale metadata, not-ready install, offline gateway, unknown gateway, and amount overrun before runtime calls", async () => {
     for (const [input, options, outcome] of [
       [validProposalInput(), { currentMetadataDigest: digest(50) }, "metadata_stale"],
       [validProposalInput(), { installPosture: "missing" }, "install_not_ready"],
+      [validProposalInput(), { installPosture: "stale" }, "install_not_ready"],
+      [validProposalInput(), { installPosture: "unsafe" }, "install_not_ready"],
+      [validProposalInput(), { installPosture: "unknown" }, "install_not_ready"],
       [validProposalInput(), { gatewayPosture: "offline" }, "gateway_offline"],
+      [validProposalInput(), { gatewayPosture: "unknown" }, "tool_execution_error"],
       [{ ...validProposalInput(), atomicAmount: "3000" }, {}, "refused"],
+      [{ ...validProposalInput(), atomicAmount: "1000", maxAtomicAmountPerCall: "999999" }, {}, "tool_execution_error"],
     ] as const) {
       const calls: Array<{ name: string; input: unknown }> = [];
       const result = await proposeMcpX402Payment(input, {
-        runtimeClient: fakeRuntimeClient(calls),
+        ...trustedOptions(fakeRuntimeClient(calls)),
         ...options,
       });
 
@@ -65,6 +70,70 @@ describe("MCP x402 proposal bridge", () => {
       expect(result.structuredContent.outcome).toBe(outcome);
       expect(result.structuredContent.authorityCreated).toBe(false);
       expect(result.structuredContent.mutationAttempted).toBe(false);
+      if (outcome === "install_not_ready" || outcome === "gateway_offline") {
+        expect(result.structuredContent.evidenceRefs).toContain(
+          "handshake://health/install/pre-contract/req_mcp_x402_1",
+        );
+      }
+      expect(calls).toEqual([]);
+    }
+  });
+
+  it("refuses oversized model proposal fields before runtime calls", async () => {
+    for (const input of [
+      { ...validProposalInput(), metadataRef: `metadata:${"x".repeat(2_000)}` },
+      { ...validProposalInput(), extensionKeys: Array.from({ length: 65 }, (_, index) => `extension:${index}`) },
+    ]) {
+      const calls: Array<{ name: string; input: unknown }> = [];
+      const result = await proposeMcpX402Payment(input, trustedOptions(fakeRuntimeClient(calls)));
+
+      expect(result.isError).toBe(true);
+      expect(result.structuredContent).toMatchObject({
+        outcome: "tool_execution_error",
+        phase: "tool_execution",
+        authorityCreated: false,
+        mutationAttempted: false,
+      });
+      expect(calls).toEqual([]);
+    }
+  });
+
+  it("surfaces tools/list changes as freshness outcomes before runtime calls", async () => {
+    const calls: Array<{ name: string; input: unknown }> = [];
+    const result = await proposeMcpX402Payment(validProposalInput(), {
+      ...trustedOptions(fakeRuntimeClient(calls)),
+      toolsListChanged: true,
+    });
+
+    expect(result.isError).toBe(false);
+    expect(result.structuredContent).toMatchObject({
+      outcome: "tools_list_changed",
+      phase: "freshness",
+      reasonCodes: ["mcp_tools_list_changed"],
+      nextAction: "reload_metadata",
+      authorityCreated: false,
+      mutationAttempted: false,
+    });
+    expect(calls).toEqual([]);
+  });
+
+  it("refuses bypass-shaped MCP inputs before runtime calls", async () => {
+    for (const input of [
+      { ...validProposalInput(), dispatchKind: "raw_sibling_x402_payment", rawCommandRef: "shell:x402-fetch" },
+      { ...validProposalInput(), signerRef: "wallet:agent-owned" },
+      { ...validProposalInput(), mutationCommand: "pay" },
+    ]) {
+      const calls: Array<{ name: string; input: unknown }> = [];
+      const result = await proposeMcpX402Payment(input, trustedOptions(fakeRuntimeClient(calls)));
+
+      expect(result.isError).toBe(true);
+      expect(result.structuredContent).toMatchObject({
+        outcome: "tool_execution_error",
+        phase: "tool_execution",
+        reasonCodes: ["mcp_input_schema_invalid"],
+        authorityCreated: false,
+        mutationAttempted: false,
+      });
       expect(calls).toEqual([]);
     }
   });
@@ -73,7 +142,7 @@ describe("MCP x402 proposal bridge", () => {
     const calls: Array<{ name: string; input: unknown }> = [];
     const client = fakeRuntimeClient(calls, { refused: true });
 
-    const result = await proposeMcpX402Payment(validProposalInput(), { runtimeClient: client });
+    const result = await proposeMcpX402Payment(validProposalInput(), trustedOptions(client));
 
     expect(result.isError).toBe(true);
     expect(result.structuredContent).toMatchObject({
@@ -91,11 +160,105 @@ describe("MCP x402 proposal bridge", () => {
       "compileIntent",
     ]);
   });
+
+  it("derives a stable idempotency key from x402 request material instead of trusting caller keys", async () => {
+    const firstCalls: Array<{ name: string; input: unknown }> = [];
+    const secondCalls: Array<{ name: string; input: unknown }> = [];
+
+    const first = await proposeMcpX402Payment(
+      { ...validProposalInput(), idempotencyKey: "caller-key:first" },
+      trustedOptions(fakeRuntimeClient(firstCalls)),
+    );
+    const second = await proposeMcpX402Payment(
+      { ...validProposalInput(), idempotencyKey: "caller-key:second" },
+      trustedOptions(fakeRuntimeClient(secondCalls)),
+    );
+
+    const firstCandidate = compileIntentCandidate(firstCalls);
+    const secondCandidate = compileIntentCandidate(secondCalls);
+
+    expect(first.structuredContent).toMatchObject({
+      outcome: "action_contract_proposed",
+      authorityCreated: false,
+      mutationAttempted: false,
+    });
+    expect(second.structuredContent).toMatchObject({
+      outcome: "action_contract_proposed",
+      authorityCreated: false,
+      mutationAttempted: false,
+    });
+    expect(firstCandidate.idempotencyKey).toBe(secondCandidate.idempotencyKey);
+    expect(firstCandidate.idempotencyKey).not.toBe("caller-key:first");
+    expect(firstCandidate.idempotencyKey).not.toBe("caller-key:second");
+    expect(first.structuredContent.idempotencyKey).toBe(firstCandidate.idempotencyKey);
+    expect(second.structuredContent.idempotencyKey).toBe(secondCandidate.idempotencyKey);
+  });
+
+  it("maps protocol replay and idempotency failures to structured non-authority outcomes", async () => {
+    for (const [code, outcome] of [
+      ["already_consumed", "replay_refused"],
+      ["idempotency_duplicate_authority", "replay_refused"],
+      ["idempotency_key_params_mismatch", "refused"],
+    ] as const) {
+      const calls: Array<{ name: string; input: unknown }> = [];
+      const result = await proposeMcpX402Payment(validProposalInput(), {
+        ...trustedOptions(fakeRuntimeClient(calls, { throwOnContract: code })),
+      });
+
+      expect(result.isError).toBe(true);
+      expect(result.structuredContent).toMatchObject({
+        outcome,
+        phase: outcome === "replay_refused" ? "replay" : "proposal",
+        reasonCodes: [code],
+        authorityCreated: false,
+        greenlightCreated: false,
+        gatewayCheckPerformed: false,
+        mutationAttempted: false,
+      });
+      expect(calls.map((call) => call.name)).toEqual([
+        "createRuntimeExecution",
+        "createToolCallDraft",
+        "transitionToolCallDraft",
+        "compileIntent",
+        "proposeActionContract",
+      ]);
+    }
+  });
+
+  it("derives distinct idempotency keys for sequenced retry attempts", async () => {
+    const firstCalls: Array<{ name: string; input: unknown }> = [];
+    const secondCalls: Array<{ name: string; input: unknown }> = [];
+
+    await proposeMcpX402Payment(
+      { ...validProposalInput(), sequenceNumber: 1 },
+      trustedOptions(fakeRuntimeClient(firstCalls)),
+    );
+    await proposeMcpX402Payment(
+      { ...validProposalInput(), sequenceNumber: 2, requiredPriorActionContractIds: ["act_previous"] },
+      trustedOptions(fakeRuntimeClient(secondCalls)),
+    );
+
+    expect(compileIntentCandidate(firstCalls).idempotencyKey).not.toBe(
+      compileIntentCandidate(secondCalls).idempotencyKey,
+    );
+  });
 });
+
+function trustedOptions(runtimeClient: McpRuntimeProposalClient) {
+  return { runtimeClient, trustedMaxAtomicAmountPerCall: "2000" };
+}
+
+function compileIntentCandidate(calls: Array<{ name: string; input: unknown }>) {
+  const call = calls.find((entry) => entry.name === "compileIntent");
+  if (!call || typeof call.input !== "object" || call.input === null || !("candidate" in call.input)) {
+    throw new Error("expected compileIntent candidate");
+  }
+  return call.input.candidate as { idempotencyKey: string };
+}
 
 function fakeRuntimeClient(
   calls: Array<{ name: string; input: unknown }>,
-  options: { refused?: boolean } = {},
+  options: { refused?: boolean; throwOnContract?: string } = {},
 ): McpRuntimeProposalClient {
   return {
     async createRuntimeExecution(input) {
@@ -126,6 +289,9 @@ function fakeRuntimeClient(
     },
     async proposeActionContract(input) {
       calls.push({ name: "proposeActionContract", input });
+      if (options.throwOnContract) {
+        throw { code: options.throwOnContract, commitState: "accepted" };
+      }
       return {
         actionContractId: "act_mcp_x402",
         actionContractDigest: digest(8),

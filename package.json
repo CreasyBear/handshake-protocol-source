@@ -45,6 +45,7 @@
     "typecheck": "tsc --noEmit",
     "test": "bun test",
     "demo:aps": "bun run ./examples/x402-protected-spend/run.ts",
+    "demo:mcp-transcript": "bun run ./examples/mcp-reference-transcript/run.ts",
     "build": "tsc -p tsconfig.build.json",
     "format": "prettier --write .",
     "format:check": "prettier --check .",

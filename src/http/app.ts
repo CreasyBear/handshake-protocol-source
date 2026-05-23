@@ -1,5 +1,6 @@
 import { Hono, type Context } from "hono";
 import type { ZodType } from "zod";
+import { HandshakeProtocolError } from "../protocol/foundation/errors";
 import { PROTOCOL_VERSION } from "../protocol/public/schemas";
 import { InMemoryProtocolStore } from "../storage/memory";
 import type { ProtocolStore } from "../protocol/store/port";
@@ -22,6 +23,8 @@ import { kernelFor, storeFor } from "./store/resolution";
 import { hideReferenceScopeMismatch } from "./routes/transition-scope-resolvers";
 
 export type { AppOptions, WorkerBindings } from "./app-options";
+
+const MAX_TRANSITION_REQUEST_BODY_BYTES = 256 * 1024;
 
 export function createApp(options: AppOptions = {}) {
   const fallbackStore = options.store ?? (options.allowEphemeralStore ? new InMemoryProtocolStore() : null);
@@ -51,8 +54,38 @@ export function createApp(options: AppOptions = {}) {
 }
 
 async function parseBody<T>(c: Context, schema: ZodType<T>): Promise<T> {
-  const json = await c.req.json();
+  const contentLength = c.req.header("content-length");
+  if (contentLength && Number(contentLength) > MAX_TRANSITION_REQUEST_BODY_BYTES) {
+    throwTransitionBodyTooLarge();
+  }
+
+  const text = await c.req.text();
+  if (new TextEncoder().encode(text).byteLength > MAX_TRANSITION_REQUEST_BODY_BYTES) {
+    throwTransitionBodyTooLarge();
+  }
+
+  let json: unknown;
+  try {
+    json = JSON.parse(text);
+  } catch {
+    throw new HandshakeProtocolError("invalid_request", "Transition request body is not valid JSON.", 400, {
+      retryability: "terminal",
+      commitState: "not_started",
+    });
+  }
   return schema.parse(json);
+}
+
+function throwTransitionBodyTooLarge(): never {
+  throw new HandshakeProtocolError(
+    "transition_request_body_too_large",
+    "Transition request body exceeds the source-owned size limit.",
+    413,
+    {
+      retryability: "terminal",
+      commitState: "not_started",
+    },
+  );
 }
 
 async function handleTransition(

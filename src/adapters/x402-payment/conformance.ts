@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { requiredGatewayCheckedBypassProbeKinds } from "../../protocol/areas/bypass-probe";
 
-export const X402FirstWedgeUnsupportedSurfaceSchema = z.enum([
+export const x402FirstWedgeUnsupportedSurfaces = [
   "upto",
   "batch-settlement",
   "lifecycle-hooks",
@@ -10,7 +10,9 @@ export const X402FirstWedgeUnsupportedSurfaceSchema = z.enum([
   "signed-receipts",
   "seller-middleware",
   "facilitator-operation",
-]);
+] as const;
+
+export const X402FirstWedgeUnsupportedSurfaceSchema = z.enum(x402FirstWedgeUnsupportedSurfaces);
 export type X402FirstWedgeUnsupportedSurface = z.infer<typeof X402FirstWedgeUnsupportedSurfaceSchema>;
 
 export const X402FirstWedgeSurfaceSchema = z.union([z.literal("exact"), X402FirstWedgeUnsupportedSurfaceSchema]);

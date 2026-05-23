@@ -109,5 +109,11 @@ describe("x402 protected spend demo report", () => {
     expect(demoSource).toContain("EvidenceClient");
     expect(demoSource).not.toContain("HandshakeClient");
     expect(demoSource).not.toContain("proposeRuntimeIngressActionContracts");
+
+    const readme = await Bun.file(`${repoRoot}/README.md`).text();
+    expect(readme).toContain("npm run demo:aps");
+    expect(readme).toContain("examples/x402-protected-spend/output/latest.md");
+    expect(readme).toContain("not hosted operation");
+    expect(readme).toContain("not broad x402 compatibility");
   });
 });

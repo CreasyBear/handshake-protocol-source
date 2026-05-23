@@ -167,6 +167,34 @@ describe("runtime ingress adapter", () => {
     expect(await recordCount(fixture.store, "greenlight")).toBe(0);
   });
 
+  it("rejects oversized dispatch blocks before recording runtime evidence", async () => {
+    const fixture = makeKernelFixture();
+    await registerFixtureObjects(fixture);
+
+    await expect(
+      proposeRuntimeIngressActionContracts(
+        fixture.kernel,
+        { packageInstall: packageInstallRuntimeConfig(fixture) },
+        {
+          principalIntentRef: "intent:oversized dispatch block",
+          generatedCodeOrSpecRef: "runtime:dispatch-block-oversized",
+          dispatchBoundaryRef: "dispatch-boundary:oversized",
+          dispatches: Array.from({ length: 65 }, (_, index) => ({
+            dispatchKind: "wrapped_package_install",
+            dispatchRef: `dispatch:package-install:${index}`,
+            package: "hono",
+            versionRange: "^4.12.19",
+          })),
+        },
+      ),
+    ).rejects.toThrow();
+
+    expect(await recordCount(fixture.store, "runtime_execution")).toBe(0);
+    expect(await recordCount(fixture.store, "generated_execution_graph")).toBe(0);
+    expect(await recordCount(fixture.store, "action_contract")).toBe(0);
+    expect(await recordCount(fixture.store, "greenlight")).toBe(0);
+  });
+
   it("records raw sibling bypass evidence and cannot manufacture gateway-checked posture", async () => {
     const fixture = makeKernelFixture();
     await registerFixtureObjects(fixture);

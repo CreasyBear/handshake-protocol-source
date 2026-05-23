@@ -18,7 +18,7 @@ The CLI is not an agent hot path. Runtime proposal belongs to SDK/MCP, gateway c
 
 ## Core components
 
-`command-manifest.ts`, `output.ts`, `aps-report.ts`, `certificate.ts`, `conformance.ts`, and `main.ts`.
+`command-manifest.ts`, `output.ts`, `aps-report.ts`, `certificate.ts`, `projection-evidence.ts`, `local-project/`, `x402/`, and `main.ts`.
 
 ## Failure and scale posture
 

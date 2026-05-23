@@ -20,11 +20,29 @@ import {
 describe("credential custody protocol records", () => {
   it("rejects raw credential material in gateway credential ref inputs and records", async () => {
     const input = credentialRefInput();
+    const encodedPaymentSignature = "evidence:UEFZTUVOVC1TSUdOQVRVUkU6IGFiYw==";
+    const encodedPrivateKey = "provider:%70%72%69%76%61%74%65%5F%6B%65%79%3Draw";
 
     expect(() =>
       RegisterGatewayCredentialRefInputSchema.parse({
         ...input,
         providerRegistryRef: "api_key=raw-provider-key",
+      }),
+    ).toThrow("credential custody records must not contain raw credential material");
+
+    for (const providerRegistryRef of [encodedPaymentSignature, encodedPrivateKey]) {
+      expect(() =>
+        RegisterGatewayCredentialRefInputSchema.parse({
+          ...input,
+          providerRegistryRef,
+        }),
+      ).toThrow("credential custody records must not contain raw credential material");
+    }
+
+    expect(() =>
+      RegisterGatewayCredentialRefInputSchema.parse({
+        ...input,
+        evidenceExpectationRefs: [encodedPaymentSignature],
       }),
     ).toThrow("credential custody records must not contain raw credential material");
 

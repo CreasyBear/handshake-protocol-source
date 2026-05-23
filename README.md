@@ -127,6 +127,26 @@ bun install --frozen-lockfile
 npm run check:repo
 ```
 
+First protected-action walkthrough:
+
+```bash
+npm run demo:aps
+```
+
+This writes the buyer-readable local x402 protected-spend report to:
+
+```text
+examples/x402-protected-spend/output/latest.md
+examples/x402-protected-spend/output/latest.json
+```
+
+Inspect the report for the exact runtime proposal, action contract, policy
+decision, gateway check, replay refusal, proof-gap posture, redacted evidence
+refs, and local terminal certificate verification. This is local/reference
+evidence only: not hosted operation, not broad x402 compatibility, not provider
+custody, not aggregate spend enforcement, not cross-org trust, and not a
+clearing-house claim.
+
 | Command                | Purpose                                                                             |
 | ---------------------- | ----------------------------------------------------------------------------------- |
 | `npm run check:repo`   | Full local and CI gate: types, lint, format, Bun tests, pack check, whitespace diff |

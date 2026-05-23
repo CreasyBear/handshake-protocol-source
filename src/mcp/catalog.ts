@@ -55,6 +55,13 @@ export const mcpResourceTemplates = [
     projectionStatus: "evidence_client",
   },
   {
+    uriTemplate: "handshake://health/install/pre-contract/{requestId}",
+    purpose: "read_pre_contract_install_health",
+    readOnly: true,
+    authorityCreated: false,
+    projectionStatus: "source_catalog",
+  },
+  {
     uriTemplate: "handshake://certificates/{authorityCertificateId}",
     purpose: "read_terminal_certificate_reference",
     readOnly: true,

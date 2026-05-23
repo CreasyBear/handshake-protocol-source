@@ -4,6 +4,7 @@ export type HttpErrorCodePhase =
   | "auth"
   | "hosted_admission"
   | "request_context"
+  | "request_body"
   | "scope_resolution"
   | "record_read"
   | "store_resolution"
@@ -34,6 +35,7 @@ export const httpTransitionErrorCodes = [
   code("request_identity_required", "request_context", "terminal", "not_started", true),
   code("request_identity_invalid", "request_context", "terminal", "not_started", true),
   code("originating_identity_invalid", "request_context", "terminal", "not_started", true),
+  code("transition_request_body_too_large", "request_body", "terminal", "not_started", true),
   code("transition_scope_unavailable", "scope_resolution", "terminal", "not_started", true),
   code("transition_scope_reference_invalid", "scope_resolution", "terminal", "not_started", true),
   code("intent_compilation_missing", "scope_resolution", "terminal", "not_started", true),

@@ -107,19 +107,49 @@ export const CredentialResolutionEvidenceSchema = ProtocolBaseSchema.extend({
 export type CredentialResolutionEvidence = z.infer<typeof CredentialResolutionEvidenceSchema>;
 
 function looksLikeCredentialMaterial(value: string): boolean {
-  return [
-    /BEGIN\s+(?:RSA\s+|EC\s+|OPENSSH\s+)?PRIVATE KEY/i,
-    /PAYMENT-SIGNATURE\s*:/i,
-    /PaymentPayload/i,
-    /raw[_-]?payment[_-]?signature/i,
-    /token[_-]?passthrough/i,
-    /facilitator[_-]?secret/i,
-    /private[_-]?key/i,
-    /api[_-]?key\s*=/i,
-    /access[_-]?token\s*=/i,
-    /secret\s*=/i,
-    /password\s*=/i,
-    /vault:\/\/.*\/secret/i,
-    /infisical:\/\/.*\/secret/i,
-  ].some((pattern) => pattern.test(value));
+  return credentialMaterialVariants(value).some((variant) =>
+    [
+      /BEGIN\s+(?:RSA\s+|EC\s+|OPENSSH\s+)?PRIVATE KEY/i,
+      /PAYMENT-SIGNATURE\s*:/i,
+      /PaymentPayload/i,
+      /raw[_-]?payment[_-]?signature/i,
+      /token[_-]?passthrough/i,
+      /facilitator[_-]?secret/i,
+      /private[_-]?key/i,
+      /api[_-]?key\s*=/i,
+      /access[_-]?token\s*=/i,
+      /secret\s*=/i,
+      /password\s*=/i,
+      /vault:\/\/.*\/secret/i,
+      /infisical:\/\/.*\/secret/i,
+    ].some((pattern) => pattern.test(variant)),
+  );
+}
+
+function credentialMaterialVariants(value: string): string[] {
+  const variants = new Set<string>([value]);
+  try {
+    variants.add(decodeURIComponent(value));
+  } catch {
+    // Keep the original value only when percent decoding is malformed.
+  }
+
+  for (const token of value.match(/[A-Za-z0-9+/_=-]{16,}/g) ?? []) {
+    const decoded = decodeBase64Like(token);
+    if (decoded) variants.add(decoded);
+  }
+
+  return [...variants];
+}
+
+function decodeBase64Like(token: string): string | null {
+  const normalized = token.replace(/-/g, "+").replace(/_/g, "/");
+  if (!/^[A-Za-z0-9+/]+={0,2}$/.test(normalized)) return null;
+  const paddingLength = (4 - (normalized.length % 4)) % 4;
+  try {
+    const decoded = atob(`${normalized}${"=".repeat(paddingLength)}`);
+    return /^[\x09\x0a\x0d\x20-\x7e]+$/.test(decoded) ? decoded : null;
+  } catch {
+    return null;
+  }
 }

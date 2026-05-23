@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { EvidenceClient } from "../sdk/surface-clients";
+import { digestMcp, type McpJsonValue } from "./digest";
 import { MCP_SCHEMA_VERSION } from "./output";
 
 export const McpResourceReadSchema = z.strictObject({
@@ -20,14 +20,13 @@ export const McpResourceReadSchema = z.strictObject({
 
 export type McpResourceRead = z.infer<typeof McpResourceReadSchema>;
 
-export type McpEvidenceResourceClient = Pick<
-  EvidenceClient,
-  | "getContractEvidenceProjection"
-  | "getAgentTransactionEnvelopeProjection"
-  | "getReceiptTimelineProjection"
-  | "getIdempotencyRecoveryProjection"
-  | "getProtectedPathInstallHealthProjection"
->;
+export type McpEvidenceResourceClient = {
+  getContractEvidenceProjection(actionContractId: string): Promise<unknown>;
+  getAgentTransactionEnvelopeProjection(actionContractId: string): Promise<unknown>;
+  getReceiptTimelineProjection(receiptId: string): Promise<unknown>;
+  getIdempotencyRecoveryProjection(actionContractId: string): Promise<unknown>;
+  getProtectedPathInstallHealthProjection(actionContractId: string): Promise<unknown>;
+};
 
 export async function readMcpResource(
   uri: string,
@@ -60,6 +59,7 @@ type ParsedMcpResourceUri =
   | { kind: "receiptTimeline"; receiptId: string }
   | { kind: "idempotency"; actionContractId: string }
   | { kind: "installHealth"; actionContractId: string }
+  | { kind: "installHealthPreContract"; requestId: string }
   | { kind: "certificateRef"; authorityCertificateId: string };
 
 export function parseMcpResourceUri(uri: string): ParsedMcpResourceUri {
@@ -84,6 +84,9 @@ export function parseMcpResourceUri(uri: string): ParsedMcpResourceUri {
     return { kind: "idempotency", actionContractId: segments[1] };
   }
   if (parsed.hostname === "health" && segments[0] === "install" && segments[1]) {
+    if (segments[1] === "pre-contract" && segments[2]) {
+      return { kind: "installHealthPreContract", requestId: segments[2] };
+    }
     return { kind: "installHealth", actionContractId: segments[1] };
   }
   if (parsed.hostname === "certificates" && segments[0]) {
@@ -95,13 +98,14 @@ export function parseMcpResourceUri(uri: string): ParsedMcpResourceUri {
 async function readPayload(parsed: ParsedMcpResourceUri, evidenceClient: McpEvidenceResourceClient): Promise<unknown> {
   switch (parsed.kind) {
     case "metadata":
-      return {
+      return withMetadataDigest({
+        resourceVersion: "mcp-metadata.v1",
         actionClass: parsed.actionClass,
         proposalTool: "handshake.actions.x402_payment.propose",
         authorityCreated: false,
         gatewayCheckPerformed: false,
         mutationAttempted: false,
-      };
+      });
     case "challenge":
       return {
         challengeId: parsed.challengeId,
@@ -118,6 +122,16 @@ async function readPayload(parsed: ParsedMcpResourceUri, evidenceClient: McpEvid
       return evidenceClient.getIdempotencyRecoveryProjection(parsed.actionContractId);
     case "installHealth":
       return evidenceClient.getProtectedPathInstallHealthProjection(parsed.actionContractId);
+    case "installHealthPreContract":
+      return withMetadataDigest({
+        resourceVersion: "mcp-install-health.pre-contract.v1",
+        requestId: parsed.requestId,
+        healthScope: "pre_contract",
+        authorityCreated: false,
+        greenlightCreated: false,
+        gatewayCheckPerformed: false,
+        mutationAttempted: false,
+      });
     case "certificateRef":
       return {
         authorityCertificateId: parsed.authorityCertificateId,
@@ -125,4 +139,11 @@ async function readPayload(parsed: ParsedMcpResourceUri, evidenceClient: McpEvid
         verificationPosture: "cli_first_reference_only",
       };
   }
+}
+
+async function withMetadataDigest(metadata: Record<string, McpJsonValue>): Promise<Record<string, McpJsonValue>> {
+  return {
+    ...metadata,
+    metadataDigest: await digestMcp(metadata),
+  };
 }

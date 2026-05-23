@@ -7,3 +7,4 @@ coverage
 .planning
 docs/internal/archive
 examples/x402-protected-spend/output
+examples/mcp-reference-transcript/output

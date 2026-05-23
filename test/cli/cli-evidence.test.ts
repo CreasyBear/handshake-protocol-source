@@ -63,14 +63,57 @@ describe("CLI evidence surface", () => {
     });
   });
 
+  it("wraps redacted contract and receipt evidence projections without raw dumps", async () => {
+    const contract = await runCliCommand(["evidence", "contract-view", await writeJson("contract", contractView())]);
+    const timeline = await runCliCommand([
+      "evidence",
+      "receipt-timeline",
+      await writeJson("timeline", receiptTimeline()),
+    ]);
+
+    expect(contract).toMatchObject({
+      command: "evidence contract-view",
+      plane: "evidence",
+      custodyRole: "review_custody",
+      authorityCreated: false,
+      rawInternalRecordIncluded: false,
+      receiptExportCreated: false,
+      result: {
+        redactionProfileRef: "contract-view:v0.2-redacted",
+        actionContractRef: "contract_demo",
+      },
+    });
+    expect(timeline).toMatchObject({
+      command: "evidence receipt-timeline",
+      plane: "evidence",
+      custodyRole: "review_custody",
+      authorityCreated: false,
+      rawInternalRecordIncluded: false,
+      receiptExportCreated: false,
+      result: {
+        redactionProfileRef: "receipt-timeline:v0.2-redacted",
+        receiptRef: "receipt_demo",
+      },
+    });
+    expect((contract as { result: { secretRefs?: unknown } }).result.secretRefs).toBeUndefined();
+    expect(JSON.stringify(timeline)).not.toContain("PAYMENT-SIGNATURE");
+  });
+
   it("exposes only active non-mutating command metadata and x402 protected-spend conformance", async () => {
     await expect(runCliCommand(["schema"])).resolves.toMatchObject({
       command: "schema",
       result: {
         commands: [
           { id: "schema", agentSafe: true },
+          { id: "init", agentSafe: false },
+          { id: "doctor", agentSafe: true },
           { id: "evidence.aps-report", agentSafe: true },
+          { id: "evidence.contract-view", agentSafe: true },
+          { id: "evidence.receipt-timeline", agentSafe: true },
           { id: "cert.verify", agentSafe: true },
+          { id: "install.x402-payment", agentSafe: false },
+          { id: "probes.x402-payment", agentSafe: false },
+          { id: "install.health", agentSafe: true },
           { id: "conformance.x402-payment", agentSafe: true },
         ],
       },
@@ -132,5 +175,69 @@ function apsReport() {
       { phase: "1_runtime_proposal", verdict: "pass" },
       { phase: "6_replay_refusal", verdict: "pass" },
     ],
+  };
+}
+
+function contractView() {
+  return {
+    actionContractRef: "contract_demo",
+    contractDigest: `sha256:${"1".repeat(64)}`,
+    intentCompilationRef: "intent_demo",
+    candidateActionRef: "candidate_demo",
+    candidateDigest: `sha256:${"2".repeat(64)}`,
+    envelopeRef: "envelope_demo",
+    principalRef: "principal_demo",
+    agentRef: "agent_demo",
+    participantIdentityBindings: [],
+    runId: "run_demo",
+    runtimeAdapterRef: "runtime_demo",
+    actionClass: "x402_payment.exact",
+    protectedSurfaceKind: "x402_payment",
+    resourceRef: "x402:base-sepolia:payee:https://seller.example.com/report",
+    gatewayId: "gateway_demo",
+    gatewayPolicyVersion: "v1",
+    requiredProtectedPathState: "gateway_checked",
+    idempotencyKey: "idempotency_demo",
+    paramsDigest: `sha256:${"3".repeat(64)}`,
+    nonSecretParamsSummary: { method: "GET" },
+    gatewayCredentialRefs: [],
+    evidenceRefs: [],
+    clearingEvidenceRefs: {},
+    signaturePosture: "local_hmac",
+    keyIdentityRef: "key_demo",
+    verificationPolicyRef: "verification_demo",
+    generatedExecutionGraphRef: null,
+    generatedExecutionNodeRef: null,
+    redactionProfileRef: "contract-view:v0.2-redacted",
+    omittedFields: ["parameters", "secretRefs", "contractSignature"],
+  };
+}
+
+function receiptTimeline() {
+  return {
+    receiptRef: "receipt_demo",
+    actionContractRef: "contract_demo",
+    policyDecisionRef: "policy_demo",
+    greenlightRef: "greenlight_demo",
+    gateAttemptRef: "gate_demo",
+    mutationAttemptRef: "mutation_demo",
+    gatewayId: "gateway_demo",
+    policyDecisionStatus: "greenlight",
+    gatewayCheckStatus: "passed",
+    gatewayAdmissionStatus: "admitted",
+    greenlightConsumptionStatus: "consumed",
+    mutationAttemptStatus: "submitted",
+    downstreamExecutionStatus: "pending",
+    downstreamOutcomeStatus: "pending",
+    proofGapRefs: [],
+    finalityStatus: "pending",
+    receiptDigest: `sha256:${"4".repeat(64)}`,
+    auditChainDigest: `sha256:${"5".repeat(64)}`,
+    streamOffsets: [],
+    events: [],
+    missingEventCount: 0,
+    failureEvidence: null,
+    redactionProfileRef: "receipt-timeline:v0.2-redacted",
+    omittedFields: ["payload", "evidenceRefs"],
   };
 }

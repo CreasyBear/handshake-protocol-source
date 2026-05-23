@@ -51,3 +51,34 @@ Extract only after the HTTP route surface is stable, SDK exports are curated, cl
 ## Scope boundary
 
 This lane sends requests and parses responses. It must not infer authority from responses, issue greenlights, perform gateway checks, mutate protected surfaces, or treat evidence reads as execution proof.
+
+## Role-client adoption closeout
+
+First-slice activation code should use `RuntimeClient` and `EvidenceClient` from
+`src/sdk/surface-clients`, not the low-level `HandshakeClient` token-map
+transport. `HandshakeClient` remains useful for protocol tests and internal
+HTTP route parity, but it teaches the wrong shape for agent-facing activation
+because it can carry multiple role tokens.
+
+`RuntimeClient` may create runtime execution evidence, tool-call drafts, intent
+compilations, and action-contract proposals through `runtime_evidence` custody.
+Those methods produce proposal records only. They do not evaluate policy,
+greenlight, gateway-check, mutate, export receipts, mint certificates, recover,
+install, isolate, or sign.
+
+`EvidenceClient` may read redacted projections and verify a supplied terminal
+`AuthorityCertificate` against explicit pinned local trust material. It does
+not mint certificates, export receipts, read raw internal records, or collapse
+gateway admission, downstream finality, replay, and proof gaps into a single
+success boolean.
+
+Challenge and support posture:
+
+- return structured protocol errors or surface outcomes; do not retry protected
+  work automatically from the SDK;
+- send support only redacted evidence refs, projection payloads, request
+  identities, reason codes, and local trust verification results;
+- never request or include `PaymentPayload`, `PAYMENT-SIGNATURE`, private keys,
+  signer refs, raw store records, role-token maps, or gateway credentials;
+- keep `InstallClient` and `GatewayClient` as deferred contracts until the user
+  explicitly expands this package surface beyond runtime/evidence.

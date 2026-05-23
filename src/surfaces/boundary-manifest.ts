@@ -335,7 +335,15 @@ export const surfaceBoundaryManifest = {
     plane: "operator",
     custodyRole: "control_plane",
     authorityPosture: "setup_only",
-    sourceRoots: ["src/cli/command-manifest.ts", "src/cli/conformance.ts", "src/cli/main.ts", "src/cli/output.ts"],
+    sourceRoots: [
+      "src/cli/command-manifest.ts",
+      "src/cli/local-project/doctor.ts",
+      "src/cli/local-project/index.ts",
+      "src/cli/main.ts",
+      "src/cli/output.ts",
+      "src/cli/x402/index.ts",
+      "src/cli/x402/local-state.ts",
+    ],
     allowedRouteFamilies: ["catalog_install_write", "install_health_read"],
     forbiddenRouteFamilies: [
       ...forbiddenAuthorityRouteFamilies,
@@ -345,8 +353,8 @@ export const surfaceBoundaryManifest = {
       "surface_reconciliation_write",
       "tool_call_draft_write",
     ],
-    allowedImportRoots: ["src/sdk", "src/surfaces"],
-    forbiddenImportFragments: [...forbiddenAuthorityImports, "adapters/", "storage/"],
+    allowedImportRoots: ["src/sdk", "src/surfaces", "src/conformance"],
+    forbiddenImportFragments: [...forbiddenAuthorityImports, "wallet-gateway", "storage/"],
     forbiddenCredentialShapes: [
       "allRoles",
       "CallerAuthTokens",
@@ -370,6 +378,7 @@ export const surfaceBoundaryManifest = {
       "src/cli/command-manifest.ts",
       "src/cli/main.ts",
       "src/cli/output.ts",
+      "src/cli/projection-evidence.ts",
     ],
     allowedRouteFamilies: ["certificate_verify_local", "evidence_projection_read", "install_health_read"],
     forbiddenRouteFamilies: [

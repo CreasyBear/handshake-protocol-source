@@ -28,16 +28,25 @@ const requiredNonAuthorityFields = [
 ] as const;
 
 describe("CLI command posture", () => {
-  it("keeps the first CLI slice to evidence, manifest, local verify, and conformance commands", () => {
+  it("keeps the first CLI slice to evidence, local readiness, manifest, local verify, and conformance commands", () => {
     expect(cliCommandManifest.map((command) => command.id)).toEqual([
       "schema",
+      "init",
+      "doctor",
       "evidence.aps-report",
+      "evidence.contract-view",
+      "evidence.receipt-timeline",
       "cert.verify",
+      "install.x402-payment",
+      "probes.x402-payment",
+      "install.health",
       "conformance.x402-payment",
     ]);
     expect(cliCommandManifest.every((command) => command.status === "active")).toBe(true);
     expect(cliCommandManifest.every((command) => command.childProcessEnvInheritance === "none")).toBe(true);
-    expect(cliCommandManifest.every((command) => command.filesystemWrites.length === 0)).toBe(true);
+    expect(
+      cliCommandManifest.filter((command) => command.filesystemWrites.length > 0).map((command) => command.id),
+    ).toEqual(["init", "install.x402-payment", "probes.x402-payment"]);
   });
 
   it("rejects mutation-shaped command names and authority route families", () => {
@@ -95,7 +104,18 @@ describe("CLI command posture", () => {
 });
 
 function cliSource(): string {
-  return ["aps-report.ts", "certificate.ts", "command-manifest.ts", "conformance.ts", "main.ts", "output.ts"]
+  return [
+    "aps-report.ts",
+    "certificate.ts",
+    "command-manifest.ts",
+    "main.ts",
+    "output.ts",
+    "projection-evidence.ts",
+    "local-project/doctor.ts",
+    "local-project/index.ts",
+    "x402/index.ts",
+    "x402/local-state.ts",
+  ]
     .map((file) => readFileSync(join("src/cli", file), "utf8"))
     .join("\n");
 }

@@ -11,6 +11,7 @@ describe("MCP resource redaction", () => {
     await readMcpResource("handshake://evidence/receipts/rcp_demo/timeline", evidenceClient);
     await readMcpResource("handshake://evidence/idempotency/act_demo", evidenceClient);
     await readMcpResource("handshake://health/install/act_demo", evidenceClient);
+    const preContractHealth = await readMcpResource("handshake://health/install/pre-contract/req_demo", evidenceClient);
 
     expect(calls).toEqual([
       "contract:act_demo",
@@ -19,6 +20,12 @@ describe("MCP resource redaction", () => {
       "idempotency:act_demo",
       "install:act_demo",
     ]);
+    expect(preContractHealth.payload).toMatchObject({
+      resourceVersion: "mcp-install-health.pre-contract.v1",
+      requestId: "req_demo",
+      healthScope: "pre_contract",
+      metadataDigest: expect.stringMatching(/^sha256:[a-f0-9]{64}$/),
+    });
   });
 
   it("keeps metadata, challenge, and certificate resources reference-only", async () => {
@@ -46,12 +53,22 @@ describe("MCP resource redaction", () => {
       expect(JSON.stringify(result)).not.toContain('"rawInternalRecord":');
       expect(JSON.stringify(result)).not.toContain("rawCredentialMaterial");
     }
+    expect(metadata.payload).toMatchObject({
+      actionClass: "x402_payment.exact",
+      proposalTool: "handshake.actions.x402_payment.propose",
+      metadataDigest: expect.stringMatching(/^sha256:[a-f0-9]{64}$/),
+      resourceVersion: "mcp-metadata.v1",
+    });
   });
 
   it("parses only the source-owned resource URI families", () => {
     expect(parseMcpResourceUri("handshake://evidence/contracts/act_demo")).toEqual({
       kind: "contract",
       actionContractId: "act_demo",
+    });
+    expect(parseMcpResourceUri("handshake://health/install/pre-contract/req_demo")).toEqual({
+      kind: "installHealthPreContract",
+      requestId: "req_demo",
     });
     expect(() => parseMcpResourceUri("handshake://actions/run/act_demo")).toThrow();
     expect(() => parseMcpResourceUri("https://example.test/evidence/contracts/act_demo")).toThrow();
@@ -80,5 +97,5 @@ function fakeEvidenceClient(calls: string[]): McpEvidenceResourceClient {
       calls.push(`install:${actionContractId}`);
       return { projection: "install", actionContractId };
     },
-  } as never;
+  };
 }

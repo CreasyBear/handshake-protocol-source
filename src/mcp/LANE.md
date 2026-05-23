@@ -14,6 +14,7 @@ This lane defines a source-owned MCP catalog, strict `x402_payment.exact` propos
 - Let the host submit one exact buyer-side `x402_payment.exact` proposal candidate.
 - Let the host receive structured refusal, not-ready, stale-metadata, or proposal outcomes.
 - Let the host read redacted evidence projections through explicit resources.
+- Treat certificate resources as local terminal evidence references only; MCP does not mint, verify hosted trust, publish revocation state, or create cross-org certificate trust.
 
 ## Constraints and assumptions
 

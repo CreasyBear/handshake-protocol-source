@@ -19,6 +19,7 @@ describe("MCP schema contract", () => {
       "handshake://evidence/receipts/{receiptId}/timeline",
       "handshake://evidence/idempotency/{actionContractId}",
       "handshake://health/install/{actionContractId}",
+      "handshake://health/install/pre-contract/{requestId}",
       "handshake://certificates/{authorityCertificateId}",
     ]);
     expect(catalog).toMatchObject({
@@ -142,7 +143,6 @@ export function validProposalInput() {
     token: "USDC",
     asset: "USDC",
     atomicAmount: "1000",
-    maxAtomicAmountPerCall: "2000",
     x402EvidenceProfile: "official_payment_required",
     x402Version: 2,
     x402Scheme: "exact",
