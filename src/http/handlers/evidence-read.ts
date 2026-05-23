@@ -3,20 +3,14 @@ import { HandshakeProtocolError } from "../../protocol/foundation/errors";
 import { projectGeneratedGraphEvidence } from "../../protocol/areas/generated-execution-graph";
 import type {
   ActionContract,
-  AuthorityCertificate,
   ContractStreamEvent,
   GatewayRegistryEntry,
-  GatewayCheckAttempt,
-  Greenlight,
   GeneratedExecutionGraph,
-  MutationAttempt,
-  PolicyDecision,
-  ProofGap,
-  Refusal,
   Receipt,
   SurfaceOperationReconciliation,
 } from "../../protocol/public/schemas";
 import {
+  assembleAgentTransactionEnvelopeInput,
   projectAgentTransactionEnvelope,
   projectContractEvidence,
   projectIdempotencyRecovery,
@@ -74,7 +68,7 @@ export async function handleEvidenceRead(
           return recordNotFound(c, errorContext);
         }
         const projection = await projectAgentTransactionEnvelope(
-          await agentTransactionEnvelopeInput(store, contractRecord.payload),
+          await assembleAgentTransactionEnvelopeInput(store, contractRecord.payload),
         );
         return c.json(projection);
       }
@@ -157,117 +151,6 @@ function callerCanReadRecord(
     !hostedIdentity ||
     (record.tenantId === hostedIdentity.tenantId && record.organizationId === hostedIdentity.organizationId)
   );
-}
-
-async function agentTransactionEnvelopeInput(store: ProtocolStore, contract: ActionContract) {
-  const scope = { tenantId: contract.tenantId, organizationId: contract.organizationId };
-  const [
-    policyDecisionRecords,
-    greenlightRecords,
-    gateAttemptRecords,
-    mutationAttemptRecords,
-    receiptRecords,
-    reconciliationRecords,
-    authorityCertificateRecords,
-  ] = await Promise.all([
-    store.listRecordsByType<PolicyDecision>("policy_decision", scope),
-    store.listRecordsByType<Greenlight>("greenlight", scope),
-    store.listRecordsByType<GatewayCheckAttempt>("gateway_check_attempt", scope),
-    store.listRecordsByType<MutationAttempt>("mutation_attempt", scope),
-    store.listRecordsByType<Receipt>("receipt", scope),
-    store.listRecordsByType<SurfaceOperationReconciliation>("surface_operation_reconciliation", scope),
-    store.listRecordsByType<AuthorityCertificate>("authority_certificate", scope),
-  ]);
-
-  const receipts = latestFirst(receiptRecords.map((record) => record.payload)).filter(
-    (receipt) => receipt.actionContractId === contract.actionContractId,
-  );
-  const receipt = receipts[0] ?? null;
-  const policyDecision =
-    (receipt
-      ? await recordPayload<PolicyDecision>(store, "policy_decision", receipt.policyDecisionId)
-      : latestFirst(policyDecisionRecords.map((record) => record.payload)).find(
-          (decision) => decision.actionContractId === contract.actionContractId,
-        )) ?? null;
-  if (!policyDecision) {
-    throw new HandshakeProtocolError(
-      "policy_decision_missing",
-      "Agent transaction envelope requires policy evidence.",
-      404,
-      {
-        retryability: "terminal",
-        commitState: "not_applicable",
-      },
-    );
-  }
-
-  const greenlight =
-    (receipt?.greenlightId
-      ? await recordPayload<Greenlight>(store, "greenlight", receipt.greenlightId)
-      : latestFirst(greenlightRecords.map((record) => record.payload)).find(
-          (record) => record.actionContractId === contract.actionContractId,
-        )) ?? null;
-  const gateAttempt =
-    (receipt?.gateAttemptId
-      ? await recordPayload<GatewayCheckAttempt>(store, "gateway_check_attempt", receipt.gateAttemptId)
-      : latestFirst(gateAttemptRecords.map((record) => record.payload)).find(
-          (record) => record.actionContractId === contract.actionContractId,
-        )) ?? null;
-  const mutationAttempt =
-    (receipt?.mutationAttemptId
-      ? await recordPayload<MutationAttempt>(store, "mutation_attempt", receipt.mutationAttemptId)
-      : latestFirst(mutationAttemptRecords.map((record) => record.payload)).find(
-          (record) => record.actionContractId === contract.actionContractId,
-        )) ?? null;
-  const ledger = await store.getCurrentIdempotencyLedgerEntry(
-    await idempotencyLedgerKeyDigest(idempotencyLedgerKey(contract)),
-  );
-  const proofGaps = await scopedProofGaps(store, contract);
-  const refusals = (await store.listRecordsByType<Refusal>("refusal", scope))
-    .map((record) => record.payload)
-    .filter((refusal) => refusal.actionContractId === contract.actionContractId);
-
-  return {
-    contract,
-    policyDecision,
-    greenlight,
-    gateAttempt,
-    mutationAttempt,
-    receipt,
-    proofGaps,
-    refusals,
-    reconciliations: reconciliationRecords.map((record) => record.payload),
-    ledger: ledger?.payload ?? null,
-    authorityCertificates: authorityCertificateRecords.map((record) => record.payload),
-  };
-}
-
-async function recordPayload<T>(
-  store: ProtocolStore,
-  objectType: Parameters<ProtocolStore["getRecord"]>[0],
-  objectId: string,
-): Promise<T | null> {
-  return (await store.getRecord<T>(objectType, objectId))?.payload ?? null;
-}
-
-async function scopedProofGaps(store: ProtocolStore, contract: ActionContract): Promise<ProofGap[]> {
-  return (
-    await store.listRecordsByType<ProofGap>("proof_gap", {
-      tenantId: contract.tenantId,
-      organizationId: contract.organizationId,
-    })
-  )
-    .map((record) => record.payload)
-    .filter((proofGap) => proofGap.affectedObjectRefs.includes(contract.actionContractId));
-}
-
-function latestFirst<T extends { createdAt: string }>(values: T[]): T[] {
-  return values
-    .map((value, index) => ({ value, index }))
-    .sort(
-      (left, right) => Date.parse(right.value.createdAt) - Date.parse(left.value.createdAt) || right.index - left.index,
-    )
-    .map((entry) => entry.value);
 }
 
 async function loadReceiptTimelineEvents(

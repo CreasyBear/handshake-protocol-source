@@ -32,6 +32,11 @@ export const AuthorityCertificateArtifactKindSchema = z.enum([
   "receipt",
   "receipt_export",
   "surface_operation_reconciliation",
+  "credential_resolution_evidence",
+  "idempotency_ledger_entry",
+  "recovery_recommendation",
+  "recovery_recommendation_status_transition",
+  "isolation_state",
 ]);
 export type AuthorityCertificateArtifactKind = z.infer<typeof AuthorityCertificateArtifactKindSchema>;
 

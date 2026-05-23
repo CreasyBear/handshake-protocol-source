@@ -71,7 +71,7 @@ export function projectContractEvidence(contract: ActionContract): ContractEvide
   });
 }
 
-export async function projectAgentTransactionEnvelope(input: {
+export type AgentTransactionEnvelopeInput = {
   contract: ActionContract;
   policyDecision: PolicyDecision;
   greenlight?: Greenlight | null;
@@ -90,7 +90,11 @@ export async function projectAgentTransactionEnvelope(input: {
     terminal: { actionContractId: string };
   }>;
   receiptExportRef?: string | null;
-}): Promise<AgentTransactionEnvelopeProjection> {
+};
+
+export async function projectAgentTransactionEnvelope(
+  input: AgentTransactionEnvelopeInput,
+): Promise<AgentTransactionEnvelopeProjection> {
   const proofGaps = input.proofGaps ?? [];
   const refusals = scopedRefusals(input.refusals ?? [], input.contract);
   const idempotencyRecoveryDispositionValue = input.ledger

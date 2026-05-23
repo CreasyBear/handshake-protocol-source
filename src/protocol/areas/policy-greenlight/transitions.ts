@@ -351,7 +351,11 @@ function policyEvaluationResponse(
     refusalRef: refusal?.refusalId ?? null,
     refusalReasonCode: refusal?.reasonCode ?? null,
     reviewRequired: decision.decision === "review_required",
-    nextAction: greenlight ? "use_greenlight_at_gateway" : decision.decision === "review_required" ? "request_review" : "read_evidence",
+    nextAction: greenlight
+      ? "use_greenlight_at_gateway"
+      : decision.decision === "review_required"
+        ? "request_review"
+        : "read_evidence",
     retryability: "not_retryable",
     evidenceRefs: [
       protocolObjectRef("action_contract", decision.actionContractId),

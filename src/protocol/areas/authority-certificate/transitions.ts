@@ -1,4 +1,4 @@
-import { projectAgentTransactionEnvelope } from "../../evidence-projections/projections";
+import { assembleAgentTransactionEnvelope, projectAgentTransactionEnvelope } from "../../evidence-projections";
 import { CANONICALIZER_VERSION } from "../../foundation/canonical";
 import { HandshakeProtocolError } from "../../foundation/errors";
 import { createId, nowIso } from "../../foundation/ids";
@@ -52,7 +52,7 @@ export async function createAuthorityCertificate(
 ): Promise<AuthorityCertificate> {
   const input = CreateAuthorityCertificateInputSchema.parse(inputValue);
   const context = await loadTerminalContext(store, recorder, input);
-  const certificate = await buildAuthorityCertificate(context, input);
+  const certificate = await buildAuthorityCertificate(store, context, input);
   await recorder.commitRecordsWithEvents(
     [{ objectType: "authority_certificate", payload: certificate }],
     [
@@ -76,23 +76,29 @@ export async function createAuthorityCertificate(
 }
 
 async function buildAuthorityCertificate(
+  store: ProtocolStore,
   context: CertificateTerminalContext,
   input: ParsedCreateAuthorityCertificateInput,
 ): Promise<AuthorityCertificate> {
   const contract = context.contractRecord.payload;
   const receipt = context.receiptRecord?.payload ?? null;
+  const assembly = await assembleAgentTransactionEnvelope(store, contract);
   const envelope = await projectAgentTransactionEnvelope({
+    ...assembly.input,
     contract,
     policyDecision: context.policyDecisionRecord.payload,
     greenlight: context.greenlightRecord?.payload ?? null,
     gateAttempt: context.gateAttemptRecord?.payload ?? null,
     mutationAttempt: context.mutationAttemptRecord?.payload ?? null,
     receipt,
-    proofGaps: context.proofGapRecords.map((record) => record.payload),
-    refusals: context.refusalRecords.map((record) => record.payload),
-    ledger: null,
+    proofGaps: [...(assembly.input.proofGaps ?? []), ...context.proofGapRecords.map((record) => record.payload)].filter(
+      uniqueById("proofGapId"),
+    ),
+    refusals: [...(assembly.input.refusals ?? []), ...context.refusalRecords.map((record) => record.payload)].filter(
+      uniqueById("refusalId"),
+    ),
   });
-  const artifacts = artifactsForContext(context);
+  const artifacts = artifactsForContext(context, assembly.supplementalRecords);
   const gatewayAdmissionRequired = Boolean(context.gateAttemptRecord);
   const certificateSeed = {
     schemaVersion: PROTOCOL_VERSION as typeof PROTOCOL_VERSION,
@@ -295,7 +301,10 @@ async function loadProofGapTerminalContext(
   };
 }
 
-function artifactsForContext(context: CertificateTerminalContext): AuthorityCertificateArtifact[] {
+function artifactsForContext(
+  context: CertificateTerminalContext,
+  supplementalRecords: StoredProtocolRecord[],
+): AuthorityCertificateArtifact[] {
   return [
     artifactForRecord(context.contractRecord, "action_contract"),
     artifactForRecord(context.policyDecisionRecord, "policy_decision"),
@@ -305,6 +314,9 @@ function artifactsForContext(context: CertificateTerminalContext): AuthorityCert
     context.receiptRecord ? artifactForRecord(context.receiptRecord, "receipt") : null,
     ...context.proofGapRecords.map((record) => artifactForRecord(record, "proof_gap")),
     ...context.refusalRecords.map((record) => artifactForRecord(record, "refusal")),
+    ...supplementalRecords.map((record) =>
+      artifactForRecord(record, record.objectType as AuthorityCertificateArtifactKind),
+    ),
     artifactForRecord(context.terminalRecord, context.terminalRecord.objectType as AuthorityCertificateArtifactKind),
   ]
     .filter((artifact): artifact is AuthorityCertificateArtifact => artifact !== null)
@@ -376,4 +388,10 @@ function uniqueRecordById<T>(
   records: StoredProtocolRecord<T>[],
 ): boolean {
   return records.findIndex((candidate) => candidate.objectId === record.objectId) === index;
+}
+
+function uniqueById<T extends Record<string, unknown>>(
+  idField: keyof T,
+): (value: T, index: number, values: T[]) => boolean {
+  return (value, index, values) => values.findIndex((candidate) => candidate[idField] === value[idField]) === index;
 }

@@ -1,10 +1,15 @@
 import { describe, expect, it } from "bun:test";
 import {
+  assembleAgentTransactionEnvelope,
   projectAgentTransactionEnvelope,
   projectContractEvidence,
   projectProtectedPathInstallHealth,
   projectReceiptTimeline,
 } from "../../src/protocol/evidence-projections";
+import type {
+  GatewayCredentialRef,
+  RegisterGatewayCredentialRefInput,
+} from "../../src/protocol/areas/credential-custody";
 import {
   idempotencyLedgerKey,
   idempotencyLedgerKeyDigest,
@@ -14,8 +19,11 @@ import type { ProofGap } from "../../src/protocol/areas/proof-gap";
 import type { Refusal } from "../../src/protocol/areas/refusal";
 import {
   createGreenlitContract,
+  futureIso,
+  makeKernelFixture,
   makePackageInstallCandidate,
   proposalInputForCompilation,
+  registerFixtureObjects,
   recordUnknownDownstreamProofGap,
 } from "../support/fixtures";
 
@@ -297,6 +305,99 @@ describe("protocol evidence projections", () => {
     expect(projection.reconciliationFinalityStatus).toBe("final");
   });
 
+  it("assembles scoped transaction envelope custody, recovery, isolation, and idempotency evidence", async () => {
+    const fixture = makeKernelFixture();
+    await registerFixtureObjects(fixture);
+    const credentialRef = await fixture.kernel.registerGatewayCredentialRef(envelopeCredentialRefInput());
+    const compilation = await fixture.kernel.compileIntent({
+      tenantId: "tenant_demo",
+      organizationId: "org_demo",
+      principalIntentRef: "intent:install hono with assembled custody evidence",
+      principalId: "principal_demo",
+      agentId: "agent_demo",
+      runId: "run_demo",
+      runtimeAdapterId: "runtime_codex",
+      operatingEnvelopeId: fixture.envelope.envelopeId,
+      toolCatalogRef: "tool_catalog_demo@v1",
+      actionCatalogRef: "action_catalog_demo@v1",
+      gatewayRegistryRef: "gateway_registry@v1",
+      candidate: makePackageInstallCandidate(fixture, {
+        idempotencyKey: "idem_assembled_transaction_envelope",
+        gatewayCredentialRefs: [envelopeCredentialBindingFor(credentialRef)],
+      }),
+    });
+    const contract = await fixture.kernel.proposeActionContract(proposalInputForCompilation(compilation));
+    const policy = await fixture.kernel.evaluatePolicy({
+      actionContractId: contract.actionContractId,
+      envelopeId: fixture.envelope.envelopeId,
+    });
+    if (!policy.greenlight) throw new Error("expected greenlight");
+    const gate = await fixture.kernel.gatewayCheck({
+      actionContractId: contract.actionContractId,
+      greenlightId: policy.greenlight.greenlightId,
+      observedParameters: contract.parameters,
+      surfaceOperationRef: "surface-op:assembled-envelope",
+    });
+    if (!gate.mutationAttempt) throw new Error("expected mutation attempt");
+    const credentialEvidence = await fixture.kernel.recordCredentialResolutionEvidence({
+      actionContractId: contract.actionContractId,
+      greenlightId: policy.greenlight.greenlightId,
+      gateAttemptId: gate.gateAttempt.gateAttemptId,
+      gatewayCredentialRefId: credentialRef.gatewayCredentialRefId,
+      gatewayCredentialRefDigest: credentialRef.gatewayCredentialRefDigest,
+      requestDigest: `sha256:${"4".repeat(64)}`,
+      resultClass: "used_by_gateway",
+      resultReasonCode: "gate_passed",
+      redactionStatus: "redacted",
+      providerRequestRef: "provider-request:assembled-envelope",
+      providerOperationRef: "provider-operation:assembled-envelope",
+      evidenceRefs: ["evidence:credential-resolution:assembled-envelope"],
+    });
+    const reconciliation = await fixture.kernel.reconcileSurfaceOperation({
+      mutationAttemptId: gate.mutationAttempt.mutationAttemptId,
+      idempotencyKey: contract.idempotencyKey,
+      observedSurfaceOperationRef: "surface-op:assembled-envelope",
+      observedDownstreamStatus: "unknown",
+      evidenceRefs: [],
+      resolvedProofGapIds: [],
+      orphanIsolationRequested: true,
+    });
+    if (!reconciliation.createdProofGap) throw new Error("expected downstream proof gap");
+    const recovery = await fixture.kernel.createRecoveryRecommendation({
+      sourceReceiptId: gate.receipt.receiptId,
+      sourceRefusalOrGapRef: reconciliation.createdProofGap.proofGapId,
+      recommendedPath: "narrower_action_contract_required",
+      allowedNextActionClasses: [contract.actionClass],
+      requiredNewEvidence: ["gateway_finality_evidence"],
+      requiresHumanReview: true,
+      reasonCode: "downstream_status_unknown",
+      reasonSummary: "Gateway did not produce downstream finality evidence.",
+      retryNotBefore: futureIso(),
+    });
+
+    const assembly = await assembleAgentTransactionEnvelope(fixture.store, contract);
+    const projection = await projectAgentTransactionEnvelope(assembly.input);
+
+    expect(projection.credentialResolutionEvidenceRefs).toContain(
+      `credential_resolution_evidence:${credentialEvidence.credentialResolutionEvidenceId}`,
+    );
+    expect(projection.gatewayCredentialEvidenceRefs).toContain(
+      `gateway_credential_ref:${credentialRef.gatewayCredentialRefId}`,
+    );
+    expect(projection.idempotencyLedgerRef).not.toBeNull();
+    expect(projection.recoveryRefs).toContain(`recovery_recommendation:${recovery.recoveryRecommendationId}`);
+    expect(projection.isolationRefs.some((ref) => ref.startsWith("isolation_state:"))).toBe(true);
+    expect(assembly.supplementalRecords.map((record) => record.objectType)).toEqual(
+      expect.arrayContaining([
+        "credential_resolution_evidence",
+        "idempotency_ledger_entry",
+        "recovery_recommendation",
+        "isolation_state",
+        "surface_operation_reconciliation",
+      ]),
+    );
+  });
+
   it("keeps facilitator verify evidence distinct from settlement finality", async () => {
     const fixture = await createGreenlitContract();
     const gate = await fixture.kernel.gatewayCheck({
@@ -371,4 +472,40 @@ async function currentLedgerForContract(
   const current = await fixture.store.getCurrentIdempotencyLedgerEntry(ledgerKeyDigest);
   if (!current) throw new Error("expected current ledger entry");
   return current.payload;
+}
+
+function envelopeCredentialRefInput(): RegisterGatewayCredentialRefInput {
+  return {
+    tenantId: "tenant_demo",
+    organizationId: "org_demo",
+    gatewayCredentialRefId: "gcr_envelope_package_manager_token",
+    principalId: "principal_demo",
+    gatewayId: "gateway_package_manager",
+    gatewayRegistryEntryId: "gateway_registry_package",
+    protectedSurfaceKind: "package_manager",
+    actionClasses: ["package.install"],
+    resourceRefs: ["npm:hono"],
+    resourceNamespaceRef: "npm:package",
+    credentialKind: "package_manager_token",
+    custodyStatus: "gateway_resolved_from_vault",
+    providerClass: "vault_provider",
+    providerRegistryRef: "vault-provider:local-test",
+    providerRegistryDigest: `sha256:${"a".repeat(64)}`,
+    resolverRef: "resolver:local-vault",
+    resolverVersion: "v1",
+    evidenceExpectationRefs: ["evidence:credential-resolution"],
+    expiresAt: futureIso(),
+  };
+}
+
+function envelopeCredentialBindingFor(credentialRef: GatewayCredentialRef) {
+  return {
+    credentialUseName: "package_manager_token",
+    gatewayCredentialRefId: credentialRef.gatewayCredentialRefId,
+    gatewayCredentialRefDigest: credentialRef.gatewayCredentialRefDigest,
+    providerRegistryRef: credentialRef.providerRegistryRef,
+    providerRegistryDigest: credentialRef.providerRegistryDigest,
+    requiredCredentialCustodyStatus: credentialRef.custodyStatus,
+    evidenceExpectationRefs: credentialRef.evidenceExpectationRefs,
+  };
 }
