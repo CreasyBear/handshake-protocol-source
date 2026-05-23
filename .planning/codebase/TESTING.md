@@ -155,6 +155,29 @@ export function makeKernelFixture() {
 - `.github/workflows/check.yml` runs `bun install --frozen-lockfile` and `npm run check:repo`.
 - Architecture tests act as structural coverage for imports, naming, root exports, package surface, CLI/MCP posture, active vocabulary, and claim boundaries.
 
+## Response And Telemetry Contract Coverage
+
+**Stable response schemas:**
+- `test/mcp/mcp-schema-contract.test.ts` parses real MCP tool/resource schemas from `src/mcp/catalog.ts`, `src/mcp/output.ts`, and `src/surfaces/outcome.ts`; it rejects authority-shaped fields such as policy, greenlight, gateway, mutation, receipt, raw, signing, and certificate-minting inputs.
+- `test/cli/cli-evidence.test.ts`, `test/cli/cli-support-bundle.test.ts`, and `test/architecture/cli-command-posture.test.ts` require CLI outputs from `src/cli/output.ts` to carry schema version, warnings, non-claims, and explicit non-authority fields.
+- `test/http/http.test.ts` exercises `src/http/errors/transition-error-envelope.ts` and route response schemas, including typed error envelopes, request custody errors, body-size refusal before commit, redacted evidence projection reads, and blocked generic raw internal reads.
+
+**Reason codes and refusal language:**
+- `test/protocol/reason-code-registry.test.ts` keeps `src/protocol/foundation/reason-codes.ts` and HTTP code registries unique and checks that source-emitted reason-code literals are registered while `ReasonCodeSchema` stays open for operator-supplied future reasons.
+- `test/mcp/mcp-x402-proposal.test.ts` covers structured MCP refusal outcomes for invalid schema, tools-list changes, stale metadata, install not ready, gateway offline or unknown, amount overrun, replay/idempotency refusal, and bypass-shaped input.
+- Runtime and adapter tests assert exact reason codes for generated-code refusal, raw sibling bypass, params mismatch, replay, per-call x402 amount bounds, and incomplete official x402 evidence in `test/runtime/runtime-ingress.test.ts`, `test/adapters/x402-payment-action-proposal.test.ts`, and `test/adapters/x402-wallet-gateway.test.ts`.
+
+**Redaction and proof gaps:**
+- `test/protocol/evidence-projections.test.ts` proves contract, idempotency recovery, receipt timeline, agent transaction envelope, and install-health projections expose redacted refs/digests while omitting raw x402 payment credentials.
+- `test/mcp/mcp-resource-redaction.test.ts` proves MCP evidence resources route through `EvidenceClient` projection methods and that metadata, challenge, and certificate resources remain reference-only.
+- `test/cli/cli-support-bundle.test.ts` proves local support bundles omit `PaymentPayload`, `PAYMENT-SIGNATURE`, private keys, tokens, raw internal records, gateway credentials, mutation commands, and receipt exports.
+- `test/adapters/x402-wallet-gateway.test.ts` and `test/integration/x402-d1-http.test.ts` prove proof-gap behavior for missing downstream responses after gateway admission and signing evidence.
+
+**Local/pre-hosted and export posture:**
+- `test/architecture/claim-boundary.test.ts`, `test/architecture/surface-boundary-posture.test.ts`, `test/architecture/package-surface.test.ts`, `test/architecture/root-exports.test.ts`, `test/architecture/mcp-surface-posture.test.ts`, and `test/architecture/cli-command-posture.test.ts` prevent hosted/provider/cross-org/broad-control claims and keep root exports, role-client subpaths, MCP internals, CLI commands, and package files narrow.
+- `test/product/x402-protected-spend-demo-report.test.ts` proves the APS demo uses `RuntimeClient` and `EvidenceClient`, not the all-role `HandshakeClient`, and asserts local/reference non-claims.
+- `test/mcp/mcp-reference-transcript.test.ts` proves source-owned MCP transcript rows cover success, not-ready, freshness, bypass, replay, params mismatch, and proof-gap cases while carrying non-authority posture.
+
 ## Active Tier 2 SDK/CLI/MCP Coverage
 
 **Current posture tests:**
@@ -184,6 +207,18 @@ export function makeKernelFixture() {
 - `test/mcp/mcp-reference-transcript.test.ts` validates `buildMcpX402ReferenceTranscript()` and `buildMcpX402ReferenceTranscriptMarkdown()` from `src/mcp/reference-transcript.ts`.
 - The transcript covers metadata read, valid proposal, evidence readback, stale metadata, tools-list change, install not ready, gateway offline, amount mismatch, parameter drift, replay refusal, raw sibling-shaped input, and downstream proof gap.
 - The demo command `npm run demo:mcp-transcript` writes `examples/mcp-reference-transcript/output/latest.json` and `examples/mcp-reference-transcript/output/latest.md`; generated files are ignored and should not become canonical source.
+
+## Closeout Commands For This Goal
+
+```bash
+npm run quality:architecture  # Surface posture, package exports, import lanes, claim boundaries
+npm run quality:claims        # Current local/pre-hosted product language and active vocabulary
+npm run quality:storage       # Durable storage, D1, and protocol persistence gates
+npm run test                  # Full Bun test suite across protocol, runtime, MCP, CLI, SDK, x402, HTTP, demos
+npm run demo:aps              # Regenerate local x402 protected-spend report artifacts
+npm run demo:mcp-transcript   # Regenerate local MCP reference transcript artifacts
+npm run check:repo            # Full closeout gate used by CI
+```
 
 ## Test Types
 

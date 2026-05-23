@@ -51,6 +51,33 @@
 - Runtime source is ESM only through `"type": "module"` in `package.json`; keep imports extensionless as the existing `moduleResolution: "Bundler"` setup expects.
 - External/model/operator inputs must enter through bounded Zod schemas before protocol calls. Examples: `McpX402PaymentProposalInputSchema` in `src/mcp/x402-proposal.ts` caps refs, URLs, extension keys, SDK package versions, and atomic amount strings; `RuntimeIngressDispatchBlockSchema` in `src/runtime/ingress/index.ts` caps dispatch blocks at 32 items; CLI x402 commands parse local install/probe payloads through schemas in `src/cli/x402/index.ts` and `src/cli/x402/local-state.ts`.
 
+## Response And Telemetry Artifact Contracts
+
+**Stable schemas:**
+- Use strict Zod schemas for emitted machine artifacts, not ad hoc JSON literals. `SurfaceOutcomeSchema` in `src/surfaces/outcome.ts`, `McpToolResultSchema` in `src/mcp/output.ts`, `CliOutputEnvelopeSchema` in `src/cli/output.ts`, `TransitionErrorResponseSchema` in `src/http/errors/transition-error-envelope.ts`, and projection schemas in `src/protocol/evidence-projections/schemas.ts` are the source-owned contracts.
+- Keep schema-version literals stable and explicit on surfaced artifacts: `handshake.surface-outcome.v0.1` in `src/surfaces/outcome.ts`, `handshake.cli.v1` in `src/cli/output.ts`, and `surface-boundary.v0.1` in `src/surfaces/boundary-manifest.ts`.
+- Emit explicit false non-authority posture fields on model/operator outputs. Required fields include `authorityCreated`, `authorityCertificateMinted`, `credentialMaterialIncluded`, `gatewayCheckPerformed`, `greenlightCreated`, `mutationAttempted`, `mutationCommandIncluded`, `rawInternalRecordIncluded`, and `receiptExportCreated` in `src/surfaces/outcome.ts` and `src/cli/output.ts`.
+- Use explicit `null` refs for unavailable authority/evidence refs instead of omitting fields. `src/mcp/x402-proposal.ts` returns `greenlightRef: null`, `gatewayCheckRef: null`, `mutationAttemptRef: null`, `receiptRef: null`, and `authorityCertificateRef: null` on proposal outcomes.
+
+**Reason codes and recovery posture:**
+- Register source-emitted protocol reason codes in `src/protocol/foundation/reason-codes.ts`; HTTP error codes live in `src/http/errors/codes.ts`. `test/protocol/reason-code-registry.test.ts` checks registry uniqueness and source-emitted literal coverage.
+- Keep `ReasonCodeSchema` open for operator-supplied future reasons in `src/protocol/foundation/schema-core.ts`, but do not introduce unregistered source literals in protocol, MCP, CLI, runtime, or adapter code.
+- Surface recoverability through structured fields, not prose-only errors. MCP outcomes in `src/surfaces/outcome.ts` and `src/mcp/x402-proposal.ts` carry `reasonCodes`, `nextAction`, `retryability`, and `commitState`; HTTP errors in `src/http/errors/transition-error-envelope.ts` carry `retryability`, `commitState`, `proofRef`, and `refusalRef`.
+
+**Redaction and proof gaps:**
+- Evidence reads must return redacted projections, not raw protocol records. Use `redactionProfileRef`, `omittedFields`, refs, and digests from `src/protocol/evidence-projections/schemas.ts` and `src/protocol/evidence-projections/projections.ts`.
+- Never surface raw `PaymentPayload`, `PAYMENT-SIGNATURE`, private keys, control-plane tokens, gateway custody tokens, signer objects, raw credential material, raw internal records, mutation commands, or receipt exports through CLI/MCP/SDK response artifacts. The forbidden terms and output fields are source-owned in `src/surfaces/boundary-manifest.ts` and tested by `test/architecture/surface-boundary-posture.test.ts`.
+- Downstream uncertainty must become a proof gap or refusal artifact. `src/adapters/x402-payment/wallet-gateway.ts` returns `payment_signature_proof_gap` for missing downstream responses; `src/protocol/evidence-projections/schemas.ts` separates gateway admission, downstream outcome, and finality status in receipt timelines.
+
+**Local and pre-hosted language:**
+- Use local/reference wording for current surfaces. `README.md`, `docs/internal/protocol-definition.md`, `docs/internal/protocol-kernel-architecture.md`, `src/cli/output.ts`, and `src/surfaces/boundary-manifest.ts` explicitly reject hosted operation, provider custody, broad x402 compatibility, aggregate spend-window enforcement, cross-org trust, marketplace certification, settlement finality, and broad MCP/CLI/browser/shell/network control claims.
+- Treat RuntimeClient, MCP proposal, CLI evidence, demo transcript, and demo APS success as proposal/evidence posture only. These surfaces do not create policy authority, greenlights, gateway checks, protected mutations, receipt exports, hosted proof, provider custody, or cross-org AuthorityCertificate trust.
+
+**Package and export posture:**
+- Keep the package surface narrow. `package.json` exports the root, `./runtime`, `./conformance`, `./sdk/role-clients`, `./experimental`, and `./package.json`; it does not export MCP internals, surface manifests, raw stores, policy kernels, gateway runners, or receipt exporters.
+- Keep role clients on the explicit `handshake-protocol-kernel/sdk/role-clients` subpath. `src/sdk/surface-clients/runtime-client.ts` owns runtime proposal/evidence writes; `src/sdk/surface-clients/evidence-client.ts` owns redacted evidence reads and local verification of supplied certificates.
+- Keep generated demo snapshots under ignored `examples/*/output/` folders. `examples/x402-protected-spend/output/` and `examples/mcp-reference-transcript/output/` are local artifacts, not package source, canonical docs, or exportable receipt stores.
+
 ## Import Organization
 
 **Order:**
