@@ -220,32 +220,68 @@ export async function proposeMcpX402Payment(
     return await proposeContract(input, idempotencyKey, options.runtimeClient, options.trustedMaxAtomicAmountPerCall);
   } catch (error) {
     const code = errorCode(error);
+    const transitionEvidence = errorTransitionEvidence(error, input.paymentRequiredEvidenceRef);
     if (code === "already_consumed" || code === "idempotency_duplicate_authority") {
       return mcpNonContractOutcome({
         outcome: "replay_refused",
         phase: "replay",
         reasonCodes: [code],
         nextAction: "read_evidence",
-        commitState: errorCommitState(error),
+        commitState: transitionEvidence.commitState,
         metadataRef: input.metadataRef,
-        evidenceRefs: [input.paymentRequiredEvidenceRef],
+        evidenceRefs: transitionEvidence.evidenceRefs,
         challengeRef: `handshake://challenges/replay-refused/${encodeURIComponent(input.requestId)}`,
         correlationRef: input.correlationRef,
         idempotencyKey,
+        proofRef: transitionEvidence.proofRef,
+        refusalRef: transitionEvidence.refusalRef,
       });
     }
     if (code === "idempotency_key_params_mismatch") {
+      const committedEvidence = transitionEvidence.proofRef !== null || transitionEvidence.refusalRef !== null;
       return mcpNonContractOutcome({
         outcome: "refused",
         phase: "proposal",
         reasonCodes: [code],
-        nextAction: "recraft_request",
-        commitState: errorCommitState(error),
+        nextAction: committedEvidence ? "read_evidence" : "recraft_request",
+        commitState: transitionEvidence.commitState,
         metadataRef: input.metadataRef,
-        evidenceRefs: [input.paymentRequiredEvidenceRef],
+        evidenceRefs: transitionEvidence.evidenceRefs,
         challengeRef: `handshake://challenges/idempotency-params-mismatch/${encodeURIComponent(input.requestId)}`,
         correlationRef: input.correlationRef,
         idempotencyKey,
+        proofRef: transitionEvidence.proofRef,
+        refusalRef: transitionEvidence.refusalRef,
+      });
+    }
+    if (transitionEvidence.proofRef !== null) {
+      return mcpNonContractOutcome({
+        outcome: "proof_gap",
+        phase: "evidence",
+        reasonCodes: [code],
+        nextAction: "read_evidence",
+        commitState: transitionEvidence.commitState,
+        metadataRef: input.metadataRef,
+        evidenceRefs: transitionEvidence.evidenceRefs,
+        correlationRef: input.correlationRef,
+        idempotencyKey,
+        proofRef: transitionEvidence.proofRef,
+        refusalRef: transitionEvidence.refusalRef,
+      });
+    }
+    if (transitionEvidence.refusalRef !== null) {
+      return mcpNonContractOutcome({
+        outcome: "refused",
+        phase: "proposal",
+        reasonCodes: [code],
+        nextAction: "read_evidence",
+        commitState: transitionEvidence.commitState,
+        metadataRef: input.metadataRef,
+        evidenceRefs: transitionEvidence.evidenceRefs,
+        correlationRef: input.correlationRef,
+        idempotencyKey,
+        proofRef: transitionEvidence.proofRef,
+        refusalRef: transitionEvidence.refusalRef,
       });
     }
     return mcpNonContractOutcome({
@@ -253,11 +289,13 @@ export async function proposeMcpX402Payment(
       phase: "tool_execution",
       reasonCodes: [code],
       nextAction: "stop",
-      commitState: errorCommitState(error),
+      commitState: transitionEvidence.commitState,
       metadataRef: input.metadataRef,
-      evidenceRefs: [input.paymentRequiredEvidenceRef],
+      evidenceRefs: transitionEvidence.evidenceRefs,
       correlationRef: input.correlationRef,
       idempotencyKey,
+      proofRef: transitionEvidence.proofRef,
+      refusalRef: transitionEvidence.refusalRef,
     });
   }
 }
@@ -442,6 +480,8 @@ async function proposeContract(
       greenlightRef: null,
       gatewayCheckRef: null,
       mutationAttemptRef: null,
+      proofRef: null,
+      refusalRef: null,
       reasonCodes: [],
       nextAction: "read_evidence",
       retryability: "not_retryable",
@@ -557,9 +597,44 @@ function errorCode(error: unknown): string {
 
 function errorCommitState(error: unknown): "not_started" | "protocol_recorded" | "ambiguous" {
   if (typeof error === "object" && error !== null && "commitState" in error) {
-    if (error.commitState === "not_started") return "not_started";
-    if (error.commitState === "accepted") return "protocol_recorded";
-    if (error.commitState === "ambiguous") return "ambiguous";
+    if (error.commitState === "committed" || error.commitState === "accepted") return "protocol_recorded";
+    if (error.commitState === "unknown" || error.commitState === "ambiguous") return "ambiguous";
+    if (
+      error.commitState === "not_started" ||
+      error.commitState === "not_committed" ||
+      error.commitState === "not_applicable"
+    ) {
+      return "not_started";
+    }
   }
   return "not_started";
+}
+
+function errorTransitionEvidence(
+  error: unknown,
+  paymentRequiredEvidenceRef: string,
+): {
+  commitState: "not_started" | "protocol_recorded" | "ambiguous";
+  evidenceRefs: string[];
+  proofRef: string | null;
+  refusalRef: string | null;
+} {
+  const proofRef = errorStringField(error, "proofRef");
+  const refusalRef = errorStringField(error, "refusalRef");
+  return {
+    commitState: errorCommitState(error),
+    evidenceRefs: [
+      paymentRequiredEvidenceRef,
+      ...(proofRef ? [`handshake://evidence/proof-gaps/${encodeURIComponent(proofRef)}`] : []),
+      ...(refusalRef ? [`handshake://evidence/refusals/${encodeURIComponent(refusalRef)}`] : []),
+    ],
+    proofRef,
+    refusalRef,
+  };
+}
+
+function errorStringField(error: unknown, field: string): string | null {
+  if (typeof error !== "object" || error === null) return null;
+  const value = (error as Record<string, unknown>)[field];
+  return typeof value === "string" && value.length > 0 ? value : null;
 }

@@ -225,6 +225,99 @@ describe("MCP x402 proposal bridge", () => {
     }
   });
 
+  it("preserves committed transition evidence in MCP non-authority outcomes", async () => {
+    const committedRefusalCalls: Array<{ name: string; input: unknown }> = [];
+    const committedRefusal = await proposeMcpX402Payment(validProposalInput(), {
+      ...trustedOptions(
+        fakeRuntimeClient(committedRefusalCalls, {
+          throwOnContract: {
+            code: "idempotency_duplicate_authority",
+            commitState: "committed",
+            refusalRef: "ref_committed_duplicate",
+          },
+        }),
+      ),
+    });
+
+    expect(committedRefusal.isError).toBe(true);
+    expect(committedRefusal.structuredContent).toMatchObject({
+      outcome: "replay_refused",
+      phase: "replay",
+      reasonCodes: ["idempotency_duplicate_authority"],
+      commitState: "protocol_recorded",
+      nextAction: "read_evidence",
+      retryability: "not_retryable",
+      refusalRef: "ref_committed_duplicate",
+      proofRef: null,
+      authorityCreated: false,
+      greenlightCreated: false,
+      gatewayCheckPerformed: false,
+      mutationAttempted: false,
+    });
+    expect(committedRefusal.structuredContent.evidenceRefs).toContain(
+      "handshake://evidence/refusals/ref_committed_duplicate",
+    );
+
+    const committedProofGapCalls: Array<{ name: string; input: unknown }> = [];
+    const committedProofGap = await proposeMcpX402Payment(validProposalInput(), {
+      ...trustedOptions(
+        fakeRuntimeClient(committedProofGapCalls, {
+          throwOnContract: {
+            code: "recovery_terminal_conflict",
+            commitState: "committed",
+            proofRef: "gap_committed_recovery",
+          },
+        }),
+      ),
+    });
+
+    expect(committedProofGap.isError).toBe(true);
+    expect(committedProofGap.structuredContent).toMatchObject({
+      outcome: "proof_gap",
+      phase: "evidence",
+      reasonCodes: ["recovery_terminal_conflict"],
+      commitState: "protocol_recorded",
+      nextAction: "read_evidence",
+      retryability: "not_retryable",
+      proofRef: "gap_committed_recovery",
+      refusalRef: null,
+      authorityCreated: false,
+      greenlightCreated: false,
+      gatewayCheckPerformed: false,
+      mutationAttempted: false,
+    });
+    expect(committedProofGap.structuredContent.evidenceRefs).toContain(
+      "handshake://evidence/proof-gaps/gap_committed_recovery",
+    );
+  });
+
+  it("maps unknown transition commit state to ambiguous instead of not started", async () => {
+    const calls: Array<{ name: string; input: unknown }> = [];
+    const result = await proposeMcpX402Payment(validProposalInput(), {
+      ...trustedOptions(
+        fakeRuntimeClient(calls, {
+          throwOnContract: {
+            code: "ambiguous_commit",
+            commitState: "unknown",
+          },
+        }),
+      ),
+    });
+
+    expect(result.isError).toBe(true);
+    expect(result.structuredContent).toMatchObject({
+      outcome: "tool_execution_error",
+      phase: "tool_execution",
+      reasonCodes: ["ambiguous_commit"],
+      commitState: "ambiguous",
+      nextAction: "stop",
+      authorityCreated: false,
+      greenlightCreated: false,
+      gatewayCheckPerformed: false,
+      mutationAttempted: false,
+    });
+  });
+
   it("derives distinct idempotency keys for sequenced retry attempts", async () => {
     const firstCalls: Array<{ name: string; input: unknown }> = [];
     const secondCalls: Array<{ name: string; input: unknown }> = [];
@@ -258,7 +351,17 @@ function compileIntentCandidate(calls: Array<{ name: string; input: unknown }>) 
 
 function fakeRuntimeClient(
   calls: Array<{ name: string; input: unknown }>,
-  options: { refused?: boolean; throwOnContract?: string } = {},
+  options: {
+    refused?: boolean;
+    throwOnContract?:
+      | string
+      | {
+          code: string;
+          commitState?: string;
+          proofRef?: string | null;
+          refusalRef?: string | null;
+        };
+  } = {},
 ): McpRuntimeProposalClient {
   return {
     async createRuntimeExecution(input) {
@@ -290,7 +393,9 @@ function fakeRuntimeClient(
     async proposeActionContract(input) {
       calls.push({ name: "proposeActionContract", input });
       if (options.throwOnContract) {
-        throw { code: options.throwOnContract, commitState: "accepted" };
+        throw typeof options.throwOnContract === "string"
+          ? { code: options.throwOnContract, commitState: "accepted" }
+          : options.throwOnContract;
       }
       return {
         actionContractId: "act_mcp_x402",

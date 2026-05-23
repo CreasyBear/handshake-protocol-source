@@ -72,6 +72,8 @@ export const SurfaceOutcomeCommonSchema = z.strictObject({
   greenlightRef: z.null(),
   gatewayCheckRef: z.null(),
   mutationAttemptRef: z.null(),
+  proofRef: z.string().min(1).nullable(),
+  refusalRef: z.string().min(1).nullable(),
   reasonCodes: z.array(z.string().min(2)),
   nextAction: z.enum(surfaceNextActions),
   retryability: z.enum(surfaceRetryability),
@@ -122,6 +124,8 @@ export type SurfaceOutcomeBaseInput = {
   challengeRef?: string | null;
   correlationRef?: string | null;
   idempotencyKey?: string | null;
+  proofRef?: string | null;
+  refusalRef?: string | null;
 };
 
 export function surfaceOutcomeBase(input: SurfaceOutcomeBaseInput): SurfaceOutcome {
@@ -139,6 +143,8 @@ export function surfaceOutcomeBase(input: SurfaceOutcomeBaseInput): SurfaceOutco
     greenlightRef: null,
     gatewayCheckRef: null,
     mutationAttemptRef: null,
+    proofRef: input.proofRef ?? null,
+    refusalRef: input.refusalRef ?? null,
     reasonCodes: input.reasonCodes ?? [],
     retryability: input.retryability ?? "not_retryable",
     commitState: input.commitState ?? "not_started",
