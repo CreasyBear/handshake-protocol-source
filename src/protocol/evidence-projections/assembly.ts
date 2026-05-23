@@ -2,11 +2,7 @@ import type { AuthorityCertificate } from "../areas/authority-certificate";
 import type { ActionContract } from "../areas/action-contract";
 import type { CredentialResolutionEvidence } from "../areas/credential-custody";
 import type { GatewayCheckAttempt, MutationAttempt } from "../areas/gateway-gate/schemas";
-import {
-  idempotencyLedgerKey,
-  idempotencyLedgerKeyDigest,
-  type IdempotencyLedgerEntry,
-} from "../areas/idempotency-ledger";
+import { idempotencyLedgerKey, idempotencyLedgerKeyDigest } from "../areas/idempotency-ledger";
 import type { IsolationState } from "../areas/isolation-breaker";
 import { isolationScopeRefsForContract } from "../areas/object-registry";
 import type { SurfaceOperationReconciliation } from "../areas/operation-lifecycle";

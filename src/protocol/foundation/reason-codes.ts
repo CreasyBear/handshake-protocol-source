@@ -29,6 +29,7 @@ export const protocolReasonCodes = [
   code("bootstrap_record_digest_conflict", "transition_error", "catalog"),
   code("invalid_transition_greenlight_already_issued", "transition_error", "policy"),
   code("idempotency_ledger_conflict", "transition_error", "policy"),
+  code("idempotency_refusal_commit_conflict", "transition_error", "policy"),
   code("stream_append_conflict", "transition_error", "gateway"),
   code("ambiguous_commit", "transition_error", "gateway", false),
 
