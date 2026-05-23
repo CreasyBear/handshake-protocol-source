@@ -57,7 +57,8 @@ export async function installX402PaymentCommand(input: { cwd: string; inputValue
     plane: "operator",
     ok: proposal.status === "ready_to_install",
     warnings: [
-      "Compiled local install posture only; no control-plane registration, greenlight, signer use, gateway check, or mutation was performed.",
+      "Compiled local x402 posture only; trusted readiness requires control-plane install registration and gateway posture evidence.",
+      "No greenlight, signer use, gateway check, or mutation was performed.",
     ],
     result: {
       ...record,
@@ -211,6 +212,9 @@ async function buildLocalInstallRecord(input: {
       : null,
     controlPlaneRegistrationRequired: true,
     controlPlaneRegistrationPerformed: false,
+    readinessAuthority: "local_compilation",
+    trustedInstallReadiness: false,
+    nextReadinessAction: "register_control_plane_install",
     authorityCreated: false,
     gatewayCheckPerformed: false,
     mutationAttempted: false,

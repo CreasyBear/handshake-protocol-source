@@ -37,6 +37,9 @@ export const LocalX402InstallRecordSchema = z.strictObject({
       operatingEnvelopeRef: z.string().min(1),
     })
     .nullable(),
+  readinessAuthority: z.literal("local_compilation"),
+  trustedInstallReadiness: z.literal(false),
+  nextReadinessAction: z.literal("register_control_plane_install"),
   controlPlaneRegistrationRequired: z.literal(true),
   controlPlaneRegistrationPerformed: z.literal(false),
   authorityCreated: z.literal(false),

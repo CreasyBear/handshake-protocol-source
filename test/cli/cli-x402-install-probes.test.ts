@@ -32,6 +32,9 @@ describe("CLI x402 install and probe posture", () => {
         rawCredentialRefsIncluded: false,
         controlPlaneRegistrationRequired: true,
         controlPlaneRegistrationPerformed: false,
+        readinessAuthority: "local_compilation",
+        trustedInstallReadiness: false,
+        nextReadinessAction: "register_control_plane_install",
         compiledRecordsIncluded: false,
       },
     });
@@ -41,6 +44,9 @@ describe("CLI x402 install and probe posture", () => {
     expect(JSON.stringify(output)).not.toContain("gateway-authority:cli");
     expect(JSON.stringify(output)).not.toContain("mutationCredentialHolderRef");
     expect(JSON.stringify(output)).not.toContain("gatewayAuthorityHolderRef");
+    expect((output as { warnings: string[] }).warnings).toContain(
+      "Compiled local x402 posture only; trusted readiness requires control-plane install registration and gateway posture evidence.",
+    );
 
     const doctor = await runCliCommand(["doctor", "--cwd", workspace]);
     expect(doctor).toMatchObject({
