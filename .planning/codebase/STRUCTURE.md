@@ -1,6 +1,6 @@
 # Codebase Structure
 
-**Analysis Date:** 2026-05-22
+**Analysis Date:** 2026-05-23
 
 ## Directory Layout
 
@@ -19,6 +19,7 @@ Handshake v0.0.2/
 |-- .github/workflows/check.yml       # CI gate running `npm run check:repo`
 |-- docs/internal/                    # Compact canonical internal docs
 |-- examples/x402-protected-spend/    # Local x402 protected-spend walkthrough and artifacts
+|-- examples/mcp-reference-transcript/ # Source-owned MCP x402 reference transcript harness
 |-- migrations/                       # D1 protocol storage schema
 |-- scripts/                          # Package/check helper scripts
 |-- src/                              # TypeScript source package
@@ -96,13 +97,15 @@ src/
 |   |-- output.ts                     # CLI JSON envelope
 |   |-- aps-report.ts                 # APS evidence renderer
 |   |-- certificate.ts                # Local certificate verifier
-|   `-- conformance.ts                # x402 conformance command
+|   |-- local-project/                 # Local project state, doctor, credential placeholders
+|   `-- x402/                          # Local x402 install/probe posture commands
 |-- mcp/
 |   |-- LANE.md                       # MCP lane ownership contract
 |   |-- index.ts                      # MCP source face
 |   |-- catalog.ts                    # MCP tool/resource catalog
 |   |-- x402-proposal.ts              # Strict x402 proposal bridge
 |   |-- resources.ts                  # Read-only resource mapping
+|   |-- reference-transcript.ts       # Source-owned MCP x402 transcript cases
 |   |-- output.ts                     # MCP result envelope
 |   `-- digest.ts                     # Local MCP digest helper
 |-- surfaces/
@@ -199,18 +202,54 @@ test/
 
 **`src/cli`:**
 - Purpose: Local operator/evidence command contract.
-- Contains: schema command, APS report renderer, certificate verifier, x402 conformance command, output envelope.
-- Key files: `src/cli/command-manifest.ts`, `src/cli/main.ts`, `src/cli/output.ts`, `src/cli/certificate.ts`, `src/cli/aps-report.ts`.
+- Contains: schema command, local project init/doctor, APS report renderer, projection readback wrappers, certificate verifier, local x402 install/probe/health posture, x402 conformance command, output envelope.
+- Key files: `src/cli/command-manifest.ts`, `src/cli/main.ts`, `src/cli/output.ts`, `src/cli/certificate.ts`, `src/cli/aps-report.ts`, `src/cli/projection-evidence.ts`, `src/cli/local-project/index.ts`, `src/cli/local-project/doctor.ts`, `src/cli/x402/index.ts`, `src/cli/x402/local-state.ts`.
 
 **`src/mcp`:**
 - Purpose: Model-facing proposal and evidence source modules.
-- Contains: MCP catalog, x402 proposal input/bridge, read-only resource mapping, output envelope, digest helper.
-- Key files: `src/mcp/catalog.ts`, `src/mcp/x402-proposal.ts`, `src/mcp/resources.ts`, `src/mcp/index.ts`.
+- Contains: MCP catalog, x402 proposal input/bridge, read-only resource mapping, source-owned reference transcript builder, output envelope, digest helper.
+- Key files: `src/mcp/catalog.ts`, `src/mcp/x402-proposal.ts`, `src/mcp/resources.ts`, `src/mcp/reference-transcript.ts`, `src/mcp/index.ts`.
 
 **`src/surfaces`:**
 - Purpose: Source-owned boundary manifests and shared non-authority outcome shapes for product surfaces.
 - Contains: surface boundary table and shared surface outcome contract.
 - Key files: `src/surfaces/boundary-manifest.ts`, `src/surfaces/outcome.ts`.
+
+## Active Tier 2 Surface Posture And Boundaries
+
+**Shared boundary source:**
+- Current implementation posture is centralized in `src/surfaces/boundary-manifest.ts`, with shared non-authority outcome fields in `src/surfaces/outcome.ts`.
+- Active current entries: `sdk.runtime`, `sdk.evidence`, `cli.operator`, `cli.evidence`, and `mcp.runtime`.
+- Deferred current entries: `sdk.install`, `sdk.gateway`, and `cli.process`; do not add implementations for these without updating the manifest and architecture tests.
+- Treat `src/surfaces/boundary-manifest.ts` as the first file to update when a surface gains a route family, command, resource, output field, credential shape, import allowance, or claim boundary.
+
+**SDK current placement:**
+- All-route transport mirror: `src/sdk/client.ts`.
+- Active role clients: `src/sdk/surface-clients/runtime-client.ts`, `src/sdk/surface-clients/evidence-client.ts`, `src/sdk/surface-clients/transport.ts`.
+- Role clients are exposed through the explicit `./sdk/role-clients` package subpath; keep root export expansion out unless `package.json`, `src/index.ts`, `test/architecture/root-exports.test.ts`, and `test/sdk/role-clients.test.ts` are deliberately updated.
+- `src/sdk/client.ts` remains root-exported and all-role; avoid using it for model-facing Tier 2 flows because `transitionToken` fallback is intentionally broader than role-scoped proposal/readback clients.
+
+**CLI current placement:**
+- Active command dispatch remains flat through `src/cli/main.ts`; cohesive command families now live under owned subdirectories such as `src/cli/local-project/*` and `src/cli/x402/*`.
+- Command metadata belongs in `src/cli/command-manifest.ts`; dispatch belongs in `src/cli/main.ts`; every JSON result goes through `src/cli/output.ts`.
+- Current CLI behavior is schema output, local init/doctor, APS evidence rendering, contract/receipt projection wrappers, local certificate verification, redacted support bundle assembly, local x402 install/probe/health posture, and x402 conformance.
+- CLI outputs may read/write local project state and generated report files only where declared in `src/cli/command-manifest.ts`; they must not create credential values, start processes, call policy/gateway/mutation routes, fetch raw records, or mint receipt/certificate authority.
+
+**MCP current placement:**
+- Tool/resource catalog belongs in `src/mcp/catalog.ts`.
+- The active proposal bridge is `src/mcp/x402-proposal.ts`; resource reads are in `src/mcp/resources.ts`; shared MCP output wrapping is in `src/mcp/output.ts`; transcript cases belong in `src/mcp/reference-transcript.ts`.
+- MCP must import role-scoped SDK clients from `src/sdk/surface-clients/*`, not the all-role `src/sdk/client.ts`, protocol kernel internals, adapters, storage, or signer/gateway code.
+- There is no public `./mcp` package export and no installed MCP server process. `examples/mcp-reference-transcript/*` is a source-owned audit harness, not an external host integration.
+
+**Macro plan placement discipline:**
+- `.planning/macro/surfaces/sdk/PLAN.md`, `.planning/macro/surfaces/cli/PLAN.md`, and `.planning/macro/surfaces/mcp/PLAN.md` describe staged work and still contain deferred paths.
+- Prefer current source paths above. Do not add code under reserved placeholders such as `src/sdk/activation` or create `src/cli/commands`, `src/mcp/tools.ts`, gateway/MCP process launchers, or public package subpaths from macro plans unless `STRUCTURE.md`, relevant `LANE.md` files, and `test/architecture/*` guards are updated first.
+
+**Code ownership seams and developer friction:**
+- Public exports intentionally lag implementation except for the first role-client SDK activation subpath. `src/sdk/surface-clients/*` is exposed through `./sdk/role-clients`; `src/mcp/*` remains a useful source module but not a public package subpath.
+- CLI posture is split between command metadata (`src/cli/command-manifest.ts`), dispatcher (`src/cli/main.ts`), output envelope (`src/cli/output.ts`), local project state (`src/cli/local-project/*`), and local x402 state (`src/cli/x402/*`). Update all of them together.
+- Evidence readback exists in HTTP projections (`src/protocol/evidence-projections/*`, `src/http/handlers/evidence-read.ts`), SDK role clients (`src/sdk/surface-clients/evidence-client.ts`), MCP resources (`src/mcp/resources.ts`), and CLI projection wrappers (`src/cli/projection-evidence.ts`). Add a projection once at the protocol/HTTP layer, then expose redacted wrappers deliberately.
+- MCP reference transcript rows pair source MCP behavior with CLI readback command IDs. Changing `src/cli/command-manifest.ts` or `src/mcp/catalog.ts` can break `src/mcp/reference-transcript.ts`.
 
 **`src/conformance`:**
 - Purpose: Reference conformance checks for adapter posture without authority or certification claims.
@@ -221,6 +260,11 @@ test/
 - Purpose: Local official exact x402 protected-spend walkthrough.
 - Contains: README, runnable demo, generated output directory.
 - Key files: `examples/x402-protected-spend/README.md`, `examples/x402-protected-spend/run.ts`, `examples/x402-protected-spend/output/.gitignore`.
+
+**`examples/mcp-reference-transcript`:**
+- Purpose: Source-owned Tier 2 MCP x402 reference transcript harness.
+- Contains: README, runnable transcript generator, generated JSON/Markdown output directory.
+- Key files: `examples/mcp-reference-transcript/README.md`, `examples/mcp-reference-transcript/run.ts`, `examples/mcp-reference-transcript/output/.gitignore`.
 
 **`test`:**
 - Purpose: Bun tests grouped by ownership and behavior boundary.
@@ -245,6 +289,7 @@ test/
 - `src/cli/main.ts`: CLI command dispatcher.
 - `src/mcp/index.ts`: MCP source face.
 - `examples/x402-protected-spend/run.ts`: Local protected-spend demo.
+- `examples/mcp-reference-transcript/run.ts`: Source-owned MCP transcript generator.
 
 **Configuration:**
 - `package.json`: Package metadata, exports, scripts, dependencies, packable files.
@@ -282,9 +327,16 @@ test/
 - `src/sdk/surface-clients/runtime-client.ts`: Runtime proposal role-scoped client.
 - `src/sdk/surface-clients/evidence-client.ts`: Evidence role-scoped client plus offline certificate verify.
 - `src/cli/command-manifest.ts`: Active CLI command contract.
+- `src/cli/local-project/index.ts`: Local project config and credential-placeholder posture.
+- `src/cli/local-project/doctor.ts`: Local readiness checks.
+- `src/cli/x402/index.ts`: Local x402 install/probe/health command implementations.
+- `src/cli/x402/local-state.ts`: Local x402 install/probe report schemas.
+- `src/cli/projection-evidence.ts`: CLI wrappers for supplied evidence projection JSON.
 - `src/mcp/catalog.ts`: MCP catalog.
 - `src/mcp/x402-proposal.ts`: MCP x402 proposal bridge.
 - `src/mcp/resources.ts`: MCP resource projection mapping.
+- `src/mcp/reference-transcript.ts`: Source-owned MCP reference transcript pack.
+- `examples/mcp-reference-transcript/README.md`: MCP transcript scope and non-claim boundary.
 
 **Testing:**
 - `test/architecture/import-posture.test.ts`: Import posture and lane manifest enforcement.
@@ -293,6 +345,11 @@ test/
 - `test/architecture/cli-command-posture.test.ts`: CLI non-authority posture.
 - `test/architecture/mcp-surface-posture.test.ts`: MCP non-authority posture.
 - `test/architecture/claim-boundary.test.ts`: Current claim boundary checks.
+- `test/architecture/package-surface.test.ts`: Packable package boundary.
+- `test/sdk/role-clients.test.ts`: Role-scoped SDK client posture.
+- `test/cli/cli-local-project.test.ts`: CLI init/doctor local posture.
+- `test/cli/cli-x402-install-probes.test.ts`: CLI local x402 install/probe/health posture.
+- `test/mcp/mcp-reference-transcript.test.ts`: MCP reference transcript coverage.
 - `test/protocol/*`: Primitive and state-machine invariants.
 - `test/support/*`: Fixtures, harnesses, and proof flows.
 
@@ -348,7 +405,9 @@ test/
 - HTTP handler: `src/http/handlers/evidence-read.ts`
 - SDK read: `src/sdk/client.ts` or `src/sdk/surface-clients/evidence-client.ts`
 - MCP resource mapping if model-facing: `src/mcp/resources.ts`
+- CLI projection wrapper if operator-facing: `src/cli/projection-evidence.ts`
 - Tests: `test/protocol/evidence-projections.test.ts`, `test/http/http.test.ts`, `test/mcp/mcp-resource-redaction.test.ts` if MCP-facing.
+- Do not expose raw records, internal-only object types, raw payment credentials, mutation commands, or credential material in projection outputs.
 
 **New Runtime Proposal Path:**
 - Primary code: `src/runtime/<action-family>/action-proposal.ts` or `src/runtime/ingress/index.ts` when it extends normalized dispatch ingress.
@@ -377,23 +436,29 @@ test/
 - Role-scoped client changes: `src/sdk/surface-clients/*`
 - Surface manifest update: `src/surfaces/boundary-manifest.ts`
 - Tests: `test/sdk/*`, `test/architecture/surface-boundary-posture.test.ts`, `test/architecture/root-exports.test.ts`.
+- Keep role-scoped clients internal/direct-import until the package-root contract is intentionally expanded through `package.json`, `src/index.ts`, `test/architecture/root-exports.test.ts`, and `test/architecture/package-surface.test.ts`.
+- Do not use `HandshakeClient` as a model-facing boundary when a role-scoped runtime/evidence client exists.
 
 **New CLI Command:**
 - Command metadata first: `src/cli/command-manifest.ts`
 - Dispatch: `src/cli/main.ts`
 - Output envelope: `src/cli/output.ts`
-- Command implementation: `src/cli/<command>.ts`
+- Command implementation: `src/cli/<command>.ts` for isolated commands or `src/cli/<family>/*` for cohesive local-state families such as `src/cli/local-project/*` and `src/cli/x402/*`.
 - Tests: `test/cli/*`, `test/architecture/cli-command-posture.test.ts`, `test/architecture/surface-boundary-posture.test.ts`.
 - Do not add mutation, process startup, gateway-check, policy, receipt-export, raw-record, or signer commands to the current active CLI slice.
+- Do not create `src/cli/commands/*` unless the directory layout and import/posture tests are updated deliberately.
+- For local setup commands, keep credential values outside CLI output and store only placeholder refs or caller-supplied file refs.
 
 **New MCP Tool Or Resource:**
 - Catalog entry: `src/mcp/catalog.ts`
 - Tool implementation: `src/mcp/<tool>.ts`
 - Resource mapping: `src/mcp/resources.ts`
 - Shared output: `src/mcp/output.ts`
+- Reference transcript update: `src/mcp/reference-transcript.ts` and `examples/mcp-reference-transcript/*` when behavior changes the Tier 2 audit surface.
 - Surface manifest update: `src/surfaces/boundary-manifest.ts`
 - Tests: `test/mcp/*`, `test/architecture/mcp-surface-posture.test.ts`, `test/architecture/surface-boundary-posture.test.ts`.
 - Do not import `src/sdk/client.ts`, `src/protocol/kernel.ts`, `src/adapters/*`, `src/storage/*`, or authority transition internals into `src/mcp/*`.
+- Do not add MCP process startup or public MCP package exports before the source custody model and package surface are explicit.
 
 **New Storage Implementation:**
 - Store implementation: `src/storage/<backend>/`
@@ -458,6 +523,11 @@ test/
 - Generated: Yes.
 - Committed: Output ignored except `.gitignore`.
 
+**`examples/mcp-reference-transcript/output/`:**
+- Purpose: Generated MCP reference transcript artifacts.
+- Generated: Yes.
+- Committed: Output files are present in the working tree for audit; treat them as generated artifacts from `examples/mcp-reference-transcript/run.ts`.
+
 **`migrations/`:**
 - Purpose: Canonical D1 schema for reference protocol storage.
 - Generated: No.
@@ -475,4 +545,4 @@ test/
 
 ---
 
-*Structure analysis: 2026-05-22*
+*Structure analysis: 2026-05-23*

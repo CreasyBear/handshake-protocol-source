@@ -1,6 +1,6 @@
 # Testing Patterns
 
-**Analysis Date:** 2026-05-22
+**Analysis Date:** 2026-05-23
 
 ## Test Framework
 
@@ -23,6 +23,8 @@ npm run quality:architecture  # Import, naming, export, surface, and conformance
 npm run quality:storage       # D1/store/kernel/storage invariant slice
 npm run quality:claims        # Vocabulary and claim-boundary slice
 npm run check:repo            # Full local and CI gate
+npm run demo:aps              # Generate local x402 protected-spend report
+npm run demo:mcp-transcript   # Generate source-owned MCP x402 reference transcript
 ```
 
 ## Test File Organization
@@ -83,6 +85,7 @@ describe("Handshake kernel invariants: policy and gateway", () => {
 - Assert absence of authority and credential material on proposal/evidence surfaces. Examples: non-authority flags in `test/mcp/mcp-schema-contract.test.ts`, CLI flags in `test/cli/cli-evidence.test.ts`, and surface manifest checks in `test/architecture/surface-boundary-posture.test.ts`.
 - For D1/HTTP tests, create a harness per test and dispose it in `finally`; see `test/integration/x402-d1-http.test.ts` and `test/http/d1-http.test.ts`.
 - Use table loops for matrix behavior where the test's purpose is coverage over variants, as in `test/mcp/mcp-x402-proposal.test.ts`, `test/protocol/kernel-cross-scope-matrix.test.ts`, and `test/conformance/x402-payment-conformance.test.ts`.
+- Use source-owned reference transcript tests when a user/model-facing workflow needs many hostile or not-ready rows without claiming a live host. `test/mcp/mcp-reference-transcript.test.ts` validates the generated transcript rows, source bindings, CLI readbacks, hostile matrix, and non-authority posture.
 
 ## Mocking
 
@@ -136,6 +139,7 @@ export function makeKernelFixture() {
 - Package, repo-write, preview-deploy, and codemode runtime flow helpers live in `test/support/package-install-flow.ts`, `test/support/repo-write-flow.ts`, `test/support/preview-deploy-flow.ts`, and `test/support/codemode-multi-action-flow.ts`.
 - Local file-system mutation surfaces live in `test/support/repo-write-surface.ts` and test-local helpers such as `writeJson()` in `test/cli/cli-evidence.test.ts`.
 - Official x402 fixture shapes are declared inside x402-specific tests such as `test/adapters/x402-wallet-gateway.test.ts`, `test/integration/x402-d1-http.test.ts`, and `test/conformance/x402-upstream-exact-fixtures.test.ts`.
+- Source-owned demo transcript fixtures live in `src/mcp/reference-transcript.ts` and are rendered by `examples/mcp-reference-transcript/run.ts`; tests should import the source builder rather than asserting on stale generated output files.
 
 ## Coverage
 
@@ -150,6 +154,36 @@ export function makeKernelFixture() {
 - `npm run check:repo` in `package.json` runs typecheck, lint, Prettier check, all Bun tests, package-surface check, and `git diff --check`.
 - `.github/workflows/check.yml` runs `bun install --frozen-lockfile` and `npm run check:repo`.
 - Architecture tests act as structural coverage for imports, naming, root exports, package surface, CLI/MCP posture, active vocabulary, and claim boundaries.
+
+## Active Tier 2 SDK/CLI/MCP Coverage
+
+**Current posture tests:**
+- Shared surface posture is guarded by `test/architecture/surface-boundary-posture.test.ts`, which reads `src/surfaces/boundary-manifest.ts`, checks active/deferred surface ids, forbids authority route families on model/operator surfaces, requires non-authority output flags, and scans existing source roots for forbidden imports, credentials, and output fields.
+- SDK role boundaries are guarded by `test/sdk/role-clients.test.ts`. It uses `// @ts-expect-error` checks to reject role maps and fallback tokens on `RuntimeClientOptions` and `EvidenceClientOptions`, captures fetch calls to prove single-role authorization headers, and asserts that role clients do not expose `evaluatePolicy`, `gatewayCheck`, `createReceiptExport`, or certificate minting methods.
+- CLI posture is guarded by `test/cli/cli-evidence.test.ts`, `test/cli/cli-local-project.test.ts`, `test/cli/cli-x402-install-probes.test.ts`, `test/cli/cli-support-bundle.test.ts`, and `test/architecture/cli-command-posture.test.ts`. These tests keep the active command set to schema/init/doctor, APS and redacted evidence wrappers, local certificate verification, redacted support bundle assembly, local x402 install/probe/install-health posture, and x402 conformance; require all CLI JSON to carry non-authority fields; and scan `src/cli/*` for all-role clients, process startup, gateway runners, raw records, and mutation-shaped command names.
+- MCP schema/resource/proposal/transcript posture is guarded by `test/mcp/mcp-schema-contract.test.ts`, `test/mcp/mcp-resource-redaction.test.ts`, `test/mcp/mcp-x402-proposal.test.ts`, `test/mcp/mcp-reference-transcript.test.ts`, and `test/architecture/mcp-surface-posture.test.ts`. These tests enforce one proposal tool, read-only resources, strict unknown-field rejection, shared `SurfaceOutcome` output, read-only projection routing, non-authority flags, no root export, no direct policy/gateway/signer/storage imports, and source-bound transcript rows.
+- `npm run quality:architecture` includes the Tier 2 structural slice: `test/architecture/import-posture.test.ts`, `test/architecture/naming-posture.test.ts`, `test/architecture/package-surface.test.ts`, `test/architecture/root-exports.test.ts`, `test/architecture/surface-boundary-posture.test.ts`, `test/architecture/cli-command-posture.test.ts`, `test/architecture/mcp-surface-posture.test.ts`, and `test/conformance/protected-mutation-adapter-conformance.test.ts`.
+
+**Current coverage gaps:**
+- SDK role-client tests use a captured fetch fake in `test/sdk/role-clients.test.ts`; they also smoke the `handshake-protocol-kernel/sdk/role-clients` package subpath. There is no HTTP/D1 integration test proving `RuntimeClient` and `EvidenceClient` against the real app routes.
+- CLI tests cover APS report rendering, invalid certificate verification, schema output, structured usage errors, conformance classification, local credential placeholder/profile storage, doctor readiness, local x402 install/probe commands, pre-contract install health, redacted contract views, receipt timelines, and file-backed support bundles. They do not yet cover valid/tampered certificate fixtures, package bin/pack checks, live control-plane install registration, live provider/gateway probes, or process-start contracts.
+- MCP proposal tests use a fake `McpRuntimeProposalClient` in `test/mcp/mcp-x402-proposal.test.ts`; `test/mcp/mcp-reference-transcript.test.ts` adds a source-owned transcript harness, but there is still no external MCP server/host transcript, no end-to-end HTTP-backed proposal bridge, and no real protocol replay/idempotency recovery path through MCP.
+- MCP proposal tests cover `toolsListChanged` freshness, strict oversized-field rejection, bypass-shaped input rejection, stable derived idempotency keys, sequenced retry keys, and replay/idempotency mapping through structured non-authority outcomes.
+- MCP resource tests prove URI parsing and evidence-client routing, but metadata, challenge, and certificate resources in `src/mcp/resources.ts` are still reference-only payloads rather than source-owned projection reads.
+- Architecture tests prevent authority drift by static scanning, but they do not prove runtime containment of sibling browser, shell, package-manager, cloud, or repo-write tools. Any claim that MCP or CLI controls those channels remains outside current evidence.
+- CLI readiness can hide operator frustration because `doctor` remains `not_ready` even after a local x402 probe passes; this is correct while `trustedReadiness` is false, but tests should preserve the exact reason-code path so future UI/help text can explain the next mechanism instead of reporting generic failure.
+- Model/developer frustration can hide behind fake clients: SDK and MCP unit tests prove surface method shape and headers, not a real network-backed activation path. Any quickstart or support workflow needs an HTTP/D1 route test before treating the surface as adoptable.
+
+## Demo Script Tests
+
+**x402 protected-spend demo:**
+- `test/product/x402-protected-spend-demo-report.test.ts` runs `examples/x402-protected-spend/run.ts`, checks the generated JSON/markdown output, verifies `RuntimeClient` and `EvidenceClient` usage, and rejects `HandshakeClient` / direct runtime-ingress shortcuts in the demo source.
+- The test asserts local/reference non-claims including no hosted operation, no broad x402 compatibility, no aggregate spend ledger, and local pinned trust only.
+
+**MCP reference transcript demo:**
+- `test/mcp/mcp-reference-transcript.test.ts` validates `buildMcpX402ReferenceTranscript()` and `buildMcpX402ReferenceTranscriptMarkdown()` from `src/mcp/reference-transcript.ts`.
+- The transcript covers metadata read, valid proposal, evidence readback, stale metadata, tools-list change, install not ready, gateway offline, amount mismatch, parameter drift, replay refusal, raw sibling-shaped input, and downstream proof gap.
+- The demo command `npm run demo:mcp-transcript` writes `examples/mcp-reference-transcript/output/latest.json` and `examples/mcp-reference-transcript/output/latest.md`; generated files are ignored and should not become canonical source.
 
 ## Test Types
 
@@ -173,6 +207,7 @@ export function makeKernelFixture() {
 **E2E Tests:**
 - No browser E2E framework is used.
 - The closest end-to-end paths are local protocol/HTTP/D1 flows in `test/integration/x402-d1-http.test.ts`, `test/integration/repo-write-d1-http.test.ts`, and `test/integration/package-install-end-to-end.test.ts`.
+- Tier 2 SDK/CLI/MCP surfaces do not have a true host/process E2E test. The current transcript and CLI demos are source-owned harnesses, not process custody, external MCP host, package bin, browser, shell, cloud, or provider-gateway tests.
 
 ## Common Patterns
 
@@ -228,6 +263,21 @@ for (const file of walkTs("src/mcp")) {
 expect(violations.sort()).toEqual([]);
 ```
 
+**Reference Transcript Testing:**
+```typescript
+const pack = await buildMcpX402ReferenceTranscript();
+
+for (const row of pack.rows) {
+  expect(row.sourceBindings.length).toBeGreaterThan(0);
+  expect(row.nonAuthorityPosture).toMatchObject({
+    authorityCreated: false,
+    greenlightCreated: false,
+    gatewayCheckPerformed: false,
+    mutationAttempted: false,
+  });
+}
+```
+
 ---
 
-*Testing analysis: 2026-05-22*
+*Testing analysis: 2026-05-23*

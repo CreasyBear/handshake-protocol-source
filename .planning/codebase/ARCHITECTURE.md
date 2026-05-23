@@ -1,7 +1,7 @@
-<!-- refreshed: 2026-05-22 -->
+<!-- refreshed: 2026-05-23 -->
 # Architecture
 
-**Analysis Date:** 2026-05-22
+**Analysis Date:** 2026-05-23
 
 ## System Overview
 
@@ -69,9 +69,10 @@
 | x402 probes and conformance | Encode signer-custody and bypass posture checks for the local protected-spend profile. | `src/adapters/x402-payment/bypass-probes.ts`, `src/adapters/x402-payment/conformance.ts` |
 | Surface manifest | Source-owned boundary table for SDK, CLI, MCP, and deferred surface posture. | `src/surfaces/boundary-manifest.ts` |
 | SDK client | Typed HTTP transition and evidence client; it submits requests and parses responses only. | `src/sdk/client.ts`, `src/sdk/surface-clients/*` |
-| CLI | Local evidence, manifest, certificate verification, and x402 conformance commands. | `src/cli/*` |
-| MCP | Model-facing proposal/evidence schema and resource mapping; no process startup or authority. | `src/mcp/*` |
+| CLI | Local operator setup, readiness checks, evidence/readback wrappers, certificate verification, and x402 posture probes; no process startup or authority. | `src/cli/*` |
+| MCP | Model-facing x402 proposal/resource source modules and reference transcript harness; no package export, process startup, gateway, signer, or authority. | `src/mcp/*`, `examples/mcp-reference-transcript/*` |
 | x402 walkthrough | Local reference proof path and artifact generator for protected spend. | `examples/x402-protected-spend/README.md`, `examples/x402-protected-spend/run.ts` |
+| MCP reference transcript | Source-owned Tier 2 MCP transcript generator that binds catalog, proposal, resources, and CLI readback IDs without claiming external host operation. | `src/mcp/reference-transcript.ts`, `examples/mcp-reference-transcript/run.ts` |
 | Architecture tests | Enforce import posture, root exports, surface boundaries, naming, CLI posture, MCP posture, package surface, and claim boundary. | `test/architecture/*` |
 
 ## Pattern Overview
@@ -152,6 +153,31 @@
 - Depends on: HTTP route contract, public protocol schemas/inputs, surface manifest.
 - Used by: Examples, tests, external integrations.
 
+## Active Tier 2 Surface Posture
+
+**Source-owned boundary table:** `src/surfaces/boundary-manifest.ts` is the executable posture map for SDK, CLI, MCP, and deferred surfaces. Active entries are `sdk.runtime`, `sdk.evidence`, `cli.operator`, `cli.evidence`, and `mcp.runtime`; deferred entries are `sdk.install`, `sdk.gateway`, and `cli.process`. `test/architecture/surface-boundary-posture.test.ts` requires each surface to declare allowed/forbidden route families, forbidden imports, forbidden credential shapes, forbidden output fields, non-authority flags, and claim-boundary labels.
+
+**Public export boundary:** `package.json` exports only root, `./runtime`, `./conformance`, `./experimental`, and package metadata. `src/index.ts` exposes the HTTP app, public protocol schemas/inputs, verified gateway helpers, authority-certificate verification helpers, and the all-route `HandshakeClient`; it does not export `src/cli/*`, `src/mcp/*`, `RuntimeClient`, `EvidenceClient`, stores, kernel internals, runtime ingress internals, or reference gateways. `test/architecture/root-exports.test.ts` and `test/architecture/package-surface.test.ts` are the public-surface gates.
+
+**SDK:** `src/sdk/client.ts` is the all-route low-level HTTP mirror. It still supports `transitionToken` fallback across roles, so it is not the model-facing Tier 2 boundary. Tier 2 activation now uses the explicit `handshake-protocol-kernel/sdk/role-clients` package subpath: `RuntimeClient` is limited to runtime execution, tool-call drafts, intent compilation, and action contract proposal (`src/sdk/surface-clients/runtime-client.ts`), while `EvidenceClient` reads redacted projections and verifies supplied authority certificates without minting (`src/sdk/surface-clients/evidence-client.ts`). `src/sdk/surface-clients/transport.ts` accepts a single role credential and `test/sdk/role-clients.test.ts` rejects role-token bags/fallback tokens plus policy, gateway, receipt-export, and certificate-mint methods.
+
+**CLI:** The active CLI slice is local operator and evidence posture: `schema`, `init`, `doctor`, `evidence aps-report`, `evidence contract-view`, `evidence receipt-timeline`, `cert verify`, `support bundle`, `install x402-payment`, `probes x402-payment`, `install health`, and `conformance x402-payment` (`src/cli/command-manifest.ts`). `src/cli/local-project/*` writes project config and credential-placeholder refs without token values; `src/cli/x402/*` records local x402 install/probe/readiness classification; `src/cli/projection-evidence.ts` wraps supplied projection JSON; `src/cli/support-bundle.ts` assembles supplied redacted projections and local posture records into one evidence-only support bundle. Every output goes through `src/cli/output.ts` with authority, greenlight, gateway, mutation, raw-record, credential-material, receipt-export, and certificate-mint flags set false. `test/architecture/cli-command-posture.test.ts`, `test/cli/cli-local-project.test.ts`, `test/cli/cli-x402-install-probes.test.ts`, and `test/cli/cli-support-bundle.test.ts` are the CLI posture gates.
+
+**MCP:** The active MCP slice exposes exactly one proposal tool, `handshake.actions.x402_payment.propose`, plus read-only resource templates (`src/mcp/catalog.ts`). `proposeMcpX402Payment()` validates strict official exact x402 input, refuses stale metadata/not-ready install/offline gateway/amount overrun before runtime calls, derives the idempotency key from exact x402 request material rather than trusting a caller key, and then uses a role-scoped `RuntimeClient` to create runtime evidence, a finalized tool-call draft, intent compilation, and an action contract proposal only (`src/mcp/x402-proposal.ts`). Evidence resources route through `EvidenceClient`; metadata/challenge/certificate/pre-contract health reads are source or reference views (`src/mcp/resources.ts`). `src/mcp/reference-transcript.ts` and `examples/mcp-reference-transcript/run.ts` generate a source-owned transcript harness, not a public MCP host quickstart. `test/mcp/*` and `test/architecture/mcp-surface-posture.test.ts` assert no policy decision, greenlight, gateway check, mutation, receipt export, payment payload, signature, hosted operation, or package export appears in the MCP path.
+
+**Runtime and adapter proof boundary:** `src/runtime/ingress/index.ts` currently recognizes local package-install and x402 dispatch blocks, including wrapped, raw-sibling, ambiguous, dynamic, retry, and loop shapes. It records runtime evidence, generated graph evidence, tool-call drafts, intent compilations, action contracts, refusals, or bypass evidence; it does not create policy, greenlight, gateway, mutation, receipt, or certificate evidence. `src/adapters/package-install/gateway.ts`, `src/adapters/repo-write/gateway.ts`, `src/adapters/preview-deploy/gateway.ts`, and `src/adapters/x402-payment/wallet-gateway.ts` are reference consequence holders and mutate only after `verifiedGatewayCheckFromResult()` returns a `VerifiedGatewayCheck`.
+
+**Evidence/readback boundary:** HTTP evidence routes in `src/http/routes/evidence-read-route-registry.ts`, SDK reads in `src/sdk/surface-clients/evidence-client.ts`, MCP resources in `src/mcp/resources.ts`, and CLI readback wrappers in `src/cli/projection-evidence.ts` expose redacted projections. Raw record reads remain diagnostic and respect object-registry `rawReadPosture` through `src/http/handlers/internal-record-read.ts`; they are not the product audit surface.
+
+**Architectural debt and ownership seams:** Keep these visible when planning Tier 2 work:
+- `HandshakeClient` remains root-exported and all-role; its fallback `transitionToken` is useful for transition compatibility but unsafe as the model-facing surface (`src/sdk/client.ts`, `src/sdk/LANE.md`).
+- Role clients are implemented and exposed through `./sdk/role-clients`, while root exports remain curated. Future SDK expansion still requires explicit package/root tests (`src/sdk/surface-clients/*`, `package.json`, `test/architecture/root-exports.test.ts`).
+- MCP is source-owned and tested, but not a package export or installed server process. `src/mcp/reference-transcript.ts` proves source behavior, not external host custody.
+- CLI local install/probe health is pre-contract readiness classification. It is not provider certification, hosted custody, or gateway operation (`src/cli/x402/*`, `src/cli/local-project/*`).
+- The surface manifest is central and hand-maintained. Adding route families, commands, resources, or clients without updating `src/surfaces/boundary-manifest.ts` and posture tests creates drift.
+- Evidence projections assemble useful readbacks by scanning stored records in `src/http/handlers/evidence-read.ts` and `src/protocol/evidence-projections/projections.ts`; this is acceptable for the local proof slice but not a provider-scale query model.
+- x402 spend windows remain metadata/conformance labels, not an enforced aggregate spend ledger (`src/adapters/x402-payment/conformance.ts`, `src/cli/x402/local-state.ts`).
+
 ## Data Flow
 
 ### Primary Protected Action Path
@@ -182,17 +208,21 @@
 ### MCP Proposal Flow
 
 1. MCP exposes one proposal tool, `handshake.actions.x402_payment.propose`, and redacted resource templates (`src/mcp/catalog.ts:7`, `src/mcp/catalog.ts:66`).
-2. `proposeMcpX402Payment()` validates strict official exact x402 input and checks metadata freshness, install posture, gateway posture, and per-call amount bound before contacting runtime routes (`src/mcp/x402-proposal.ts:91`).
+2. `proposeMcpX402Payment()` validates strict official exact x402 input and checks metadata freshness, install posture, gateway posture, and per-call amount bound before contacting runtime routes (`src/mcp/x402-proposal.ts:103`).
 3. MCP uses a role-scoped `RuntimeClient`, not the all-role SDK client (`src/sdk/surface-clients/runtime-client.ts:19`).
-4. MCP records runtime execution, tool-call draft, intent compilation, and action contract proposal, then returns non-authority flags and redacted evidence refs (`src/mcp/x402-proposal.ts:320`).
-5. MCP resource reads use `EvidenceClient` projections and mark every read as non-authority (`src/mcp/resources.ts`).
+4. MCP derives a stable idempotency key from x402 request material, records runtime execution, tool-call draft, intent compilation, and action contract proposal, then returns non-authority flags and redacted evidence refs (`src/mcp/x402-proposal.ts`).
+5. MCP currently records `generatedExecutionGraphId: null` because generated graph creation is not exposed by the role-scoped runtime client; the response labels that as non-authority posture, not missing permission (`src/mcp/x402-proposal.ts`).
+6. MCP resource reads use `EvidenceClient` projections and mark every read as non-authority (`src/mcp/resources.ts`).
+7. The source-owned transcript harness covers valid proposal, evidence readback, stale metadata, tools-list change, install-not-ready, offline gateway, amount mismatch, params mismatch, replay refusal, raw sibling-shaped input, and proof-gap/downstream uncertainty cases (`src/mcp/reference-transcript.ts`, `examples/mcp-reference-transcript/run.ts`).
 
-### CLI Evidence Flow
+### CLI Local Operator And Evidence Flow
 
-1. The CLI command manifest allows only schema, APS evidence report rendering, local certificate verification, and x402 conformance (`src/cli/command-manifest.ts:33`).
-2. `runCliCommand()` dispatches commands to local parsers/verifiers and does not call policy, gateway, runtime proposal, or mutation entrypoints (`src/cli/main.ts`).
-3. Certificate verification calls offline verification against supplied trust material (`src/cli/certificate.ts`).
-4. Every CLI output is wrapped through `cliOutput()` and guarded by CLI posture tests (`src/cli/output.ts`, `test/architecture/cli-command-posture.test.ts`).
+1. The CLI command manifest declares each active command, plane, custody role, route families, filesystem behavior, and non-goals (`src/cli/command-manifest.ts`).
+2. `init` and `doctor` manage local `.handshake/project.json` plus out-of-workspace credential-placeholder refs and trust-bundle posture; they do not create token values (`src/cli/local-project/index.ts`, `src/cli/local-project/doctor.ts`).
+3. `install x402-payment`, `probes x402-payment`, and `install health` produce local pre-contract install/probe/readiness records; readiness is local classification and remains `not_contract_keyed_yet` until a contract exists (`src/cli/x402/index.ts`, `src/cli/x402/local-state.ts`).
+4. `evidence aps-report`, `evidence contract-view`, and `evidence receipt-timeline` wrap supplied projection JSON into CLI outputs; they do not fetch raw records or create receipt exports (`src/cli/aps-report.ts`, `src/cli/projection-evidence.ts`).
+5. `cert verify` performs offline verification against supplied trust material and cannot mint an authority certificate (`src/cli/certificate.ts`).
+6. Every CLI output is wrapped through `cliOutput()` and guarded by CLI posture tests (`src/cli/output.ts`, `test/architecture/cli-command-posture.test.ts`, `test/cli/cli-evidence.test.ts`, `test/cli/cli-local-project.test.ts`, `test/cli/cli-x402-install-probes.test.ts`).
 
 **State Management:**
 - Protocol state is represented as immutable `ProtocolRecord` objects plus ordered `ContractStreamEvent` records (`src/protocol/areas/object-registry/schemas.ts`, `src/protocol/events/schemas.ts`).
@@ -249,6 +279,21 @@
 - Examples: `src/surfaces/boundary-manifest.ts`, `test/architecture/surface-boundary-posture.test.ts`
 - Pattern: Allowed and forbidden route families, imports, credential shapes, output fields, non-authority flags, and claim labels.
 
+**RoleScopedTransport:**
+- Purpose: SDK transport boundary that carries exactly one role credential.
+- Examples: `src/sdk/surface-clients/transport.ts`, `src/sdk/surface-clients/runtime-client.ts`, `src/sdk/surface-clients/evidence-client.ts`
+- Pattern: Runtime and evidence clients expose narrow method sets and reject role maps/fallback tokens in tests.
+
+**CliLocalProjectPosture:**
+- Purpose: Local setup/readiness state for CLI users without creating authority or credential values.
+- Examples: `src/cli/local-project/index.ts`, `src/cli/local-project/doctor.ts`, `src/cli/x402/local-state.ts`
+- Pattern: Workspace project config plus external state-root credential refs, trust bundle, x402 install/probe reports, and fail-closed doctor reasons.
+
+**McpReferenceTranscript:**
+- Purpose: Source-owned MCP behavior transcript for Tier 2 audit.
+- Examples: `src/mcp/reference-transcript.ts`, `examples/mcp-reference-transcript/run.ts`, `test/mcp/mcp-reference-transcript.test.ts`
+- Pattern: Deterministic catalog/proposal/resource cases with non-authority posture and CLI readback pairings.
+
 **AuthorityCertificate:**
 - Purpose: Terminal signed evidence only.
 - Examples: `src/protocol/areas/authority-certificate/*`, `src/cli/certificate.ts`, `src/sdk/surface-clients/evidence-client.ts`
@@ -294,17 +339,22 @@
 **CLI:**
 - Location: `src/cli/main.ts`
 - Triggers: Bun/Node execution or import of `runCliCommand()`.
-- Responsibilities: Render schemas/evidence, verify supplied certificate files, and run x402 conformance classification.
+- Responsibilities: Render schemas/evidence, initialize local project posture, run local doctor checks, verify supplied certificate files, record local x402 install/probe/health classifications, and run x402 conformance classification without process startup or authority.
 
 **MCP Source Surface:**
 - Location: `src/mcp/index.ts`
 - Triggers: Future MCP host integration importing source modules.
-- Responsibilities: Expose catalog, proposal schema, resource parsing, and x402 proposal bridge without process startup or authority.
+- Responsibilities: Expose catalog, proposal schema, resource parsing, x402 proposal bridge, and source-owned reference transcript builder without process startup, public package export, gateway custody, signer access, or authority.
 
 **x402 Demo:**
 - Location: `examples/x402-protected-spend/run.ts`
 - Triggers: `npm run demo:aps`.
 - Responsibilities: Exercise local protected-spend proof path and write redacted artifacts under `examples/x402-protected-spend/output/`.
+
+**MCP Reference Transcript Demo:**
+- Location: `examples/mcp-reference-transcript/run.ts`
+- Triggers: `npm run demo:mcp-transcript`.
+- Responsibilities: Generate JSON and Markdown reference transcript artifacts under `examples/mcp-reference-transcript/output/` from source-owned MCP behavior.
 
 ## Architectural Constraints
 
@@ -315,6 +365,10 @@
 - **Runtime ingress:** Current public runtime ingress is limited to local x402 payment and package-install dispatch boundaries (`src/runtime/ingress/index.ts`). It is observer/compiler evidence, not broad MCP/browser/shell/network interception.
 - **x402 scope:** Current x402 enforcement is buyer-side `exact` per call through the local/reference wallet gateway. `src/adapters/x402-payment/conformance.ts` cuts unsupported surfaces such as `upto`, batch settlement, seller middleware, facilitator operation, and signed offers/receipts.
 - **Root exports:** `src/index.ts` is curated. Reference gateways live under `src/experimental.ts`; runtime ingress lives under `src/runtime/index.ts`; conformance lives under `src/conformance/index.ts`.
+- **Role clients:** `RuntimeClient` and `EvidenceClient` are implemented under `src/sdk/surface-clients/*` and exposed through `./sdk/role-clients`. Treat them as the first package-level Tier 2 activation surface, not as root exports.
+- **CLI posture:** CLI readiness and install reports are local classification only. They do not prove hosted setup, provider custody, external gateway operation, or enforce aggregate spend.
+- **MCP posture:** MCP modules are source-owned and tested, but there is no public `./mcp` package export and no installed MCP server process. The reference transcript is not an external-host transcript.
+- **Evidence readback:** Redacted projections are the product read surface. Raw record reads are diagnostic and internal-only records are blocked; projection assembly currently scans local record sets and is not a scale-proof query architecture.
 - **Raw reads:** Generic raw HTTP reads must respect object registry `rawReadPosture`; internal-only records such as stream events, idempotency ledger entries, bypass probes, and tool-call drafts are hidden by `src/http/handlers/internal-record-read.ts`.
 - **Scratch docs:** `.planning/` may contain mapper and planning artifacts but is not repo truth.
 
@@ -343,6 +397,30 @@
 **Why it's wrong:** Raw records include internal reconstruction and control state that can confuse evidence posture, leak internal details, or turn store shape into public API.
 
 **Do this instead:** Add a redacted projection under `src/protocol/evidence-projections/*`, route it through `src/http/handlers/evidence-read.ts`, and add SDK/MCP reads through `src/sdk/surface-clients/evidence-client.ts` or `src/mcp/resources.ts`.
+
+### All-Role SDK As Model Boundary
+
+**What happens:** Model-facing code uses `HandshakeClient` with a broad `transitionToken` fallback because it is already root-exported and convenient.
+
+**Why it's wrong:** This reintroduces ambient role authority at the surface that is supposed to be constrained to proposal or evidence.
+
+**Do this instead:** Use `RuntimeClient` for proposal writes and `EvidenceClient` for readback under `src/sdk/surface-clients/*`; make any public export expansion explicit in `package.json`, `src/index.ts`, `test/architecture/root-exports.test.ts`, and `test/sdk/role-clients.test.ts`.
+
+### CLI Probe As Provider Certification
+
+**What happens:** `install x402-payment`, `probes x402-payment`, `install health`, or `doctor` output is treated as hosted gateway readiness or provider-grade certification.
+
+**Why it's wrong:** The CLI records local posture and pre-contract readiness only; it cannot prove external gateway custody, signer custody, or future mutation enforcement.
+
+**Do this instead:** Keep CLI outputs in the non-authority envelope from `src/cli/output.ts`; only gateway-side code such as `src/adapters/x402-payment/wallet-gateway.ts` can prove a checked mutation attempt.
+
+### MCP Transcript As Hosted MCP Operation
+
+**What happens:** The source-owned reference transcript is marketed or wired as if it proves an installed MCP server, external host custody, or production model integration.
+
+**Why it's wrong:** `src/mcp/reference-transcript.ts` exercises source modules in-process and records non-authority posture; it does not prove process isolation, host transport, or deployment custody.
+
+**Do this instead:** Treat `examples/mcp-reference-transcript/*` as a Tier 2 audit fixture. Add a separate host/process custody lane and package export only after `src/mcp/LANE.md`, `package.json`, `STRUCTURE.md`, and posture tests are updated.
 
 ### Adapter Rail Defining Protocol Meaning
 
@@ -378,8 +456,8 @@
 
 **Redaction:** Evidence projections and surface outputs must exclude raw credential material, mutation commands, and raw internal records (`src/protocol/evidence-projections/*`, `src/surfaces/boundary-manifest.ts`, `src/mcp/resources.ts`, `src/cli/output.ts`).
 
-**Package Surface:** `package.json` keeps the package private and exports only root, runtime, conformance, experimental, and package metadata subpaths.
+**Package Surface:** `package.json` keeps the package private and exports root, runtime, conformance, role-scoped SDK clients, experimental, and package metadata subpaths. CLI and MCP remain source surfaces, not public package subpaths.
 
 ---
 
-*Architecture analysis: 2026-05-22*
+*Architecture analysis: 2026-05-23*

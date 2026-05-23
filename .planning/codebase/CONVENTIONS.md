@@ -1,6 +1,6 @@
 # Coding Conventions
 
-**Analysis Date:** 2026-05-22
+**Analysis Date:** 2026-05-23
 
 ## Naming Patterns
 
@@ -8,7 +8,7 @@
 - Use lower-kebab concept names for implementation files: `src/adapters/x402-payment/action-proposal.ts`, `src/adapters/x402-payment/wallet-gateway.ts`, `src/surfaces/boundary-manifest.ts`, and `src/http/admission/request-context.ts`.
 - Use owned-domain directory names, not buckets: `src/protocol/areas/action-contract/`, `src/protocol/areas/policy-greenlight/`, `src/protocol/areas/gateway-gate/`, `src/sdk/surface-clients/`, and `src/mcp/`.
 - Do not introduce source path segments named `utils`, `helpers`, `common`, `misc`, `stuff`, `manager`, or `service`; `test/architecture/naming-posture.test.ts` enforces this against `src/**`.
-- Name tests by guarded behavior and ownership lane: `test/architecture/surface-boundary-posture.test.ts`, `test/mcp/mcp-schema-contract.test.ts`, `test/sdk/role-clients.test.ts`, and `test/conformance/x402-upstream-exact-fixtures.test.ts`.
+- Name tests by guarded behavior and ownership lane: `test/architecture/surface-boundary-posture.test.ts`, `test/mcp/mcp-schema-contract.test.ts`, `test/mcp/mcp-reference-transcript.test.ts`, `test/sdk/role-clients.test.ts`, and `test/conformance/x402-upstream-exact-fixtures.test.ts`.
 - Keep root `test/` free of loose `.test.ts` files; place tests under `test/protocol/`, `test/architecture/`, `test/http/`, `test/runtime/`, `test/adapters/`, `test/mcp/`, `test/cli/`, `test/sdk/`, `test/conformance/`, `test/product/`, or `test/integration/`.
 
 **Functions:**
@@ -23,6 +23,7 @@
 - Use UPPER_SNAKE_CASE only for stable public constants that are already named that way: `PROTOCOL_VERSION` in `src/protocol/public/schemas.ts`, `CANONICALIZER_VERSION` in `src/protocol/foundation/canonical.ts`, and `CLI_SCHEMA_VERSION` in `src/cli/output.ts`.
 - Use lowerCamelCase plural arrays with `as const` for registries and literal unions: `surfaceIds`, `surfaceRouteFamilies`, `surfaceNonAuthorityFlags`, and `surfaceBoundaryManifest` in `src/surfaces/boundary-manifest.ts`.
 - Use explicit nulls for absent protocol refs instead of `undefined` in durable shapes: `greenlightRef: null`, `gatewayCheckRef: null`, and `mutationAttemptRef: null` in `src/mcp/x402-proposal.ts` and `src/surfaces/outcome.ts`.
+- Use explicit `false` flags for non-authority posture instead of deriving absence from missing properties. The shared posture is enforced by `SurfaceOutcomeCommonSchema` in `src/surfaces/outcome.ts`, `cliOutput()` in `src/cli/output.ts`, and `mcpReferenceNonAuthorityPosture` in `src/mcp/reference-transcript.ts`.
 
 **Types:**
 - Use PascalCase for exported types, classes, and schemas: `HandshakeKernel` in `src/protocol/kernel.ts`, `HandshakeClientError` in `src/sdk/client.ts`, `X402PaymentParametersSchema` in `src/adapters/x402-payment/wallet-gateway.ts`, and `McpX402PaymentProposalInputSchema` in `src/mcp/x402-proposal.ts`.
@@ -48,6 +49,7 @@
 - Code must pass `tsc --noEmit --pretty false` through `npm run check:types`.
 - `tsconfig.json` enables `strict`, `noUncheckedIndexedAccess`, and `exactOptionalPropertyTypes`; prefer explicit null handling and `?.` checks over assuming indexed values exist.
 - Runtime source is ESM only through `"type": "module"` in `package.json`; keep imports extensionless as the existing `moduleResolution: "Bundler"` setup expects.
+- External/model/operator inputs must enter through bounded Zod schemas before protocol calls. Examples: `McpX402PaymentProposalInputSchema` in `src/mcp/x402-proposal.ts` caps refs, URLs, extension keys, SDK package versions, and atomic amount strings; `RuntimeIngressDispatchBlockSchema` in `src/runtime/ingress/index.ts` caps dispatch blocks at 32 items; CLI x402 commands parse local install/probe payloads through schemas in `src/cli/x402/index.ts` and `src/cli/x402/local-state.ts`.
 
 ## Import Organization
 
@@ -63,7 +65,7 @@
 **Layer imports:**
 - Protocol area modules under `src/protocol/areas/*` may depend on `src/protocol/foundation/`, `src/protocol/events/`, `src/protocol/context/`, `src/protocol/store/`, and other area public indexes.
 - Protocol areas must not import HTTP, storage implementations, runtime wrappers, SDK clients, or adapter fixtures; `test/architecture/import-posture.test.ts` enforces this.
-- HTTP and SDK code must import protocol behavior through public faces, not area internals; `src/sdk/client.ts` imports public schemas/inputs and specific allowed helpers.
+- HTTP and SDK code must import protocol behavior through public faces, public area indexes, or explicit architecture-test exceptions; `src/sdk/client.ts` remains the broad low-level HTTP mirror, while `src/sdk/surface-clients/*` must stay role-scoped and away from authority-bearing area internals.
 - `src/runtime/` must stay on observer/compiler evidence and proposal helpers; it must not import gateway, policy, receipt, or mutation authority internals.
 - `src/cli/` and `src/mcp/` must not import authority-bearing clients, gateway runners, signer factories, raw stores, or protocol kernel internals; `test/architecture/cli-command-posture.test.ts` and `test/architecture/mcp-surface-posture.test.ts` enforce this.
 
@@ -73,7 +75,7 @@
 - Protocol transitions throw `HandshakeProtocolError` from `src/protocol/foundation/errors.ts` with stable `code`, HTTP-like `status`, and optional metadata such as `retryability`, `commitState`, `proofRef`, and `refusalRef`.
 - Guard functions return structured `TransitionGuardResult` values and callers convert failed guards into `HandshakeProtocolError`, as `HandshakeKernel.assertTransition()` does in `src/protocol/kernel.ts`.
 - Boundary schemas parse input with Zod before building protocol records: `X402PaymentAttemptSchema.parse()` in `src/adapters/x402-payment/action-proposal.ts`, `X402PaymentParametersSchema.parse()` in `src/adapters/x402-payment/wallet-gateway.ts`, and `McpX402PaymentProposalInputSchema.safeParse()` in `src/mcp/x402-proposal.ts`.
-- MCP and surface code should return structured refusal/not-ready/error outcomes instead of leaking authority-shaped exceptions; `proposeMcpX402Payment()` in `src/mcp/x402-proposal.ts` maps invalid input, stale metadata, gateway offline, and runtime bridge errors into `mcpNonContractOutcome()`.
+- MCP and surface code should return structured refusal/not-ready/error outcomes instead of leaking authority-shaped exceptions; `proposeMcpX402Payment()` in `src/mcp/x402-proposal.ts` maps invalid input, stale metadata, changed tools list, install not ready, gateway offline, amount bounds, replay/idempotency failures, and runtime bridge errors into `mcpNonContractOutcome()`.
 - SDK HTTP failures become `HandshakeClientError` from `src/sdk/client.ts`; clients should inspect `code`, `retryability`, `commitState`, `proofRef`, and `refusalRef` rather than parsing raw strings.
 - Adapter gateways return discriminated results and non-mutation outcomes for failed gates; `runX402WalletGateway()` in `src/adapters/x402-payment/wallet-gateway.ts` returns `gateway_check_refused`, `gateway_check_not_authoritative`, `payment_signature_reconciled`, `payment_signature_proof_gap`, or `payment_signature_failed`.
 - Downstream uncertainty must become receipt/proof-gap evidence, not swallowed exceptions; `runX402WalletGateway()` reconciles failed signing through `reconcileSurfaceOperation()` with redacted diagnostics.
@@ -87,6 +89,7 @@
 - CLI user output belongs at the process boundary in `src/cli/main.ts` through `process.stdout.write()` and `process.stderr.write()`.
 - Library modules should return structured outcomes, throw typed errors, or record protocol evidence instead of logging side effects.
 - Tests should assert on durable records, returned envelopes, warnings arrays, and reason codes rather than reading logs.
+- Demo scripts may print walkthrough markdown at the process edge, as `examples/x402-protected-spend/run.ts` and `examples/mcp-reference-transcript/run.ts` do, but the source-owned assertions must stay in tests and JSON/markdown outputs. Do not use demo console output as authority evidence.
 
 ## Comments
 
@@ -112,6 +115,7 @@
 - Use nullable refs to distinguish absent authority from missing fields, as in `greenlight: Greenlight | null` from `src/protocol/kernel.ts`.
 - Use explicit non-authority boolean flags on product surfaces, as in `CliOutputEnvelope` in `src/cli/output.ts` and `SurfaceOutcomeCommonSchema` in `src/surfaces/outcome.ts`.
 - Do not return raw credential material. x402 gateway evidence exposes refs and digests in `src/adapters/x402-payment/wallet-gateway.ts`.
+- Use reason codes and `nextAction` fields to expose user/operator/dev/agent recovery posture. `doctorLocalProject()` in `src/cli/local-project/index.ts` returns concrete readiness failures such as `cli_token_ref_missing`, `cli_gateway_posture_unknown`, and `cli_state_root_inside_workspace`; `proposeMcpX402Payment()` in `src/mcp/x402-proposal.ts` returns `reload_metadata`, `fix_install`, `wait_for_gateway`, `recraft_request`, `read_evidence`, or `stop` instead of generic failure text.
 
 ## Module Design
 
@@ -132,6 +136,36 @@
 - Use `src/surfaces/boundary-manifest.ts` as the source-owned contract for SDK, CLI, MCP, and other non-kernel surface posture.
 - Treat `.planning/` as scratch only. Repo-facing source, tests, exports, scripts, and canonical docs must use `AGENTS.md`, `README.md`, `QUALITY.md`, `STRUCTURE.md`, `docs/internal/decisions.md`, and `docs/internal/protocol-notes.md` as evidence.
 
+## Active Tier 2 SDK/CLI/MCP Surface Posture
+
+**Shared surface boundary:**
+- Use `src/surfaces/boundary-manifest.ts` as the executable Tier 2 posture table. It marks `sdk.runtime`, `sdk.evidence`, `cli.operator`, `cli.evidence`, and `mcp.runtime` as active; `sdk.install`, `sdk.gateway`, and `cli.process` remain deferred.
+- Every active model/operator surface must carry non-authority flags from `src/surfaces/outcome.ts` or `src/cli/output.ts`: `authorityCreated: false`, `greenlightCreated: false`, `gatewayCheckPerformed: false`, `mutationAttempted: false`, `credentialMaterialIncluded: false`, `rawInternalRecordIncluded: false`, `receiptExportCreated: false`, and `authorityCertificateMinted: false`.
+- Do not use `.planning/macro/surfaces/*/PLAN.md` as implementation truth when it conflicts with source. The macro plans still describe some surfaces as nonexistent or blocked, while the current source owns active slices in `src/sdk/`, `src/cli/`, `src/mcp/`, and `src/surfaces/`.
+- Treat surface success as posture or proposal success only. A successful `RuntimeClient`, CLI, MCP, transcript, or demo call does not create policy authority, greenlights, gateway checks, mutation attempts, receipt exports, provider custody, hosted operation, cross-org trust, or clearing-house readiness.
+
+**SDK posture:**
+- Treat `src/sdk/client.ts` as the low-level route mirror and compatibility substrate. It can call control-plane, runtime, gateway, review, recovery, and evidence routes through role tokens and remains the only SDK object exported from `src/index.ts`.
+- Use `src/sdk/surface-clients/runtime-client.ts` and `src/sdk/surface-clients/evidence-client.ts` for Tier 2 activation work. `RuntimeClient` may create runtime execution evidence, tool-call drafts, intent compilations, and action contracts only; `EvidenceClient` may read redacted projections and verify a supplied terminal certificate only.
+- Do not root-export role clients. They are exposed through the explicit `handshake-protocol-kernel/sdk/role-clients` package subpath, while `test/architecture/root-exports.test.ts` keeps root exports curated.
+
+**CLI posture:**
+- The active CLI slice is local operator/evidence posture only: `schema`, `init`, `doctor`, `evidence aps-report`, `evidence contract-view`, `evidence receipt-timeline`, `cert verify`, `support bundle`, `install x402-payment`, `probes x402-payment`, `install health`, and `conformance x402-payment` in `src/cli/command-manifest.ts`.
+- `src/cli/main.ts` may read explicit JSON paths, write local non-secret project pointers, write external local x402 posture/probe records when `--record-local` is supplied, and write JSON to stdout/stderr. It must not add process startup, policy evaluation, gateway checks, mutation commands, raw-record reads, receipt export, signer use, provider certification, or credential values.
+- All CLI output must use `cliOutput()` from `src/cli/output.ts` so agent-consumable JSON remains evidence, not permission.
+- CLI `doctor` readiness is deliberately severe: local x402 probe reports use `trustedReadiness: false` in `src/cli/x402/local-state.ts`, so even a passed local classification remains `not_ready` until a trusted gateway/control-plane readiness source exists.
+
+**MCP posture:**
+- MCP is internal source, not a package-root export. `src/mcp/catalog.ts` exposes read resources plus exactly one proposal tool: `handshake.actions.x402_payment.propose`.
+- `src/mcp/x402-proposal.ts` must bridge through the narrowed `McpRuntimeProposalClient` interface and may call only runtime evidence, tool-call draft, intent compilation, and action-contract proposal methods.
+- MCP resources in `src/mcp/resources.ts` must route evidence reads through `EvidenceClient` projection methods or return reference-only metadata/challenge/certificate objects. They must not expose raw records, credentials, receipt exports, signer material, or certificate minting.
+- The MCP reference transcript in `src/mcp/reference-transcript.ts` and `examples/mcp-reference-transcript/run.ts` is a source-owned harness, not a public MCP host. It must stay bound to catalog/resource/tool/shared-outcome source functions and explicit CLI readback command IDs.
+
+**Demo script posture:**
+- `npm run demo:aps` uses `examples/x402-protected-spend/run.ts` to produce a local buyer-readable x402 protected-spend report. Tests require it to use `RuntimeClient` and `EvidenceClient`, not the all-role `HandshakeClient`.
+- `npm run demo:mcp-transcript` uses `examples/mcp-reference-transcript/run.ts` to produce a source-owned MCP transcript for metadata read, valid proposal, evidence readback, stale metadata, tools-list change, install not ready, gateway offline, amount mismatch, parameter drift, replay refusal, raw sibling-shaped input, and proof-gap cases.
+- Demo outputs belong under `examples/*/output/` with `.gitignore` guards. Treat generated report files as local evidence artifacts, not canonical docs or package source.
+
 ---
 
-*Convention analysis: 2026-05-22*
+*Convention analysis: 2026-05-23*
