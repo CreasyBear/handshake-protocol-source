@@ -53,6 +53,13 @@
 
 ## Response And Telemetry Artifact Contracts
 
+**Committed telemetry hardening at HEAD:**
+- Keep policy-evaluation responses structured and explicit. `src/protocol/areas/policy-greenlight/transitions.ts` returns `PolicyEvaluationResponse` with `authorityCreated`, `gatewayCheckPerformed: false`, `mutationAttempted: false`, `policyDecisionRef`, `greenlightRef`, `refusalRef`, `refusalReasonCode`, `reviewRequired`, `nextAction`, `retryability`, and `evidenceRefs`; `src/http/routes/transition-response-schemas.ts` mirrors this schema for HTTP.
+- Preserve committed refusal posture through client and HTTP boundaries. `src/sdk/client.ts` exposes `HandshakeClientError.retryability`, `commitState`, `proofRef`, and `refusalRef`; `src/http/errors/transition-error-envelope.ts` classifies transition failures with `retryability`, `commitState`, and evidence refs instead of reducing them to status text.
+- Runtime ingress must return response posture, not authority. `src/runtime/ingress/index.ts` emits `RuntimeIngressResponsePosture` with `schemaVersion: "handshake.runtime-ingress.outcome.v1"`, explicit false non-authority flags, redacted evidence refs, runtime/graph/draft/compilation/contract refs, refusal refs, `reasonCodes`, `nextAction`, and `retryability`.
+- CLI output must go through `cliOutput()` in `src/cli/output.ts`, which emits `schemaVersion: "handshake.cli.v1"`, non-claims, reason codes, next action, retryability, commit state, redaction profile refs, evidence refs, proof-gap refs, and refusal refs on every command envelope.
+- MCP proposal and evidence output must use `SurfaceOutcomeSchema` from `src/surfaces/outcome.ts` and `McpToolResultSchema` from `src/mcp/output.ts`. `src/mcp/x402-proposal.ts` preserves committed transition evidence in structured non-authority outcomes by mapping committed refusals/proof gaps to `commitState: "protocol_recorded"` and evidence URIs instead of generic tool errors.
+
 **Stable schemas:**
 - Use strict Zod schemas for emitted machine artifacts, not ad hoc JSON literals. `SurfaceOutcomeSchema` in `src/surfaces/outcome.ts`, `McpToolResultSchema` in `src/mcp/output.ts`, `CliOutputEnvelopeSchema` in `src/cli/output.ts`, `TransitionErrorResponseSchema` in `src/http/errors/transition-error-envelope.ts`, and projection schemas in `src/protocol/evidence-projections/schemas.ts` are the source-owned contracts.
 - Keep schema-version literals stable and explicit on surfaced artifacts: `handshake.surface-outcome.v0.1` in `src/surfaces/outcome.ts`, `handshake.cli.v1` in `src/cli/output.ts`, and `surface-boundary.v0.1` in `src/surfaces/boundary-manifest.ts`.
@@ -162,6 +169,21 @@
 - Every first-level `src/*` lane must carry `LANE.md` with the required fields enforced by `test/architecture/import-posture.test.ts`.
 - Use `src/surfaces/boundary-manifest.ts` as the source-owned contract for SDK, CLI, MCP, and other non-kernel surface posture.
 - Treat `.planning/` as scratch only. Repo-facing source, tests, exports, scripts, and canonical docs must use `AGENTS.md`, `README.md`, `QUALITY.md`, `STRUCTURE.md`, `docs/internal/decisions.md`, and `docs/internal/protocol-notes.md` as evidence.
+
+## Visible Dirty Working Tree Posture
+
+**Preserve as user-owned state:**
+- The visible dirty working tree contains tracked edits in `STRUCTURE.md`, `docs/internal/protocol-notes.md`, `src/adapters/LANE.md`, `src/experimental.ts`, and `test/architecture/root-exports.test.ts`.
+- The visible dirty working tree also contains untracked auth.md adapter files: `src/adapters/auth-md/profiles.ts`, `src/adapters/auth-md/action-proposal.ts`, `src/adapters/auth-md/index.ts`, and `test/adapters/auth-md-adapter.test.ts`.
+- Do not treat the auth.md adapter as committed baseline until it is intentionally landed. It is visible local adapter state layered on top of committed source.
+
+**Dirty auth.md adapter conventions to preserve if landed:**
+- Keep auth.md under the experimental/reference adapter boundary. `src/adapters/auth-md/index.ts` only re-exports `./profiles` and `./action-proposal`; `src/experimental.ts` currently has dirty exports prefixed with `experimental` or `Experimental`.
+- Treat OAuth Protected Resource Metadata `agent_auth` as the machine source of truth and auth.md prose as supporting evidence. `buildAuthMdDiscoveryEvidence()` in `src/adapters/auth-md/profiles.ts` normalizes PRM fields, sorts list values, records `authMdDocumentDigest` only as support, and emits `authorityCreated: false`.
+- Import issued credentials into gateway custody only as opaque refs. `buildAuthMdGatewayCredentialIntake()` returns redacted `AuthMdRegistrationEvidence` plus `RegisterGatewayCredentialRefInput`; it must not return `credentialMaterial`, ID subject values, bearer tokens, access tokens, API keys, JWTs, private keys, or provider secrets.
+- Keep raw credential leak detection close to auth.md parsing. `assertNoLeakedAuthMdCredentialMaterial()` in `src/adapters/auth-md/profiles.ts` scans plain strings, URL-decoded variants, and base64-like decoded variants for bearer tokens, private keys, token/secret assignments, and JWT-like material.
+- Proposed auth.md service calls are contracts only. `proposeAuthMdProtectedApiCallActionContract()` in `src/adapters/auth-md/action-proposal.ts` can compile/propose `auth_md_protected_api_call.exact` with gateway credential bindings, but it does not evaluate policy, issue greenlights, perform gateway checks, create receipts, or mutate the downstream API.
+- Refuse auth.md bypass and overreach before compilation. `authMdProtectedApiCallRefusalReasonCodes()` rejects non-consequential methods, endpoint origin mismatch, raw authorization headers, dynamic endpoint construction, and unsafe runtime-visible credential custody.
 
 ## Active Tier 2 SDK/CLI/MCP Surface Posture
 

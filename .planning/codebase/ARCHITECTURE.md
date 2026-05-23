@@ -34,7 +34,9 @@
 +----------------------------------------------------------------------------------+
 ```
 
-Authority is enforced only at the gateway check path. `src/runtime/*`, `src/sdk/*`, `src/cli/*`, `src/mcp/*`, HTTP admission, evidence projections, demos, and conformance checks expose proposal posture, response envelopes, readiness, or redacted evidence. They do not enforce mutation authority.
+Authority is enforced only in the Tier 1 kernel/gateway path: exact `ActionContract` -> `PolicyDecision` -> one-use `Greenlight` -> `GatewayCheck` before mutation. Tier 2 surfaces in `src/runtime/*`, `src/sdk/surface-clients/*`, `src/cli/*`, `src/mcp/*`, and `src/surfaces/*` expose proposal posture, response envelopes, readiness, or redacted evidence. They do not enforce mutation authority, hosted operation, provider custody, settlement, clearing-house operation, or downstream business success.
+
+Current git-state boundary: committed source includes the Tier 1 kernel, runtime ingress, x402/package-install proof lanes, CLI/MCP/SDK response posture, and transition-budget telemetry hardening. The visible `auth.md` adapter work is dirty working-tree state: tracked diffs mention it in `STRUCTURE.md`, `docs/internal/protocol-notes.md`, `src/adapters/LANE.md`, `src/experimental.ts`, and `test/architecture/root-exports.test.ts`; untracked implementation/test files exist under `src/adapters/auth-md/*` and `test/adapters/auth-md-adapter.test.ts`. Treat that auth.md state as observed adapter work, not committed architecture.
 
 ## Component Responsibilities
 
@@ -65,10 +67,12 @@ Authority is enforced only at the gateway check path. `src/runtime/*`, `src/sdk/
 | MCP transcript harness | Produces source-owned transcript rows for metadata, proposal, readback, stale metadata, tools-list change, readiness, gateway offline, amount/params mismatch, replay, raw sibling-shaped input, and proof gap. | `src/mcp/reference-transcript.ts`, `examples/mcp-reference-transcript/run.ts` |
 | Runtime ingress | Converts observed package-install and x402 dispatch blocks into runtime execution, generated graph, tool-call draft, compilation, contract, or refusal evidence. | `src/runtime/ingress/index.ts` |
 | Runtime package subpath | Exports runtime ingress as an observer/compiler surface, not as policy, gateway, mutation, or receipt authority. | `src/runtime/index.ts` |
+| Transition-budget telemetry hardening | Committed test harness that records read/write/record/event/partition counts for authority-bearing transitions and fails on budget drift. | `test/support/transition-budget-recorder.ts`, `test/protocol/transition-budget-recorder.test.ts` |
 | x402 install compiler | Compiles one buyer-side `x402_payment.exact` install proposal into catalog/envelope/gateway records or refusal reasons. | `src/adapters/x402-payment/install-proposal.ts` |
 | x402 action proposal | Builds exact x402 candidate parameters and idempotency material from official PAYMENT-REQUIRED evidence. | `src/adapters/x402-payment/action-proposal.ts`, `src/adapters/x402-payment/upstream-evidence.ts` |
 | x402 wallet gateway | Uses official x402 SDK signing only after `VerifiedGatewayCheck`; records redacted payment evidence and reconciliation. | `src/adapters/x402-payment/wallet-gateway.ts` |
 | Adapter conformance and probes | Classifies unsupported x402 surfaces and hostile signer/bypass posture without creating authority or provider certification. | `src/adapters/x402-payment/conformance.ts`, `src/adapters/x402-payment/bypass-probes.ts` |
+| Visible dirty auth.md adapter state | Working-tree-only profile for OAuth Protected Resource Metadata `agent_auth`, credential-custody intake, and `auth_md_protected_api_call.exact` proposal. It is not committed and must not be treated as a stable provider/auth product claim. | `src/adapters/auth-md/*`, `test/adapters/auth-md-adapter.test.ts`, `src/experimental.ts` |
 | Storage port | Defines durable records, stream events, greenlight consumption, idempotency, posture, isolation, operation-claim, and receipt indexes. | `src/protocol/store/port.ts` |
 | D1 store | Durable reference `ProtocolStore` implementation with protocol records, stream events, and authority indexes. | `src/storage/d1/index.ts`, `src/storage/d1/statements.ts`, `migrations/0001_protocol_kernel.sql` |
 | Memory store | Test fixture and invariant oracle implementing the same atomic store contract. | `src/storage/memory/index.ts` |
@@ -77,9 +81,11 @@ Authority is enforced only at the gateway check path. `src/runtime/*`, `src/sdk/
 
 ## Pattern Overview
 
-**Overall:** Source-lane protocol kernel with strict response contracts, reason-code telemetry, role-scoped pre-hosted surfaces, append-only reconstruction storage, and reference gateway fixtures.
+**Overall:** Tiered source-lane protocol kernel with strict response contracts, reason-code telemetry, non-hosted role-scoped surfaces, append-only reconstruction storage, and reference gateway fixtures.
 
 **Key Characteristics:**
+- Treat Tier 1 as the authority kernel and gateway enforcement chain: `src/protocol/*`, `src/http/*` transport, `src/storage/*` stores, and gateway-side `src/adapters/*/gateway.ts` mutation fixtures after `VerifiedGatewayCheck`.
+- Treat Tier 2 as activation and evidence surfaces only: `src/runtime/*`, `src/sdk/surface-clients/*`, `src/cli/*`, `src/mcp/*`, and `src/surfaces/*` can propose, render, read redacted evidence, or report readiness, but cannot authorize, mutate, clear, settle, or certify.
 - Use source lanes as authority boundaries. Each first-level lane has a manifest such as `src/protocol/LANE.md`, `src/http/LANE.md`, `src/runtime/LANE.md`, `src/sdk/LANE.md`, `src/cli/LANE.md`, `src/mcp/LANE.md`, `src/adapters/LANE.md`, `src/storage/LANE.md`, `src/surfaces/LANE.md`, `src/install/LANE.md`, and `src/conformance/LANE.md`.
 - Keep protocol meaning under `src/protocol/*`. HTTP routes, SDK clients, CLI commands, MCP resources, examples, and tests must import public faces rather than primitive internals.
 - Treat response objects as contracts. Protocol schemas live in `src/protocol/public/schemas.ts`; HTTP composite responses live in `src/http/routes/transition-response-schemas.ts`; surface outcomes live in `src/surfaces/outcome.ts`; CLI and MCP wrap those responses without adding authority.
@@ -89,6 +95,7 @@ Authority is enforced only at the gateway check path. `src/runtime/*`, `src/sdk/
 - Treat CLI output as evidence/readiness posture. `src/cli/output.ts` sets authority, greenlight, gateway, mutation, raw-record, credential-material, receipt-export, and certificate-mint flags to false for every command result.
 - Treat adapters as consequence holders. `src/adapters/*/gateway.ts` and `src/adapters/x402-payment/wallet-gateway.ts` may mutate only after `verifiedGatewayCheckFromResult()` yields a `VerifiedGatewayCheck`.
 - Treat x402 as a proof profile. `src/adapters/x402-payment/*` models one buyer-side `exact` per-call path; session/day/review spend windows are metadata until a ledger exists.
+- Treat dirty adapter state separately from committed architecture. `src/adapters/auth-md/*` is visible in the working tree with matching dirty export/test/doc changes, but it is not committed source and does not promote Handshake into an auth provider, OAuth server, generic API gateway, provider custodian, or certification body.
 
 ## Layers
 
@@ -121,7 +128,7 @@ Authority is enforced only at the gateway check path. `src/runtime/*`, `src/sdk/
 - Used by: Runtime subpath, MCP bridge, x402 demo, runtime tests.
 
 **Tier 2 Surface Layer:**
-- Purpose: Provide pre-hosted runtime/evidence/operator surfaces without granting authority.
+- Purpose: Provide local/source runtime, evidence, and operator surfaces without granting authority or hosted-operation claims.
 - Location: `src/sdk/surface-clients/*`, `src/cli/*`, `src/mcp/*`, `src/surfaces/*`
 - Contains: Role-scoped SDK clients, CLI output envelopes, support bundle, local project/x402 readiness, MCP catalog/resources/proposal bridge, shared outcome and boundary manifests.
 - Depends on: HTTP response contracts, protocol projections, surface manifest.
@@ -133,6 +140,13 @@ Authority is enforced only at the gateway check path. `src/runtime/*`, `src/sdk/
 - Contains: Fixture gateways, x402 wallet signing surface, hostile probes, conformance classifiers, upstream x402 evidence decoding.
 - Depends on: Public protocol gateway verification helpers and adapter-local parameter schemas.
 - Used by: Experimental subpath, conformance, demos, adapter/integration tests.
+
+**Visible Dirty Adapter Layer:**
+- Purpose: Show uncommitted auth.md adapter direction without treating it as committed architecture.
+- Location: `src/adapters/auth-md/*`, `test/adapters/auth-md-adapter.test.ts`, plus tracked dirty edits in `src/experimental.ts`, `src/adapters/LANE.md`, `STRUCTURE.md`, `docs/internal/protocol-notes.md`, and `test/architecture/root-exports.test.ts`.
+- Contains: Protected Resource Metadata normalization, redacted registration evidence, `GatewayCredentialRef` intake, and `auth_md_protected_api_call.exact` proposal helper.
+- Depends on: Protocol credential-custody, intent-compilation, action-contract, and foundation digest helpers.
+- Used by: Dirty adapter test only in the current working tree.
 
 **Storage And Reconstruction Layer:**
 - Purpose: Persist protocol evidence and atomic indexes for reconstruction, replay refusal, idempotency, posture, isolation, and receipt lookup.
@@ -208,6 +222,11 @@ Authority is enforced only at the gateway check path. `src/runtime/*`, `src/sdk/
 - Use `test/architecture/root-exports.test.ts`, `test/architecture/package-surface.test.ts`, `test/architecture/import-posture.test.ts`, `test/architecture/surface-boundary-posture.test.ts`, `test/architecture/cli-command-posture.test.ts`, `test/architecture/mcp-surface-posture.test.ts`, `test/architecture/claim-boundary.test.ts`, `test/architecture/active-vocabulary.test.ts`, and `test/architecture/naming-posture.test.ts`.
 - Evidence note: These tests are the active guardrail for keeping response/telemetry surfaces from becoming gateway authority.
 
+**Committed transition-budget telemetry hardening:**
+- Use `test/support/transition-budget-recorder.ts` as the store wrapper that counts reads, writes, committed records, emitted events, touched stream partitions, record writes by type, event writes by type, and store method calls.
+- Use `test/protocol/transition-budget-recorder.test.ts` to assert conservative ceilings for `evaluatePolicy`, `gatewayCheck`, `createReceiptExport`, `reconcileSurfaceOperation`, and `transitionRecoveryRecommendationStatus`.
+- Evidence note: This is architecture telemetry for transition blast-radius drift, not hosted observability or clearing-house monitoring.
+
 ## Data Flow
 
 ### Primary Protected Action Path
@@ -252,6 +271,16 @@ Authority is enforced only at the gateway check path. `src/runtime/*`, `src/sdk/
 3. Evidence wrappers in `src/cli/aps-report.ts` and `src/cli/projection-evidence.ts` parse supplied reports/projections.
 4. `src/cli/support-bundle.ts` accepts only redacted projections and local x402 posture records, then omits raw credentials, raw records, receipt exports, mutation commands, and payment material.
 5. `src/cli/output.ts` wraps every result with non-authority flags.
+
+### Visible Dirty auth.md Adapter Path
+
+1. `src/adapters/auth-md/profiles.ts` normalizes OAuth Protected Resource Metadata `agent_auth` and redacts auth.md registration evidence.
+2. `buildAuthMdGatewayCredentialIntake()` prepares a `RegisterGatewayCredentialRefInput` with opaque gateway custody and no raw credential material in returned evidence.
+3. `src/adapters/auth-md/action-proposal.ts` rejects read-only methods, wrong origins, raw authorization-header passthrough, dynamic endpoint construction, and unsafe credential custody before compilation.
+4. `proposeAuthMdProtectedApiCallActionContract()` compiles `auth_md_protected_api_call.exact` into intent compilation and action contract proposal only.
+5. `test/adapters/auth-md-adapter.test.ts` asserts no greenlight, gateway check, or mutation attempt is created by this proposal helper.
+
+This path is visible dirty worktree state. It is not committed source and does not create auth-provider, hosted, provider-custody, or generic API-gateway claims.
 
 **State Management:**
 - Protocol state is immutable `ProtocolRecord` payloads plus digest-linked `ContractStreamEvent` rows in `src/protocol/events/*`.
@@ -301,6 +330,11 @@ Authority is enforced only at the gateway check path. `src/runtime/*`, `src/sdk/
 - Examples: `src/protocol/evidence-projections/*`, `src/http/handlers/evidence-read.ts`
 - Pattern: Purpose-built projection schemas with `redactionProfileRef` and `omittedFields`.
 
+**TransitionBudgetRecorder:**
+- Purpose: Guard committed authority-transition cost and record/event fan-out as architectural telemetry.
+- Examples: `test/support/transition-budget-recorder.ts`, `test/protocol/transition-budget-recorder.test.ts`
+- Pattern: Test-only `ProtocolStore` wrapper plus explicit per-transition ceilings; it does not create runtime telemetry, hosted monitoring, or authority.
+
 ## Entry Points
 
 **HTTP App:**
@@ -341,6 +375,7 @@ Authority is enforced only at the gateway check path. `src/runtime/*`, `src/sdk/
 ## Architectural Constraints
 
 - **Authority:** Only gateway-side checks before mutation enforce authority. `src/runtime/*`, `src/sdk/*`, `src/cli/*`, `src/mcp/*`, demos, conformance, evidence projections, and HTTP admission are not enforcement points.
+- **Tier boundary:** Tier 1 kernel code may define and enforce protocol authority. Tier 2 surfaces may propose, read, render, or report posture only.
 - **Threading:** The code runs in JavaScript runtimes with async I/O. Authority consistency is expressed through store-level atomic commit contracts, not worker threads.
 - **Global state:** Demos instantiate local stores and kernels in files such as `examples/x402-protected-spend/run.ts`. Source lanes do not rely on ambient global authority state.
 - **Store consistency:** `ProtocolStore.commitProtocolRecords()` and `ProtocolStore.commitGatewayCheck()` are the authority-bearing write boundaries in `src/protocol/store/port.ts`.
@@ -350,6 +385,7 @@ Authority is enforced only at the gateway check path. `src/runtime/*`, `src/sdk/
 - **CLI package posture:** `src/cli/*` is source-owned; there is no package/bin authority surface in this checkout.
 - **x402 SDK imports:** Official x402 signer and client imports belong in `src/adapters/x402-payment/wallet-gateway.ts` and upstream parity tests, not MCP, CLI, SDK role clients, or root exports.
 - **Spend windows:** x402 session/day/review spend bounds are metadata in `src/adapters/x402-payment/install-proposal.ts`; only per-call bounds are enforced.
+- **Dirty adapter state:** `src/adapters/auth-md/*` and `test/adapters/auth-md-adapter.test.ts` are untracked; related tracked diffs are user-owned working-tree state. Do not treat auth.md as committed package shape until those files are committed and the architecture/package gates pass.
 
 ## Anti-Patterns
 

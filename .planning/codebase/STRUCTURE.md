@@ -39,7 +39,7 @@ src/
 |-- protocol/                          # Protocol meaning, response objects, events, store port
 |-- http/                              # Hono/Worker transport, envelopes, routes, evidence reads
 |-- runtime/                           # Generated-execution proposal helpers and ingress subpath
-|-- adapters/                          # Reference gateway fixtures and x402 proof profile
+|-- adapters/                          # Reference gateway fixtures, x402 proof profile, visible dirty auth.md work
 |-- install/                           # Generic protected-action install proposal contracts
 |-- storage/                           # D1, memory, KV, and store implementation plumbing
 |-- sdk/                               # Low-level HTTP client and role-scoped Tier 2 clients
@@ -64,6 +64,18 @@ test/
 |-- product/                           # Local proof report and transcript-facing product checks
 `-- support/                           # Fixtures and harnesses
 ```
+
+## Current Git-State Boundary
+
+**Committed architecture:**
+- Tier 1 kernel authority lives in `src/protocol/*`, HTTP transition transport in `src/http/*`, durable store mechanics in `src/storage/*`, and gateway-side reference mutation fixtures in committed adapter families such as `src/adapters/package-install/*`, `src/adapters/repo-write/*`, `src/adapters/preview-deploy/*`, and `src/adapters/x402-payment/*`.
+- Tier 2 surfaces live in `src/runtime/*`, `src/sdk/surface-clients/*`, `src/cli/*`, `src/mcp/*`, and `src/surfaces/*`. They propose, render, read redacted evidence, or report readiness; they do not authorize, gateway-check, mutate, settle, clear, certify, or prove provider custody.
+- Committed transition-budget telemetry hardening lives in `test/support/transition-budget-recorder.ts` and `test/protocol/transition-budget-recorder.test.ts`.
+
+**Visible dirty auth.md adapter state:**
+- Tracked dirty docs/export/test changes mention auth.md in `STRUCTURE.md`, `docs/internal/protocol-notes.md`, `src/adapters/LANE.md`, `src/experimental.ts`, and `test/architecture/root-exports.test.ts`.
+- Untracked implementation/test files exist under `src/adapters/auth-md/index.ts`, `src/adapters/auth-md/profiles.ts`, `src/adapters/auth-md/action-proposal.ts`, and `test/adapters/auth-md-adapter.test.ts`.
+- Treat auth.md as observed working-tree adapter work only. It is not committed architecture, not Tier 1 kernel, not a stable package surface, and not a hosted/auth-provider/provider-custody/generic-API-gateway claim.
 
 ## Directory Purposes
 
@@ -119,7 +131,7 @@ test/
 
 **`src/adapters`:**
 - Purpose: Reference gateway fixtures and adapter proof profiles.
-- Contains: package-install, repo-write, preview-deploy, protected-path probes, x402 payment proof profile, downstream failure evidence.
+- Contains: committed package-install, repo-write, preview-deploy, protected-path probes, x402 payment proof profile, downstream failure evidence; visible dirty auth.md adapter files are working-tree state only.
 - Key files: `src/adapters/package-install/gateway.ts`, `src/adapters/repo-write/gateway.ts`, `src/adapters/preview-deploy/gateway.ts`, `src/adapters/x402-payment/wallet-gateway.ts`, `src/adapters/x402-payment/install-proposal.ts`, `src/adapters/x402-payment/action-proposal.ts`, `src/adapters/x402-payment/upstream-evidence.ts`, `src/adapters/x402-payment/conformance.ts`, `src/adapters/x402-payment/bypass-probes.ts`.
 
 **`src/install`:**
@@ -238,6 +250,8 @@ test/
 - `test/protocol/reason-code-registry.test.ts`: Reason-code registry guard.
 - `test/runtime/runtime-ingress.test.ts`: Runtime ingress contract/refusal/no-authority guard.
 - `test/sdk/role-clients.test.ts`: Role-scoped client guard.
+- `test/support/transition-budget-recorder.ts`: Committed telemetry harness that counts transition reads, writes, committed records, events, stream partitions, and store calls.
+- `test/protocol/transition-budget-recorder.test.ts`: Committed budget guard for policy, gateway, receipt export, reconciliation, and recovery status transitions.
 - `test/cli/cli-support-bundle.test.ts`: Support bundle redaction/non-authority guard.
 - `test/mcp/mcp-reference-transcript.test.ts`: MCP transcript harness guard.
 - `test/adapters/x402-wallet-gateway.test.ts`: x402 gateway signer custody and replay guard.
@@ -338,6 +352,12 @@ test/
 - Tests: `test/adapters/<family>.test.ts`, `test/conformance/<family>.test.ts`, `test/architecture/import-posture.test.ts`, `test/architecture/root-exports.test.ts`.
 - Guardrail: Mutation must happen only after `VerifiedGatewayCheck`; adapters must not import storage internals or use SDK/runtime as authority.
 
+**New auth.md Adapter Work:**
+- Current working-tree files: `src/adapters/auth-md/index.ts`, `src/adapters/auth-md/profiles.ts`, `src/adapters/auth-md/action-proposal.ts`, `test/adapters/auth-md-adapter.test.ts`.
+- Tracked dirty export/doc guards: `src/experimental.ts`, `src/adapters/LANE.md`, `STRUCTURE.md`, `docs/internal/protocol-notes.md`, `test/architecture/root-exports.test.ts`.
+- Placement: keep auth.md under `src/adapters/auth-md/` as an experimental/reference adapter profile until committed and guarded.
+- Guardrail: It may normalize Protected Resource Metadata, prepare opaque `GatewayCredentialRef` intake, and propose exact service-call contracts. It must not issue policy, greenlight, gateway check, receipt, credential material, hosted identity, auth-provider, OAuth-server, certification, provider-custody, or generic API-gateway claims.
+
 **New Storage Evidence Or Index:**
 - Store contract: `src/protocol/store/port.ts`.
 - D1 implementation: `src/storage/d1/index.ts`.
@@ -358,6 +378,12 @@ test/
 - Surface posture: `test/architecture/surface-boundary-posture.test.ts`, `test/architecture/cli-command-posture.test.ts`, `test/architecture/mcp-surface-posture.test.ts`.
 - Claims/naming/vocabulary: `test/architecture/claim-boundary.test.ts`, `test/architecture/active-vocabulary.test.ts`, `test/architecture/naming-posture.test.ts`.
 - Guardrail: Add guard tests before expanding source-facing authority surfaces.
+
+**New Transition-Budget Telemetry Guard:**
+- Harness: `test/support/transition-budget-recorder.ts`.
+- Tests: `test/protocol/transition-budget-recorder.test.ts`.
+- Use for: guarding read/write/record/event/partition fan-out of authority-bearing transitions.
+- Guardrail: This is local test telemetry for architecture drift, not hosted observability, provider operation, clearing-house monitoring, or execution authority.
 
 ## Active Tier 2 Surface Ownership
 
@@ -410,9 +436,16 @@ test/
 **Adapter and x402 surfaces:**
 - Reference gateways: `src/adapters/package-install/gateway.ts`, `src/adapters/repo-write/gateway.ts`, `src/adapters/preview-deploy/gateway.ts`.
 - x402 proof profile: `src/adapters/x402-payment/*`.
+- Visible dirty auth.md profile: `src/adapters/auth-md/*` and `test/adapters/auth-md-adapter.test.ts`, not committed architecture.
 - Conformance subpath: `src/conformance/index.ts`.
 - Experimental subpath: `src/experimental.ts`.
 - Tests: `test/adapters/*`, `test/conformance/*`, `test/integration/x402-d1-http.test.ts`.
+
+**Committed telemetry guards:**
+- Store wrapper: `test/support/transition-budget-recorder.ts`.
+- Budget tests: `test/protocol/transition-budget-recorder.test.ts`.
+- Purpose: local transition-cost and evidence fan-out drift detection.
+- Boundary: test-only architecture telemetry, not runtime monitoring or authority.
 
 ## Special Directories
 

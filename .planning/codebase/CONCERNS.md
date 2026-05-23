@@ -4,241 +4,227 @@
 
 ## Scope
 
-This mapper focuses on pre-hosted Tier 2 telemetry and response-contract hardening for active source surfaces. Canon was checked first in `AGENTS.md`, `README.md`, `QUALITY.md`, `STRUCTURE.md`, `docs/internal/decisions.md`, `docs/internal/protocol-notes.md`, `docs/internal/protocol-definition.md`, and `docs/internal/protocol-kernel-architecture.md`.
+This refresh separates committed-source concerns from dirty/unpromoted `auth.md` adapter concerns.
 
-`.planning/` is scratch and is not treated as repo truth. Concerns below are grounded in live source and tests only.
+**Committed source inspected:**
+- Runtime ingress: `src/runtime/ingress/index.ts`, `test/runtime/runtime-ingress.test.ts`, `test/product/agent-proof-slice.test.ts`
+- MCP x402 proposal and resources: `src/mcp/x402-proposal.ts`, `src/mcp/output.ts`, `test/mcp/mcp-x402-proposal.test.ts`, `test/mcp/mcp-resource-redaction.test.ts`
+- CLI response surfaces: `src/cli/output.ts`, `src/cli/projection-evidence.ts`, `src/cli/support-bundle.ts`, `src/cli/local-project/index.ts`
+- x402 adapters and proof lane: `src/adapters/x402-payment/action-proposal.ts`, `src/adapters/x402-payment/install-proposal.ts`, `test/conformance/x402-upstream-exact-fixtures.test.ts`
+- Evidence projections: `src/protocol/evidence-projections/assembly.ts`, `src/protocol/evidence-projections/projections.ts`, `src/http/handlers/evidence-read.ts`, `test/protocol/evidence-projections.test.ts`, `test/protocol/authority-certificate.test.ts`
 
-**Active surfaces inspected:**
-- HTTP transition and evidence responses: `src/http/routes/transition-response-schemas.ts`, `src/http/handlers/evidence-read.ts`, `src/http/errors/transition-error-envelope.ts`
-- SDK and role-scoped error transport: `src/sdk/client.ts`, `src/sdk/surface-clients/transport.ts`
-- MCP proposal and resource outputs: `src/mcp/x402-proposal.ts`, `src/mcp/output.ts`, `src/mcp/resources.ts`
-- Runtime ingress proposal output: `src/runtime/ingress/index.ts`
-- Evidence projections and certificates: `src/protocol/evidence-projections/projections.ts`, `src/protocol/evidence-projections/schemas.ts`, `src/protocol/areas/authority-certificate/transitions.ts`
-- CLI output contracts: `src/cli/output.ts`, `src/cli/projection-evidence.ts`, `src/cli/support-bundle.ts`, `src/cli/local-project/index.ts`
-- Active gateway adapters: `src/adapters/x402-payment/wallet-gateway.ts`, `src/adapters/package-install/gateway.ts`
+**Dirty/unpromoted `auth.md` state inspected:**
+- Untracked adapter implementation: `src/adapters/auth-md/profiles.ts`, `src/adapters/auth-md/action-proposal.ts`, `src/adapters/auth-md/index.ts`
+- Untracked tests: `test/adapters/auth-md-adapter.test.ts`
+- Dirty tracked references: `STRUCTURE.md`, `docs/internal/protocol-notes.md`, `src/adapters/LANE.md`, `src/experimental.ts`, `test/architecture/root-exports.test.ts`
+
+`.planning/` is scratch. Canonical claims remain limited to `AGENTS.md`, `README.md`, `STRUCTURE.md`, `docs/internal/decisions.md`, and `docs/internal/protocol-notes.md`. Do not promote hosted verifier, provider custody, clearing-house, or public-distribution claims from these concerns.
 
 ## Priority Index
 
-| Priority | Concern | Active fix candidate |
-|----------|---------|----------------------|
-| P0 | Agent transaction envelope and AuthorityCertificate omit existing custody, recovery, and isolation evidence | Yes |
-| P0 | Policy refusal response hides durable refusal evidence from immediate caller | Yes |
-| P0 | MCP committed transition errors can be reported as `not_started` | Yes |
-| P1 | Retry telemetry labels ordinary reconciliations as `paid_retry_attempted` | Yes |
-| P1 | CLI envelope lacks a standard operator response contract | Yes |
-| P2 | Runtime ingress returns raw proposal records without a surface outcome wrapper | Yes |
+| Priority | Concern | Scope |
+|----------|---------|-------|
+| P1 | Runtime ingress records refusal evidence but drops refusal refs from the response posture | Committed |
+| P1 | `auth.md` adapter is proposal/intake only and has no gateway runner, runtime-ingress family, or mutation receipt lane | Dirty/unpromoted |
+| P1 | `auth.md` dirty fixture marks raw bypass possible while treating protected path state as not required | Dirty/unpromoted |
+| P2 | Agent transaction envelope assembly uses tenant/org fan-out instead of indexed per-action projection | Committed |
+| P2 | MCP x402 proposal evidence is graphless | Committed |
+| P2 | Runtime ingress family routing is hardcoded to package-install and x402 suffix branches | Committed |
+| P2 | x402 aggregate spend/review windows remain metadata without a spend ledger | Committed |
 
 ## Tech Debt
 
-### Active-Goal Fix Candidate: Agent Transaction Envelope Omits Custody, Recovery, and Isolation Records
+**Committed: Runtime ingress refusal refs are not surfaced to callers**
+- Issue: `compileIntent` commits durable `Refusal` records for rejected candidates in `src/protocol/areas/intent-compilation/transitions.ts`, but `RuntimeIngressResponsePosture.refusalRefs` is always `[]` in `src/runtime/ingress/index.ts`.
+- Files: `src/runtime/ingress/index.ts`, `src/protocol/areas/intent-compilation/transitions.ts`, `test/runtime/runtime-ingress.test.ts`
+- Impact: The runtime caller gets refusal reason codes but not the durable refusal evidence reference. Reconstruction still exists in the store, but the immediate response boundary hides the evidence handle.
+- Fix approach: Add refusal references to the intent-compilation record or compiler return value, copy them into each rejected runtime proposal, and assert `responsePosture.refusalRefs` in `test/runtime/runtime-ingress.test.ts`.
 
-- Issue: `getAgentTransactionEnvelopeProjection` assembles the envelope without loading scoped credential-resolution evidence, recovery recommendations, recovery status transitions, active isolation states, or idempotency ledger posture, even though the projection schema supports these references.
-- Files: `src/http/handlers/evidence-read.ts`, `src/protocol/evidence-projections/schemas.ts`, `src/protocol/evidence-projections/projections.ts`, `src/protocol/areas/recovery/schemas.ts`, `src/protocol/areas/isolation-breaker/schemas.ts`
-- Expected symptom: `GET /v1/evidence/agent-transactions/:actionContractId` can return empty `credentialResolutionEvidenceRefs`, `recoveryRefs`, and `isolationRefs` for an action whose protocol records contain credential custody, recovery, or isolation evidence.
-- Invariant risk: A support engineer or security reviewer cannot reconstruct custody posture, isolation state, or next safe action from the standard transaction envelope. Missing evidence is smoothed into empty arrays instead of surfaced as unavailable, omitted, or proof-gap-adjacent posture.
-- Suggested smallest mechanism: Extract a source-owned `agentTransactionEnvelopeInput` assembler that loads scoped `credential_resolution_evidence`, recovery recommendation/status, isolation state, and idempotency ledger records before projection. Use the same assembler from HTTP evidence reads and certificate generation. Keep credential material redacted; expose only refs, digests, custody roles, reason codes, and redaction posture.
-- Test target: Add an HTTP evidence-read test that records credential resolution evidence, a recovery recommendation, and an isolation state for a contract, then asserts `credentialResolutionEvidenceRefs`, `gatewayCredentialEvidenceRefs`, `recoveryRefs`, and `isolationRefs` are present in the projection.
+**Committed: MCP x402 proposal path is graphless**
+- Issue: The MCP x402 proposal path creates a runtime execution and tool-call draft but sets `generatedExecutionGraphId` to `null` with posture `not_exposed_by_role_scoped_runtime_surface`.
+- Files: `src/mcp/x402-proposal.ts`, `test/mcp/mcp-x402-proposal.test.ts`
+- Impact: MCP proposal evidence is weaker than runtime-ingress evidence for generated execution shape. It can prove a role-scoped proposal boundary, but it cannot reconstruct branch, loop, retry, or sibling-tool structure from a generated execution graph.
+- Fix approach: Either keep MCP explicitly single-dispatch and graphless in docs/tests, or add a minimal graph record for MCP proposals before treating this surface as equivalent to runtime ingress.
 
-### Active-Goal Fix Candidate: AuthorityCertificate Uses a Partial Evidence Assembly
+**Committed: Runtime ingress action-family routing is hand-coded**
+- Issue: Runtime ingress dispatch classification switches over package-install and x402 patterns directly instead of using a registered action-family table.
+- Files: `src/runtime/ingress/index.ts`, `test/runtime/runtime-ingress.test.ts`
+- Impact: New protected action families require edits to central ingress conditionals, which increases the chance that raw bypass, ambiguous dispatch, or proposal posture behavior drifts by family.
+- Fix approach: Introduce an internal family registry with classification, compile input building, raw-bypass reason codes, and config lookup before promoting another adapter family.
 
-- Issue: `buildAuthorityCertificate` calls `projectAgentTransactionEnvelope` with contract, policy, greenlight, gate, mutation, receipt, proof gaps, and refusals, but not credential resolution evidence, recovery posture, isolation posture, or idempotency ledger posture.
-- Files: `src/protocol/areas/authority-certificate/transitions.ts`, `src/protocol/evidence-projections/projections.ts`, `src/protocol/evidence-projections/schemas.ts`, `test/protocol/authority-certificate.test.ts`
-- Expected symptom: An AuthorityCertificate can present a complete-looking terminal envelope while omitting custody-resolution evidence and recovery/isolation records that affect whether future mutation is safe.
-- Invariant risk: The certificate becomes evidence theatre for custody and recovery. It proves a terminal object exists, but not whether the operator can reconstruct the authority path, credential custody holder, exact next safe action, or isolation block that should govern future attempts.
-- Suggested smallest mechanism: Reuse the same envelope assembler as HTTP evidence reads, and include credential-resolution, recovery, isolation, and idempotency artifacts in `artifacts`. Add explicit `omittedEvidenceReasonCodes` if any supported evidence class is intentionally unavailable.
-- Test target: Extend `test/protocol/authority-certificate.test.ts` with a terminal receipt that also has credential-resolution evidence and a recovery recommendation, then assert the certificate envelope and artifacts include those refs.
-
-### Active-Goal Fix Candidate: Policy Refusal Response Hides the Durable Refusal Ref
-
-- Issue: `PolicyEvaluationResponseSchema` returns only `{ decision, greenlight }`. The policy record layer creates and stores a durable `Refusal` for non-greenlight decisions, but the immediate HTTP/SDK response does not return `refusal`, `refusalRef`, `refusalReasonCode`, or an explicit `authorityCreated: false` field.
-- Files: `src/http/routes/transition-response-schemas.ts`, `src/protocol/areas/policy-greenlight/transitions.ts`, `src/protocol/areas/policy-greenlight/policy-record/index.ts`, `test/protocol/kernel-policy-gateway.test.ts`, `test/http/d1-http.test.ts`
-- Expected symptom: A caller receiving `greenlight: null` must perform a separate evidence read or infer refusal state from `decision` to know whether a refusal was durably recorded. Model agents and support tooling lack an immediate refusal object to cite.
-- Invariant risk: Refusal is not first-class at the response boundary. A caller can mistake a recorded refusal for an incomplete evaluation, retry with altered parameters, or fail to reconstruct why authority was not created.
-- Suggested smallest mechanism: Extend the policy evaluation result with nullable `refusal` or `refusalRef`, `refusalReasonCode`, and `authorityCreated: false` for non-greenlight decisions. Prefer returning the durable refusal ref produced by `commitPolicyEvaluation` rather than reconstructing it later.
-- Test target: Update the duplicate-idempotency HTTP test in `test/http/d1-http.test.ts` and kernel policy test in `test/protocol/kernel-policy-gateway.test.ts` to assert refusal refs are returned immediately.
-
-### Active-Goal Fix Candidate: MCP Errors Can Downgrade Committed Protocol State to `not_started`
-
-- Issue: `errorCommitState()` in `src/mcp/x402-proposal.ts` maps only `"accepted"` to `"protocol_recorded"`. Real transition error envelopes use `TransitionCommitState` values from `src/protocol/foundation/errors.ts`, including `"committed"`, `"not_committed"`, and `"unknown"`. A committed protocol error therefore falls through to `"not_started"`.
-- Files: `src/mcp/x402-proposal.ts`, `src/http/errors/transition-error-envelope.ts`, `src/protocol/foundation/errors.ts`, `test/mcp/mcp-x402-proposal.test.ts`, `src/mcp/reference-transcript-fixtures.ts`
-- Expected symptom: A model-facing MCP tool result can say `commitState: "not_started"` after the protocol has durably recorded a refusal, proof gap, or other error evidence.
-- Invariant risk: The model agent receives unsafe retry posture. It may recraft or retry when the only safe next action is to read evidence and preserve the recorded refusal/proof gap chain.
-- Suggested smallest mechanism: Map `"committed"` to `"protocol_recorded"` and handle `"not_committed"` explicitly. Propagate `proofRef` and `refusalRef` from `TransitionErrorEnvelope` into MCP surface outcomes when present.
-- Test target: Add MCP tests with a `HandshakeClientError`-shaped envelope carrying `commitState: "committed"` and `refusalRef`, then assert `commitState: "protocol_recorded"` and `nextAction: "read_evidence"`.
-
-### Active-Goal Fix Candidate: Retry Telemetry Has a False-Positive Label
-
-- Issue: `surfaceOperationEvidenceLabels()` adds `paid_retry_attempted` whenever a mutation attempt and latest reconciliation exist. The condition does not prove any retry occurred.
-- Files: `src/protocol/evidence-projections/projections.ts`, `src/protocol/evidence-projections/schemas.ts`, `test/protocol/evidence-projections.test.ts`
-- Expected symptom: A normal downstream reconciliation can be displayed as a paid retry attempt. Current tests assert `paid_retry_attempted` in a redaction/reconciliation case.
-- Invariant risk: Retry posture is falsified. Operators and support engineers cannot tell ordinary downstream reconciliation from a replay, duplicate idempotency attempt, retry loop, or paid retry.
-- Suggested smallest mechanism: Replace the label with a neutral reconciliation label such as `downstream_reconciliation_recorded`. Add retry labels only from explicit retry evidence: runtime `retryDetected`, `retryOfDispatchRef`, idempotency replay/refusal, recovery transition, or a dedicated retry record.
-- Test target: Update `test/protocol/evidence-projections.test.ts` so ordinary reconciliation does not assert a retry label, then add a separate explicit retry fixture when a source-owned retry signal exists.
-
-### Active-Goal Fix Candidate: CLI Envelope Is Not a Standard Operator Response Contract
-
-- Issue: `CliOutputEnvelope` standardizes authority false flags, but it does not standardize top-level `reasonCodes`, `nextAction`, `retryability`, `commitState`, `redactionProfileRef`, `evidenceRefs`, or `proofGapRefs`. Commands place these fields inconsistently inside `result`, if at all.
-- Files: `src/cli/output.ts`, `src/cli/projection-evidence.ts`, `src/cli/support-bundle.ts`, `src/cli/local-project/index.ts`
-- Expected symptom: Operators, support engineers, and scripts must parse command-specific result shapes to know whether evidence is redacted, whether a retry is safe, what reason code applies, and what the next safe action is.
-- Invariant risk: The CLI remains non-authoritative, but its response shape still invites free-form interpretation. A human can treat a diagnostic or projection command as actionable without a standardized safe-next-action contract.
-- Suggested smallest mechanism: Add optional top-level telemetry fields to `CliOutputEnvelope` and require active CLI commands to set them. Start with `reasonCodes`, `nextAction`, `retryability`, `commitState`, `evidenceRefs`, `proofGapRefs`, and `redactionProfileRef`. Keep `mayAuthorize`, `mayMutate`, `gatewayChecked`, and `greenlightIssued` false by default.
-- Test target: Add CLI output tests for `support.bundle`, local project doctor, and evidence projection commands that assert the top-level response contract is present and conservative.
-
-### Active-Goal Fix Candidate: Runtime Ingress Output Lacks a Surface Outcome Wrapper
-
-- Issue: `proposeRuntimeIngressActionContracts()` returns `outcome`, runtime execution records, generated execution graph records, and per-proposal results. It does not return a standard response wrapper with authority flags, aggregate reason codes, retryability, next safe action, redaction posture, or evidence refs.
-- Files: `src/runtime/ingress/index.ts`, `src/runtime/ingress/classifier.ts`, `test/runtime/runtime-ingress.test.ts`
-- Expected symptom: A runtime adapter or model-facing caller must infer whether to stop, recraft, read evidence, or proceed to policy evaluation from raw proposal records and per-dispatch refusal codes.
-- Invariant risk: Tool availability and action proposal can be confused with authorization. Unsupported, raw, dynamic, ambiguous, or retrying dispatches do not have a uniform non-authority response contract.
-- Suggested smallest mechanism: Add a `RuntimeIngressOutcome` projector or wrapper with `schemaVersion`, `mayAuthorize: false`, `mayMutate: false`, `gatewayChecked: false`, `greenlightIssued: false`, aggregate `reasonCodes`, `nextAction`, `retryability`, `redactionProfileRef`, and evidence refs to generated graph/proposal records.
-- Test target: Extend runtime ingress tests so raw-tool, sibling-tool, dynamic-dispatch, and retry-detected cases assert conservative wrapper fields.
+**Dirty/unpromoted `auth.md`: tracked exports depend on untracked adapter files**
+- Issue: Dirty tracked files export or document `auth.md`, while the implementation and tests live in untracked files.
+- Files: `src/experimental.ts`, `test/architecture/root-exports.test.ts`, `STRUCTURE.md`, `docs/internal/protocol-notes.md`, `src/adapters/LANE.md`, `src/adapters/auth-md/profiles.ts`, `src/adapters/auth-md/action-proposal.ts`, `test/adapters/auth-md-adapter.test.ts`
+- Impact: The working tree can pass locally only with untracked files present. A partial commit of tracked files would point public experimental exports at missing source.
+- Fix approach: Promote the adapter atomically or keep all `auth.md` references unpromoted until the implementation, tests, docs, and export surface move together.
 
 ## Known Bugs
 
-**Committed MCP error state downgrade:**
-- Symptoms: A committed transition error can be represented as `commitState: "not_started"` in MCP output.
-- Files: `src/mcp/x402-proposal.ts`, `src/http/errors/transition-error-envelope.ts`, `src/protocol/foundation/errors.ts`
-- Trigger: A `HandshakeClientError` or compatible thrown error carries `commitState: "committed"` through MCP proposal error handling.
-- Workaround: Read durable evidence directly through evidence resources or HTTP projections before retrying. Do not trust MCP `not_started` in this path until the mapping is corrected.
+**Committed: Runtime ingress rejected-candidate responses omit refusal evidence references**
+- Symptoms: Dynamic dispatch and truncated graph paths create refusal records, but `responsePosture.refusalRefs` remains empty.
+- Files: `src/runtime/ingress/index.ts`, `src/protocol/areas/intent-compilation/transitions.ts`, `test/runtime/runtime-ingress.test.ts`
+- Trigger: Send a runtime ingress request that produces `candidate_rejected` or `graph_truncated` posture.
+- Workaround: Inspect the receipt store directly by tenant/org and object family. This is a poor caller contract because the response already exposes `proofGapRefs` and `evidenceRefs`.
 
-**False retry evidence label:**
-- Symptoms: Ordinary reconciliation is labeled `paid_retry_attempted`.
-- Files: `src/protocol/evidence-projections/projections.ts`, `test/protocol/evidence-projections.test.ts`
-- Trigger: Any projection input with both `mutationAttempt` and latest reconciliation.
-- Workaround: Treat `paid_retry_attempted` as a reconciliation label only. Do not use it as proof of retry posture until a dedicated retry signal exists.
+**Dirty/unpromoted `auth.md`: protected path posture is under-specified in the fixture**
+- Symptoms: The dirty `auth.md` fixture marks `tool.rawBypassPossible: true` while the proposed envelope uses `requiredProtectedPathState: "not_required"`.
+- Files: `test/adapters/auth-md-adapter.test.ts`, `src/adapters/auth-md/action-proposal.ts`
+- Trigger: Use the dirty `auth.md` action proposal fixture as the basis for future policy evaluation or gateway checks.
+- Workaround: Treat the dirty adapter as proposal-only. Do not evaluate or greenlight `auth_md_protected_api_call.exact.v0` until protected path posture is explicit.
 
 ## Security Considerations
 
-### Active-Goal Security Risk: Evidence Gaps at Response Boundaries
+**Committed: Runtime ingress is caller-observed evidence, not interception proof**
+- Risk: Runtime ingress can record dynamic dispatch, raw sibling bypass, and proposal posture only for the observed caller path. It does not prove that every sibling tool path is technically intercepted.
+- Files: `src/runtime/ingress/index.ts`, `test/runtime/runtime-ingress.test.ts`, `test/product/agent-proof-slice.test.ts`, `docs/internal/protocol-notes.md`, `README.md`
+- Current mitigation: Tests cover raw package-install, raw x402, direct MCP x402 bypass, dynamic dispatch, ambiguous dispatch, retries, and changed-parameter retries.
+- Recommendations: Keep every new family honest by requiring a raw/sibling bypass posture test and a response posture reason code before documenting it as runtime ingress support.
 
-- Risk: Durable evidence can exist in protocol storage while active response surfaces omit the refs operators need to reconstruct authority posture.
-- Files: `src/http/handlers/evidence-read.ts`, `src/protocol/areas/authority-certificate/transitions.ts`, `src/http/routes/transition-response-schemas.ts`
-- Current mitigation: Projection schemas include fields for credential, recovery, isolation, proof-gap, refusal, and authority-certificate refs in `src/protocol/evidence-projections/schemas.ts`. Gateway adapters return distinct non-authoritative/proof-gap/failure outcomes in `src/adapters/x402-payment/wallet-gateway.ts` and `src/adapters/package-install/gateway.ts`.
-- Recommendations: Treat missing supported evidence classes as explicit response posture, not silent empty arrays. Add `omittedEvidenceReasonCodes` or load the scoped evidence before projection.
+**Committed: MCP x402 proposal has no graph evidence**
+- Risk: A role-scoped MCP proposal can be safe as proposal-only, but it does not prove generated-code structure or hidden branch behavior.
+- Files: `src/mcp/x402-proposal.ts`, `test/mcp/mcp-x402-proposal.test.ts`
+- Current mitigation: Tests assert no policy, greenlight, gateway check, mutation, payment signature, or payment payload is produced by the MCP proposal tool.
+- Recommendations: Keep MCP proposal language narrow unless graph evidence is added.
 
-### Deferred Hosted/Non-Goal Capture: Hosted Audit and Retention Are Not Active Proof
+**Dirty/unpromoted `auth.md`: credential intake is not provider custody**
+- Risk: `credentialMaterial` appears in adapter input before the helper returns a `RegisterGatewayCredentialRefInput`. The helper redacts evidence, but it does not store material in a provider or prove secret lifecycle controls.
+- Files: `src/adapters/auth-md/profiles.ts`, `test/adapters/auth-md-adapter.test.ts`
+- Current mitigation: Tests assert secret material is excluded from returned evidence and credential reference input.
+- Recommendations: Keep claims to gateway credential-ref intake. Do not describe this as provider custody, hosted custody, or OAuth-server operation.
 
-- Risk: Hosted operators will eventually need admission audit, search, retention, and cross-tenant evidence boundaries.
-- Files: `src/http/admission/*`, `src/http/handlers/evidence-read.ts`, `docs/internal/protocol-kernel-architecture.md`
-- Current mitigation: Canon states the repo is a local TypeScript protocol kernel, not hosted operation, and that hosted enforcement requires real deployment boundary and credential custody.
-- Recommendations: Do not report hosted audit/search/retention gaps as current Tier 2 bugs. Capture them when the hosted boundary, customer/provider identity, and credential authority holder exist in source.
+**Dirty/unpromoted `auth.md`: no gateway runner enforces proposed protected API calls**
+- Risk: `auth_md_protected_api_call.exact.v0` can be proposed as an action contract, but no dirty file implements a gateway check that consumes a one-use greenlight before the API mutation.
+- Files: `src/adapters/auth-md/action-proposal.ts`, `test/adapters/auth-md-adapter.test.ts`
+- Current mitigation: Dirty tests assert proposal does not create greenlight, gateway check, mutation, or payment proof records.
+- Recommendations: Before promotion, add a gateway-side adapter test that refuses without exact greenlight binding and records gateway/mutation/proof-gap outcomes separately.
 
 ## Performance Bottlenecks
 
-**Not detected for this focus.**
-- Files: `src/http/handlers/evidence-read.ts`, `src/protocol/evidence-projections/projections.ts`, `src/runtime/ingress/index.ts`
-- Rationale: The inspected concerns are response completeness, evidence binding, and operator reconstruction posture. No active slow path was validated in this pass.
+**Committed: Agent transaction envelope assembly fans out across tenant/org object families**
+- Problem: `assembleAgentTransactionEnvelope` gathers records by tenant/org and object family, then filters them in memory for a contract or transaction.
+- Files: `src/protocol/evidence-projections/assembly.ts`, `src/http/handlers/evidence-read.ts`, `src/protocol/areas/authority-certificate/transitions.ts`, `test/protocol/evidence-projections.test.ts`, `test/protocol/authority-certificate.test.ts`
+- Cause: The local append-only store has no indexed per-action projection table for envelope reads.
+- Improvement path: Keep the current assembler for local proof, but add an indexed transaction/evidence projection before using this shape for large tenants or hosted read paths.
 
 ## Fragile Areas
 
-**Evidence assembly is duplicated across response surfaces:**
-- Files: `src/http/handlers/evidence-read.ts`, `src/protocol/areas/authority-certificate/transitions.ts`, `src/protocol/evidence-projections/projections.ts`
-- Why fragile: HTTP evidence reads and AuthorityCertificate construction assemble similar transaction context independently, so new evidence classes can appear in projection schemas without being loaded by all response paths.
-- Safe modification: Centralize transaction-envelope assembly before adding more projection fields.
-- Test coverage: Add paired HTTP and certificate tests for every new evidence class loaded into `AgentTransactionEnvelopeProjection`.
+**Committed: Response posture shapes can drift across HTTP, runtime ingress, MCP, and CLI**
+- Files: `src/http/routes/transition-response-schemas.ts`, `src/runtime/ingress/index.ts`, `src/mcp/output.ts`, `src/cli/output.ts`, `src/surfaces/outcome.ts`
+- Why fragile: Each surface now exposes a conservative outcome posture, but the fields are assembled in separate modules.
+- Safe modification: Add shared tests for response invariants: non-authority proposal surfaces must keep `authorityCreated`, `gatewayCheckPerformed`, and `mutationAttempted` false; rejected candidates must expose refusal refs when records exist.
+- Test coverage: CLI, MCP, runtime ingress, and HTTP have focused tests, but no single cross-surface invariant test binds all response envelopes.
 
-**Reason-code and next-action posture is command-specific:**
-- Files: `src/cli/output.ts`, `src/mcp/x402-proposal.ts`, `src/runtime/ingress/index.ts`, `src/surfaces/outcome.ts`
-- Why fragile: MCP has `SurfaceOutcome`, CLI has `CliOutputEnvelope`, and runtime ingress has raw proposal output. The three response families do not share a minimal non-authority response contract.
-- Safe modification: Define a small shared response posture type for non-authoritative surfaces, then adapt MCP, CLI, and runtime ingress to it without changing durable protocol records.
-- Test coverage: Add fixture tests that compare required conservative fields across MCP, CLI, and runtime ingress outputs.
+**Committed: Evidence projection correctness depends on supplemental record wiring**
+- Files: `src/protocol/evidence-projections/assembly.ts`, `src/protocol/evidence-projections/projections.ts`, `test/protocol/evidence-projections.test.ts`, `test/protocol/authority-certificate.test.ts`
+- Why fragile: The envelope can include credential, recovery, isolation, idempotency, reconciliation, and authority-certificate records only if each new evidence family is added to the assembler and projection.
+- Safe modification: When adding a protocol record family, update both the assembler and the projection tests in the same change.
+- Test coverage: Current tests cover custody, recovery, isolation, idempotency, retry reconciliation, and certificate embedding.
+
+**Dirty/unpromoted `auth.md`: proposal path accepts optional generated execution context**
+- Files: `src/adapters/auth-md/action-proposal.ts`, `test/adapters/auth-md-adapter.test.ts`
+- Why fragile: `runtimeExecutionId`, `generatedGraph`, and `toolCallDraftId` are optional or nullable in the dirty path, so a future promotion could propose protected API calls without generated-code provenance.
+- Safe modification: Require a generated execution graph or a documented non-codemode proposal posture before exposing `auth.md` beyond experimental exports.
+- Test coverage: Dirty tests assert proposal-only behavior but do not require graph or draft evidence.
 
 ## Scaling Limits
 
-### Deferred Hosted/Non-Goal Capture: Aggregate Spend and Review Windows
+**Committed: x402 aggregate spend and review windows are metadata**
+- Current capacity: Per-call x402 package-install and payment-call contracts can be proposed, greenlit, gateway-checked, and receipted in local proof tests.
+- Limit: Session, day, and review-window spend limits are metadata until a spend ledger exists.
+- Files: `src/adapters/x402-payment/action-proposal.ts`, `src/adapters/x402-payment/install-proposal.ts`, `test/runtime/runtime-ingress.test.ts`, `test/product/agent-proof-slice.test.ts`, `docs/internal/protocol-notes.md`, `README.md`
+- Scaling path: Add a ledger-backed spend window before enforcing aggregate buyer-side limits or claiming aggregate spend control.
 
-- Current capacity: The active x402 path is local and per-call. It enforces `trustedMaxAtomicAmountPerCall` and emits per-call contract/greenlight/gateway/receipt evidence.
-- Limit: Session/day/org-level spend windows and review thresholds are metadata until a source-owned ledger exists.
-- Files: `src/mcp/x402-proposal.ts`, `src/protocol/areas/idempotency-ledger/*`, `docs/internal/protocol-definition.md`
-- Scaling path: Add an aggregate spend ledger only when the active wedge requires it. Do not imply aggregate budget enforcement from per-call x402 evidence.
+**Committed: Runtime ingress supports two hardcoded action families**
+- Current capacity: Runtime ingress covers package-install and x402 dispatch families.
+- Limit: Additional families require edits to classification, config lookup, compile input construction, and bypass reason-code mapping.
+- Files: `src/runtime/ingress/index.ts`, `test/runtime/runtime-ingress.test.ts`
+- Scaling path: Add an adapter-family registry before adding `auth.md` or other protected API action families to runtime ingress.
 
-### Deferred Hosted/Non-Goal Capture: Provider Custody and Multi-Tenant Gateway Operation
-
-- Current capacity: Gateway credential refs and credential-resolution evidence exist as local protocol records and redacted projections.
-- Limit: Provider-hosted custody, tenant isolation, gateway key rotation, and live provider audit are not active proof in this repo.
-- Files: `src/protocol/areas/credential-custody/*`, `src/protocol/evidence-projections/projections.ts`, `docs/internal/decisions.md`
-- Scaling path: Introduce hosted custody only with an explicit gateway authority holder, deployment boundary, rotation posture, and customer-visible evidence refs.
+**Dirty/unpromoted `auth.md`: credential lifecycle is discovery/intake only**
+- Current capacity: Dirty helper code can parse protected-resource metadata and return redacted registration input for a gateway credential ref.
+- Limit: No rotation, revocation, provider-backed storage, gateway execution, or receipt lane is implemented in the dirty adapter.
+- Files: `src/adapters/auth-md/profiles.ts`, `src/adapters/auth-md/action-proposal.ts`, `test/adapters/auth-md-adapter.test.ts`
+- Scaling path: Keep `auth.md` as an adapter profile until gateway credential storage and protected API-call enforcement exist.
 
 ## Dependencies at Risk
 
-**Not detected for this focus.**
-- Files: `package.json`
-- Risk: No package-level dependency risk was validated in this telemetry/response-contract pass.
-- Migration plan: Not applicable.
+**Committed: x402 conformance is coupled to upstream package semantics**
+- Risk: The exact buyer-side proof lane depends on `@x402/core`, `@x402/evm`, and `@x402/fetch` behavior and fixture shape.
+- Impact: Upstream changes can break local exact-proof fixtures or signer-custody assumptions.
+- Files: `package.json`, `test/conformance/x402-upstream-exact-fixtures.test.ts`, `src/adapters/x402-payment/action-proposal.ts`, `src/adapters/x402-payment/install-proposal.ts`
+- Migration plan: Keep conformance tests as the upgrade gate. Update fixtures and non-claim docs together when bumping x402 packages.
+
+**Dirty/unpromoted `auth.md`: discovery depends on OAuth Protected Resource Metadata semantics**
+- Risk: The dirty adapter treats OAuth Protected Resource Metadata as the discovery source of truth and `auth.md` prose as supporting evidence.
+- Impact: Metadata shape drift affects contract proposal and credential-intake evidence.
+- Files: `src/adapters/auth-md/profiles.ts`, `docs/internal/protocol-notes.md`, `test/adapters/auth-md-adapter.test.ts`
+- Migration plan: Keep schemas narrow, fixture-backed, and experimental until the adapter has gateway enforcement.
 
 ## Missing Critical Features
 
-### Deferred Hosted/Non-Goal Capture: Durable Pre-Contract Evidence Projection
+**Committed: Refusal refs are missing from runtime ingress response posture**
+- Problem: Refusal evidence exists but is not returned as a first-class response reference.
+- Blocks: Runtime callers cannot directly attach the refusal record to reconstruction or recovery workflows.
 
-- Problem: MCP resources expose metadata, challenge, pre-contract health, and AuthorityCertificate reference resources, but these are resource/read views rather than durable pre-contract evidence projections.
-- Blocks: Future hosted support flows may need a canonical pre-contract projection that shows catalog, challenge, custody posture, redaction, and safe next action before a contract exists.
-- Files: `src/mcp/resources.ts`, `test/mcp/mcp-resource-redaction.test.ts`, `src/mcp/x402-proposal.ts`
-- Why deferred: Current tests correctly assert resource reads are read-only and non-authoritative. Turning these into durable evidence is a product expansion, not a current active-surface defect.
+**Committed: Spend ledger is missing for aggregate x402 limits**
+- Problem: Aggregate spend windows are declared as metadata, not enforced state.
+- Blocks: Any claim that session/day/review spend limits are enforced.
 
-### Deferred Hosted/Non-Goal Capture: Broad Tool/Process Interception
+**Committed: Generic runtime ingress family registry is missing**
+- Problem: Runtime ingress families are centralized conditionals instead of registered adapters.
+- Blocks: Low-risk expansion to new action families such as `auth.md`.
 
-- Problem: Current active proof covers declared local protocol paths, x402 proposal/signing, package-install gateway fixtures, and runtime ingress detection. It does not intercept arbitrary MCP hosts, shell processes, browser tools, package managers, or network calls.
-- Blocks: Hosted or general agent-runtime claims.
-- Files: `src/runtime/ingress/index.ts`, `src/adapters/x402-payment/wallet-gateway.ts`, `src/adapters/package-install/gateway.ts`, `docs/internal/protocol-kernel-architecture.md`
-- Why deferred: Canon narrows Tier 2 to local protocol kernel and pre-hosted surfaces. Broad interception becomes active only when a runtime adapter or gateway boundary claims to enforce it.
+**Dirty/unpromoted `auth.md`: gateway check and mutation receipt path are missing**
+- Problem: The dirty adapter stops at discovery, credential-ref intake, and proposal.
+- Blocks: Any claim that `auth.md` protected API calls are enforced by Handshake.
+
+**Dirty/unpromoted `auth.md`: runtime ingress binding is missing**
+- Problem: No dirty file wires `auth_md_protected_api_call.exact.v0` into runtime ingress dispatch, raw bypass posture, or generated graph evidence.
+- Blocks: Treating `auth.md` as part of the runtime-ingress proof lane.
 
 ## Test Coverage Gaps
 
-**HTTP and certificate projection completeness:**
-- What's not tested: End-to-end readback that credential-resolution evidence, recovery recommendations, isolation states, and idempotency posture appear in HTTP transaction envelopes and AuthorityCertificate envelopes.
-- Files: `src/http/handlers/evidence-read.ts`, `src/protocol/areas/authority-certificate/transitions.ts`, `test/http/d1-http.test.ts`, `test/protocol/authority-certificate.test.ts`
-- Risk: New evidence classes can exist in storage and direct projection tests while active response surfaces silently omit them.
+**Committed: Runtime ingress refusal references are not asserted**
+- What's not tested: Rejected runtime ingress responses should expose `responsePosture.refusalRefs` when refusal records are committed.
+- Files: `src/runtime/ingress/index.ts`, `test/runtime/runtime-ingress.test.ts`
+- Risk: Refusal evidence remains durable but undiscoverable from the response boundary.
 - Priority: High
 
-**Policy refusal response contract:**
-- What's not tested: Immediate policy evaluation responses returning refusal refs and non-authority posture.
-- Files: `src/http/routes/transition-response-schemas.ts`, `src/protocol/areas/policy-greenlight/transitions.ts`, `test/http/d1-http.test.ts`, `test/protocol/kernel-policy-gateway.test.ts`
-- Risk: Refusal remains durable but not visible at the response boundary where model agents decide whether to retry.
-- Priority: High
-
-**MCP committed error mapping:**
-- What's not tested: MCP proposal error handling for real `TransitionErrorEnvelope` commit states, especially `"committed"`.
-- Files: `src/mcp/x402-proposal.ts`, `test/mcp/mcp-x402-proposal.test.ts`, `src/mcp/reference-transcript-fixtures.ts`
-- Risk: Surface outcome can lie about whether protocol evidence exists.
-- Priority: High
-
-**Retry posture evidence:**
-- What's not tested: Separation between downstream reconciliation, idempotency replay, runtime retry detection, and paid retry attempts.
-- Files: `src/protocol/evidence-projections/projections.ts`, `test/protocol/evidence-projections.test.ts`, `src/runtime/ingress/index.ts`
-- Risk: Operators and model agents cannot reconstruct whether repeated mutation was attempted.
+**Committed: Cross-surface response posture invariants are not centralized**
+- What's not tested: HTTP, runtime ingress, MCP, and CLI response envelopes should share core no-authority/no-mutation flags for proposal-only surfaces.
+- Files: `src/http/routes/transition-response-schemas.ts`, `src/runtime/ingress/index.ts`, `src/mcp/output.ts`, `src/cli/output.ts`, `src/surfaces/outcome.ts`
+- Risk: One surface can drift into evidence theatre by implying authority or execution where only proposal occurred.
 - Priority: Medium
 
-**CLI and runtime ingress response posture:**
-- What's not tested: Standard conservative fields across CLI and runtime ingress outputs.
-- Files: `src/cli/output.ts`, `src/runtime/ingress/index.ts`, `test/runtime/runtime-ingress.test.ts`
-- Risk: Non-authoritative diagnostics and proposal outputs remain command-specific and easy to misread.
+**Committed: MCP proposal graphlessness is documented by posture but not pressure-tested against multi-step generated plans**
+- What's not tested: MCP x402 proposal behavior for generated multi-call, branch, or retry graph inputs.
+- Files: `src/mcp/x402-proposal.ts`, `test/mcp/mcp-x402-proposal.test.ts`
+- Risk: The MCP path may be mistaken for runtime-ingress graph coverage.
 - Priority: Medium
 
-## Stale/Non-Issues
+**Dirty/unpromoted `auth.md`: no policy/gateway/evidence projection tests**
+- What's not tested: Policy evaluation, one-use greenlight binding, gateway check refusal, mutation receipt, proof gap recording, redacted evidence projection, and authority-certificate inclusion for `auth_md_protected_api_call.exact.v0`.
+- Files: `src/adapters/auth-md/action-proposal.ts`, `src/adapters/auth-md/profiles.ts`, `test/adapters/auth-md-adapter.test.ts`
+- Risk: Proposal-only helper code could be promoted as if it enforces protected API calls.
+- Priority: High
 
-**Runtime ingress `gatewayCredentialRefs` digest binding:**
-- Status: Not an active concern.
-- Files: `src/runtime/ingress/index.ts`
-- Evidence: Runtime ingress includes `gatewayCredentialRefs` in protected action parameter digest material and tool-call draft creation/finalization.
-- Reason: The older drift pattern where runtime ingress failed to bind gateway credential refs is not present in the inspected source.
+**Dirty/unpromoted `auth.md`: no runtime-ingress bypass tests**
+- What's not tested: Raw Authorization header calls, direct client calls, dynamic endpoint construction, and sibling HTTP client bypass under runtime ingress.
+- Files: `src/adapters/auth-md/action-proposal.ts`, `test/adapters/auth-md-adapter.test.ts`, `src/runtime/ingress/index.ts`
+- Risk: The adapter could look contract-shaped while generated code still escapes the contract boundary.
+- Priority: High
 
-**Gateway adapters distinguish gateway refusal, downstream failure, and proof gap:**
-- Status: Not an active response-contract concern for this focus.
-- Files: `src/adapters/x402-payment/wallet-gateway.ts`, `src/adapters/package-install/gateway.ts`
-- Evidence: Both adapters check the gateway before mutation and return distinct refused, not-authoritative, reconciled, failed, and proof-gap outcomes.
-- Reason: The active blind spots are in projections and response envelopes around those records, not in the inspected adapter outcome unions.
+## Resolved or Stale Concerns From Prior Map
 
-**Raw credential projection redaction:**
-- Status: Not an active concern.
-- Files: `src/protocol/evidence-projections/projections.ts`, `test/protocol/evidence-projections.test.ts`, `test/protocol/credential-custody.test.ts`
-- Evidence: Projection redaction strips credential-looking raw refs and tests assert redacted credential evidence projections.
-- Reason: Redaction exists at the projection layer. The active issue is that some response assemblers do not load credential-resolution evidence into the projection.
+These prior concerns are not active in the inspected source and should not be carried forward as current defects:
 
-**MCP resource reads are read-only and non-authoritative:**
-- Status: Not an active concern.
-- Files: `src/mcp/resources.ts`, `test/mcp/mcp-resource-redaction.test.ts`
-- Evidence: Resource read outputs set `readOnly: true`, `mayAuthorize: false`, `mayMutate: false`, `gatewayChecked: false`, and tests reject action-running URIs.
-- Reason: These resources can still need future durable pre-contract projections, but they do not currently claim authority.
+- Agent transaction envelopes now include credential resolution, recovery, isolation, idempotency, reconciliation, and authority-certificate evidence in `src/protocol/evidence-projections/assembly.ts`, `src/protocol/evidence-projections/projections.ts`, `test/protocol/evidence-projections.test.ts`, and `test/protocol/authority-certificate.test.ts`.
+- Authority certificates now embed assembled custody, recovery, isolation, and idempotency evidence through `src/protocol/areas/authority-certificate/transitions.ts` and `test/protocol/authority-certificate.test.ts`.
+- Policy refusal responses now expose refusal and retry posture through `src/protocol/areas/policy-greenlight/transitions.ts`, `src/http/routes/transition-response-schemas.ts`, and `src/protocol/areas/policy-greenlight/policy-record/index.ts`.
+- MCP x402 error mapping now preserves `protocol_recorded`, `ambiguous`, and `not_started` commit states in `src/mcp/x402-proposal.ts` and `test/mcp/mcp-x402-proposal.test.ts`.
+- Retry telemetry no longer uses the misleading `paid_retry_attempted` label in the inspected evidence projections and tests at `src/protocol/evidence-projections/projections.ts` and `test/protocol/evidence-projections.test.ts`.
+- CLI output now uses a standard conservative envelope in `src/cli/output.ts`, `src/cli/projection-evidence.ts`, `src/cli/support-bundle.ts`, and `src/cli/local-project/index.ts`.
+- Runtime ingress now returns an explicit response posture in `src/runtime/ingress/index.ts`; the remaining bug is refusal-ref omission, not absence of a wrapper.
 
 ---
 

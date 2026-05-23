@@ -27,6 +27,14 @@ npm run demo:aps              # Generate local x402 protected-spend report
 npm run demo:mcp-transcript   # Generate source-owned MCP x402 reference transcript
 ```
 
+**Current gate posture from scripts:**
+- `package.json` defines `npm run check:repo` as `npm run check:types && npm run lint && npm run format:check && npm run test && npm run pack:check && git diff --check`.
+- `package.json` defines `npm run quality:architecture` as the architecture/import/export/surface/conformance slice: `test/architecture/import-posture.test.ts`, `test/architecture/naming-posture.test.ts`, `test/architecture/package-surface.test.ts`, `test/architecture/root-exports.test.ts`, `test/architecture/surface-boundary-posture.test.ts`, `test/architecture/cli-command-posture.test.ts`, `test/architecture/mcp-surface-posture.test.ts`, and `test/conformance/protected-mutation-adapter-conformance.test.ts`.
+- `package.json` defines `npm run quality:claims` as `test/architecture/active-vocabulary.test.ts` plus `test/architecture/claim-boundary.test.ts`.
+- `package.json` defines `npm run quality:storage` as `test/http/d1-http.test.ts`, `test/protocol/kernel-*.test.ts`, `test/protocol/transition-matrix.test.ts`, `test/protocol/model-based-invariants.test.ts`, `test/protocol/action-attempt-lifecycle.test.ts`, `test/protocol/evidence-projections.test.ts`, `test/protocol/protocol-store-atomicity-contract.test.ts`, and `test/protocol/authority-certificate.test.ts`.
+- `.github/workflows/check.yml` runs `npm run check:repo`.
+- This mapper refresh did not execute gates. Treat the above as available gate composition from source, not as a fresh pass/fail result.
+
 ## Test File Organization
 
 **Location:**
@@ -157,6 +165,13 @@ export function makeKernelFixture() {
 
 ## Response And Telemetry Contract Coverage
 
+**Committed telemetry/response posture coverage:**
+- Policy refusal response posture is tested in `test/protocol/kernel-policy-gateway.test.ts` and `test/http/d1-http.test.ts`. Duplicate authority and missing protected-path posture refusals must return `authorityCreated: false`, `gatewayCheckPerformed: false`, `mutationAttempted: false`, `greenlightRef: null`, `refusalReasonCode`, `nextAction: "read_evidence"`, `retryability: "not_retryable"`, and a persisted `refusalRef`.
+- HTTP transition response schemas are source-owned in `src/http/routes/transition-response-schemas.ts`; `test/http/d1-http.test.ts` exercises the D1/Hono route path so policy responses preserve structured refusal posture over HTTP.
+- Runtime ingress response posture is tested in `test/runtime/runtime-ingress.test.ts`. The tests assert `schemaVersion: "handshake.runtime-ingress.outcome.v1"`, false non-authority flags, reason-code mapping, read/recraft/stop next actions, runtime/graph/draft/compilation/contract refs, x402 retry refs, raw sibling bypass evidence, and zero policy/greenlight/gateway/mutation/receipt/certificate records from runtime ingress.
+- CLI response posture is tested in `test/cli/cli-evidence.test.ts`, `test/cli/cli-local-project.test.ts`, `test/cli/cli-support-bundle.test.ts`, and `test/cli/cli-x402-install-probes.test.ts`. These tests require `handshake.cli.v1` envelopes, non-claims, redaction profile refs, reason codes, next actions, retryability, commit state, and explicit non-authority flags across success and failure paths.
+- MCP transition evidence posture is tested in `test/mcp/mcp-x402-proposal.test.ts`. Committed refusals and proof gaps must surface as structured `SurfaceOutcome` values with `commitState: "protocol_recorded"`, `refusalRef` or `proofRef`, read-evidence next actions, and evidence URIs; unknown commit state maps to `commitState: "ambiguous"` and `nextAction: "stop"`.
+
 **Stable response schemas:**
 - `test/mcp/mcp-schema-contract.test.ts` parses real MCP tool/resource schemas from `src/mcp/catalog.ts`, `src/mcp/output.ts`, and `src/surfaces/outcome.ts`; it rejects authority-shaped fields such as policy, greenlight, gateway, mutation, receipt, raw, signing, and certificate-minting inputs.
 - `test/cli/cli-evidence.test.ts`, `test/cli/cli-support-bundle.test.ts`, and `test/architecture/cli-command-posture.test.ts` require CLI outputs from `src/cli/output.ts` to carry schema version, warnings, non-claims, and explicit non-authority fields.
@@ -196,6 +211,20 @@ export function makeKernelFixture() {
 - Architecture tests prevent authority drift by static scanning, but they do not prove runtime containment of sibling browser, shell, package-manager, cloud, or repo-write tools. Any claim that MCP or CLI controls those channels remains outside current evidence.
 - CLI readiness can hide operator frustration because `doctor` remains `not_ready` even after a local x402 probe passes; this is correct while `trustedReadiness` is false, but tests should preserve the exact reason-code path so future UI/help text can explain the next mechanism instead of reporting generic failure.
 - Model/developer frustration can hide behind fake clients: SDK and MCP unit tests prove surface method shape and headers, not a real network-backed activation path. Any quickstart or support workflow needs an HTTP/D1 route test before treating the surface as adoptable.
+
+## Visible Dirty Auth.md Adapter Coverage
+
+**Local dirty tests:**
+- `test/adapters/auth-md-adapter.test.ts` is untracked local state. It is visible and should be treated as dirty adapter coverage, not committed baseline.
+- `test/adapters/auth-md-adapter.test.ts` covers PRM `agent_auth` normalization, auth.md document digest as supporting evidence, credential intake redaction, exact `auth_md_protected_api_call.exact` contract proposal, no greenlight/gateway/mutation from the proposal helper, and pre-compilation refusal for raw authorization headers, dynamic endpoints, read-only methods, cross-origin endpoints, and unsafe custody.
+- `test/architecture/root-exports.test.ts` is modified local state. The dirty expectation adds auth.md profile/proposal helpers to the explicit `./experimental` surface through `src/experimental.ts`, while keeping them off the package root.
+- `STRUCTURE.md`, `docs/internal/protocol-notes.md`, and `src/adapters/LANE.md` are modified local state documenting auth.md as an experimental/reference adapter profile, not a standards claim or provider integration.
+
+**How to validate if auth.md is intentionally landed:**
+- Run `npm run check:types` first because `src/adapters/auth-md/*` is untracked TypeScript source and root export expectations reference it.
+- Run `npm run test -- test/adapters/auth-md-adapter.test.ts test/architecture/root-exports.test.ts` for the dirty adapter slice.
+- Run `npm run quality:architecture` after staging/landing because architecture tests include root export curation and adapter conformance, but the auth.md adapter test itself is not listed in the current `quality:architecture` script.
+- Run `npm run check:repo` before closeout because `npm run test` will pick up `test/adapters/auth-md-adapter.test.ts` once it exists in the working tree and `git diff --check` will check the tracked auth.md documentation/export diffs.
 
 ## Demo Script Tests
 
