@@ -30,6 +30,11 @@ describe("CLI local project readiness", () => {
       mutationAttempted: false,
       credentialMaterialIncluded: false,
       mutationCommandIncluded: false,
+      reasonCodes: [],
+      nextAction: "run_doctor",
+      retryability: "not_retryable",
+      commitState: "not_applicable",
+      redactionProfileRef: "cli-local-project:v1-redacted",
       result: {
         projectId: "proj_cli_test",
         workspaceRef: workspace,
@@ -67,6 +72,10 @@ describe("CLI local project readiness", () => {
       gatewayCheckPerformed: false,
       mutationAttempted: false,
       credentialMaterialIncluded: false,
+      reasonCodes: ["cli_gateway_posture_unknown", "cli_install_not_configured", "cli_token_ref_missing"],
+      nextAction: "fix_install",
+      retryability: "retryable_after_fix",
+      redactionProfileRef: "cli-local-project:v1-redacted",
       result: {
         status: "not_ready",
         projectId: "proj_cli_doctor",

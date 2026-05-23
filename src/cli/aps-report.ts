@@ -51,6 +51,8 @@ export function renderApsReportCommand(reportValue: unknown) {
     plane: "evidence",
     custodyRole: "review_custody",
     nonClaims: parsed.report.nonClaims,
+    nextAction: "read_evidence",
+    redactionProfileRef: "aps-report:v1-redacted",
     result: {
       schemaVersion: parsed.report.schemaVersion,
       proofBoundary: parsed.report.proofObject.proofBoundary,

@@ -31,6 +31,8 @@ export async function runCliCommand(argv: readonly string[]): Promise<unknown> {
     return cliOutput({
       command: "schema",
       plane: "operator",
+      nextAction: "read_result",
+      redactionProfileRef: "cli-command-manifest:v1-redacted",
       result: {
         name: "handshake",
         commands: cliSchemaOutput(),
@@ -117,6 +119,11 @@ export function cliCommandErrorOutput(input: {
     command: commandLabel(input.argv),
     plane: commandPlane(input.argv),
     ok: false,
+    reasonCodes: [input.errorCode],
+    nextAction: input.nextAction,
+    retryability: "retryable_after_fix",
+    commitState: "not_started",
+    redactionProfileRef: "cli-error:v1-redacted",
     warnings: ["Command failed before any authority, gateway check, signer use, or protected mutation."],
     result: {
       errorCode: input.errorCode,

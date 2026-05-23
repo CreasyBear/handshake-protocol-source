@@ -23,6 +23,11 @@ describe("CLI evidence surface", () => {
       mutationCommandIncluded: false,
       receiptExportCreated: false,
       authorityCertificateMinted: false,
+      reasonCodes: [],
+      nextAction: "read_evidence",
+      retryability: "not_retryable",
+      commitState: "not_applicable",
+      redactionProfileRef: "aps-report:v1-redacted",
       result: {
         proofBoundary: "local_reference",
         protectedAction: {
@@ -54,6 +59,10 @@ describe("CLI evidence surface", () => {
       ok: false,
       authorityCreated: false,
       authorityCertificateMinted: false,
+      reasonCodes: ["schema_invalid"],
+      nextAction: "fix_arguments",
+      retryability: "retryable_after_fix",
+      redactionProfileRef: "authority-certificate-verification:v1-redacted",
       result: {
         verificationValid: false,
         signingInputDigest: null,
@@ -78,6 +87,8 @@ describe("CLI evidence surface", () => {
       authorityCreated: false,
       rawInternalRecordIncluded: false,
       receiptExportCreated: false,
+      nextAction: "read_evidence",
+      redactionProfileRef: "contract-view:v0.2-redacted",
       result: {
         redactionProfileRef: "contract-view:v0.2-redacted",
         actionContractRef: "contract_demo",
@@ -90,6 +101,8 @@ describe("CLI evidence surface", () => {
       authorityCreated: false,
       rawInternalRecordIncluded: false,
       receiptExportCreated: false,
+      nextAction: "read_evidence",
+      redactionProfileRef: "receipt-timeline:v0.2-redacted",
       result: {
         redactionProfileRef: "receipt-timeline:v0.2-redacted",
         receiptRef: "receipt_demo",
@@ -124,6 +137,8 @@ describe("CLI evidence surface", () => {
         command: "conformance x402-payment",
         ok: true,
         authorityCreated: false,
+        reasonCodes: [],
+        nextAction: "read_result",
         result: {
           profile: "protected-spend",
           adapterPackId: "adapter_pack_x402_payment_exact",
@@ -145,6 +160,10 @@ describe("CLI evidence surface", () => {
       gatewayCheckPerformed: false,
       mutationAttempted: false,
       credentialMaterialIncluded: false,
+      reasonCodes: ["cli_command_unsupported"],
+      nextAction: "run_schema",
+      retryability: "retryable_after_fix",
+      commitState: "not_started",
       result: {
         errorCode: "cli_command_unsupported",
         message: "Unsupported command.",
@@ -171,6 +190,10 @@ describe("CLI evidence surface", () => {
       plane: "evidence",
       ok: false,
       authorityCertificateMinted: false,
+      reasonCodes: ["cli_required_argument_missing"],
+      nextAction: "fix_arguments",
+      retryability: "retryable_after_fix",
+      commitState: "not_started",
       result: {
         errorCode: "cli_required_argument_missing",
         message: "cert verify requires --trust-bundle <path>.",

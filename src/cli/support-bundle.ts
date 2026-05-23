@@ -56,11 +56,22 @@ export function supportBundleCommand(value: unknown) {
   for (const reason of input.installHealth?.reasonCodes ?? []) reasonCodes.add(reason);
   for (const reason of input.localX402Install?.refusalReasonCodes ?? []) reasonCodes.add(reason);
   for (const reason of input.localX402ProbeReport?.reasonCodes ?? []) reasonCodes.add(reason);
+  const proofGapRefs = input.receiptTimeline?.proofGapRefs ?? [];
+  const evidenceRefs = [
+    ...(input.contractView?.evidenceRefs ?? []),
+    ...(input.receiptTimeline?.proofGapRefs.map((ref) => `proof_gap:${ref}`) ?? []),
+    input.installHealth?.currentPostureRef ? `protected_path_posture:${input.installHealth.currentPostureRef}` : null,
+  ].filter((ref): ref is string => ref !== null);
 
   return cliOutput({
     command: "support bundle",
     plane: "evidence",
     custodyRole: "review_custody",
+    reasonCodes: [...reasonCodes].sort(),
+    nextAction: reasonCodes.size > 0 || proofGapRefs.length > 0 ? "read_evidence" : "read_result",
+    redactionProfileRef: "cli-support-bundle:v1-redacted",
+    evidenceRefs,
+    proofGapRefs,
     warnings: [
       "Support bundle is assembled from supplied redacted projections and local posture records only.",
       "It is not a receipt export, raw record dump, gateway check, mutation proof, or trusted install readiness signal.",

@@ -10,6 +10,16 @@ export async function verifyCertificateCommand(input: { certificate: unknown; tr
     plane: "evidence",
     custodyRole: "review_custody",
     ok: verification.valid,
+    reasonCodes: verification.failures.map((failure) => failure.code),
+    nextAction: verification.valid ? "read_evidence" : "fix_arguments",
+    retryability: verification.valid ? "not_retryable" : "retryable_after_fix",
+    redactionProfileRef: "authority-certificate-verification:v1-redacted",
+    evidenceRefs: [
+      verification.envelope?.actionContractRef ? `action_contract:${verification.envelope.actionContractRef}` : null,
+      verification.envelope?.receiptRef ? `receipt:${verification.envelope.receiptRef}` : null,
+    ].filter((ref): ref is string => ref !== null),
+    proofGapRefs: verification.envelope?.proofGapRefs ?? [],
+    refusalRefs: verification.envelope?.refusalRefs ?? [],
     result: {
       verificationValid: verification.valid,
       signingInputDigest: verification.signingInputDigest,

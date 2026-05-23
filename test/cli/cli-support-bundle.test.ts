@@ -25,6 +25,12 @@ describe("CLI support bundle", () => {
       rawInternalRecordIncluded: false,
       credentialMaterialIncluded: false,
       receiptExportCreated: false,
+      reasonCodes: ["x402_paid_fetch_client_not_blocked"],
+      nextAction: "read_evidence",
+      retryability: "not_retryable",
+      commitState: "not_applicable",
+      redactionProfileRef: "cli-support-bundle:v1-redacted",
+      proofGapRefs: ["proof_gap_demo"],
       result: {
         schemaVersion: "handshake.cli.support-bundle.v1",
         bundleKind: "redacted_evidence_support_bundle",
