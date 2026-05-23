@@ -76,6 +76,7 @@ export const AuthMdProtectedApiCallAttemptSchema = z.strictObject({
   dynamicEndpointConstructionObserved: z.boolean().default(false),
   dynamicHostConstructionObserved: z.boolean().default(false),
   retryAuthorityReuseDetected: z.boolean().default(false),
+  evidenceRefs: z.array(z.string().min(1)).default([]),
   sequenceNumber: z.number().int().nonnegative().default(1),
   requiredPriorActionContractIds: z.array(IdSchema).default([]),
 });
@@ -262,8 +263,9 @@ async function buildAuthMdProtectedApiCallCompileIntentInputUnchecked(
     requiredEvidenceRefs: [
       discoveryEvidenceRef,
       authorizationServerEvidenceRef,
+      ...attempt.evidenceRefs,
       ...attempt.requiredScopes.map((scope) => `scope:auth-md:${scope}`),
-    ],
+    ].filter(unique),
     candidate: {
       toolCapabilityId: config.toolCapabilityId,
       actionTypeId: config.actionTypeId,
@@ -280,7 +282,7 @@ async function buildAuthMdProtectedApiCallCompileIntentInputUnchecked(
       gatewayCredentialRefs,
       purposeCode: "auth_md_service_mutation",
       expectedSideEffectCodes: ["auth_md_service_mutation_attempt"],
-      evidenceRefs: [discoveryEvidenceRef, authorizationServerEvidenceRef],
+      evidenceRefs: [discoveryEvidenceRef, authorizationServerEvidenceRef, ...attempt.evidenceRefs].filter(unique),
       bounds: {
         protectedResourceOrigin,
         endpointOrigin,
@@ -340,7 +342,8 @@ export function authMdCredentialBindingForAttempt(
         "sha256:".length,
         "sha256:".length + 16,
       )}`,
-    ],
+      ...attempt.evidenceRefs,
+    ].filter(unique),
   };
 }
 
@@ -365,4 +368,8 @@ function requireCandidateDigest(candidateDigest: string | null): string {
 
 function sortedUnique<T extends string>(values: readonly T[]): T[] {
   return [...new Set(values)].sort();
+}
+
+function unique<T>(value: T, index: number, values: T[]): boolean {
+  return values.indexOf(value) === index;
 }

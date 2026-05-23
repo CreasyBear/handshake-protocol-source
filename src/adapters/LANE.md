@@ -8,11 +8,11 @@ and gateway-bound credential use. Mutation-capable adapters run only after a
 
 ## Current proof claim
 
-Reference gateway fixtures and adapter-pack proofs for package install, repo write, preview deploy, external payment signing behavior, and auth.md credential-registration/protected-call profiles. The auth.md lane now includes a protected API-call gateway fixture that records redacted credential-resolution evidence only after a verified gate. These are proof lanes, not production provider integrations or standards certification claims.
+Reference gateway fixtures and adapter-pack proofs for package install, repo write, preview deploy, external payment signing behavior, and auth.md credential-registration/protected-call profiles. The auth.md lane now includes a protected API-call gateway fixture that records redacted credential-resolution evidence only after a verified gate, adapter-owned lifecycle isolation mapping, and hostile bypass probe executors. These are proof lanes, not production provider integrations or standards certification claims.
 
 ## Use cases
 
-Demonstrate mutation-side enforcement for protected package installs, repository writes, preview deploys, payment signatures, and auth.md-backed protected service calls after the protocol derives a verified gateway check. Auth.md adapter helpers demonstrate upstream two-hop PRM/authorization-server registration provenance, gateway credential custody intake, exact protected service-call proposal, post-gate credential-resolution evidence, replay refusal, downstream proof gaps, and redaction failure handling without treating registration as authority.
+Demonstrate mutation-side enforcement for protected package installs, repository writes, preview deploys, payment signatures, and auth.md-backed protected service calls after the protocol derives a verified gateway check. Auth.md adapter helpers demonstrate upstream two-hop PRM/authorization-server registration provenance, gateway credential custody intake, exact protected service-call proposal, post-gate credential-resolution evidence, replay refusal, downstream proof gaps, lifecycle isolation for revocation/expiry/401/metadata drift, hostile bypass posture, and redaction failure handling without treating registration as authority.
 
 ## Constraints and assumptions
 
@@ -20,7 +20,7 @@ Adapters that hold consequence must re-check observed parameters against exact c
 
 ## Core components
 
-`auth-md/profiles.ts`, `auth-md/action-proposal.ts`, `auth-md/gateway.ts`, `package-install/gateway.ts`, `repo-write/gateway.ts`, `preview-deploy/gateway.ts`, `x402-payment/install-proposal.ts`, `x402-payment/action-proposal.ts`, `x402-payment/wallet-gateway.ts`, `x402-payment/conformance.ts`, and adapter conformance tests.
+`auth-md/profiles.ts`, `auth-md/action-proposal.ts`, `auth-md/gateway.ts`, `auth-md/revocation.ts`, `auth-md/bypass-probes.ts`, `package-install/gateway.ts`, `repo-write/gateway.ts`, `preview-deploy/gateway.ts`, `x402-payment/install-proposal.ts`, `x402-payment/action-proposal.ts`, `x402-payment/wallet-gateway.ts`, `x402-payment/conformance.ts`, and adapter conformance tests.
 
 ## Failure and scale posture
 
@@ -40,7 +40,7 @@ Storage internals, protocol primitive internals, Hono route handlers, SDK/client
 
 ## Guarding tests
 
-`test/architecture/import-posture.test.ts`, `test/conformance/protected-mutation-adapter-conformance.test.ts`, `test/adapters/auth-md-adapter.test.ts`, `test/adapters/auth-md-gateway.test.ts`, `test/adapters/package-install-gateway.test.ts`, `test/adapters/repo-write-gateway.test.ts`, `test/adapters/preview-deploy-gateway.test.ts`, `test/adapters/x402-wallet-gateway.test.ts`, and `test/integration/repo-write-d1-http.test.ts`.
+`test/architecture/import-posture.test.ts`, `test/conformance/protected-mutation-adapter-conformance.test.ts`, `test/adapters/auth-md-adapter.test.ts`, `test/adapters/auth-md-gateway.test.ts`, `test/adapters/auth-md-gateway-pressure.test.ts`, `test/adapters/auth-md-revocation.test.ts`, `test/adapters/auth-md-bypass-probes.test.ts`, `test/adapters/auth-md-serialization-redaction.test.ts`, `test/integration/auth-md-protected-call.test.ts`, `test/integration/auth-md-receipt-reconstruction.test.ts`, `test/adapters/package-install-gateway.test.ts`, `test/adapters/repo-write-gateway.test.ts`, `test/adapters/preview-deploy-gateway.test.ts`, `test/adapters/x402-wallet-gateway.test.ts`, and `test/integration/repo-write-d1-http.test.ts`.
 
 ## Public surface
 

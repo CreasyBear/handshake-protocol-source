@@ -28,6 +28,7 @@ import {
   ProtectedPathInstallHealthProjectionSchema,
   ReceiptTimelineProjectionSchema,
   type AgentTransactionEnvelopeProjection,
+  type AuthMdEvidenceRefsProjection,
   type ContractEvidenceProjection,
   type IdempotencyRecoveryDisposition,
   type IdempotencyRecoveryProjection,
@@ -35,6 +36,8 @@ import {
   type ProtectedPathInstallHealthStatus,
   type ReceiptTimelineProjection,
 } from "./schemas";
+
+const AuthMdEvidenceRefsProjectionSchema = AgentTransactionEnvelopeProjectionSchema.shape.authMdEvidenceRefs;
 
 export function projectContractEvidence(contract: ActionContract): ContractEvidenceProjection {
   return ContractEvidenceProjectionSchema.parse({
@@ -123,6 +126,24 @@ export async function projectAgentTransactionEnvelope(
     ...credentialResolutionEvidenceRefs,
   ]);
   const downstreamRefs = downstreamEvidenceRefs(surfaceOperationEvidenceRefs);
+  const envelopeEvidenceRefs = [
+    ...redactedProjectionRefs(input.contract.evidenceRefs),
+    ...redactedProjectionRefs(input.receipt?.evidenceRefs ?? []),
+    ...redactedProjectionRefs(proofGaps.flatMap((proofGap) => proofGap.affectedObjectRefs)),
+    ...redactedProjectionRefs(refusals.flatMap((refusal) => refusal.evidenceRefs)),
+    ...redactedProjectionRefs(input.ledger?.evidenceRefs ?? []),
+    ...surfaceOperationEvidenceRefs,
+    ...credentialResolutionEvidenceRefs,
+    ...redactedProjectionRefs(credentialResolutionEvidence.flatMap((evidence) => evidence.evidenceRefs)),
+  ].filter(unique);
+  const authMdEvidenceRefs = projectAuthMdEvidenceRefs({
+    evidenceRefs: envelopeEvidenceRefs,
+    gatewayCredentialEvidenceRefs: gatewayCredentialRefs,
+    credentialResolutionEvidenceRefs,
+    surfaceOperationEvidenceRefs,
+  });
+  const gatewayAdmissionStatus = agentTransactionGatewayAdmissionStatus(input);
+  const downstreamOutcomeStatus = agentTransactionDownstreamOutcomeStatus(input);
   const envelopeSeed = {
     actionContractRef: input.contract.actionContractId,
     contractDigest: input.contract.actionContractDigest,
@@ -162,13 +183,26 @@ export async function projectAgentTransactionEnvelope(
     gatewayCredentialEvidenceRefs: gatewayCredentialRefs,
     credentialResolutionEvidenceRefs,
     downstreamEvidenceRefs: downstreamRefs,
+    authMdEvidenceRefs,
+    authMdEvidenceLabels: authMdEvidenceLabels({
+      authMdEvidenceRefs,
+      policyDecisionRef: input.policyDecision.policyDecisionId,
+      greenlightRef: input.greenlight?.greenlightId ?? input.receipt?.greenlightId ?? null,
+      gateAttemptRef: input.gateAttempt?.gateAttemptId ?? input.receipt?.gateAttemptId ?? null,
+      mutationAttemptRef: input.mutationAttempt?.mutationAttemptId ?? input.receipt?.mutationAttemptId ?? null,
+      refusalRefs: refusals.map((refusal) => refusal.refusalId),
+      proofGapRefs: [...(input.receipt?.proofGapIds ?? []), ...proofGaps.map((proofGap) => proofGap.proofGapId)],
+      gatewayAdmissionStatus,
+      downstreamOutcomeStatus,
+      reconciliationFinalityStatus: latestReconciliation?.finalityStatus ?? null,
+    }),
     providerRequestRef: latestReconciliation?.providerRequestRef ?? null,
     providerOperationRef: latestReconciliation?.providerOperationRef ?? null,
     downstreamRetryability: latestReconciliation?.downstreamRetryability ?? null,
     reconciliationFinalityStatus: latestReconciliation?.finalityStatus ?? null,
-    gatewayAdmissionStatus: agentTransactionGatewayAdmissionStatus(input),
+    gatewayAdmissionStatus,
     greenlightConsumptionStatus: input.receipt?.greenlightConsumptionStatus ?? null,
-    downstreamOutcomeStatus: agentTransactionDownstreamOutcomeStatus(input),
+    downstreamOutcomeStatus,
     proofGapRefs: [...(input.receipt?.proofGapIds ?? []), ...proofGaps.map((proofGap) => proofGap.proofGapId)].filter(
       unique,
     ),
@@ -185,16 +219,7 @@ export async function projectAgentTransactionEnvelope(
       .filter((certificate) => certificate.terminal.actionContractId === input.contract.actionContractId)
       .map((certificate) => certificate.authorityCertificateId)
       .filter(unique),
-    evidenceRefs: [
-      ...redactedProjectionRefs(input.contract.evidenceRefs),
-      ...redactedProjectionRefs(input.receipt?.evidenceRefs ?? []),
-      ...redactedProjectionRefs(proofGaps.flatMap((proofGap) => proofGap.affectedObjectRefs)),
-      ...redactedProjectionRefs(refusals.flatMap((refusal) => refusal.evidenceRefs)),
-      ...redactedProjectionRefs(input.ledger?.evidenceRefs ?? []),
-      ...surfaceOperationEvidenceRefs,
-      ...credentialResolutionEvidenceRefs,
-      ...redactedProjectionRefs(credentialResolutionEvidence.flatMap((evidence) => evidence.evidenceRefs)),
-    ].filter(unique),
+    evidenceRefs: envelopeEvidenceRefs,
     streamOffsets: input.receipt?.streamOffsets ?? [],
     receiptDigest: input.receipt?.receiptDigest ?? null,
     auditChainDigest: input.receipt?.auditChainDigest ?? null,
@@ -438,7 +463,7 @@ function agentTransactionDownstreamOutcomeStatus(input: {
   return "unknown";
 }
 
-function unique<T>(value: T, index: number, values: T[]): boolean {
+function unique<T>(value: T, index: number, values: readonly T[]): boolean {
   return values.indexOf(value) === index;
 }
 
@@ -474,7 +499,82 @@ function looksLikeRawPaymentCredential(value: string): boolean {
     /raw_payment_signature/i,
     /token[_-]?passthrough/i,
     /facilitator[_-]?secret/i,
+    /\bBearer\s+[A-Za-z0-9._~+/-]+=*/i,
+    /\b(?:claim[_-]?token|access[_-]?token|api[_-]?key|client[_-]?secret|refresh[_-]?token)\s*[:=]\s*\S+/i,
+    /\bsk_(?:live|test)_[A-Za-z0-9_/-]+/i,
+    /auth[-_]?md.*secret/i,
   ].some((pattern) => pattern.test(value));
+}
+
+function projectAuthMdEvidenceRefs(input: {
+  evidenceRefs: readonly string[];
+  gatewayCredentialEvidenceRefs: readonly string[];
+  credentialResolutionEvidenceRefs: readonly string[];
+  surfaceOperationEvidenceRefs: readonly string[];
+}): AuthMdEvidenceRefsProjection {
+  const refs = input.evidenceRefs;
+  const protectedApiCallRefs = refs
+    .filter((ref) => ref.startsWith("evidence:auth-md-protected-api-call"))
+    .filter(unique);
+  return AuthMdEvidenceRefsProjectionSchema.parse({
+    discoveryRefs: refs.filter((ref) => ref.startsWith("evidence:auth-md-discovery:")).filter(unique),
+    authorizationServerRefs: refs
+      .filter((ref) => ref.startsWith("evidence:auth-md-authorization-server:"))
+      .filter(unique),
+    identityAssertionRefs: refs.filter((ref) => ref.startsWith("evidence:auth-md-identity-assertion:")).filter(unique),
+    registrationRefs: refs.filter((ref) => ref.startsWith("evidence:auth-md-registration:")).filter(unique),
+    claimRefs: refs.filter((ref) => ref.startsWith("evidence:auth-md-claim:")).filter(unique),
+    revocationRefs: refs.filter((ref) => ref.startsWith("evidence:auth-md-revocation:")).filter(unique),
+    credentialCustodyRefs: input.gatewayCredentialEvidenceRefs
+      .filter((ref) => ref.startsWith("gateway_credential_ref:"))
+      .filter(unique),
+    credentialResolutionRefs: input.credentialResolutionEvidenceRefs.filter(unique),
+    protectedApiCallRefs,
+    downstreamEvidenceRefs: [
+      ...protectedApiCallRefs,
+      ...input.surfaceOperationEvidenceRefs.filter((ref) => ref.startsWith("evidence:auth-md-downstream")),
+    ].filter(unique),
+  });
+}
+
+function authMdEvidenceLabels(input: {
+  authMdEvidenceRefs: AuthMdEvidenceRefsProjection;
+  policyDecisionRef: string | null;
+  greenlightRef: string | null;
+  gateAttemptRef: string | null;
+  mutationAttemptRef: string | null;
+  refusalRefs: readonly string[];
+  proofGapRefs: readonly string[];
+  gatewayAdmissionStatus: AgentTransactionEnvelopeProjection["gatewayAdmissionStatus"];
+  downstreamOutcomeStatus: AgentTransactionEnvelopeProjection["downstreamOutcomeStatus"];
+  reconciliationFinalityStatus: AgentTransactionEnvelopeProjection["reconciliationFinalityStatus"];
+}): string[] {
+  const labels: string[] = [];
+  if (input.authMdEvidenceRefs.discoveryRefs.length > 0) labels.push("auth_md_discovery");
+  if (input.authMdEvidenceRefs.authorizationServerRefs.length > 0) {
+    labels.push("auth_md_authorization_server_metadata");
+  }
+  if (input.authMdEvidenceRefs.identityAssertionRefs.length > 0) labels.push("auth_md_identity_assertion");
+  if (input.authMdEvidenceRefs.registrationRefs.length > 0) labels.push("auth_md_registration");
+  if (input.authMdEvidenceRefs.claimRefs.length > 0) labels.push("auth_md_claim");
+  if (input.authMdEvidenceRefs.revocationRefs.length > 0) labels.push("auth_md_revocation");
+  if (input.authMdEvidenceRefs.credentialCustodyRefs.length > 0) labels.push("gateway_credential_custody");
+  if (input.policyDecisionRef) labels.push("handshake_policy_decision");
+  if (input.greenlightRef) labels.push("handshake_one_use_greenlight");
+  if (input.gateAttemptRef) labels.push("handshake_gateway_check");
+  if (input.authMdEvidenceRefs.credentialResolutionRefs.length > 0) labels.push("gateway_credential_resolution");
+  if (input.mutationAttemptRef) labels.push("handshake_mutation_attempt");
+  if (input.authMdEvidenceRefs.protectedApiCallRefs.length > 0) labels.push("auth_md_protected_api_call_evidence");
+  if (input.refusalRefs.length > 0 || input.gatewayAdmissionStatus === "refused") labels.push("handshake_refusal");
+  if (input.proofGapRefs.length > 0 || input.gatewayAdmissionStatus === "proof_gap") labels.push("handshake_proof_gap");
+  if (input.reconciliationFinalityStatus === "unknown" || input.downstreamOutcomeStatus === "unknown") {
+    labels.push("downstream_uncertainty");
+  } else if (input.downstreamOutcomeStatus === "pending") {
+    labels.push("downstream_pending");
+  } else if (input.downstreamOutcomeStatus !== "not_started") {
+    labels.push(`downstream_${input.downstreamOutcomeStatus}`);
+  }
+  return labels.filter(unique);
 }
 
 function gatewayCredentialEvidenceRefs(refs: readonly string[]): string[] {

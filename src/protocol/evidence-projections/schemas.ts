@@ -152,6 +152,20 @@ export const ReceiptTimelineProjectionSchema = z.strictObject({
 });
 export type ReceiptTimelineProjection = z.infer<typeof ReceiptTimelineProjectionSchema>;
 
+const AuthMdEvidenceRefsProjectionSchema = z.strictObject({
+  discoveryRefs: z.array(z.string().min(1)).default([]),
+  authorizationServerRefs: z.array(z.string().min(1)).default([]),
+  identityAssertionRefs: z.array(z.string().min(1)).default([]),
+  registrationRefs: z.array(z.string().min(1)).default([]),
+  claimRefs: z.array(z.string().min(1)).default([]),
+  revocationRefs: z.array(z.string().min(1)).default([]),
+  credentialCustodyRefs: z.array(z.string().min(1)).default([]),
+  credentialResolutionRefs: z.array(z.string().min(1)).default([]),
+  protectedApiCallRefs: z.array(z.string().min(1)).default([]),
+  downstreamEvidenceRefs: z.array(z.string().min(1)).default([]),
+});
+export type AuthMdEvidenceRefsProjection = z.infer<typeof AuthMdEvidenceRefsProjectionSchema>;
+
 export const AgentTransactionEnvelopeProjectionSchema = z.strictObject({
   actionContractRef: IdSchema,
   contractDigest: DigestSchema,
@@ -182,6 +196,8 @@ export const AgentTransactionEnvelopeProjectionSchema = z.strictObject({
   gatewayCredentialEvidenceRefs: z.array(z.string().min(1)).default([]),
   credentialResolutionEvidenceRefs: z.array(z.string().min(1)).default([]),
   downstreamEvidenceRefs: z.array(z.string().min(1)).default([]),
+  authMdEvidenceRefs: AuthMdEvidenceRefsProjectionSchema,
+  authMdEvidenceLabels: z.array(z.string().min(1)).default([]),
   providerRequestRef: z.string().min(1).nullable(),
   providerOperationRef: z.string().min(1).nullable(),
   downstreamRetryability: DownstreamRetryabilitySchema.nullable(),

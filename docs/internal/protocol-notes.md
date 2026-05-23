@@ -142,13 +142,25 @@ Protocol areas may depend on foundation/events/context/store and other area publ
   mutates only after a `VerifiedGatewayCheck`, records redacted
   `CredentialResolutionEvidence` after the passed gate, refuses parameter drift
   and replay before service execution, records downstream unknown finality as a
-  proof gap, and fails closed when downstream evidence tries to return raw
-  authorization material. The profile also owns redacted discovery source/cache,
+  proof gap, blocks scope/metadata/credential-ref digest drift, gateway policy
+  drift, and credential-ref isolation before credential resolution, and fails
+  closed when downstream evidence tries to return raw authorization material.
+  The profile also owns redacted discovery source/cache,
   authorization-server metadata, ID-JAG identity assertion, claim, and revocation
-  evidence shapes as provenance only; lifecycle evidence can recommend
-  credential-ref isolation, but it is not itself a policy decision, gateway
-  refusal, or receipt. It does not make Handshake an auth provider, OAuth server,
-  WorkOS alternative, certification body, generic API gateway, or provider-side
+  evidence shapes as provenance only; adapter-owned lifecycle handling maps
+  logout, explicit revocation, expiry, downstream 401, metadata drift, and
+  ambiguous lifecycle evidence into credential-ref isolation/quarantine/state
+  suspect posture that policy and gateway checks re-read. Runtime ingress can
+  compile the fixed protected API call into proposal evidence and refuse unsafe
+  generated shapes before policy; policy tests prove lifecycle evidence does not
+  mint greenlights. Redacted evidence projections now separate auth.md discovery,
+  authorization-server metadata, ID-JAG, registration, claim, revocation,
+  credential custody, credential resolution, protected API-call evidence, refusal,
+  proof-gap, and downstream uncertainty labels. Hostile auth.md bypass probes
+  record raw bearer, direct HTTP, MCP, browser, network, token replay, stale
+  metadata, and retry-loop posture as prevented, detected, or proof gap. The
+  profile does not make Handshake an auth provider, OAuth server, WorkOS
+  alternative, certification body, generic API gateway, or provider-side
   enforcement surface.
 - The `./runtime` package subpath exposes runtime ingress for local x402 payment
   package-install, and experimental auth.md protected API dispatch boundaries.

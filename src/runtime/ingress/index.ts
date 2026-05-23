@@ -848,6 +848,7 @@ function authMdProtectedApiCallAttemptForDispatch(
     dynamicEndpointConstructionObserved: dispatch.dynamicEndpointConstructionObserved,
     dynamicHostConstructionObserved: dispatch.dynamicHostConstructionObserved,
     retryAuthorityReuseDetected: dispatch.retryAuthorityReuseDetected,
+    evidenceRefs: dispatch.evidenceRefs,
     sequenceNumber,
     requiredPriorActionContractIds,
   };

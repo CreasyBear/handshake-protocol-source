@@ -38,7 +38,7 @@ Hono or Worker transport, SDK/client code, runtime wrappers, reference gateways,
 
 ## Guarding tests
 
-`test/architecture/import-posture.test.ts`, `test/architecture/root-exports.test.ts`, `test/protocol/kernel-*.test.ts`, `test/protocol/generated-execution-graph.test.ts`, `test/protocol/transition-matrix.test.ts`, and `test/protocol/model-based-invariants.test.ts`.
+`test/architecture/import-posture.test.ts`, `test/architecture/root-exports.test.ts`, `test/protocol/kernel-*.test.ts`, `test/protocol/generated-execution-graph.test.ts`, `test/protocol/evidence-projections.test.ts`, `test/protocol/policy-auth-md.test.ts`, `test/integration/auth-md-receipt-reconstruction.test.ts`, `test/protocol/transition-matrix.test.ts`, and `test/protocol/model-based-invariants.test.ts`.
 
 ## Public surface
 
