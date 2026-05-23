@@ -6,7 +6,7 @@ import { actionLifecycleStreamRefs } from "../../../events/chains";
 import { createId } from "../../../foundation/ids";
 import type { ProtocolRecorder } from "../../../events/records";
 import type { ProtectedPathPosture } from "../../protected-path-posture";
-import { buildRefusal, protocolObjectRef } from "../../refusal";
+import { buildRefusal, protocolObjectRef, type Refusal } from "../../refusal";
 import type { StoredProtocolRecord } from "../../../store/port";
 import {
   GreenlightSchema,
@@ -33,6 +33,10 @@ export type PolicyCommitPlan = {
   idempotencyLedgerEntry: IdempotencyLedgerEntry | null;
   now: string;
 };
+
+export type PolicyCommitResult =
+  | { status: "committed"; refusal: Refusal | null }
+  | { status: "idempotency_ledger_conflict"; refusal: null };
 
 export async function buildPolicyDecision(
   input: ParsedEvaluatePolicyInput,
@@ -121,15 +125,15 @@ export function buildGreenlight(
 export async function commitPolicyEvaluation(
   recorder: ProtocolRecorder,
   plan: PolicyCommitPlan,
-): Promise<"committed" | "idempotency_ledger_conflict"> {
+): Promise<PolicyCommitResult> {
   if (!plan.greenlight) {
-    await commitPolicyDecisionOnly(recorder, plan);
-    return "committed";
+    const refusal = await commitPolicyDecisionOnly(recorder, plan);
+    return { status: "committed", refusal };
   }
   return commitGreenlightPolicyDecision(recorder, plan, plan.greenlight);
 }
 
-async function commitPolicyDecisionOnly(recorder: ProtocolRecorder, plan: PolicyCommitPlan): Promise<void> {
+async function commitPolicyDecisionOnly(recorder: ProtocolRecorder, plan: PolicyCommitPlan): Promise<Refusal | null> {
   const { contract, decision } = plan;
   const refusal =
     decision.decision === "review_required"
@@ -173,13 +177,14 @@ async function commitPolicyDecisionOnly(recorder: ProtocolRecorder, plan: Policy
       },
     ],
   );
+  return refusal;
 }
 
 async function commitGreenlightPolicyDecision(
   recorder: ProtocolRecorder,
   plan: PolicyCommitPlan,
   greenlight: Greenlight,
-): Promise<"committed" | "idempotency_ledger_conflict"> {
+): Promise<PolicyCommitResult> {
   const { contract, decision } = plan;
   const records = [
     { objectType: "policy_decision", payload: decision },
@@ -240,5 +245,5 @@ async function commitGreenlightPolicyDecision(
         : [],
     },
   );
-  return commitResult.status;
+  return { status: commitResult.status, refusal: null };
 }

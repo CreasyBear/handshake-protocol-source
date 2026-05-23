@@ -36,6 +36,7 @@ import { guardGreenlightIssuance, guardPolicyEvaluation } from "./guards";
 import type { TransitionGuardResult } from "../../foundation/transition-guards";
 import type { ProtocolStore, StoredProtocolRecord } from "../../store/port";
 import { isolationScopeRefsForContract } from "../object-registry";
+import { protocolObjectRef, type Refusal } from "../refusal";
 import { buildGreenlight, buildPolicyDecision, commitPolicyEvaluation } from "./policy-record";
 
 type ParsedEvaluatePolicyInput = ReturnType<typeof EvaluatePolicyInputSchema.parse>;
@@ -78,11 +79,27 @@ type PolicyConstraintEvaluation = PolicyEvaluationContext & {
   isolationSnapshot: string;
 };
 
+export type PolicyEvaluationResponse = {
+  decision: PolicyDecision;
+  greenlight: Greenlight | null;
+  authorityCreated: boolean;
+  gatewayCheckPerformed: false;
+  mutationAttempted: false;
+  policyDecisionRef: string;
+  greenlightRef: string | null;
+  refusalRef: string | null;
+  refusalReasonCode: string | null;
+  reviewRequired: boolean;
+  nextAction: "use_greenlight_at_gateway" | "read_evidence" | "request_review";
+  retryability: "not_retryable";
+  evidenceRefs: string[];
+};
+
 export async function evaluatePolicy(
   store: ProtocolStore,
   recorder: ProtocolRecorder,
   inputValue: EvaluatePolicyInput,
-): Promise<{ decision: PolicyDecision; greenlight: Greenlight | null }> {
+): Promise<PolicyEvaluationResponse> {
   const input = EvaluatePolicyInputSchema.parse(inputValue);
   const context = await getPolicyEvaluationContext(recorder, input);
   assertTransition(guardPolicyEvaluation(context.contract, context.envelope));
@@ -111,10 +128,10 @@ export async function evaluatePolicy(
     await assertGreenlightIssuable(store, context.contract);
   }
   const commitResult = await commitPolicyEvaluation(recorder, plan);
-  if (commitResult === "idempotency_ledger_conflict") {
+  if (commitResult.status === "idempotency_ledger_conflict") {
     return commitIdempotencyConflictRefusal(store, recorder, constraints);
   }
-  return { decision, greenlight };
+  return policyEvaluationResponse(decision, greenlight, commitResult.refusal);
 }
 
 async function getPolicyEvaluationContext(
@@ -275,7 +292,7 @@ async function commitIdempotencyConflictRefusal(
   store: ProtocolStore,
   recorder: ProtocolRecorder,
   constraints: PolicyConstraintEvaluation,
-): Promise<{ decision: PolicyDecision; greenlight: null }> {
+): Promise<PolicyEvaluationResponse> {
   const ledgerKeyDigest = await idempotencyLedgerKeyDigest(idempotencyLedgerKey(constraints.contract));
   const current = await store.getCurrentIdempotencyLedgerEntry(ledgerKeyDigest);
   const decisionValue = current
@@ -295,13 +312,55 @@ async function commitIdempotencyConflictRefusal(
     constraints.isolationSnapshot,
     constraints.now,
   );
-  await commitPolicyEvaluation(recorder, {
+  const commitResult = await commitPolicyEvaluation(recorder, {
     ...constraints,
     decision,
     greenlight: null,
     idempotencyLedgerEntry: null,
   });
-  return { decision, greenlight: null };
+  if (commitResult.status !== "committed") {
+    throw new HandshakeProtocolError(
+      "idempotency_refusal_commit_conflict",
+      "Idempotency conflict refusal could not be committed.",
+      409,
+      {
+        retryability: "retryable",
+        commitState: "not_committed",
+      },
+    );
+  }
+  return policyEvaluationResponse(decision, null, commitResult.refusal);
+}
+
+function policyEvaluationResponse(
+  decision: PolicyDecision,
+  greenlight: Greenlight | null,
+  refusal: Refusal | null,
+): PolicyEvaluationResponse {
+  const policyDecisionRef = protocolObjectRef("policy_decision", decision.policyDecisionId);
+  const greenlightObjectRef = greenlight ? protocolObjectRef("greenlight", greenlight.greenlightId) : null;
+  const refusalObjectRef = refusal ? protocolObjectRef("refusal", refusal.refusalId) : null;
+  return {
+    decision,
+    greenlight,
+    authorityCreated: Boolean(greenlight),
+    gatewayCheckPerformed: false,
+    mutationAttempted: false,
+    policyDecisionRef,
+    greenlightRef: greenlight?.greenlightId ?? null,
+    refusalRef: refusal?.refusalId ?? null,
+    refusalReasonCode: refusal?.reasonCode ?? null,
+    reviewRequired: decision.decision === "review_required",
+    nextAction: greenlight ? "use_greenlight_at_gateway" : decision.decision === "review_required" ? "request_review" : "read_evidence",
+    retryability: "not_retryable",
+    evidenceRefs: [
+      protocolObjectRef("action_contract", decision.actionContractId),
+      policyDecisionRef,
+      greenlightObjectRef,
+      refusalObjectRef,
+      decision.policyInputDigest,
+    ].filter((ref): ref is string => typeof ref === "string"),
+  };
 }
 
 function applyProtectedPathPolicy(

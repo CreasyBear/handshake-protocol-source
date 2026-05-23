@@ -63,9 +63,21 @@ describe("Handshake kernel invariants: policy and gateway", () => {
     expect(duplicate.decision.decision).toBe("refuse");
     expect(duplicate.decision.decisionReasonCode).toBe("idempotency_duplicate_authority");
     expect(duplicate.greenlight).toBeNull();
+    expect(duplicate).toMatchObject({
+      authorityCreated: false,
+      gatewayCheckPerformed: false,
+      mutationAttempted: false,
+      greenlightRef: null,
+      refusalReasonCode: "idempotency_duplicate_authority",
+      nextAction: "read_evidence",
+      retryability: "not_retryable",
+    });
     expect(fixture.store.countRecordsOfType("greenlight")).toBe(1);
     const refusals = await fixture.store.listRecordsByType<Refusal>("refusal");
-    expect(refusals.at(-1)?.payload).toMatchObject({
+    const latestRefusal = refusals.at(-1)?.payload;
+    if (!latestRefusal) throw new Error("expected policy refusal");
+    expect(duplicate.refusalRef).toBe(latestRefusal.refusalId);
+    expect(latestRefusal).toMatchObject({
       phase: "policy",
       actionContractId: fixture.contract.actionContractId,
       policyDecisionId: duplicate.decision.policyDecisionId,
@@ -90,6 +102,8 @@ describe("Handshake kernel invariants: policy and gateway", () => {
     expect(duplicate.decision.decision).toBe("refuse");
     expect(duplicate.decision.decisionReasonCode).toBe("idempotency_duplicate_authority");
     expect(duplicate.greenlight).toBeNull();
+    expect(duplicate.refusalRef).toBeString();
+    expect(duplicate.nextAction).toBe("read_evidence");
     expect(store.countRecordsOfType("greenlight")).toBe(1);
   });
 
@@ -109,8 +123,20 @@ describe("Handshake kernel invariants: policy and gateway", () => {
     expect(missingPosture.decision.decision).toBe("refuse");
     expect(missingPosture.decision.decisionReasonCode).toBe("protected_path_posture_missing");
     expect(missingPosture.greenlight).toBeNull();
+    expect(missingPosture).toMatchObject({
+      authorityCreated: false,
+      gatewayCheckPerformed: false,
+      mutationAttempted: false,
+      greenlightRef: null,
+      refusalReasonCode: "protected_path_posture_missing",
+      nextAction: "read_evidence",
+      retryability: "not_retryable",
+    });
     const policyRefusals = await fixture.store.listRecordsByType<Refusal>("refusal");
     expect(policyRefusals).toHaveLength(1);
+    const postureRefusal = policyRefusals[0]?.payload;
+    if (!postureRefusal) throw new Error("expected protected path policy refusal");
+    expect(missingPosture.refusalRef).toBe(postureRefusal.refusalId);
     expect(policyRefusals[0]?.payload).toMatchObject({
       phase: "policy",
       actionContractId: fixture.contract.actionContractId,

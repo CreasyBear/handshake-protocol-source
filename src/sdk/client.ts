@@ -5,12 +5,10 @@ import type {
   BreakerDecision,
   BypassProbe,
   ContractEvidenceProjection,
-  Greenlight,
   IntentCompilationRecord,
   IdempotencyRecoveryProjection,
   IsolationState,
   OperatingEnvelope,
-  PolicyDecision,
   ProtectedPathInstallHealthProjection,
   ProtectedPathPosture,
   RecoveryRecommendation,
@@ -26,6 +24,7 @@ import type {
 } from "../protocol/public/schemas";
 import type { GatewayCheckResult } from "../protocol/areas/gateway-gate";
 import type { SurfaceOperationReconciliationResult } from "../protocol/areas/operation-lifecycle";
+import type { PolicyEvaluationResponse } from "../protocol/areas/policy-greenlight";
 import type {
   CompileIntentInput,
   CreateBypassProbeInput,
@@ -152,7 +151,7 @@ export class HandshakeClient {
     return this.post("/v0.2/action-contracts", input, "runtime_evidence");
   }
 
-  evaluatePolicy(input: EvaluatePolicyInput): Promise<{ decision: PolicyDecision; greenlight: Greenlight | null }> {
+  evaluatePolicy(input: EvaluatePolicyInput): Promise<PolicyEvaluationResponse> {
     return this.post("/v0.2/policy-decisions", input, "control_plane");
   }
 

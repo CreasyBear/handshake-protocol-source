@@ -437,10 +437,20 @@ describe("D1-backed Hono protocol surface", () => {
       expect(duplicatePolicy.greenlight).toBeNull();
       expect(duplicatePolicy.decision.decision).toBe("refuse");
       expect(duplicatePolicy.decision.decisionReasonCode).toBe("idempotency_duplicate_authority");
+      expect(duplicatePolicy).toMatchObject({
+        authorityCreated: false,
+        gatewayCheckPerformed: false,
+        mutationAttempted: false,
+        greenlightRef: null,
+        refusalReasonCode: "idempotency_duplicate_authority",
+        nextAction: "read_evidence",
+        retryability: "not_retryable",
+      });
       expect(await recordCount(harness, "greenlight")).toBe(1);
       expect(await recordCount(harness, "mutation_attempt")).toBe(0);
       expect(await recordCount(harness, "idempotency_ledger_entry")).toBe(1);
       expect(await recordCount(harness, "refusal")).toBe(1);
+      expect(duplicatePolicy.refusalRef).toStartWith("ref_");
 
       const recoveryProjection = await client.getIdempotencyRecoveryProjection(actionContract.actionContractId);
       expect(recoveryProjection).toMatchObject({

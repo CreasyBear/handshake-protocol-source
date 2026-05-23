@@ -39,7 +39,7 @@ import {
 import type { CreateBreakerDecisionInput, CreateIsolationInput, IsolationState } from "./areas/isolation-breaker";
 import { ProtocolRecordSchema, type ProtocolRecord } from "./areas/object-registry";
 import { evaluatePolicy as evaluatePolicyTransition } from "./areas/policy-greenlight";
-import type { EvaluatePolicyInput, Greenlight, PolicyDecision } from "./areas/policy-greenlight";
+import type { EvaluatePolicyInput, PolicyEvaluationResponse } from "./areas/policy-greenlight";
 import { createProtectedPathPosture as createProtectedPathPostureTransition } from "./areas/protected-path-posture";
 import type { CreateProtectedPathPostureInput, ProtectedPathPosture } from "./areas/protected-path-posture";
 import { createReceiptExport as createReceiptExportTransition } from "./areas/receipt-export";
@@ -151,7 +151,7 @@ export class HandshakeKernel {
     return createAuthorityCertificateTransition(this.store, this.recorder, input);
   }
 
-  evaluatePolicy(input: EvaluatePolicyInput): Promise<{ decision: PolicyDecision; greenlight: Greenlight | null }> {
+  evaluatePolicy(input: EvaluatePolicyInput): Promise<PolicyEvaluationResponse> {
     return evaluatePolicyTransition(this.store, this.recorder, input);
   }
 
