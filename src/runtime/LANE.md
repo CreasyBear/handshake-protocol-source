@@ -38,7 +38,7 @@ Protocol root compatibility aggregators, policy decision issuance as authority, 
 
 ## Guarding tests
 
-`test/architecture/import-posture.test.ts`, `test/architecture/claim-boundary.test.ts`, `test/runtime/runtime-ingress.test.ts`, `test/runtime/package-install-runtime.test.ts`, `test/runtime/codemode-multi-action-runtime.test.ts`, and `test/protocol/generated-execution-graph.test.ts`.
+`test/architecture/import-posture.test.ts`, `test/architecture/claim-boundary.test.ts`, `test/runtime/runtime-ingress.test.ts`, `test/runtime/auth-md-candidate-compilation.test.ts`, `test/runtime/package-install-runtime.test.ts`, `test/runtime/codemode-multi-action-runtime.test.ts`, and `test/protocol/generated-execution-graph.test.ts`.
 
 ## Public surface
 

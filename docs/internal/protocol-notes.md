@@ -131,11 +131,32 @@ Protocol areas may depend on foundation/events/context/store and other area publ
   adapter surfaces. It enforces per-call spend only; session/day/review windows
   are metadata until a ledger exists. This is not live provider custody.
 - Protected mutation adapter conformance lives under the `./conformance` package subpath.
+- The auth.md adapter profile lives under the experimental/reference adapter
+  surface. It treats the OAuth protected-resource to authorization-server
+  metadata chain, including authorization-server `agent_auth`, as registration
+  provenance, binds both PRM and authorization-server metadata digests in
+  custody/action evidence, treats auth.md prose as supporting evidence only,
+  imports issued credentials into gateway custody as opaque
+  `GatewayCredentialRef` inputs, and proposes
+  `auth_md_protected_api_call.exact` contracts. Its reference gateway fixture
+  mutates only after a `VerifiedGatewayCheck`, records redacted
+  `CredentialResolutionEvidence` after the passed gate, refuses parameter drift
+  and replay before service execution, records downstream unknown finality as a
+  proof gap, and fails closed when downstream evidence tries to return raw
+  authorization material. The profile also owns redacted discovery source/cache,
+  authorization-server metadata, ID-JAG identity assertion, claim, and revocation
+  evidence shapes as provenance only; lifecycle evidence can recommend
+  credential-ref isolation, but it is not itself a policy decision, gateway
+  refusal, or receipt. It does not make Handshake an auth provider, OAuth server,
+  WorkOS alternative, certification body, generic API gateway, or provider-side
+  enforcement surface.
 - The `./runtime` package subpath exposes runtime ingress for local x402 payment
-  and package-install dispatch boundaries. It emits runtime evidence, graph evidence,
-  finalized tool-call drafts, compilations, contracts, and refusals; it does not
-  issue policy decisions, greenlights, gateway checks, receipts, or mutations.
-- Codemode multi-action, x402 payment ingress, and package-install runtime paths prove generated-execution proposal behavior.
+  package-install, and experimental auth.md protected API dispatch boundaries.
+  It emits runtime evidence, graph evidence, finalized tool-call drafts,
+  compilations, contracts, and refusals; it does not issue policy decisions,
+  greenlights, gateway checks, receipts, or mutations.
+- Codemode multi-action, x402 payment ingress, package-install, and auth.md
+  protected API runtime paths prove generated-execution proposal behavior.
 - Internal protected-action representation contracts prove Metadata, Challenge,
   Request, and EvidenceProjection shapes cannot create authority. Public
   MCP/CLI/browser/shell/network interception remains future integration work.

@@ -11,7 +11,7 @@ Last structural audit: 2026-05-19.
 | `src/protocol/`       | Protocol primitives, state transitions, canonicalization, events, store port, navigation, public schemas and inputs. | HTTP transport, storage implementations, runtime wrappers, gateway fixtures, client ergonomics, hosted operation. |
 | `src/http/`           | Hono/Worker app, admission, route metadata, handlers, OpenAPI, HTTP errors, store resolution.                        | Protocol meaning, policy interpretation, mutation authority.                                                      |
 | `src/runtime/`        | Generated-execution evidence and action proposal helpers.                                                            | Policy decisions, greenlights, gateway checks, receipts, mutation attempts.                                       |
-| `src/adapters/`       | Reference gateway fixtures that mutate only after a verified gateway check.                                          | Storage internals, runtime authority, provider-side claims.                                                       |
+| `src/adapters/`       | Reference adapter profiles and gateway fixtures; mutation fixtures run only after a verified gateway check.          | Storage internals, runtime authority, provider-side claims, identity-provider claims.                             |
 | `src/conformance/`    | Reference checks for protocol and gateway posture.                                                                   | Hosted operation, standards claims, provider certification, mutation attempts.                                    |
 | `src/storage/`        | Atomic record commits, stream offsets, D1, memory fixtures, KV cache plumbing.                                       | Protocol meaning, route handling, SDK behavior.                                                                   |
 | `src/sdk/`            | Typed client calls and response parsing.                                                                             | Authority inference, mutation, storage, runtime wrappers.                                                         |
@@ -19,7 +19,7 @@ Last structural audit: 2026-05-19.
 | `src/mcp/`            | Model-facing proposal/evidence schemas, resource mappings, and pure runtime-client proposal bridge.                  | Process startup, policy evaluation, gateway checks, mutation commands, raw records, or credential custody.        |
 | `src/surfaces/`       | Source-owned boundary manifests and shared non-authority outcomes for non-kernel product surfaces.                   | Protocol meaning, policy interpretation, route behavior, gateway authority, or public product claims.             |
 | `src/index.ts`        | Curated package export surface.                                                                                      | Internal kernel/store objects or compatibility shims.                                                             |
-| `src/experimental.ts` | Explicit reference gateway fixture exports.                                                                          | Stable public API claims or provider enforcement claims.                                                          |
+| `src/experimental.ts` | Explicit reference adapter profile and gateway fixture exports.                                                      | Stable public API claims, provider enforcement claims, or standards certification claims.                         |
 | `src/worker.ts`       | Cloudflare Worker entrypoint wiring.                                                                                 | Protocol meaning, route behavior, or deployment policy.                                                           |
 | `migrations/`         | Canonical D1 schema for protocol storage.                                                                            | Runtime behavior or product documentation.                                                                        |
 | `wrangler.toml`       | Worker binding and deployment configuration.                                                                         | Product claims or protocol semantics.                                                                             |
@@ -53,9 +53,11 @@ src/
     preview-deploy/
     codemode-multi-action/
   adapters/
+    auth-md/
     package-install/
     repo-write/
     preview-deploy/
+    x402-payment/
   conformance/
   storage/
     d1/
