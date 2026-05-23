@@ -393,6 +393,7 @@ export const surfaceBoundaryManifest = {
       "src/cli/main.ts",
       "src/cli/output.ts",
       "src/cli/projection-evidence.ts",
+      "src/cli/support-bundle.ts",
     ],
     allowedRouteFamilies: ["certificate_verify_local", "evidence_projection_read", "install_health_read"],
     forbiddenRouteFamilies: [

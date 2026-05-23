@@ -10,6 +10,7 @@ import {
   installHealthProjectionCommand,
 } from "./projection-evidence";
 import { cliOutput } from "./output";
+import { supportBundleCommand } from "./support-bundle";
 import {
   installHealthCommand,
   installX402PaymentCommand,
@@ -56,6 +57,9 @@ export async function runCliCommand(argv: readonly string[]): Promise<unknown> {
   }
   if (group === "evidence" && subcommand === "receipt-timeline" && maybePath) {
     return evidenceReceiptTimelineCommand(await readJsonFile(maybePath));
+  }
+  if (group === "support" && subcommand === "bundle" && maybePath) {
+    return supportBundleCommand(await readJsonFile(maybePath));
   }
   if (group === "cert" && subcommand === "verify" && maybePath) {
     const trustBundleFlagIndex = rest.indexOf("--trust-bundle");

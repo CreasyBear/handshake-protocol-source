@@ -12,6 +12,7 @@ export {
 export { runCliCommand } from "./main";
 export { CLI_SCHEMA_VERSION, cliOutput, cliNonClaims } from "./output";
 export type { CliOutputEnvelope } from "./output";
+export { supportBundleCommand } from "./support-bundle";
 export {
   installHealthCommand,
   installX402PaymentCommand,
