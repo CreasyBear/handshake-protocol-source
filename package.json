@@ -20,6 +20,11 @@
       "import": "./src/runtime/index.ts",
       "default": "./src/runtime/index.ts"
     },
+    "./sdk/role-clients": {
+      "types": "./dist/sdk/surface-clients/index.d.ts",
+      "import": "./src/sdk/surface-clients/index.ts",
+      "default": "./src/sdk/surface-clients/index.ts"
+    },
     "./experimental": {
       "types": "./dist/experimental.d.ts",
       "import": "./src/experimental.ts",

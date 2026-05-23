@@ -107,6 +107,7 @@ describe("x402 protected spend demo report", () => {
     const demoSource = await Bun.file(`${repoRoot}/examples/x402-protected-spend/run.ts`).text();
     expect(demoSource).toContain("RuntimeClient");
     expect(demoSource).toContain("EvidenceClient");
+    expect(demoSource).toContain("handshake-protocol-kernel/sdk/role-clients");
     expect(demoSource).not.toContain("HandshakeClient");
     expect(demoSource).not.toContain("proposeRuntimeIngressActionContracts");
 

@@ -1,7 +1,6 @@
 import { mkdir, writeFile } from "node:fs/promises";
+import { EvidenceClient, RuntimeClient, type HandshakeFetch } from "handshake-protocol-kernel/sdk/role-clients";
 import { createApp, type WorkerBindings } from "../../src/http/app";
-import type { HandshakeFetch } from "../../src/sdk/client";
-import { EvidenceClient, RuntimeClient } from "../../src/sdk/surface-clients";
 import { runBypassProbeExecutors } from "../../src/adapters/protected-path-probes";
 import { x402PaymentHostileBypassProbeExecutors } from "../../src/adapters/x402-payment/bypass-probes";
 import {

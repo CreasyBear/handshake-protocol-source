@@ -37,6 +37,11 @@ describe("package surface", () => {
       import: "./src/runtime/index.ts",
       default: "./src/runtime/index.ts",
     });
+    expect(pkg.exports["./sdk/role-clients"]).toEqual({
+      types: "./dist/sdk/surface-clients/index.d.ts",
+      import: "./src/sdk/surface-clients/index.ts",
+      default: "./src/sdk/surface-clients/index.ts",
+    });
     expect(pkg.exports["./experimental"]).toEqual({
       types: "./dist/experimental.d.ts",
       import: "./src/experimental.ts",

@@ -10,10 +10,11 @@ import type {
 import {
   EvidenceClient,
   type EvidenceClientOptions,
+  HandshakeClientError,
+  type HandshakeFetch,
   RuntimeClient,
   type RuntimeClientOptions,
-} from "../../src/sdk/surface-clients";
-import type { HandshakeFetch } from "../../src/sdk/client";
+} from "handshake-protocol-kernel/sdk/role-clients";
 
 describe("role-scoped SDK clients", () => {
   it("keeps runtime client construction to one runtime credential and no authority methods", async () => {
@@ -135,6 +136,16 @@ describe("role-scoped SDK clients", () => {
     expect(calls[0]?.path).toBe("/v0.2/evidence/agent-transactions/act_demo");
     expect(calls[0]?.headers.get("authorization")).toBe("Bearer runtime-token");
     expect(calls[0]?.headers.get("x-handshake-request-identity")).toBe("runtime-read-id");
+  });
+
+  it("keeps the package role-client surface narrow and non-authority", async () => {
+    const roleClients = await import("handshake-protocol-kernel/sdk/role-clients");
+    const exportNames = Object.keys(roleClients).sort();
+
+    expect(HandshakeClientError).toBeFunction();
+    expect(exportNames).toEqual(["EvidenceClient", "HandshakeClientError", "RuntimeClient"]);
+    expect(exportNames).not.toContain("HandshakeClient");
+    expect(exportNames.join(" ")).not.toMatch(/Policy|Greenlight|Gateway|ReceiptExport|AuthorityCertificateMint/);
   });
 });
 

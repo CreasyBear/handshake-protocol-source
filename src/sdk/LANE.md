@@ -42,7 +42,17 @@ Protocol primitive internals, storage implementations, Hono app internals, runti
 
 ## Public surface
 
-Root exports remain `HandshakeClient`, `HandshakeClientError`, client options, fetch adapter types, transition methods, and redacted diagnostic evidence projection reads. Role-scoped surface clients are internal until their public package boundary is explicitly designed.
+Root exports remain `HandshakeClient`, `HandshakeClientError`, client options,
+fetch adapter types, transition methods, and redacted diagnostic evidence
+projection reads.
+
+Role-scoped activation clients are exposed through the explicit
+`handshake-protocol-kernel/sdk/role-clients` package subpath. That subpath may
+export `RuntimeClient`, `EvidenceClient`, `HandshakeClientError`, and safe
+transport types only. It must not export `HandshakeClient`, role-token maps,
+fallback transition-token options, install clients, gateway clients, policy
+methods, greenlight methods, receipt-export methods, certificate minting, raw
+record reads, signer material, or mutation commands.
 
 ## Extraction trigger
 
@@ -55,10 +65,10 @@ This lane sends requests and parses responses. It must not infer authority from 
 ## Role-client adoption closeout
 
 First-slice activation code should use `RuntimeClient` and `EvidenceClient` from
-`src/sdk/surface-clients`, not the low-level `HandshakeClient` token-map
-transport. `HandshakeClient` remains useful for protocol tests and internal
-HTTP route parity, but it teaches the wrong shape for agent-facing activation
-because it can carry multiple role tokens.
+`handshake-protocol-kernel/sdk/role-clients`, not the low-level
+`HandshakeClient` token-map transport. `HandshakeClient` remains useful for
+protocol tests and internal HTTP route parity, but it teaches the wrong shape
+for agent-facing activation because it can carry multiple role tokens.
 
 `RuntimeClient` may create runtime execution evidence, tool-call drafts, intent
 compilations, and action-contract proposals through `runtime_evidence` custody.

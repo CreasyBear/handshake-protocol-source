@@ -256,4 +256,16 @@ describe("root package exports", () => {
     expect(exportNames.join(" ")).not.toMatch(/GatewayCheck|Greenlight|Mutation|PolicyDecision|Receipt/);
     expect(runtime.proposeRuntimeIngressActionContracts).toBeFunction();
   });
+
+  it("keeps role-scoped SDK clients on an explicit non-root package surface", async () => {
+    const root = await import("../../src");
+    const roleClients = await import("handshake-protocol-kernel/sdk/role-clients");
+    const exportNames = Object.keys(roleClients).sort();
+
+    expect(Object.keys(root)).not.toContain("RuntimeClient");
+    expect(Object.keys(root)).not.toContain("EvidenceClient");
+    expect(exportNames).toEqual(["EvidenceClient", "HandshakeClientError", "RuntimeClient"]);
+    expect(exportNames).not.toContain("HandshakeClient");
+    expect(exportNames.join(" ")).not.toMatch(/Policy|Greenlight|Gateway|ReceiptExport|AuthorityCertificateMint/);
+  });
 });

@@ -147,6 +147,18 @@ evidence only: not hosted operation, not broad x402 compatibility, not provider
 custody, not aggregate spend enforcement, not cross-org trust, and not a
 clearing-house claim.
 
+Role-scoped SDK activation imports:
+
+```ts
+import { EvidenceClient, RuntimeClient } from "handshake-protocol-kernel/sdk/role-clients";
+```
+
+Use this subpath for runtime proposal and redacted evidence readback. It is not
+an install client, gateway client, signer surface, policy evaluator, receipt
+exporter, or certificate minter. The package root still exposes the lower-level
+`HandshakeClient` for route parity and tests, but first-slice activation should
+not teach all-role or fallback-token usage.
+
 Model-facing MCP reference transcript:
 
 ```bash
