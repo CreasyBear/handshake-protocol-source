@@ -111,7 +111,7 @@ describe("x402 first-wedge surface classification", () => {
 });
 
 describe("x402 first-wedge evidence taxonomy", () => {
-  it("distinguishes gateway, credential, retry, and response evidence without creating authority", () => {
+  it("distinguishes gateway, credential, reconciliation, and response evidence without creating authority", () => {
     expect(classifyX402FirstWedgeEvidenceLabel("local_gateway_check")).toMatchObject({
       authorityCreated: false,
       evidenceRole: "gateway_check",
@@ -123,9 +123,9 @@ describe("x402 first-wedge evidence taxonomy", () => {
       evidenceRole: "gateway_held_payment_credential",
       settlementFinality: "not_settlement_finality",
     });
-    expect(classifyX402FirstWedgeEvidenceLabel("paid_retry_attempted")).toMatchObject({
+    expect(classifyX402FirstWedgeEvidenceLabel("downstream_reconciliation_recorded")).toMatchObject({
       authorityCreated: false,
-      evidenceRole: "paid_retry",
+      evidenceRole: "downstream_reconciliation",
       settlementFinality: "not_settlement_finality",
     });
     expect(classifyX402FirstWedgeEvidenceLabel("payment_response_received")).toMatchObject({

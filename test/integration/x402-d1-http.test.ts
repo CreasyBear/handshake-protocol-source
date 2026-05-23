@@ -239,9 +239,10 @@ describe("x402 Hono/D1 wallet gateway establishment path", () => {
       expect(envelope.surfaceOperationEvidenceLabels).toEqual([
         "local_gateway_check",
         "payment_payload_created",
-        "paid_retry_attempted",
+        "downstream_reconciliation_recorded",
         "payment_response_received",
       ]);
+      expect(envelope.surfaceOperationEvidenceLabels).not.toContain("paid_retry_attempted");
       expect(envelope.surfaceOperationEvidenceRefs).toContain(gatewayResult.signatureEvidence.evidenceRef);
       expect(envelope.surfaceOperationEvidenceRefs).toContain(
         gatewayResult.signatureEvidence.paymentSignatureHeaderRef,

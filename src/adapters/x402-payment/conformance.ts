@@ -51,7 +51,7 @@ export type X402FirstWedgeSurfaceClassification =
 export const X402FirstWedgeEvidenceLabelSchema = z.enum([
   "local_gateway_check",
   "payment_payload_created",
-  "paid_retry_attempted",
+  "downstream_reconciliation_recorded",
   "payment_response_received",
   "payment_response_missing",
   "facilitator_verify_attempted",
@@ -69,7 +69,7 @@ export type X402FirstWedgeEvidenceLabelClassification = {
   evidenceRole:
     | "gateway_check"
     | "gateway_held_payment_credential"
-    | "paid_retry"
+    | "downstream_reconciliation"
     | "payment_response"
     | "facilitator_verify"
     | "facilitator_settlement";
@@ -87,7 +87,7 @@ const x402FirstWedgeEvidenceLabelClassifications = {
   facilitator_verify_failed: evidenceLabel("facilitator_verify_failed", "facilitator_verify"),
   facilitator_verify_succeeded: evidenceLabel("facilitator_verify_succeeded", "facilitator_verify"),
   local_gateway_check: evidenceLabel("local_gateway_check", "gateway_check"),
-  paid_retry_attempted: evidenceLabel("paid_retry_attempted", "paid_retry"),
+  downstream_reconciliation_recorded: evidenceLabel("downstream_reconciliation_recorded", "downstream_reconciliation"),
   payment_payload_created: evidenceLabel("payment_payload_created", "gateway_held_payment_credential"),
   payment_response_missing: evidenceLabel("payment_response_missing", "payment_response", {
     settlementFinality: "settlement_unknown",

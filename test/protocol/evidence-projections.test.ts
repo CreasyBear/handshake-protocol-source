@@ -287,7 +287,7 @@ describe("protocol evidence projections", () => {
     expect(projection.surfaceOperationEvidenceLabels).toEqual([
       "local_gateway_check",
       "payment_payload_created",
-      "paid_retry_attempted",
+      "downstream_reconciliation_recorded",
       "payment_response_received",
     ]);
     for (const ref of safeRefs) expect(projection.surfaceOperationEvidenceRefs).toContain(ref);
@@ -434,10 +434,11 @@ describe("protocol evidence projections", () => {
 
     expect(projection.surfaceOperationEvidenceLabels).toEqual([
       "local_gateway_check",
-      "paid_retry_attempted",
+      "downstream_reconciliation_recorded",
       "payment_response_missing",
       "facilitator_verify_succeeded",
     ]);
+    expect(projection.surfaceOperationEvidenceLabels).not.toContain("paid_retry_attempted");
     expect(projection.downstreamOutcomeStatus).toBe("pending");
     expect(projection.reconciliationFinalityStatus).toBe("unknown");
     expect(projection.downstreamEvidenceRefs).toEqual([]);

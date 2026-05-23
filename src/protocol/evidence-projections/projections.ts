@@ -512,7 +512,7 @@ function surfaceOperationEvidenceLabels(input: {
         : "gateway_credential_evidence",
     );
   }
-  if (input.mutationAttempt && input.latestReconciliation) labels.push("paid_retry_attempted");
+  if (input.mutationAttempt && input.latestReconciliation) labels.push("downstream_reconciliation_recorded");
   if (input.downstreamEvidenceRefs.length > 0) {
     labels.push("payment_response_received");
   } else if (input.latestReconciliation?.observedDownstreamStatus === "unknown") {
