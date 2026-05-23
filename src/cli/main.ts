@@ -2,6 +2,7 @@ import { readFile } from "node:fs/promises";
 import { renderApsReportCommand } from "./aps-report";
 import { verifyCertificateCommand } from "./certificate";
 import { cliCommandManifest, cliSchemaOutput } from "./command-manifest";
+import type { CliCommandPlane } from "./command-manifest";
 import { doctorCommand, initCommand } from "./local-project/doctor";
 import {
   evidenceContractViewCommand,
@@ -15,6 +16,13 @@ import {
   probesX402PaymentCommand,
   x402PaymentConformanceCommand,
 } from "./x402";
+
+type CliCommandErrorCode =
+  | "cli_command_unsupported"
+  | "cli_required_argument_missing"
+  | "cli_input_json_invalid"
+  | "cli_input_schema_invalid"
+  | "cli_command_failed";
 
 export async function runCliCommand(argv: readonly string[]): Promise<unknown> {
   const [group, subcommand, maybePath, ...rest] = argv;
@@ -52,7 +60,14 @@ export async function runCliCommand(argv: readonly string[]): Promise<unknown> {
   if (group === "cert" && subcommand === "verify" && maybePath) {
     const trustBundleFlagIndex = rest.indexOf("--trust-bundle");
     const trustBundlePath = trustBundleFlagIndex >= 0 ? rest[trustBundleFlagIndex + 1] : null;
-    if (!trustBundlePath) throw new Error("cert verify requires --trust-bundle <path>.");
+    if (!trustBundlePath) {
+      return cliCommandErrorOutput({
+        argv,
+        errorCode: "cli_required_argument_missing",
+        message: "cert verify requires --trust-bundle <path>.",
+        nextAction: "fix_arguments",
+      });
+    }
     return verifyCertificateCommand({
       certificate: await readJsonFile(maybePath),
       trustMaterial: await readJsonFile(trustBundlePath),
@@ -80,9 +95,39 @@ export async function runCliCommand(argv: readonly string[]): Promise<unknown> {
       recordLocal: argv.includes("--record-local"),
     });
   }
-  throw new Error(
-    `Unsupported command. Active commands: ${cliCommandManifest.map((command) => command.aliases[0]).join(", ")}.`,
-  );
+  return cliCommandErrorOutput({
+    argv,
+    errorCode: "cli_command_unsupported",
+    message: "Unsupported command.",
+    nextAction: "run_schema",
+  });
+}
+
+export function cliCommandErrorOutput(input: {
+  argv: readonly string[];
+  errorCode: CliCommandErrorCode;
+  message: string;
+  nextAction: "run_schema" | "fix_arguments" | "fix_input_json" | "fix_input_schema";
+}) {
+  return cliOutput({
+    command: commandLabel(input.argv),
+    plane: commandPlane(input.argv),
+    ok: false,
+    warnings: ["Command failed before any authority, gateway check, signer use, or protected mutation."],
+    result: {
+      errorCode: input.errorCode,
+      message: input.message,
+      activeCommands: cliCommandManifest.map((command) => command.aliases[0]),
+      nextAction: input.nextAction,
+    },
+  });
+}
+
+function cliCommandExceptionOutput(argv: readonly string[], error: unknown) {
+  return cliCommandErrorOutput({
+    argv,
+    ...safeCliCommandError(error),
+  });
 }
 
 async function readJsonFile(path: string): Promise<unknown> {
@@ -95,12 +140,59 @@ function optionValue(argv: readonly string[], flag: string): string | null {
   return argv[index + 1] ?? null;
 }
 
+function commandLabel(argv: readonly string[]): string {
+  const explicitAlias = findCommand(argv)?.aliases[0];
+  if (explicitAlias) return explicitAlias;
+  return (
+    argv
+      .filter((part) => !part.startsWith("--"))
+      .slice(0, 2)
+      .join(" ") || "unknown"
+  );
+}
+
+function commandPlane(argv: readonly string[]): CliCommandPlane {
+  return findCommand(argv)?.plane ?? "operator";
+}
+
+function findCommand(argv: readonly string[]) {
+  return cliCommandManifest.find((command) =>
+    command.aliases.some((alias) => argv.slice(0, alias.split(" ").length).join(" ") === alias),
+  );
+}
+
+function safeCliCommandError(error: unknown): {
+  errorCode: CliCommandErrorCode;
+  message: string;
+  nextAction: "fix_input_json" | "fix_input_schema" | "fix_arguments";
+} {
+  if (error instanceof SyntaxError) {
+    return {
+      errorCode: "cli_input_json_invalid",
+      message: "Input JSON could not be parsed.",
+      nextAction: "fix_input_json",
+    };
+  }
+  if (error instanceof Error && error.name === "ZodError") {
+    return {
+      errorCode: "cli_input_schema_invalid",
+      message: "Input JSON did not match the command schema.",
+      nextAction: "fix_input_schema",
+    };
+  }
+  return {
+    errorCode: "cli_command_failed",
+    message: error instanceof Error && error.message ? error.message : "Command failed.",
+    nextAction: "fix_arguments",
+  };
+}
+
 if (import.meta.main) {
   try {
     const output = await runCliCommand(process.argv.slice(2));
     process.stdout.write(`${JSON.stringify(output, null, 2)}\n`);
   } catch (error) {
-    process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
+    process.stderr.write(`${JSON.stringify(cliCommandExceptionOutput(process.argv.slice(2), error), null, 2)}\n`);
     process.exitCode = 1;
   }
 }

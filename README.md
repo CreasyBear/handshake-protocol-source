@@ -147,17 +147,38 @@ evidence only: not hosted operation, not broad x402 compatibility, not provider
 custody, not aggregate spend enforcement, not cross-org trust, and not a
 clearing-house claim.
 
-| Command                | Purpose                                                                             |
-| ---------------------- | ----------------------------------------------------------------------------------- |
-| `npm run check:repo`   | Full local and CI gate: types, lint, format, Bun tests, pack check, whitespace diff |
-| `npm run check:types`  | CI-stable no-pretty TypeScript gate                                                 |
-| `npm run typecheck`    | Interactive TypeScript alias                                                        |
-| `npm run lint`         | ESLint over `src` and `test` with zero warnings                                     |
-| `npm run format:check` | Prettier check                                                                      |
-| `npm run test`         | All Bun tests                                                                       |
-| `npm run build`        | Declaration build for the private source package boundary                           |
-| `npm run pack:check`   | Dry-run package surface check; excludes scratch and test-only material              |
-| `npm run dev`          | Wrangler Worker dev after local D1/KV bindings are configured                       |
+Model-facing MCP reference transcript:
+
+```bash
+npm run demo:mcp-transcript
+```
+
+This writes the source-owned MCP proposal/evidence transcript to:
+
+```text
+examples/mcp-reference-transcript/output/latest.md
+examples/mcp-reference-transcript/output/latest.json
+```
+
+Inspect the transcript for metadata read, valid proposal, evidence readback,
+stale metadata, tools-list change, install-not-ready, gateway-offline,
+amount/params mismatch, replay refusal, raw sibling-shaped input, and proof-gap
+cases. It is proposal/evidence posture only: not policy, not greenlight, not
+gateway check, not mutation, not hosted operation, and not provider custody.
+
+| Command                       | Purpose                                                                             |
+| ----------------------------- | ----------------------------------------------------------------------------------- |
+| `npm run check:repo`          | Full local and CI gate: types, lint, format, Bun tests, pack check, whitespace diff |
+| `npm run demo:aps`            | Local x402 protected-spend authority proof report                                   |
+| `npm run demo:mcp-transcript` | Source-owned MCP x402 proposal/evidence transcript                                  |
+| `npm run check:types`         | CI-stable no-pretty TypeScript gate                                                 |
+| `npm run typecheck`           | Interactive TypeScript alias                                                        |
+| `npm run lint`                | ESLint over `src` and `test` with zero warnings                                     |
+| `npm run format:check`        | Prettier check                                                                      |
+| `npm run test`                | All Bun tests                                                                       |
+| `npm run build`               | Declaration build for the private source package boundary                           |
+| `npm run pack:check`          | Dry-run package surface check; excludes scratch and test-only material              |
+| `npm run dev`                 | Wrangler Worker dev after local D1/KV bindings are configured                       |
 
 Focused gates:
 

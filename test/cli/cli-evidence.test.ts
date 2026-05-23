@@ -132,6 +132,50 @@ describe("CLI evidence surface", () => {
       },
     );
   });
+
+  it("returns structured non-authority usage errors for agents and operators", async () => {
+    await expect(runCliCommand(["ship", "it"])).resolves.toMatchObject({
+      schemaVersion: "handshake.cli.v1",
+      command: "ship it",
+      plane: "operator",
+      ok: false,
+      authorityCreated: false,
+      greenlightCreated: false,
+      gatewayCheckPerformed: false,
+      mutationAttempted: false,
+      credentialMaterialIncluded: false,
+      result: {
+        errorCode: "cli_command_unsupported",
+        message: "Unsupported command.",
+        nextAction: "run_schema",
+        activeCommands: [
+          "schema",
+          "init",
+          "doctor",
+          "evidence aps-report",
+          "evidence contract-view",
+          "evidence receipt-timeline",
+          "cert verify",
+          "install x402-payment",
+          "probes x402-payment",
+          "install health",
+          "conformance x402-payment",
+        ],
+      },
+    });
+
+    await expect(runCliCommand(["cert", "verify", await writeJson("certificate", {})])).resolves.toMatchObject({
+      command: "cert verify",
+      plane: "evidence",
+      ok: false,
+      authorityCertificateMinted: false,
+      result: {
+        errorCode: "cli_required_argument_missing",
+        message: "cert verify requires --trust-bundle <path>.",
+        nextAction: "fix_arguments",
+      },
+    });
+  });
 });
 
 async function writeJson(prefix: string, value: unknown): Promise<string> {

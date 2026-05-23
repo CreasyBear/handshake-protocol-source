@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
-import { join, relative } from "node:path";
+import { dirname, join, normalize, relative } from "node:path";
 import {
   surfaceBoundaryManifest,
   surfaceBoundaryManifestVersion,
@@ -152,6 +152,26 @@ describe("surface boundary posture", () => {
     expect(violations.sort()).toEqual([]);
   });
 
+  it("enforces allowed internal import roots for existing surface implementation roots", () => {
+    const violations: string[] = [];
+
+    for (const id of expectedSurfaceIds) {
+      const boundary = boundaryFor(id);
+      for (const file of existingSurfaceFiles(boundary)) {
+        const text = readFileSync(file, "utf8");
+        for (const specifier of importsFrom(text)) {
+          const target = internalImportTarget(file, specifier);
+          if (!target) continue;
+          if (!isAllowedInternalImport(boundary, target)) {
+            violations.push(`${relative(process.cwd(), file)} imports ${specifier} for ${id} outside allowed roots`);
+          }
+        }
+      }
+    }
+
+    expect(violations.sort()).toEqual([]);
+  });
+
   it("keeps forbidden credential and output shapes out of existing surface source roots", () => {
     const violations: string[] = [];
 
@@ -196,6 +216,16 @@ function existingSurfaceFiles(boundary: SurfaceBoundary): string[] {
 
 function importsFrom(text: string): string[] {
   return [...text.matchAll(/from\s+["']([^"']+)["']/g)].map((match) => match[1] ?? "");
+}
+
+function internalImportTarget(file: string, specifier: string): string | null {
+  if (!specifier.startsWith(".") && !specifier.startsWith("src/")) return null;
+  const target = specifier.startsWith(".") ? normalize(join(dirname(file), specifier)) : normalize(specifier);
+  return target.replaceAll("\\", "/");
+}
+
+function isAllowedInternalImport(boundary: SurfaceBoundary, target: string): boolean {
+  return boundary.allowedImportRoots.some((root) => target === root || target.startsWith(`${root}/`));
 }
 
 function stripRequiredNonAuthorityFlagMentions(text: string, boundary: SurfaceBoundary): string {
