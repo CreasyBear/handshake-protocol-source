@@ -47,6 +47,18 @@ describe("runtime ingress adapter", () => {
     );
 
     expect(result.outcome).toBe("action_contracts_proposed");
+    expect(result.responsePosture).toMatchObject({
+      schemaVersion: "handshake.runtime-ingress.outcome.v1",
+      authorityCreated: false,
+      greenlightCreated: false,
+      gatewayCheckPerformed: false,
+      mutationAttempted: false,
+      authorityCertificateMinted: false,
+      nextAction: "read_evidence",
+      retryability: "not_retryable",
+      reasonCodes: [],
+      graphCoverageStatus: "fully_covered_no_unsupported_nodes",
+    });
     expect(result.runtimeExecution.runtimePosture).toBe("hook_assisted");
     expect(result.runtimeExecution.observedConsequentialCallCount).toBe(1);
     expect(result.generatedExecutionGraph.coverageStatus).toBe("fully_covered_no_unsupported_nodes");
@@ -57,6 +69,7 @@ describe("runtime ingress adapter", () => {
     expect(proposal.toolCallDraft.generatedExecutionNodeId).toBe(runtimeIngressDispatchNodeId(1));
     expect(proposal.intentCompilation.candidateAction.candidateStatus).toBe("contractable");
     expect(proposal.actionContract.resourceRef).toBe("npm:hono");
+    expect(result.responsePosture.actionContractRefs).toEqual([proposal.actionContract.actionContractId]);
     expect(proposal.actionContract.runtimeExecutionId).toBe(result.runtimeExecution.runtimeExecutionId);
     expect(proposal.actionContract.generatedExecutionGraphId).toBe(
       result.generatedExecutionGraph.generatedExecutionGraphId,
@@ -97,6 +110,21 @@ describe("runtime ingress adapter", () => {
     );
 
     expect(result.outcome).toBe("one_or_more_dispatches_refused");
+    expect(result.responsePosture).toMatchObject({
+      authorityCreated: false,
+      gatewayCheckPerformed: false,
+      mutationAttempted: false,
+      nextAction: "recraft_request",
+      retryability: "retryable_after_recraft",
+      actionContractRefs: [],
+    });
+    expect(result.responsePosture.reasonCodes).toEqual(
+      expect.arrayContaining([
+        "runtime_dynamic_tool_construction_detected",
+        "runtime_unobserved_regions_present",
+        "generated_execution_graph_not_contractable",
+      ]),
+    );
     expect(result.runtimeExecution.dynamicToolConstructionDetected).toBe(true);
     expect(result.runtimeExecution.unobservedRegionRefs).toEqual(["argv:package-name"]);
     expect(result.generatedExecutionGraph.coverageStatus).toBe("unsupported_or_ambiguous");
@@ -144,6 +172,10 @@ describe("runtime ingress adapter", () => {
     );
 
     expect(result.outcome).toBe("action_contracts_proposed");
+    expect(result.responsePosture.reasonCodes).toEqual(
+      expect.arrayContaining(["runtime_ingress_loop_detected", "runtime_ingress_retry_detected"]),
+    );
+    expect(result.responsePosture.nextAction).toBe("read_evidence");
     expect(result.runtimeExecution.loopDetected).toBe(true);
     expect(result.runtimeExecution.retryDetected).toBe(true);
     expect(result.runtimeExecution.executionShape).toBe("tool_dispatch_chain");
@@ -220,6 +252,12 @@ describe("runtime ingress adapter", () => {
     );
 
     expect(result.outcome).toBe("one_or_more_dispatches_refused");
+    expect(result.responsePosture).toMatchObject({
+      nextAction: "stop",
+      retryability: "not_retryable",
+      actionContractRefs: [],
+    });
+    expect(result.responsePosture.reasonCodes).toContain("runtime_ingress_raw_sibling_bypass");
     expect(result.generatedExecutionGraph.coverageStatus).toBe("contains_bypass_risk");
     expect(result.generatedExecutionGraph.terminalReasonCodes).toContain("runtime_ingress_raw_sibling_bypass");
     expect(result.generatedExecutionGraph.terminalReasonCodes).toContain("generated_execution_node_bypass_risk");

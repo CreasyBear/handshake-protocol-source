@@ -176,6 +176,32 @@ type ParsedX402PaymentDispatch = Extract<
 >;
 type RuntimeIngressFamilyConfig = PackageInstallRuntimeConfig | X402PaymentRuntimeConfig;
 
+export type RuntimeIngressResponsePosture = {
+  schemaVersion: "handshake.runtime-ingress.outcome.v1";
+  authorityCreated: false;
+  authorityCertificateMinted: false;
+  credentialMaterialIncluded: false;
+  gatewayCheckPerformed: false;
+  greenlightCreated: false;
+  mutationAttempted: false;
+  mutationCommandIncluded: false;
+  rawInternalRecordIncluded: false;
+  receiptExportCreated: false;
+  reasonCodes: string[];
+  nextAction: "read_evidence" | "recraft_request" | "stop";
+  retryability: "not_retryable" | "retryable_after_recraft";
+  redactionProfileRef: "runtime-ingress:v0.1-redacted";
+  evidenceRefs: string[];
+  runtimeExecutionRef: string;
+  generatedExecutionGraphRef: string;
+  graphCoverageStatus: GeneratedExecutionGraph["coverageStatus"];
+  toolCallDraftRefs: string[];
+  intentCompilationRefs: string[];
+  actionContractRefs: string[];
+  refusalRefs: string[];
+  dispatchCount: number;
+};
+
 export type RuntimeIngressConfig = {
   packageInstall?: PackageInstallRuntimeConfig;
   x402Payment?: X402PaymentRuntimeConfig;
@@ -213,6 +239,7 @@ export type RuntimeIngressActionProposal =
 
 export type RuntimeIngressResult = {
   outcome: "action_contracts_proposed" | "one_or_more_dispatches_refused";
+  responsePosture: RuntimeIngressResponsePosture;
   runtimeExecution: RuntimeExecutionRecord;
   generatedExecutionGraph: GeneratedExecutionGraph;
   proposals: RuntimeIngressActionProposal[];
@@ -281,13 +308,72 @@ export async function proposeRuntimeIngressActionContracts(
     requiredPriorActionContractIds.push(actionContract.actionContractId);
   }
 
+  const outcome = proposals.every((proposal) => proposal.outcome === "action_contract_proposed")
+    ? "action_contracts_proposed"
+    : "one_or_more_dispatches_refused";
   return {
-    outcome: proposals.every((proposal) => proposal.outcome === "action_contract_proposed")
-      ? "action_contracts_proposed"
-      : "one_or_more_dispatches_refused",
+    outcome,
+    responsePosture: runtimeIngressResponsePosture(outcome, block, runtimeExecution, graph, proposals),
     runtimeExecution,
     generatedExecutionGraph: graph,
     proposals,
+  };
+}
+
+function runtimeIngressResponsePosture(
+  outcome: RuntimeIngressResult["outcome"],
+  block: ParsedRuntimeIngressDispatchBlock,
+  runtimeExecution: RuntimeExecutionRecord,
+  graph: GeneratedExecutionGraph,
+  proposals: RuntimeIngressActionProposal[],
+): RuntimeIngressResponsePosture {
+  const reasonCodes = unique([
+    ...graph.terminalReasonCodes,
+    ...proposals.flatMap((proposal) => proposal.refusalReasonCodes),
+    ...(runtimeExecution.loopDetected ? ["runtime_ingress_loop_detected"] : []),
+    ...(runtimeExecution.retryDetected ? ["runtime_ingress_retry_detected"] : []),
+    ...(runtimeExecution.branchDetected ? ["runtime_ingress_branch_detected"] : []),
+  ]);
+  const nextAction =
+    outcome === "action_contracts_proposed"
+      ? "read_evidence"
+      : graph.coverageStatus === "contains_bypass_risk"
+        ? "stop"
+        : "recraft_request";
+  return {
+    schemaVersion: "handshake.runtime-ingress.outcome.v1",
+    authorityCreated: false,
+    authorityCertificateMinted: false,
+    credentialMaterialIncluded: false,
+    gatewayCheckPerformed: false,
+    greenlightCreated: false,
+    mutationAttempted: false,
+    mutationCommandIncluded: false,
+    rawInternalRecordIncluded: false,
+    receiptExportCreated: false,
+    reasonCodes,
+    nextAction,
+    retryability: nextAction === "recraft_request" ? "retryable_after_recraft" : "not_retryable",
+    redactionProfileRef: "runtime-ingress:v0.1-redacted",
+    evidenceRefs: unique([
+      ...runtimeIngressEvidenceRefs(block),
+      `runtime_execution:${runtimeExecution.runtimeExecutionId}`,
+      `generated_execution_graph:${graph.generatedExecutionGraphId}`,
+      ...proposals.flatMap((proposal) => [
+        `tool_call_draft:${proposal.toolCallDraft.toolCallDraftId}`,
+        `intent_compilation:${proposal.intentCompilation.intentCompilationId}`,
+      ]),
+    ]),
+    runtimeExecutionRef: runtimeExecution.runtimeExecutionId,
+    generatedExecutionGraphRef: graph.generatedExecutionGraphId,
+    graphCoverageStatus: graph.coverageStatus,
+    toolCallDraftRefs: proposals.map((proposal) => proposal.toolCallDraft.toolCallDraftId),
+    intentCompilationRefs: proposals.map((proposal) => proposal.intentCompilation.intentCompilationId),
+    actionContractRefs: proposals
+      .map((proposal) => proposal.actionContract?.actionContractId ?? null)
+      .filter((ref): ref is string => ref !== null),
+    refusalRefs: [],
+    dispatchCount: block.dispatches.length,
   };
 }
 
