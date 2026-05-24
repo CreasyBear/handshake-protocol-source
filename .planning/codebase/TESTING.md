@@ -1,6 +1,6 @@
 # Testing Patterns
 
-**Analysis Date:** 2026-05-23
+**Analysis Date:** 2026-05-24
 
 ## Test Framework
 
@@ -25,6 +25,7 @@ npm run quality:claims        # Vocabulary and claim-boundary slice
 npm run check:repo            # Full local and CI gate
 npm run demo:aps              # Generate local x402 protected-spend report
 npm run demo:mcp-transcript   # Generate source-owned MCP x402 reference transcript
+npm run demo:self-hosted      # Generate local self-hosted activation packet
 ```
 
 **Current gate posture from scripts:**
@@ -33,10 +34,8 @@ npm run demo:mcp-transcript   # Generate source-owned MCP x402 reference transcr
 - `package.json` defines `npm run quality:claims` as `test/architecture/active-vocabulary.test.ts` plus `test/architecture/claim-boundary.test.ts`.
 - `package.json` defines `npm run quality:storage` as `test/http/d1-http.test.ts`, `test/protocol/kernel-*.test.ts`, `test/protocol/transition-matrix.test.ts`, `test/protocol/model-based-invariants.test.ts`, `test/protocol/action-attempt-lifecycle.test.ts`, `test/protocol/evidence-projections.test.ts`, `test/protocol/protocol-store-atomicity-contract.test.ts`, and `test/protocol/authority-certificate.test.ts`.
 - `.github/workflows/check.yml` runs `npm run check:repo`.
-- This mapper refresh executed the focused auth.md dirty expansion slice:
-  `npm run test -- test/adapters/auth-md-adapter.test.ts test/adapters/auth-md-gateway.test.ts test/adapters/auth-md-bypass-probes.test.ts test/adapters/auth-md-revocation.test.ts test/adapters/auth-md-gateway-pressure.test.ts test/adapters/auth-md-serialization-redaction.test.ts test/runtime/auth-md-candidate-compilation.test.ts test/protocol/policy-auth-md.test.ts test/integration/auth-md-protected-call.test.ts test/integration/auth-md-receipt-reconstruction.test.ts`
-  returned 34 pass / 0 fail / 459 expects.
-- This mapper refresh did not execute the full repo gate. Treat `npm run check:repo` as still required before committing the dirty auth.md expansion.
+- This mapper refresh executed focused pre-hosted Tier 2 closeout slices for policy refusal responses, MCP committed error readback, evidence projections, x402 D1/conformance, CLI response posture, runtime ingress, local MCP stdio proof, and the local self-hosted activation packet.
+- Treat `npm run check:repo` as still required before committing the self-hosted/MCP stdio closeout expansion.
 
 ## Test File Organization
 
@@ -210,7 +209,7 @@ export function makeKernelFixture() {
 - CLI tests cover APS report rendering, invalid certificate verification, schema output, structured usage errors, conformance classification, local credential placeholder/profile storage, doctor readiness, local x402 install/probe commands, pre-contract install health, redacted contract views, receipt timelines, and file-backed support bundles. They do not yet cover valid/tampered certificate fixtures, package bin/pack checks, live control-plane install registration, live provider/gateway probes, or process-start contracts.
 - MCP proposal tests use a fake `McpRuntimeProposalClient` in `test/mcp/mcp-x402-proposal.test.ts`; `test/mcp/mcp-reference-transcript.test.ts` adds a source-owned transcript harness, but there is still no external MCP server/host transcript, no end-to-end HTTP-backed proposal bridge, and no real protocol replay/idempotency recovery path through MCP.
 - MCP proposal tests cover `toolsListChanged` freshness, strict oversized-field rejection, bypass-shaped input rejection, stable derived idempotency keys, sequenced retry keys, and replay/idempotency mapping through structured non-authority outcomes.
-- MCP resource tests prove URI parsing and evidence-client routing, but metadata, challenge, and certificate resources in `src/mcp/resources.ts` are still reference-only payloads rather than source-owned projection reads.
+- MCP resource tests prove URI parsing and evidence-client routing, but metadata, challenge, and certificate resources in `src/mcp/resources.ts` are still reference-only payloads rather than source-owned projection reads. The stdio proof exercises a real local MCP process through the official SDK, but still does not prove browser/shell/package-manager/cloud containment or hosted process supervision.
 - Architecture tests prevent authority drift by static scanning, but they do not prove runtime containment of sibling browser, shell, package-manager, cloud, or repo-write tools. Any claim that MCP or CLI controls those channels remains outside current evidence.
 - CLI readiness can hide operator frustration because `doctor` remains `not_ready` even after a local x402 probe passes; this is correct while `trustedReadiness` is false, but tests should preserve the exact reason-code path so future UI/help text can explain the next mechanism instead of reporting generic failure.
 - Model/developer frustration can hide behind fake clients: SDK and MCP unit tests prove surface method shape and headers, not a real network-backed activation path. Any quickstart or support workflow needs an HTTP/D1 route test before treating the surface as adoptable.
@@ -223,7 +222,7 @@ export function makeKernelFixture() {
 - `test/runtime/auth-md-candidate-compilation.test.ts` covers runtime-ingress auth.md compilation into `CandidateAction` without authority, unsafe generated shapes, raw sibling bypass evidence, and graph coverage refusal.
 - `test/architecture/root-exports.test.ts` keeps auth.md off the package root and exposes only explicit experimental fixture exports.
 
-**Dirty auth.md lifecycle/bypass/reconstruction tests:**
+**Committed auth.md lifecycle/bypass/reconstruction tests:**
 - `test/adapters/auth-md-bypass-probes.test.ts` covers prevented, detected, and proof-gap hostile posture for raw bearer passthrough, direct HTTP, sibling MCP, browser tool, raw network, token replay, stale metadata, unsafe retry loop, gateway wrapper drift, and failure-closed behavior.
 - `test/adapters/auth-md-revocation.test.ts` covers lifecycle evidence mapping to credential-ref isolation and verifies future policy and stale unconsumed greenlights are blocked after isolation.
 - `test/adapters/auth-md-gateway-pressure.test.ts` covers scope, metadata, credential-ref drift, incompatible gateway policy drift, stale greenlights after credential isolation, and gateway-observed unsafe parameters before credential resolution.
@@ -232,11 +231,11 @@ export function makeKernelFixture() {
 - `test/integration/auth-md-protected-call.test.ts` covers the local twelve-workflow transcript for discovery, registration, proposal, policy, gateway, replay, refusal, proof gap, bypass, lifecycle, redaction, and reconstruction posture.
 - `test/integration/auth-md-receipt-reconstruction.test.ts` separates auth.md provenance from Handshake enforcement and downstream proof gaps, and projects policy refusal without implying gateway admission or credential use.
 
-**How to validate the dirty auth.md expansion before landing:**
-- Run the focused auth.md slice listed above.
-- Run `npm run quality:architecture` because the expansion touches exports, adapter posture, architecture guards, and runtime ingress.
+**How to validate auth.md-sensitive changes before landing:**
+- Run the focused auth.md slice when adapter, lifecycle, bypass, policy, gateway, or reconstruction files change.
+- Run `npm run quality:architecture` because auth.md touches exports, adapter posture, architecture guards, and runtime ingress.
 - Run `npm run quality:claims` because auth.md language can easily drift into auth-provider, OAuth-server, provider-custody, or hosted-operation claims.
-- Run `npm run check:repo` before closeout because the dirty expansion touches source, tests, architecture docs, and generated evidence projection shapes.
+- Run `npm run check:repo` before closeout because auth.md touches source, tests, architecture docs, and generated evidence projection shapes.
 
 ## Demo Script Tests
 
@@ -249,6 +248,12 @@ export function makeKernelFixture() {
 - The transcript covers metadata read, valid proposal, evidence readback, stale metadata, tools-list change, install not ready, gateway offline, amount mismatch, parameter drift, replay refusal, raw sibling-shaped input, and downstream proof gap.
 - The demo command `npm run demo:mcp-transcript` writes `examples/mcp-reference-transcript/output/latest.json` and `examples/mcp-reference-transcript/output/latest.md`; generated files are ignored and should not become canonical source.
 
+**Self-hosted activation demo:**
+- `test/product/self-hosted-activation.test.ts` runs `examples/self-hosted-activation/run.ts`, checks generated JSON/markdown output, and requires APS, CLI readback, MCP transcript, and MCP stdio proof rows to pass.
+- `test/mcp/mcp-stdio-process.test.ts` exercises the local MCP stdio server through `@modelcontextprotocol/client` and `@modelcontextprotocol/server` while asserting explicit non-authority posture.
+- `test/cli/cli-self-hosted-readback.test.ts` verifies CLI-style readback of the self-hosted output artifact without turning it into an authority surface.
+- `test/architecture/self-hosted-activation-claim-boundary.test.ts` keeps the packet local/source-owned and rejects hosted/process/custody overclaims.
+
 ## Closeout Commands For This Goal
 
 ```bash
@@ -258,6 +263,7 @@ npm run quality:storage       # Durable storage, D1, and protocol persistence ga
 npm run test                  # Full Bun test suite across protocol, runtime, MCP, CLI, SDK, x402, HTTP, demos
 npm run demo:aps              # Regenerate local x402 protected-spend report artifacts
 npm run demo:mcp-transcript   # Regenerate local MCP reference transcript artifacts
+npm run demo:self-hosted      # Regenerate local self-hosted activation packet artifacts
 npm run check:repo            # Full closeout gate used by CI
 ```
 
@@ -356,4 +362,4 @@ for (const row of pack.rows) {
 
 ---
 
-*Testing analysis: 2026-05-23*
+*Testing analysis: 2026-05-24*

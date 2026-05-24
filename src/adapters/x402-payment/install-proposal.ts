@@ -88,7 +88,7 @@ export const X402SpendBoundsSchema = z.strictObject({
   maxAtomicAmountPerSession: AtomicAmountSchema,
   maxAtomicAmountPerDay: AtomicAmountSchema,
   reviewThresholdAtomicAmount: AtomicAmountSchema,
-  spendWindowEnforcementStatus: z.literal("not_enforced_tier1_metadata").default("not_enforced_tier1_metadata"),
+  spendWindowEnforcementStatus: z.literal("not_enforced_local_metadata").default("not_enforced_local_metadata"),
   issuedAt: IsoDateSchema,
   expiresAt: IsoDateSchema,
 });

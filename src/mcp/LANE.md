@@ -6,7 +6,7 @@ The MCP lane is owned by surface code. It may expose model-facing proposal and e
 
 ## Current proof claim
 
-This lane defines a source-owned MCP catalog, strict `x402_payment.exact` proposal schema, structured non-authority outcomes, and read-only evidence resource mapping. It does not start an MCP process, evaluate policy, create greenlights, perform gateway checks, sign payments, execute mutations, export receipts, read raw records, or mint authority certificates.
+This lane defines a source-owned MCP catalog, strict `x402_payment.exact` proposal schema, structured non-authority outcomes, read-only evidence resource mapping, and a local stdio process harness exercised through the official MCP TypeScript SDK. It does not evaluate policy, create greenlights, perform gateway checks, sign payments, execute mutations, export receipts, read raw records, or mint authority certificates.
 
 ## Use cases
 
@@ -14,6 +14,7 @@ This lane defines a source-owned MCP catalog, strict `x402_payment.exact` propos
 - Let the host submit one exact buyer-side `x402_payment.exact` proposal candidate.
 - Let the host receive structured refusal, not-ready, stale-metadata, or proposal outcomes.
 - Let the host read redacted evidence projections through explicit resources.
+- Let the local self-hosted packet prove the source-owned MCP stdio process can list tools, read resources, and call the proposal tool without creating authority.
 - Treat certificate resources as local terminal evidence references only; MCP does not mint, verify hosted trust, publish revocation state, or create cross-org certificate trust.
 
 ## Constraints and assumptions
@@ -29,6 +30,9 @@ This lane defines a source-owned MCP catalog, strict `x402_payment.exact` propos
 - `output.ts`: MCP result wrapper over the shared surface outcome contract.
 - `resources.ts`: read-only resource URI parsing and evidence-client routing.
 - `x402-proposal.ts`: strict x402 proposal input schema and runtime-client bridge.
+- `stdio/server.ts`: internal source-owned MCP stdio server harness.
+- `stdio/entry.ts`: local process entrypoint for the self-hosted proof packet.
+- `stdio/process-proof.ts`: official MCP client-SDK proof harness for the local process.
 - `digest.ts`: local deterministic digest helper for metadata and proposal evidence binding.
 
 ## Failure and scale posture
@@ -62,6 +66,7 @@ Potential future package subpath: `handshake-protocol-kernel/mcp`. This is defer
 - `test/mcp/mcp-schema-contract.test.ts`
 - `test/mcp/mcp-x402-proposal.test.ts`
 - `test/mcp/mcp-resource-redaction.test.ts`
+- `test/mcp/mcp-stdio-process.test.ts`
 - `test/architecture/mcp-surface-posture.test.ts`
 - `test/architecture/surface-boundary-posture.test.ts`
 
@@ -71,7 +76,7 @@ No package-root export in this slice. Source modules are internal until package 
 
 ## Extraction trigger
 
-Extract only after the catalog, proposal schema, resource mapping, process custody, and at least one real MCP host transcript are stable under the architecture and claim gates.
+Extract only after the catalog, proposal schema, resource mapping, process custody, and at least one real external MCP host transcript are stable under the architecture and claim gates.
 
 ## Scope boundary
 

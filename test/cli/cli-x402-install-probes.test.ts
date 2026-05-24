@@ -28,7 +28,7 @@ describe("CLI x402 install and probe posture", () => {
         selectedPaymentRequirementIndex: 1,
         selectedPaymentRequirementDigest: digestB,
         perCallAmountBound: "2500",
-        spendWindowEnforcementStatus: "not_enforced_tier1_metadata",
+        spendWindowEnforcementStatus: "not_enforced_local_metadata",
         rawCredentialRefsIncluded: false,
         controlPlaneRegistrationRequired: true,
         controlPlaneRegistrationPerformed: false,

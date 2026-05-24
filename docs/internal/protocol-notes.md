@@ -170,8 +170,10 @@ Protocol areas may depend on foundation/events/context/store and other area publ
 - Codemode multi-action, x402 payment ingress, package-install, and auth.md
   protected API runtime paths prove generated-execution proposal behavior.
 - Internal protected-action representation contracts prove Metadata, Challenge,
-  Request, and EvidenceProjection shapes cannot create authority. Public
-  MCP/CLI/browser/shell/network interception remains future integration work.
+  Request, and EvidenceProjection shapes cannot create authority. A local
+  source-owned MCP stdio process proof is landed for proposal/evidence transport.
+  Public broad MCP/CLI/browser/shell/network interception remains future
+  integration work.
 - HTTP and SDK evidence reads expose redacted contract, receipt timeline, generated graph, and install-health projections.
 - D1 and memory stores prove reconstruction and atomicity mechanics for the reference implementation.
 - Provider-neutral gateway credential ref and credential-resolution evidence records

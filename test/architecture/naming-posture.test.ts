@@ -20,6 +20,7 @@ const repoFacingRoots = [
   "QUALITY.md",
   "STRUCTURE.md",
   "docs/internal",
+  "examples",
   "package.json",
   ".github",
   "src",
@@ -39,7 +40,7 @@ const overclaimingFunctionNamePattern =
 const vagueProtocolMutationPattern =
   /\b(handle(?!Id\b)[A-Z]\w*|process(?!Id\b)[A-Z]\w*|do(?!Id\b)[A-Z]\w*|run(?!Id\b)[A-Z]\w*)\s*(?:\(|:|=|<)/;
 const adapterRailMarkers = [/\bx402\b/i] as const;
-const permittedStageLabelLiterals = ["not_enforced_tier1_metadata"] as const;
+const permittedStageLabelLiterals = ["not_enforced_local_metadata"] as const;
 const adapterRailAllowedFiles = new Set(["src/runtime/ingress/index.ts", "docs/internal/protocol-notes.md"]);
 
 describe("repo naming posture", () => {

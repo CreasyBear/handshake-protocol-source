@@ -21,7 +21,7 @@ export const LocalX402InstallRecordSchema = z.strictObject({
   selectedPaymentRequirementIndex: z.number().int().nonnegative().nullable(),
   selectedPaymentRequirementDigest: DigestSchema.nullable(),
   perCallAmountBound: z.string().regex(/^(?:0|[1-9]\d*)$/),
-  spendWindowEnforcementStatus: z.literal("not_enforced_tier1_metadata"),
+  spendWindowEnforcementStatus: z.literal("not_enforced_local_metadata"),
   gatewayAuthorityRefDigest: DigestSchema,
   paymentCredentialRefDigest: DigestSchema,
   credentialCustodyStatus: z.enum(["gateway_held", "fixture_gateway_held", "agent_exposed", "unknown"]),

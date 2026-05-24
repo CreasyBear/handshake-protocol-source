@@ -176,9 +176,12 @@ const certificate = await kernel.createAuthorityCertificate({
   terminalObjectRef: `receipt:${receipt.receiptId}`,
   signers: signerInputs(signers),
 });
-const certificateVerification = await roleClients.evidenceClient.verifyAuthorityCertificate(
-  certificate,
-  trustMaterial(signers),
+const trustBundle = trustMaterial(signers);
+const certificateVerification = await roleClients.evidenceClient.verifyAuthorityCertificate(certificate, trustBundle);
+const contractView = await roleClients.evidenceClient.getContractEvidenceProjection(contract.actionContractId);
+const receiptTimeline = await roleClients.evidenceClient.getReceiptTimelineProjection(receipt.receiptId);
+const installHealth = await roleClients.evidenceClient.getProtectedPathInstallHealthProjection(
+  contract.actionContractId,
 );
 
 const replay = await runX402WalletGateway({
@@ -270,6 +273,13 @@ const output = {
   generatedAt: new Date().toISOString(),
   invariant: "runtime proposes; gateway alone signs after exact greenlight verification",
   report: buyerReadableApsReport(),
+  cliArtifacts: {
+    contractView,
+    receiptTimeline,
+    installHealth,
+    certificate,
+    trustBundle,
+  },
   outputFiles: {
     markdown: "examples/x402-protected-spend/output/latest.md",
     json: "examples/x402-protected-spend/output/latest.json",
@@ -285,7 +295,7 @@ function buyerReadableApsReport() {
     schemaVersion: "handshake.demo.aps-report.v1",
     proofObject: {
       name: "local x402 protected-spend authority envelope",
-      tier: "Tier 2 activation over local Tier 1 kernel evidence",
+      activationSurface: "Self-hosted activation over local foundation kernel evidence",
       currentClaim:
         "One generated x402 exact spend attempt was reduced to an exact contract, greenlit once, checked by the gateway before signer use, recorded as redacted evidence, locally certified, and replay-refused.",
       proofBoundary: "local_reference",
@@ -635,7 +645,7 @@ function officialInstallInput(paymentRequirementsDigest: `sha256:${string}`): X4
       maxAtomicAmountPerSession: "10000",
       maxAtomicAmountPerDay: "20000",
       reviewThresholdAtomicAmount: selected.amount,
-      spendWindowEnforcementStatus: "not_enforced_tier1_metadata",
+      spendWindowEnforcementStatus: "not_enforced_local_metadata",
       issuedAt: createdAt,
       expiresAt: futureIso(),
     },
@@ -810,7 +820,7 @@ function demoMarkdown(outputValue: typeof output): string {
     "### Proof Object",
     "",
     `- Name: ${outputValue.report.proofObject.name}`,
-    `- Tier: ${outputValue.report.proofObject.tier}`,
+    `- Activation surface: ${outputValue.report.proofObject.activationSurface}`,
     `- Boundary: ${outputValue.report.proofObject.proofBoundary}`,
     `- Claim: ${outputValue.report.proofObject.currentClaim}`,
     "",

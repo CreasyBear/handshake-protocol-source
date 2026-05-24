@@ -49,6 +49,7 @@
     "dev": "wrangler dev",
     "typecheck": "tsc --noEmit",
     "test": "bun test",
+    "demo:self-hosted": "bun run ./examples/self-hosted-activation/run.ts",
     "demo:aps": "bun run ./examples/x402-protected-spend/run.ts",
     "demo:mcp-transcript": "bun run ./examples/mcp-reference-transcript/run.ts",
     "build": "tsc -p tsconfig.build.json",
@@ -63,6 +64,9 @@
     "quality:storage": "npm run test -- test/http/d1-http.test.ts test/protocol/kernel-*.test.ts test/protocol/transition-matrix.test.ts test/protocol/model-based-invariants.test.ts test/protocol/action-attempt-lifecycle.test.ts test/protocol/evidence-projections.test.ts test/protocol/protocol-store-atomicity-contract.test.ts test/protocol/authority-certificate.test.ts"
   },
   "dependencies": {
+    "@cfworker/json-schema": "^4.1.1",
+    "@modelcontextprotocol/client": "^2.0.0-alpha.2",
+    "@modelcontextprotocol/server": "^2.0.0-alpha.2",
     "@x402/core": "2.12.0",
     "@x402/evm": "2.12.0",
     "hono": "^4.12.19",

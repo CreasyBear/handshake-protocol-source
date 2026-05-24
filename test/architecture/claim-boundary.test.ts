@@ -62,6 +62,8 @@ describe("claim boundary", () => {
     expect(readme).toContain("No adapter family defines the protocol");
     expect(readme).toContain("public runtime ingress for local x402 payment and package-install dispatch boundaries");
     expect(readme).toContain("not live provider custody, hosted operation, generic MCP/runtime control");
+    expect(readme).toContain("npm run demo:self-hosted");
+    expect(readme).toContain("source-owned local MCP stdio proposal/evidence process proof");
     expect(readme).toContain("facilitator operation, seller middleware, unsupported x402 schemes");
     expect(readme).toContain("cross-org AuthorityCertificate trust, live JWKS/revocation, hosted verifier operation");
     expect(readme).toContain("session/day/review spend windows are metadata until a ledger exists");
@@ -95,7 +97,8 @@ describe("claim boundary", () => {
     const mcpLane = readFileSync("src/mcp/LANE.md", "utf8");
 
     expect(mcpLane).toContain("proposal and evidence transport only");
-    expect(mcpLane).toContain("It does not start an MCP process, evaluate policy, create greenlights");
+    expect(mcpLane).toContain("local stdio process harness exercised through the official MCP TypeScript SDK");
+    expect(mcpLane).toContain("It does not evaluate policy, create greenlights");
     expect(mcpLane).toContain("Gateway custody, control-plane install, signer material");
     expect(mcpLane).toContain("certificate resources as local terminal evidence references only");
     expect(mcpLane).toContain("MCP can propose and display evidence. It cannot authorize");

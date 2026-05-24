@@ -1,10 +1,10 @@
 # External Integrations
 
-**Analysis Date:** 2026-05-23
+**Analysis Date:** 2026-05-24
 
 ## Scope
 
-This map covers external APIs, storage, auth, telemetry, deployment, and evidence surfaces for Handshake v0.0.2. It separates committed auth.md protected-call support from the newer dirty auth.md lifecycle/bypass/reconstruction expansion.
+This map covers external APIs, storage, auth, telemetry, deployment, and evidence surfaces for Handshake v0.0.2. It separates committed kernel/adapter authority from local Tier 2 activation evidence, including the source-owned self-hosted packet and local MCP stdio process proof.
 
 `.planning/` is scratch. Do not treat this mapper output as canon without re-validating against `AGENTS.md`, `README.md`, `QUALITY.md`, `STRUCTURE.md`, `docs/internal/decisions.md`, `docs/internal/protocol-notes.md`, `package.json`, source, and tests.
 
@@ -45,6 +45,10 @@ This map covers external APIs, storage, auth, telemetry, deployment, and evidenc
   - SDK/Client: `src/mcp/reference-transcript.ts`, `src/mcp/reference-transcript-fixtures.ts`, `examples/mcp-reference-transcript/run.ts`.
   - Auth: local fixtures only.
   - Boundary: not a public MCP host quickstart, SDK install client, SDK gateway client, CLI package bin, spend ledger, hosted provider, or external gateway operation claim.
+- MCP stdio process proof - local process harness exercised through the official MCP TypeScript SDK for list/read/call proof.
+  - SDK/Client: `@modelcontextprotocol/client`, `@modelcontextprotocol/server`, `@cfworker/json-schema`, `src/mcp/stdio/server.ts`, `src/mcp/stdio/entry.ts`, `src/mcp/stdio/process-proof.ts`, and `test/mcp/mcp-stdio-process.test.ts`.
+  - Auth: no provider credential custody; proof calls local source functions and role-scoped proposal/evidence stubs.
+  - Boundary: source-owned local process proof only. It is not a public MCP host, hosted process supervisor, MCP install package, external gateway operation, generated-tool containment proof, or model authority surface.
 
 **x402 buyer-side exact path:**
 - Official x402 parser and wallet gateway - parses `PAYMENT-REQUIRED`, builds exact payment attempts, creates `PaymentPayload` and `PAYMENT-SIGNATURE` only after verified gateway check, and records downstream evidence/proof gaps.
@@ -64,14 +68,10 @@ This map covers external APIs, storage, auth, telemetry, deployment, and evidenc
   - Auth: protocol gateway check, not provider deployment-token custody.
 
 **auth.md protected API-call profile:**
-- Committed auth.md adapter - OAuth Protected Resource Metadata plus authorization-server `agent_auth` provenance, auth.md supporting document digest, redacted gateway credential intake, exact protected API-call proposals, and a reference gateway fixture.
-  - SDK/Client: `src/adapters/auth-md/index.ts`, `src/adapters/auth-md/profiles.ts`, `src/adapters/auth-md/action-proposal.ts`, `src/adapters/auth-md/gateway.ts`, explicit `src/experimental.ts` exports, and tests in `test/adapters/auth-md-adapter.test.ts`, `test/adapters/auth-md-gateway.test.ts`, and `test/runtime/auth-md-candidate-compilation.test.ts`.
+- Committed auth.md adapter - OAuth Protected Resource Metadata plus authorization-server `agent_auth` provenance, auth.md supporting document digest, redacted gateway credential intake, exact protected API-call proposals, lifecycle isolation, hostile bypass probes, evidence labels, and a reference gateway fixture.
+  - SDK/Client: `src/adapters/auth-md/index.ts`, `src/adapters/auth-md/profiles.ts`, `src/adapters/auth-md/action-proposal.ts`, `src/adapters/auth-md/gateway.ts`, `src/adapters/auth-md/revocation.ts`, `src/adapters/auth-md/bypass-probes.ts`, explicit `src/experimental.ts` exports, and tests in `test/adapters/auth-md-*`, `test/runtime/auth-md-candidate-compilation.test.ts`, `test/protocol/policy-auth-md.test.ts`, and `test/integration/auth-md-*`.
   - Auth: accepts credential material only at gateway custody intake, emits redacted registration/identity/claim/revocation evidence, binds `GatewayCredentialRef` inputs into action contracts, resolves credentials only after `VerifiedGatewayCheck`, and records `CredentialResolutionEvidence` after the gate.
   - Boundary: not an auth provider, OAuth server, WorkOS alternative, certification body, provider custody claim, hosted identity system, or generic API gateway.
-- Dirty auth.md lifecycle/bypass expansion - user-owned working-tree additions for revocation-to-isolation, hostile bypass probes, auth.md evidence labels in transaction envelopes, and integration/reconstruction tests.
-  - Files: `src/adapters/auth-md/revocation.ts`, `src/adapters/auth-md/bypass-probes.ts`, dirty `src/protocol/evidence-projections/projections.ts`, dirty `src/protocol/evidence-projections/schemas.ts`, and untracked tests under `test/adapters/auth-md-*`, `test/integration/auth-md-*`, and `test/protocol/policy-auth-md.test.ts`.
-  - Auth: lifecycle evidence can isolate a gateway credential ref for future policy/gateway use; bypass probes classify raw bearer passthrough, direct HTTP, sibling MCP, browser, raw network, token replay, metadata staleness, wrapper drift, unsafe retry loops, and failure-closed posture.
-  - Boundary: focused auth.md tests pass, but the expansion is not yet full-gated or committed.
 
 ## Data Storage
 
@@ -90,7 +90,7 @@ This map covers external APIs, storage, auth, telemetry, deployment, and evidenc
 
 **File Storage:**
 - Package declarations - generated under `dist/` by `npm run build`.
-- Demo reports - generated under `examples/x402-protected-spend/output/` and `examples/mcp-reference-transcript/output/`.
+- Demo reports - generated under `examples/x402-protected-spend/output/`, `examples/mcp-reference-transcript/output/`, and `examples/self-hosted-activation/output/`.
 - Local CLI project state - `.handshake/project.json` and external token-reference/trust-bundle refs from `src/cli/local-project/index.ts`.
 - Support bundles - caller-supplied redacted projection bundles through `src/cli/support-bundle.ts`.
 
@@ -138,6 +138,7 @@ This map covers external APIs, storage, auth, telemetry, deployment, and evidenc
 - CLI envelope and support bundle - `src/cli/output.ts` and `src/cli/support-bundle.ts`.
 - MCP structured outcome and resources - `src/mcp/output.ts`, `src/mcp/catalog.ts`, and `src/mcp/resources.ts`.
 - Surface route/custody boundary manifest - `src/surfaces/boundary-manifest.ts`.
+- Self-hosted activation packet - `examples/self-hosted-activation/run.ts` composes APS, CLI readbacks, MCP reference transcript, and local MCP stdio process proof into an ignored local report.
 
 **Telemetry tests:**
 - `test/protocol/evidence-projections.test.ts` verifies clearing refs are non-authority, transaction envelopes separate refusal/admission/replay/proof-gap, and raw x402 credential evidence is redacted.
@@ -145,6 +146,7 @@ This map covers external APIs, storage, auth, telemetry, deployment, and evidenc
 - `test/product/agent-proof-slice.test.ts` verifies redacted agent transaction envelopes and x402 gateway evidence.
 - `test/cli/cli-support-bundle.test.ts` verifies support-bundle omission of raw material.
 - `test/mcp/mcp-schema-contract.test.ts` and `test/mcp/mcp-resource-redaction.test.ts` verify MCP non-authority and read-only posture.
+- `test/mcp/mcp-stdio-process.test.ts`, `test/product/self-hosted-activation.test.ts`, `test/cli/cli-self-hosted-readback.test.ts`, and `test/architecture/self-hosted-activation-claim-boundary.test.ts` verify the local self-hosted packet and stdio proof without broad hosted/process/custody claims.
 
 ## CI/CD & Deployment
 
@@ -194,10 +196,10 @@ This map covers external APIs, storage, auth, telemetry, deployment, and evidenc
 
 - No hosted verifier/provider custody/clearing-house claim exists in committed source.
 - No facilitator operation, seller middleware, settlement finality, aggregate spend ledger, or broad x402 compatibility is claimed.
-- No broad MCP, CLI, browser, shell, network, package-manager, or generated-tool-stream interception is claimed.
+- No broad MCP, CLI, browser, shell, network, package-manager, or generated-tool-stream interception is claimed. The stdio process proof is local and source-owned only.
 - No production wallet custody, live vault provider, live JWKS/revocation, cross-org AuthorityCertificate trust, marketplace certification, or provider-side enforcement is claimed.
 - Tier 2-facing surfaces are pre-hosted local/reference activation surfaces until a real deployment boundary, customer/provider gateway check, credential custody model, and audited receipt retention/search surface exist in source.
 
 ---
 
-*Integration audit: 2026-05-23*
+*Integration audit: 2026-05-24*

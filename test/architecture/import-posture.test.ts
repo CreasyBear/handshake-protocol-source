@@ -287,13 +287,13 @@ describe("protocol module import posture", () => {
   });
 
   it("keeps vault provider clients and secret retrieval APIs out of foundation protocol surfaces", () => {
-    const tierOneRoots = ["src/protocol", "src/http", "src/runtime", "src/sdk"];
-    const providerImportViolations = importViolations(tierOneRoots, [
+    const foundationRoots = ["src/protocol", "src/http", "src/runtime", "src/sdk"];
+    const providerImportViolations = importViolations(foundationRoots, [
       /from\s+["'][^"']*(?:infisical|vault)(?:\/|["'])/i,
     ]);
     const retrievalApiViolations: string[] = [];
 
-    for (const file of tierOneRoots.flatMap((root) => walkTs(root))) {
+    for (const file of foundationRoots.flatMap((root) => walkTs(root))) {
       const rel = relative(process.cwd(), file);
       const text = readFileSync(file, "utf8");
       if (/\b(?:getSecret|retrieveSecret|secretPath)\b/.test(text)) {

@@ -16,6 +16,8 @@ const McpSmallListSchema = <T extends z.ZodTypeAny>(schema: T) => z.array(schema
 
 export const McpInstallPostureSchema = z.enum(["ready", "missing", "stale", "unsafe", "unknown"]);
 export const McpGatewayPostureSchema = z.enum(["online", "offline", "unknown"]);
+export type McpInstallPosture = z.infer<typeof McpInstallPostureSchema>;
+export type McpGatewayPosture = z.infer<typeof McpGatewayPostureSchema>;
 
 export const McpX402PaymentProposalInputSchema = z.strictObject({
   requestId: McpIdSchema,
@@ -96,8 +98,8 @@ export type ProposeMcpX402PaymentOptions = {
   runtimeClient: McpRuntimeProposalClient;
   currentMetadataDigest?: `sha256:${string}`;
   toolsListChanged?: boolean;
-  installPosture?: z.infer<typeof McpInstallPostureSchema>;
-  gatewayPosture?: z.infer<typeof McpGatewayPostureSchema>;
+  installPosture?: McpInstallPosture;
+  gatewayPosture?: McpGatewayPosture;
   trustedMaxAtomicAmountPerCall?: `${number}` | string;
 };
 

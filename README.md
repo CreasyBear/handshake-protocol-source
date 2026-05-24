@@ -22,7 +22,7 @@ vague principal intent
 
 The kernel does not claim hosted operation, provider-side enforcement, broad agent governance, or downstream business success. A path is protected only when the gateway owns the mutation credential and verifies the exact greenlight before mutation.
 
-Current local foundation status: source and tests cover the protected-action kernel chain, derived lifecycle evidence, idempotency ledger, redacted evidence projections including agent transaction envelopes, terminal AuthorityCertificate minting and offline pinned-key verification, package-install supply-chain gate binding, the narrow official x402 exact buyer-side proof path through D1/HTTP durable evidence, official x402 SDK signer-custody/bypass probes, and public runtime ingress for local x402 payment and package-install dispatch boundaries. x402 coverage is one official buyer-side `exact` per-call path with gateway-held `PaymentPayload` / `PAYMENT-SIGNATURE` creation after `VerifiedGatewayCheck`; package install remains a regression fixture. No adapter family defines the protocol. This is local kernel foundation, not broad x402 compatibility, not live provider custody, hosted operation, generic MCP/runtime control, external package-material attestation, cross-org AuthorityCertificate trust, live JWKS/revocation, hosted verifier operation, facilitator operation, seller middleware, unsupported x402 schemes, marketplace/certification, or spend-window ledger enforcement. Runtime ingress is observer/compiler evidence and current x402 spend enforcement is per-call only; session/day/review spend windows are metadata until a ledger exists.
+Current local foundation status: source and tests cover the protected-action kernel chain, derived lifecycle evidence, idempotency ledger, redacted evidence projections including agent transaction envelopes, terminal AuthorityCertificate minting and offline pinned-key verification, package-install supply-chain gate binding, the narrow official x402 exact buyer-side proof path through D1/HTTP durable evidence, official x402 SDK signer-custody/bypass probes, public runtime ingress for local x402 payment and package-install dispatch boundaries, and a source-owned local MCP stdio proposal/evidence process proof. x402 coverage is one official buyer-side `exact` per-call path with gateway-held `PaymentPayload` / `PAYMENT-SIGNATURE` creation after `VerifiedGatewayCheck`; package install remains a regression fixture. No adapter family defines the protocol. This is local kernel foundation, not broad x402 compatibility, not live provider custody, hosted operation, generic MCP/runtime control, external package-material attestation, cross-org AuthorityCertificate trust, live JWKS/revocation, hosted verifier operation, facilitator operation, seller middleware, unsupported x402 schemes, marketplace/certification, or spend-window ledger enforcement. Runtime ingress and MCP are observer/compiler/proposal evidence surfaces and current x402 spend enforcement is per-call only; session/day/review spend windows are metadata until a ledger exists.
 
 ## Repo Truth
 
@@ -127,7 +127,28 @@ bun install --frozen-lockfile
 npm run check:repo
 ```
 
-First protected-action walkthrough:
+Self-hosted activation packet:
+
+```bash
+npm run demo:self-hosted
+```
+
+This writes the local activation packet to:
+
+```text
+examples/self-hosted-activation/output/latest.md
+examples/self-hosted-activation/output/latest.json
+```
+
+Inspect the packet for the x402 exact proposal path, policy decision, gateway
+check, replay refusal, proof-gap posture, CLI evidence readbacks, local terminal
+certificate verification, MCP reference transcript, and real local MCP stdio
+process proof. This is a self-hosted local packet only: not hosted operation,
+not provider/customer custody, not broad MCP/browser/shell/network/package
+manager protection, not spend-window ledger enforcement, not WorkOS/auth.md
+attestation, not cross-org certificate trust, and not a clearing-house claim.
+
+Component x402 protected-action walkthrough:
 
 ```bash
 npm run demo:aps
@@ -175,12 +196,15 @@ examples/mcp-reference-transcript/output/latest.json
 Inspect the transcript for metadata read, valid proposal, evidence readback,
 stale metadata, tools-list change, install-not-ready, gateway-offline,
 amount/params mismatch, replay refusal, raw sibling-shaped input, and proof-gap
-cases. It is proposal/evidence posture only: not policy, not greenlight, not
-gateway check, not mutation, not hosted operation, and not provider custody.
+cases. The self-hosted packet also starts the local stdio MCP process and exercises it
+through the official MCP client SDK. MCP remains proposal/evidence posture only:
+not policy, not greenlight, not gateway check, not mutation, not hosted
+operation, and not provider custody.
 
 | Command                       | Purpose                                                                             |
 | ----------------------------- | ----------------------------------------------------------------------------------- |
 | `npm run check:repo`          | Full local and CI gate: types, lint, format, Bun tests, pack check, whitespace diff |
+| `npm run demo:self-hosted`    | Self-hosted activation packet                                                       |
 | `npm run demo:aps`            | Local x402 protected-spend authority proof report                                   |
 | `npm run demo:mcp-transcript` | Source-owned MCP x402 proposal/evidence transcript                                  |
 | `npm run check:types`         | CI-stable no-pretty TypeScript gate                                                 |

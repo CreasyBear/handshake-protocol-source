@@ -71,6 +71,7 @@ describe("package surface", () => {
 
   it("binds package checks into the full repo gate", () => {
     expect(pkg.scripts.build).toBe("tsc -p tsconfig.build.json");
+    expect(pkg.scripts["demo:self-hosted"]).toBe("bun run ./examples/self-hosted-activation/run.ts");
     expect(pkg.scripts["pack:check"]).toBe("npm run build && node scripts/check-package-surface.mjs");
     expect(pkg.scripts["check:repo"]).toContain("npm run pack:check");
   });

@@ -1,6 +1,6 @@
 # MCP x402 Reference Transcript
 
-Status: source-owned Tier 2 reference transcript
+Status: source-owned self-hosted reference transcript
 Scope: model-facing MCP proposal and evidence transport for the buyer-side `x402_payment.exact` path
 
 ## Invariant At Stake

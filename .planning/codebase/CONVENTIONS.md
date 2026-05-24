@@ -1,6 +1,6 @@
 # Coding Conventions
 
-**Analysis Date:** 2026-05-23
+**Analysis Date:** 2026-05-24
 
 ## Naming Patterns
 
@@ -83,7 +83,7 @@
 **Package and export posture:**
 - Keep the package surface narrow. `package.json` exports the root, `./runtime`, `./conformance`, `./sdk/role-clients`, `./experimental`, and `./package.json`; it does not export MCP internals, surface manifests, raw stores, policy kernels, gateway runners, or receipt exporters.
 - Keep role clients on the explicit `handshake-protocol-kernel/sdk/role-clients` subpath. `src/sdk/surface-clients/runtime-client.ts` owns runtime proposal/evidence writes; `src/sdk/surface-clients/evidence-client.ts` owns redacted evidence reads and local verification of supplied certificates.
-- Keep generated demo snapshots under ignored `examples/*/output/` folders. `examples/x402-protected-spend/output/` and `examples/mcp-reference-transcript/output/` are local artifacts, not package source, canonical docs, or exportable receipt stores.
+- Keep generated demo snapshots under ignored `examples/*/output/` folders. `examples/x402-protected-spend/output/`, `examples/mcp-reference-transcript/output/`, and `examples/self-hosted-activation/output/` are local artifacts, not package source, canonical docs, or exportable receipt stores.
 
 ## Import Organization
 
@@ -173,7 +173,7 @@
 ## Auth.md Adapter Posture
 
 **Committed conventions:**
-- Keep auth.md under the experimental/reference adapter boundary. The committed `src/adapters/auth-md/index.ts` re-exports adapter-local profiles, proposal, and gateway helpers; the current dirty index also re-exports lifecycle/probe helpers. `src/experimental.ts` keeps the surface explicit and off the package root.
+- Keep auth.md under the experimental/reference adapter boundary. The committed `src/adapters/auth-md/index.ts` re-exports adapter-local profiles, proposal, gateway, lifecycle, and probe helpers. `src/experimental.ts` keeps the surface explicit and off the package root.
 - Treat OAuth Protected Resource Metadata plus authorization-server `agent_auth` as machine provenance and `/auth.md` prose as supporting evidence. `buildAuthMdDiscoveryEvidence()` in `src/adapters/auth-md/profiles.ts` normalizes PRM and authorization-server metadata, sorts list values, records `authMdDocumentDigest` only as support, and emits `authorityCreated: false`.
 - Import issued credentials into gateway custody only as opaque refs. `buildAuthMdGatewayCredentialIntake()` returns redacted `AuthMdRegistrationEvidence` plus `RegisterGatewayCredentialRefInput`; it must not return `credentialMaterial`, ID subject values, bearer tokens, access tokens, API keys, JWTs, private keys, or provider secrets.
 - Keep raw credential leak detection close to auth.md parsing and downstream evidence. `assertNoLeakedAuthMdCredentialMaterial()` in `src/adapters/auth-md/profiles.ts` scans plain strings, URL-decoded variants, and base64-like decoded variants for bearer tokens, private keys, token/secret assignments, and JWT-like material.
@@ -181,10 +181,10 @@
 - The auth.md gateway is the consequence holder. `runAuthMdProtectedApiCallGateway()` must call `gatewayCheck()`, require `VerifiedGatewayCheck`, record `CredentialResolutionEvidence` only after the gate, refuse drift/replay/non-authoritative gates before service execution, and reconcile success/refusal/proof-gap/failure without leaking raw auth material.
 - Refuse auth.md bypass and overreach before compilation or before gateway execution. `authMdProtectedApiCallRefusalReasonCodes()` rejects non-consequential methods, endpoint origin mismatch, raw authorization headers, dynamic endpoint/host construction, wildcard scopes, stale metadata, stale/revoked/expired credential refs, missing idempotency material, retry authority reuse, and unsafe runtime-visible credential custody.
 
-**Current dirty expansion conventions:**
+**Committed lifecycle/bypass expansion conventions:**
 - `applyAuthMdCredentialLifecycleIsolation()` in `src/adapters/auth-md/revocation.ts` maps logout, explicit revocation, credential expiry, downstream 401, metadata drift, and ambiguous lifecycle events to credential-ref isolation. It records evidence and isolation, not authority.
 - `authMdProtectedApiCallBypassProbeExecutors()` in `src/adapters/auth-md/bypass-probes.ts` classifies hostile paths as prevented, detected, or proof gap. Probe outputs must stay redacted and cannot create protected-path authority by themselves.
-- Dirty auth.md evidence labels in `src/protocol/evidence-projections/projections.ts` are buyer-readable reconstruction aids. They must not imply provider custody, gateway admission, or downstream success without the matching Handshake policy/gate/reconciliation records.
+- Auth.md evidence labels in `src/protocol/evidence-projections/projections.ts` are buyer-readable reconstruction aids. They must not imply provider custody, gateway admission, or downstream success without the matching Handshake policy/gate/reconciliation records.
 
 ## Active Tier 2 SDK/CLI/MCP Surface Posture
 
@@ -210,12 +210,14 @@
 - `src/mcp/x402-proposal.ts` must bridge through the narrowed `McpRuntimeProposalClient` interface and may call only runtime evidence, tool-call draft, intent compilation, and action-contract proposal methods.
 - MCP resources in `src/mcp/resources.ts` must route evidence reads through `EvidenceClient` projection methods or return reference-only metadata/challenge/certificate objects. They must not expose raw records, credentials, receipt exports, signer material, or certificate minting.
 - The MCP reference transcript in `src/mcp/reference-transcript.ts` and `examples/mcp-reference-transcript/run.ts` is a source-owned harness, not a public MCP host. It must stay bound to catalog/resource/tool/shared-outcome source functions and explicit CLI readback command IDs.
+- The local stdio harness in `src/mcp/stdio/*` is source-owned proof machinery for `npm run demo:self-hosted`. It may exercise list/read/call behavior through the official MCP TypeScript SDK, but it must not become a package subpath, public host quickstart, process supervisor, gateway runner, signer surface, raw-record reader, or mutation executor.
 
 **Demo script posture:**
 - `npm run demo:aps` uses `examples/x402-protected-spend/run.ts` to produce a local buyer-readable x402 protected-spend report. Tests require it to use `RuntimeClient` and `EvidenceClient`, not the all-role `HandshakeClient`.
 - `npm run demo:mcp-transcript` uses `examples/mcp-reference-transcript/run.ts` to produce a source-owned MCP transcript for metadata read, valid proposal, evidence readback, stale metadata, tools-list change, install not ready, gateway offline, amount mismatch, parameter drift, replay refusal, raw sibling-shaped input, and proof-gap cases.
+- `npm run demo:self-hosted` uses `examples/self-hosted-activation/run.ts` to produce a local activation packet across APS, CLI readbacks, MCP reference transcript, and local MCP stdio process proof. Treat it as local activation evidence only, not hosted operation, broad runtime control, public MCP hosting, or clearing-house readiness.
 - Demo outputs belong under `examples/*/output/` with `.gitignore` guards. Treat generated report files as local evidence artifacts, not canonical docs or package source.
 
 ---
 
-*Convention analysis: 2026-05-23*
+*Convention analysis: 2026-05-24*

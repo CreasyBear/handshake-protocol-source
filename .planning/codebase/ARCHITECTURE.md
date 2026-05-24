@@ -1,7 +1,7 @@
-<!-- refreshed: 2026-05-23 -->
+<!-- refreshed: 2026-05-24 -->
 # Architecture
 
-**Analysis Date:** 2026-05-23
+**Analysis Date:** 2026-05-24
 
 ## System Overview
 
@@ -36,7 +36,7 @@
 
 Authority is enforced only in the Tier 1 kernel/gateway path: exact `ActionContract` -> `PolicyDecision` -> one-use `Greenlight` -> `GatewayCheck` before mutation. Tier 2 surfaces in `src/runtime/*`, `src/sdk/surface-clients/*`, `src/cli/*`, `src/mcp/*`, and `src/surfaces/*` expose proposal posture, response envelopes, readiness, or redacted evidence. They do not enforce mutation authority, hosted operation, provider custody, settlement, clearing-house operation, or downstream business success.
 
-Current git-state boundary: committed source includes the Tier 1 kernel, runtime ingress, x402/package-install proof lanes, CLI/MCP/SDK response posture, transition-budget telemetry hardening, and the first auth.md protected API-call adapter/gateway/runtime-ingress slice from commit `7bba365`. The current dirty tree adds a second auth.md expansion around revocation-to-isolation, hostile bypass probes, transaction-envelope auth.md evidence labels, and integration/reconstruction tests. Treat the first auth.md slice as committed experimental/reference adapter architecture; treat the lifecycle/bypass expansion as user-owned dirty state until staged, full-gated, and committed.
+Current git-state boundary: committed source includes the Tier 1 kernel, runtime ingress, x402/package-install proof lanes, CLI/MCP/SDK response posture, transition-budget telemetry hardening, and the auth.md protected API-call/lifecycle/bypass/reconstruction slice. The active closeout adds a source-owned local self-hosted activation packet and local MCP stdio process proof. Treat these as local/pre-hosted activation evidence only.
 
 ## Component Responsibilities
 
@@ -62,9 +62,9 @@ Current git-state boundary: committed source includes the Tier 1 kernel, runtime
 | CLI command manifest | Declares active CLI command ids, route families, filesystem posture, redaction posture, and non-goals. | `src/cli/command-manifest.ts` |
 | CLI support bundle | Assembles caller-supplied redacted projections and local x402 posture only. | `src/cli/support-bundle.ts` |
 | MCP outcome contract | Reuses shared non-authority surface outcomes for model-facing proposal and resource reads. | `src/surfaces/outcome.ts`, `src/mcp/output.ts` |
-| MCP catalog and resources | Exposes one proposal tool and read-only resource templates without process, gateway, signer, receipt export, or certificate minting authority. | `src/mcp/catalog.ts`, `src/mcp/resources.ts` |
+| MCP catalog and resources | Exposes one proposal tool, read-only resource templates, and a local stdio proof harness without gateway, signer, receipt export, certificate minting, or public host authority. | `src/mcp/catalog.ts`, `src/mcp/resources.ts`, `src/mcp/stdio/*` |
 | MCP x402 proposal bridge | Validates strict `x402_payment.exact` input, checks freshness/readiness bounds, and uses `RuntimeClient` to create runtime evidence, tool-call draft, intent compilation, and action contract proposal only. | `src/mcp/x402-proposal.ts` |
-| MCP transcript harness | Produces source-owned transcript rows for metadata, proposal, readback, stale metadata, tools-list change, readiness, gateway offline, amount/params mismatch, replay, raw sibling-shaped input, and proof gap. | `src/mcp/reference-transcript.ts`, `examples/mcp-reference-transcript/run.ts` |
+| MCP transcript and stdio harness | Produces source-owned transcript rows for metadata, proposal, readback, stale metadata, tools-list change, readiness, gateway offline, amount/params mismatch, replay, raw sibling-shaped input, and proof gap; the stdio harness exercises local list/read/call behavior through the official MCP TypeScript SDK. | `src/mcp/reference-transcript.ts`, `examples/mcp-reference-transcript/run.ts`, `src/mcp/stdio/*`, `test/mcp/mcp-stdio-process.test.ts` |
 | Runtime ingress | Converts observed package-install, x402, and auth.md protected-call dispatch blocks into runtime execution, generated graph, tool-call draft, compilation, contract, or refusal evidence. | `src/runtime/ingress/index.ts` |
 | Runtime package subpath | Exports runtime ingress as an observer/compiler surface, not as policy, gateway, mutation, or receipt authority. | `src/runtime/index.ts` |
 | Transition-budget telemetry hardening | Committed test harness that records read/write/record/event/partition counts for authority-bearing transitions and fails on budget drift. | `test/support/transition-budget-recorder.ts`, `test/protocol/transition-budget-recorder.test.ts` |
@@ -72,8 +72,8 @@ Current git-state boundary: committed source includes the Tier 1 kernel, runtime
 | x402 action proposal | Builds exact x402 candidate parameters and idempotency material from official PAYMENT-REQUIRED evidence. | `src/adapters/x402-payment/action-proposal.ts`, `src/adapters/x402-payment/upstream-evidence.ts` |
 | x402 wallet gateway | Uses official x402 SDK signing only after `VerifiedGatewayCheck`; records redacted payment evidence and reconciliation. | `src/adapters/x402-payment/wallet-gateway.ts` |
 | Adapter conformance and probes | Classifies unsupported x402 surfaces and hostile signer/bypass posture without creating authority or provider certification. | `src/adapters/x402-payment/conformance.ts`, `src/adapters/x402-payment/bypass-probes.ts` |
-| auth.md protected-call adapter | Experimental/reference profile for OAuth Protected Resource Metadata `agent_auth`, credential-custody intake, `auth_md_protected_api_call.exact` proposal, runtime-ingress binding, and gateway execution only after `VerifiedGatewayCheck`. It is not an auth provider, OAuth server, hosted identity service, or generic API gateway. | `src/adapters/auth-md/*`, `test/adapters/auth-md-adapter.test.ts`, `test/adapters/auth-md-gateway.test.ts`, `test/runtime/auth-md-candidate-compilation.test.ts`, `src/experimental.ts` |
-| Dirty auth.md lifecycle/bypass expansion | Working-tree additions for credential lifecycle isolation, bypass probes, auth.md evidence labeling, policy and reconstruction tests. Focused tests pass, but this expansion is not committed architecture yet. | `src/adapters/auth-md/revocation.ts`, `src/adapters/auth-md/bypass-probes.ts`, `src/protocol/evidence-projections/*`, `test/adapters/auth-md-*`, `test/integration/auth-md-*`, `test/protocol/policy-auth-md.test.ts` |
+| auth.md protected-call adapter | Experimental/reference profile for OAuth Protected Resource Metadata `agent_auth`, credential-custody intake, `auth_md_protected_api_call.exact` proposal, runtime-ingress binding, lifecycle isolation, bypass probes, evidence labeling, and gateway execution only after `VerifiedGatewayCheck`. It is not an auth provider, OAuth server, hosted identity service, or generic API gateway. | `src/adapters/auth-md/*`, `test/adapters/auth-md-*`, `test/runtime/auth-md-candidate-compilation.test.ts`, `test/integration/auth-md-*`, `test/protocol/policy-auth-md.test.ts`, `src/experimental.ts` |
+| Self-hosted activation packet | Source-owned local packet that composes APS, CLI readbacks, MCP reference transcript, and local MCP stdio process proof. It is not hosted operation, public MCP process startup, process supervision, gateway authority, or broad runtime containment. | `examples/self-hosted-activation/*`, `test/product/self-hosted-activation.test.ts`, `test/cli/cli-self-hosted-readback.test.ts`, `test/architecture/self-hosted-activation-claim-boundary.test.ts` |
 | Storage port | Defines durable records, stream events, greenlight consumption, idempotency, posture, isolation, operation-claim, and receipt indexes. | `src/protocol/store/port.ts` |
 | D1 store | Durable reference `ProtocolStore` implementation with protocol records, stream events, and authority indexes. | `src/storage/d1/index.ts`, `src/storage/d1/statements.ts`, `migrations/0001_protocol_kernel.sql` |
 | Memory store | Test fixture and invariant oracle implementing the same atomic store contract. | `src/storage/memory/index.ts` |
@@ -97,7 +97,7 @@ Current git-state boundary: committed source includes the Tier 1 kernel, runtime
 - Treat adapters as consequence holders. `src/adapters/*/gateway.ts` and `src/adapters/x402-payment/wallet-gateway.ts` may mutate only after `verifiedGatewayCheckFromResult()` yields a `VerifiedGatewayCheck`.
 - Treat x402 as a proof profile. `src/adapters/x402-payment/*` models one buyer-side `exact` per-call path; session/day/review spend windows are metadata until a ledger exists.
 - Treat auth.md as an adapter profile, not an identity product. The committed auth.md slice uses source-exact discovery/custody/proposal/gateway mechanics while preserving the rule that only Handshake policy plus a verified gateway check can authorize consequence.
-- Treat dirty auth.md lifecycle/bypass state separately from committed architecture. The new revocation/probe/projection work is promising and focused-test green, but it is not a stable source boundary until it passes full repo gates and lands atomically.
+- Treat self-hosted/MCP stdio activation state separately from public product claims. The local packet is useful activation evidence, but it is not a hosted surface, production process contract, or public MCP host until a later plan designs those boundaries.
 
 ## Layers
 
@@ -136,6 +136,13 @@ Current git-state boundary: committed source includes the Tier 1 kernel, runtime
 - Depends on: HTTP response contracts, protocol projections, surface manifest.
 - Used by: Examples, MCP transcript, CLI tests, SDK tests, architecture posture tests.
 
+**Local Activation Packet Layer:**
+- Purpose: Prove the local buyer-readable activation loop without claiming hosted operation or public process hosting.
+- Location: `examples/self-hosted-activation/*`, `src/mcp/stdio/*`
+- Contains: APS composition, CLI readback checks, MCP reference transcript inclusion, official MCP SDK stdio list/read/call proof, deferred-gate language, and ignored local outputs.
+- Depends on: Tier 2 surface outputs, x402 APS demo artifacts, CLI readbacks, MCP reference transcript, and MCP source modules.
+- Used by: `npm run demo:self-hosted`, self-hosted product tests, and claim-boundary tests.
+
 **Gateway Adapter Layer:**
 - Purpose: Demonstrate mutation-side enforcement after a verified gateway check.
 - Location: `src/adapters/package-install/*`, `src/adapters/repo-write/*`, `src/adapters/preview-deploy/*`, `src/adapters/x402-payment/*`
@@ -145,10 +152,10 @@ Current git-state boundary: committed source includes the Tier 1 kernel, runtime
 
 **auth.md Adapter Layer:**
 - Purpose: Latch onto auth.md as provenance and credential-intake infrastructure without turning auth.md into execution authority.
-- Location: `src/adapters/auth-md/*`, `test/adapters/auth-md-adapter.test.ts`, `test/adapters/auth-md-gateway.test.ts`, `test/runtime/auth-md-candidate-compilation.test.ts`, and explicit experimental exports in `src/experimental.ts`.
-- Contains: Protected Resource Metadata normalization, authorization-server `agent_auth` normalization, redacted discovery/registration/identity/claim/revocation evidence, `GatewayCredentialRef` intake, `auth_md_protected_api_call.exact` proposal helper, runtime-ingress family binding, and protected API-call gateway fixture.
+- Location: `src/adapters/auth-md/*`, `test/adapters/auth-md-*`, `test/runtime/auth-md-candidate-compilation.test.ts`, `test/integration/auth-md-*`, `test/protocol/policy-auth-md.test.ts`, and explicit experimental exports in `src/experimental.ts`.
+- Contains: Protected Resource Metadata normalization, authorization-server `agent_auth` normalization, redacted discovery/registration/identity/claim/revocation evidence, `GatewayCredentialRef` intake, `auth_md_protected_api_call.exact` proposal helper, runtime-ingress family binding, lifecycle isolation, bypass probes, and protected API-call gateway fixture.
 - Depends on: Protocol credential-custody, intent-compilation, action-contract, gateway-gate, operation-lifecycle, generated-execution graph, tool-call-draft, and foundation digest helpers.
-- Used by: Experimental/reference adapter tests, runtime ingress tests, and the current dirty lifecycle/bypass/reconstruction expansion.
+- Used by: Experimental/reference adapter tests, runtime ingress tests, and committed lifecycle/bypass/reconstruction tests.
 
 **Storage And Reconstruction Layer:**
 - Purpose: Persist protocol evidence and atomic indexes for reconstruction, replay refusal, idempotency, posture, isolation, and receipt lookup.
@@ -190,13 +197,14 @@ Current git-state boundary: committed source includes the Tier 1 kernel, runtime
 - Use `src/cli/projection-evidence.ts`, `src/cli/aps-report.ts`, and `src/cli/certificate.ts` for evidence wrappers and local certificate verification.
 - Evidence note: `test/architecture/cli-command-posture.test.ts`, `test/cli/cli-evidence.test.ts`, `test/cli/cli-support-bundle.test.ts`, `test/cli/cli-local-project.test.ts`, and `test/cli/cli-x402-install-probes.test.ts` guard non-authority CLI posture.
 
-**MCP transcript and resources:**
+**MCP transcript, stdio proof, and resources:**
 - Use `src/mcp/catalog.ts` for `handshake.actions.x402_payment.propose` and read-only resource templates.
 - Use `src/mcp/resources.ts` for `handshake://` URI parsing and evidence-client resource reads.
 - Use `src/mcp/x402-proposal.ts` for strict x402 proposal validation and runtime-client bridge.
 - Use `src/mcp/output.ts` and `src/surfaces/outcome.ts` for structured non-authority tool results.
 - Use `src/mcp/reference-transcript.ts` and `examples/mcp-reference-transcript/run.ts` for the source-owned transcript harness.
-- Evidence note: `test/mcp/*` and `test/architecture/mcp-surface-posture.test.ts` guard no policy, greenlight, gateway check, mutation, raw record, signer, wallet, `PaymentPayload`, `PAYMENT-SIGNATURE`, or package export posture.
+- Use `src/mcp/stdio/*` only for the local stdio process proof exercised by `examples/self-hosted-activation/run.ts`.
+- Evidence note: `test/mcp/*`, `test/mcp/mcp-stdio-process.test.ts`, and `test/architecture/mcp-surface-posture.test.ts` guard no policy, greenlight, gateway check, mutation, raw record, signer, wallet, `PaymentPayload`, `PAYMENT-SIGNATURE`, public host claim, or package export posture.
 
 **Runtime ingress:**
 - Use `src/runtime/ingress/index.ts` for local `wrapped_package_install`, `raw_sibling_package_install`, `ambiguous_package_install`, `wrapped_x402_payment`, `raw_sibling_x402_payment`, `ambiguous_x402_payment`, `wrapped_auth_md_protected_api_call`, `raw_sibling_auth_md_protected_api_call`, and `ambiguous_auth_md_protected_api_call` dispatch schemas.
@@ -218,6 +226,7 @@ Current git-state boundary: committed source includes the Tier 1 kernel, runtime
 **Demos:**
 - Use `examples/x402-protected-spend/run.ts` and `examples/x402-protected-spend/README.md` for APS proof artifacts.
 - Use `examples/mcp-reference-transcript/run.ts` and `examples/mcp-reference-transcript/README.md` for model-facing transcript artifacts.
+- Use `examples/self-hosted-activation/run.ts` and `examples/self-hosted-activation/README.md` for the source-owned local activation packet. Generated output is ignored and must remain local evidence, not canonical docs or package source.
 - Evidence note: `test/product/x402-protected-spend-demo-report.test.ts` verifies APS output uses `RuntimeClient` and `EvidenceClient`, not low-level `HandshakeClient` or direct runtime helper calls.
 
 **Architecture and export guards:**
@@ -282,7 +291,7 @@ Current git-state boundary: committed source includes the Tier 1 kernel, runtime
 4. `proposeAuthMdProtectedApiCallActionContract()` compiles `auth_md_protected_api_call.exact` into intent compilation and action contract proposal only.
 5. Policy evaluation and greenlight issuance still come from `src/protocol/areas/policy-greenlight/*`.
 6. `src/adapters/auth-md/gateway.ts` runs the protected API-call surface only after `VerifiedGatewayCheck`, records `CredentialResolutionEvidence` after the gate, and reconciles success/refusal/proof-gap/failure evidence.
-7. Dirty `src/adapters/auth-md/revocation.ts` and `src/adapters/auth-md/bypass-probes.ts` extend the path with lifecycle isolation and hostile posture classification; those additions are focused-test green but not yet committed.
+7. `src/adapters/auth-md/revocation.ts` and `src/adapters/auth-md/bypass-probes.ts` extend the path with lifecycle isolation and hostile posture classification.
 
 This path does not create auth-provider, hosted, provider-custody, OAuth-server, certification, or generic API-gateway claims.
 
@@ -389,7 +398,7 @@ This path does not create auth-provider, hosted, provider-custody, OAuth-server,
 - **CLI package posture:** `src/cli/*` is source-owned; there is no package/bin authority surface in this checkout.
 - **x402 SDK imports:** Official x402 signer and client imports belong in `src/adapters/x402-payment/wallet-gateway.ts` and upstream parity tests, not MCP, CLI, SDK role clients, or root exports.
 - **Spend windows:** x402 session/day/review spend bounds are metadata in `src/adapters/x402-payment/install-proposal.ts`; only per-call bounds are enforced.
-- **auth.md adapter state:** the protected-call proposal/gateway/runtime-ingress slice is committed under the explicit experimental/reference adapter surface. The revocation, bypass-probe, and projection-label expansion is dirty working-tree state and needs full gates before commit.
+- **auth.md adapter state:** the protected-call proposal/gateway/runtime-ingress/lifecycle/bypass/reconstruction slice is committed under the explicit experimental/reference adapter surface.
 
 ## Anti-Patterns
 
@@ -443,4 +452,4 @@ This path does not create auth-provider, hosted, provider-custody, OAuth-server,
 
 ---
 
-*Architecture analysis: 2026-05-23*
+*Architecture analysis: 2026-05-24*

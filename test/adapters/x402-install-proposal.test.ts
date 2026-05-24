@@ -18,7 +18,7 @@ describe("x402 install proposal compiler", () => {
     expect(proposal.adapterPackId).toBe(x402PaymentExactAdapterPack.adapterPackId);
     expect(proposal.humanSummary).toContain("agent will not receive signing authority");
     expect(proposal.humanSummary).toContain("session/day/review windows are metadata");
-    expect(proposal.spendBounds.spendWindowEnforcementStatus).toBe("not_enforced_tier1_metadata");
+    expect(proposal.spendBounds.spendWindowEnforcementStatus).toBe("not_enforced_local_metadata");
     expect(proposal.compiledRecords?.actionType.actionClass).toBe("x402_payment.exact");
     expect(proposal.compiledRecords?.gatewayRegistryEntry.credentialCustodyStatus).toBe("fixture_gateway_held");
     expect(proposal.compiledRecords?.gatewayRegistryEntry.enforcementMode).toBe("reference_fixture");

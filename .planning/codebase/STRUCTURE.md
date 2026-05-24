@@ -1,6 +1,6 @@
 # Codebase Structure
 
-**Analysis Date:** 2026-05-23
+**Analysis Date:** 2026-05-24
 
 ## Directory Layout
 
@@ -20,6 +20,7 @@ Handshake v0.0.2/
 |-- docs/internal/                     # Compact canonical internal docs
 |-- examples/x402-protected-spend/     # Local x402 APS proof artifact generator
 |-- examples/mcp-reference-transcript/ # Source-owned MCP transcript artifact generator
+|-- examples/self-hosted-activation/   # Source-owned local self-hosted activation packet
 |-- migrations/                        # D1 protocol storage schema
 |-- scripts/                           # Package surface check script
 |-- src/                               # TypeScript source package
@@ -44,7 +45,7 @@ src/
 |-- storage/                           # D1, memory, KV, and store implementation plumbing
 |-- sdk/                               # Low-level HTTP client and role-scoped Tier 2 clients
 |-- cli/                               # Local operator/evidence command surfaces
-|-- mcp/                               # Model-facing proposal/resource source modules
+|-- mcp/                               # Model-facing proposal/resource source modules and local stdio proof harness
 |-- surfaces/                          # Shared non-authority surface manifests and outcomes
 `-- conformance/                       # Reference conformance checks
 ```
@@ -77,10 +78,10 @@ test/
 - Treat auth.md as an experimental/reference adapter profile: discovery and registration are provenance; `GatewayCredentialRef` is custody evidence; `auth_md_protected_api_call.exact` is an action contract; `runAuthMdProtectedApiCallGateway()` mutates only after `VerifiedGatewayCheck`.
 - It is not Tier 1 kernel, not an auth provider, not an OAuth server, not WorkOS replacement, not provider custody, not hosted operation, and not a generic API gateway.
 
-**Current dirty auth.md expansion:**
-- Dirty tracked/untracked files add lifecycle isolation, bypass probes, auth.md transaction-envelope evidence labels, shared flow fixtures, policy tests, gateway pressure tests, serialization redaction tests, and local integration/reconstruction tests.
-- Key files: `src/adapters/auth-md/revocation.ts`, `src/adapters/auth-md/bypass-probes.ts`, `test/support/auth-md-flow.ts`, `test/protocol/policy-auth-md.test.ts`, `test/integration/auth-md-protected-call.test.ts`, and `test/integration/auth-md-receipt-reconstruction.test.ts`.
-- Treat these as user-owned working-tree state until full-gated and committed.
+**Current Tier 2 activation closeout:**
+- Closeout files add a source-owned local self-hosted activation packet, local MCP stdio process proof, CLI self-hosted readback tests, and claim-boundary tests for the packet.
+- Key files: `examples/self-hosted-activation/*`, `src/mcp/stdio/*`, `test/product/self-hosted-activation.test.ts`, `test/mcp/mcp-stdio-process.test.ts`, `test/cli/cli-self-hosted-readback.test.ts`, and `test/architecture/self-hosted-activation-claim-boundary.test.ts`.
+- Treat these as local/pre-hosted activation evidence only. They are not public MCP host packaging, hosted operation, process supervision, gateway authority, or broad runtime containment.
 
 ## Directory Purposes
 
@@ -136,7 +137,7 @@ test/
 
 **`src/adapters`:**
 - Purpose: Reference gateway fixtures and adapter proof profiles.
-- Contains: committed package-install, repo-write, preview-deploy, protected-path probes, x402 payment proof profile, downstream failure evidence, and auth.md protected-call adapter profile; current dirty auth.md lifecycle/bypass files are working-tree state.
+- Contains: committed package-install, repo-write, preview-deploy, protected-path probes, x402 payment proof profile, downstream failure evidence, and auth.md protected-call/lifecycle/bypass adapter profile.
 - Key files: `src/adapters/package-install/gateway.ts`, `src/adapters/repo-write/gateway.ts`, `src/adapters/preview-deploy/gateway.ts`, `src/adapters/x402-payment/wallet-gateway.ts`, `src/adapters/x402-payment/install-proposal.ts`, `src/adapters/x402-payment/action-proposal.ts`, `src/adapters/x402-payment/upstream-evidence.ts`, `src/adapters/x402-payment/conformance.ts`, `src/adapters/x402-payment/bypass-probes.ts`.
 
 **`src/install`:**
@@ -161,7 +162,7 @@ test/
 
 **`src/mcp`:**
 - Purpose: Model-facing x402 proposal and evidence source modules.
-- Contains: `catalog.ts`, `resources.ts`, `x402-proposal.ts`, `output.ts`, `digest.ts`, `reference-transcript.ts`, `reference-transcript-fixtures.ts`, `index.ts`.
+- Contains: `catalog.ts`, `resources.ts`, `x402-proposal.ts`, `output.ts`, `digest.ts`, `reference-transcript.ts`, `reference-transcript-fixtures.ts`, `index.ts`, and the local `stdio/` proof harness.
 - Key files: `src/mcp/catalog.ts`, `src/mcp/resources.ts`, `src/mcp/x402-proposal.ts`, `src/mcp/output.ts`, `src/mcp/reference-transcript.ts`.
 
 **`src/surfaces`:**
@@ -184,6 +185,11 @@ test/
 - Contains: `run.ts`, `README.md`, `output/latest.json`, `output/latest.md`.
 - Key files: `examples/mcp-reference-transcript/run.ts`, `src/mcp/reference-transcript.ts`.
 
+**`examples/self-hosted-activation`:**
+- Purpose: Source-owned local activation packet that composes APS, CLI readbacks, MCP reference transcript, and local MCP stdio process proof.
+- Contains: `run.ts`, `README.md`, `DEFERRED_GATES.md`, `output/.gitignore`, and ignored generated output files.
+- Key files: `examples/self-hosted-activation/run.ts`, `src/mcp/stdio/process-proof.ts`, `test/product/self-hosted-activation.test.ts`.
+
 ## Key File Locations
 
 **Entry Points:**
@@ -196,8 +202,10 @@ test/
 - `src/worker.ts`: Worker fetch entrypoint.
 - `src/cli/main.ts`: Source CLI dispatcher.
 - `src/mcp/index.ts`: MCP source-module exports, not a package subpath.
+- `src/mcp/stdio/entry.ts`: Local MCP stdio process entrypoint for the source-owned self-hosted proof packet, not a package export.
 - `examples/x402-protected-spend/run.ts`: APS proof artifact generator.
 - `examples/mcp-reference-transcript/run.ts`: MCP transcript artifact generator.
+- `examples/self-hosted-activation/run.ts`: Local self-hosted activation packet generator.
 
 **Configuration:**
 - `package.json`: Package exports, scripts, files, dependencies.
@@ -359,7 +367,7 @@ test/
 
 **auth.md Adapter Work:**
 - Committed files: `src/adapters/auth-md/profiles.ts`, `src/adapters/auth-md/action-proposal.ts`, `src/adapters/auth-md/gateway.ts`, `src/adapters/auth-md/index.ts`, `test/adapters/auth-md-adapter.test.ts`, `test/adapters/auth-md-gateway.test.ts`, and `test/runtime/auth-md-candidate-compilation.test.ts`.
-- Dirty expansion files: `src/adapters/auth-md/revocation.ts`, `src/adapters/auth-md/bypass-probes.ts`, `test/support/auth-md-flow.ts`, `test/adapters/auth-md-bypass-probes.test.ts`, `test/adapters/auth-md-revocation.test.ts`, `test/adapters/auth-md-gateway-pressure.test.ts`, `test/adapters/auth-md-serialization-redaction.test.ts`, `test/protocol/policy-auth-md.test.ts`, `test/integration/auth-md-protected-call.test.ts`, and `test/integration/auth-md-receipt-reconstruction.test.ts`.
+- Lifecycle/bypass/reconstruction files: `src/adapters/auth-md/revocation.ts`, `src/adapters/auth-md/bypass-probes.ts`, `test/support/auth-md-flow.ts`, `test/adapters/auth-md-bypass-probes.test.ts`, `test/adapters/auth-md-revocation.test.ts`, `test/adapters/auth-md-gateway-pressure.test.ts`, `test/adapters/auth-md-serialization-redaction.test.ts`, `test/protocol/policy-auth-md.test.ts`, `test/integration/auth-md-protected-call.test.ts`, and `test/integration/auth-md-receipt-reconstruction.test.ts`.
 - Placement: keep auth.md under `src/adapters/auth-md/` and explicit `src/experimental.ts` exports. Do not move it to root, runtime, SDK, CLI, MCP, or conformance package surfaces unless a future source-owned boundary explicitly proves that move.
 - Guardrail: It may normalize Protected Resource Metadata, prepare opaque `GatewayCredentialRef` intake, propose exact service-call contracts, and run a reference gateway only after `VerifiedGatewayCheck`. It must not issue policy by itself, create ambient greenlights, leak credential material, claim hosted identity, become an auth provider or OAuth server, certify providers, or act as a generic API gateway.
 
@@ -441,7 +449,7 @@ test/
 **Adapter and x402 surfaces:**
 - Reference gateways: `src/adapters/package-install/gateway.ts`, `src/adapters/repo-write/gateway.ts`, `src/adapters/preview-deploy/gateway.ts`.
 - x402 proof profile: `src/adapters/x402-payment/*`.
-- Committed auth.md profile: `src/adapters/auth-md/*` proposal/gateway/runtime-ingress slice is experimental/reference architecture; current revocation/bypass/reconstruction additions are dirty working-tree state.
+- Committed auth.md profile: `src/adapters/auth-md/*` proposal/gateway/runtime-ingress/lifecycle/bypass/reconstruction slice is experimental/reference architecture.
 - Conformance subpath: `src/conformance/index.ts`.
 - Experimental subpath: `src/experimental.ts`.
 - Tests: `test/adapters/*`, `test/conformance/*`, `test/integration/x402-d1-http.test.ts`.
@@ -492,4 +500,4 @@ test/
 
 ---
 
-*Structure analysis: 2026-05-23*
+*Structure analysis: 2026-05-24*

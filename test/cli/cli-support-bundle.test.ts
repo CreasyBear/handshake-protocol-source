@@ -194,7 +194,7 @@ function localX402Install() {
     selectedPaymentRequirementIndex: 0,
     selectedPaymentRequirementDigest: digestB,
     perCallAmountBound: "2500",
-    spendWindowEnforcementStatus: "not_enforced_tier1_metadata",
+    spendWindowEnforcementStatus: "not_enforced_local_metadata",
     gatewayAuthorityRefDigest: digestC,
     paymentCredentialRefDigest: digestD,
     credentialCustodyStatus: "gateway_held",

@@ -630,7 +630,7 @@ function validX402InstallInput(): X402InstallProposalInput {
       maxAtomicAmountPerSession: "10000",
       maxAtomicAmountPerDay: "20000",
       reviewThresholdAtomicAmount: "5000",
-      spendWindowEnforcementStatus: "not_enforced_tier1_metadata",
+      spendWindowEnforcementStatus: "not_enforced_local_metadata",
       issuedAt: createdAt,
       expiresAt: futureIso(),
     },

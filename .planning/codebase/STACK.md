@@ -1,6 +1,6 @@
 # Technology Stack
 
-**Analysis Date:** 2026-05-23
+**Analysis Date:** 2026-05-24
 
 ## Source Boundary
 
@@ -14,12 +14,10 @@
 - The committed telemetry hardening is source-backed by redacted evidence projections in `src/protocol/evidence-projections/schemas.ts`, projection assembly in `src/protocol/evidence-projections/projections.ts`, transaction-envelope assembly in `src/protocol/evidence-projections/assembly.ts`, CLI non-authority envelopes in `src/cli/output.ts`, support-bundle redaction in `src/cli/support-bundle.ts`, MCP non-authority outcomes in `src/mcp/output.ts`, and surface boundary flags in `src/surfaces/boundary-manifest.ts`.
 - Tests proving the telemetry boundary include `test/protocol/evidence-projections.test.ts`, `test/http/http.test.ts`, `test/cli/cli-support-bundle.test.ts`, `test/mcp/mcp-resource-redaction.test.ts`, and `test/product/agent-proof-slice.test.ts`.
 
-**Current source state after auth.md promotion:**
-- Commit `7bba365` promoted the first `src/adapters/auth-md/` slice: `profiles.ts`, `action-proposal.ts`, `gateway.ts`, `index.ts`, adapter tests, gateway tests, runtime-ingress candidate-compilation tests, export posture, and compact docs.
-- The committed auth.md adapter treats OAuth Protected Resource Metadata plus authorization-server `agent_auth` metadata as machine provenance, treats `/auth.md` prose as supporting evidence only, imports issued credentials into `GatewayCredentialRef` custody, proposes `auth_md_protected_api_call.exact` contracts, and runs protected API calls only after `VerifiedGatewayCheck`.
-- The current working tree has additional user-owned dirty auth.md expansion beyond that commit: `src/adapters/auth-md/bypass-probes.ts`, `src/adapters/auth-md/revocation.ts`, dirty evidence-projection labels, dirty runtime/test fixture refactors, and untracked auth.md pressure, redaction, integration, policy, reconstruction, bypass, and revocation tests.
-- Focused verification for the dirty auth.md expansion passed during this remap: the auth.md slice returned 34 pass / 0 fail.
-- Keep committed auth.md protected-call support separate from the dirty lifecycle/bypass/reconstruction expansion until the expansion is reviewed, staged, full-gated, and committed.
+**Current source state after pre-hosted Tier 2 closeout work:**
+- The committed auth.md adapter treats OAuth Protected Resource Metadata plus authorization-server `agent_auth` metadata as machine provenance, treats `/auth.md` prose as supporting evidence only, imports issued credentials into `GatewayCredentialRef` custody, proposes `auth_md_protected_api_call.exact` contracts, handles lifecycle isolation and bypass probes, and runs protected API calls only after `VerifiedGatewayCheck`.
+- The active closeout tree adds a source-owned local self-hosted activation packet plus a local MCP stdio process proof. These prove APS, CLI readback, MCP transcript, and MCP stdio list/read/call posture locally; they do not add hosted operation, public MCP host packaging, process supervision, gateway authority, signer custody, or broad generated-tool containment.
+- Keep self-hosted activation and MCP stdio proof posture separate from public SDK/CLI/MCP implementation promises until full closeout gates pass and a later hosted/process boundary is designed.
 
 ## Languages
 
@@ -29,7 +27,7 @@
 **Secondary:**
 - JavaScript ESM - package surface validation in `scripts/check-package-surface.mjs`; the package is `"type": "module"` in `package.json`.
 - SQL - Cloudflare D1 schema in `migrations/0001_protocol_kernel.sql`.
-- Markdown - canonical docs in repo root and `docs/internal/`; generated demo reports in `examples/x402-protected-spend/output/` and `examples/mcp-reference-transcript/output/`.
+- Markdown - canonical docs in repo root and `docs/internal/`; generated demo reports in `examples/x402-protected-spend/output/`, `examples/mcp-reference-transcript/output/`, and `examples/self-hosted-activation/output/`.
 
 ## Runtime
 
@@ -50,6 +48,7 @@
 - Zod ^4.4.3 - schema validation across protocol areas, HTTP errors/routes, CLI outputs, MCP resources, SDK boundaries, runtime ingress, and adapters.
 - Cloudflare D1/KV - durable protocol store and isolation cache bindings via `wrangler.toml`, `src/storage/d1/index.ts`, `src/storage/d1/statements.ts`, and `src/storage/kv/index.ts`.
 - x402 SDK 2.12.0 - official buyer-side exact path through `@x402/core` and `@x402/evm` in `src/adapters/x402-payment/upstream-evidence.ts` and `src/adapters/x402-payment/wallet-gateway.ts`.
+- MCP TypeScript SDK 2.0.0 alpha - local stdio process proof through `@modelcontextprotocol/client`, `@modelcontextprotocol/server`, and JSON Schema conversion via `@cfworker/json-schema`.
 
 **Testing:**
 - Bun test - invoked by `npm run test`; tests live under `test/`.
@@ -69,6 +68,9 @@
 - `hono` ^4.12.19 - reference HTTP API in `src/http/app.ts`.
 - `@x402/core` 2.12.0 - official x402 payment-required parsing and payment-payload creation in `src/adapters/x402-payment/upstream-evidence.ts` and `src/adapters/x402-payment/wallet-gateway.ts`.
 - `@x402/evm` 2.12.0 - exact EVM signing surface in `src/adapters/x402-payment/wallet-gateway.ts`.
+- `@modelcontextprotocol/client` ^2.0.0-alpha.2 - local MCP stdio client proof in `src/mcp/stdio/process-proof.ts`.
+- `@modelcontextprotocol/server` ^2.0.0-alpha.2 - local MCP stdio server harness in `src/mcp/stdio/server.ts`.
+- `@cfworker/json-schema` ^4.1.1 - Zod-to-JSON-Schema bridge for the local MCP stdio server harness.
 
 **Infrastructure:**
 - `@cloudflare/workers-types` ^4.20260517.1 - D1, KV, and Worker typings for `src/http/`, `src/storage/`, and `src/worker.ts`.
@@ -84,7 +86,7 @@
 - `./runtime` -> `src/runtime/index.ts` and `dist/runtime/index.d.ts`; runtime ingress proposal helpers only.
 - `./sdk/role-clients` -> `src/sdk/surface-clients/index.ts` and `dist/sdk/surface-clients/index.d.ts`; runtime and evidence role clients.
 - `./conformance` -> `src/conformance/index.ts` and `dist/conformance/index.d.ts`; reference conformance helpers.
-- `./experimental` -> `src/experimental.ts` and `dist/experimental.d.ts`; committed reference gateway fixture exports, including explicit auth.md profile/proposal/gateway fixture exports. The current dirty tree adds auth.md lifecycle and bypass-probe exports here.
+- `./experimental` -> `src/experimental.ts` and `dist/experimental.d.ts`; committed reference gateway fixture exports, including explicit auth.md profile/proposal/gateway/lifecycle/probe fixture exports.
 
 **Package guard:**
 - `scripts/check-package-surface.mjs` requires source, generated declarations, README, quality/structure docs, and compact `docs/internal/*` canon; it rejects `.planning/`, `.agents/`, tests, deleted docs trees, `.DS_Store`, and `skills-lock.json`.
@@ -132,9 +134,11 @@ npm run quality:claims
 ```bash
 npm run demo:aps
 npm run demo:mcp-transcript
+npm run demo:self-hosted
 ```
 
 `npm run demo:aps` refreshes `examples/x402-protected-spend/output/latest.json` and `examples/x402-protected-spend/output/latest.md`. `npm run demo:mcp-transcript` refreshes `examples/mcp-reference-transcript/output/latest.json` and `examples/mcp-reference-transcript/output/latest.md`.
+`npm run demo:self-hosted` refreshes `examples/self-hosted-activation/output/latest.json` and `examples/self-hosted-activation/output/latest.md`; those output files are local ignored artifacts.
 
 ## Platform Requirements
 
@@ -151,7 +155,7 @@ npm run demo:mcp-transcript
 
 ## Pre-Hosted Limitations
 
-- Current Tier 2-facing surfaces are local/reference and pre-hosted: role SDKs in `src/sdk/surface-clients/`, CLI envelopes in `src/cli/`, MCP reference transcript in `src/mcp/`, and the x402 protected-spend demo in `examples/x402-protected-spend/`.
+- Current Tier 2-facing surfaces are local/reference and pre-hosted: role SDKs in `src/sdk/surface-clients/`, CLI envelopes in `src/cli/`, MCP reference transcript and local stdio proof in `src/mcp/`, the x402 protected-spend demo in `examples/x402-protected-spend/`, and the local self-hosted activation packet in `examples/self-hosted-activation/`.
 - Runtime ingress in `src/runtime/ingress/index.ts` is observer/compiler evidence. It does not issue policy decisions, greenlights, gateway checks, receipts, certificates, or mutations.
 - x402 support is one official buyer-side V2 `exact` path. `src/adapters/x402-payment/conformance.ts` marks `upto`, batch settlement, lifecycle hooks, MCP auto-pay, signed offers, signed receipts, seller middleware, and facilitator operation unsupported.
 - Spend windows in `src/adapters/x402-payment/install-proposal.ts` are metadata until a ledger exists.
@@ -159,4 +163,4 @@ npm run demo:mcp-transcript
 
 ---
 
-*Stack analysis: 2026-05-23*
+*Stack analysis: 2026-05-24*
