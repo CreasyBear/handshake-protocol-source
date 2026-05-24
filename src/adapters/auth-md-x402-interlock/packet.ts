@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { DigestSchema, IdSchema } from "../protocol/foundation/schema-core";
+import { DigestSchema, IdSchema } from "../../protocol/foundation/schema-core";
 
 const NonEmptyStringSchema = z.string().min(1);
 

@@ -18,7 +18,7 @@ Surface manifests are guardrails for implementation and review. The protocol ker
 
 ## Core components
 
-`index.ts` is the internal source face for this lane. `boundary-manifest.ts` defines the shared surface boundary table consumed by architecture tests. `release-proof.ts` defines public distribution release-state evidence for package readiness, publication, registry discoverability, proof gaps, and authority non-claims. `auth-md-x402-interlock.ts` defines the read-only packet projection that links auth.md provenance evidence to x402 protected-spend evidence without creating authority, resolving credentials, signing payments, or claiming downstream success.
+`boundary-manifest.ts` defines the shared surface boundary table consumed by architecture tests. `release-proof.ts` defines public distribution release-state evidence for package readiness, publication, registry discoverability, proof gaps, and authority non-claims.
 
 ## Failure and scale posture
 
@@ -50,4 +50,4 @@ Extract only after SDK, CLI, and MCP implementations consume the manifest withou
 
 ## Scope boundary
 
-This lane defines what product surfaces may import, expose, and claim. Release proof records publication evidence only. Auth.md/x402 interlock packets record provenance/spend evidence only. They must not evaluate policy, issue greenlights, perform gateway checks, mutate protected surfaces, resolve credentials, invoke signers, mint certificates, export receipts, certify trust, host operation, manage settlement/payment, or read raw protocol records.
+This lane defines what product surfaces may import, expose, and claim. Release proof records publication evidence only. Adapter/plugin packets must live in adapter/plugin lanes, not this shared surface lane. This lane must not evaluate policy, issue greenlights, perform gateway checks, mutate protected surfaces, mint certificates, export receipts, certify trust, host operation, manage settlement/payment, or read raw protocol records.

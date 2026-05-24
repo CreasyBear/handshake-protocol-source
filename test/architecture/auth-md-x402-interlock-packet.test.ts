@@ -4,7 +4,7 @@ import {
   AuthMdX402InterlockAuthorityBoundarySchema,
   projectAuthMdX402InterlockPacket,
   type AuthMdX402InterlockPacketInput,
-} from "../../src/surfaces/auth-md-x402-interlock";
+} from "../../src/adapters/auth-md-x402-interlock";
 
 describe("auth.md x402 interlock packet", () => {
   it("projects auth.md provenance and x402 protected spend evidence without authority", () => {
