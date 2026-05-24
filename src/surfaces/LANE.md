@@ -18,7 +18,7 @@ Surface manifests are guardrails for implementation and review. The protocol ker
 
 ## Core components
 
-`boundary-manifest.ts` defines the shared surface boundary table consumed by architecture tests. `release-proof.ts` defines public distribution release-state evidence for package readiness, publication, registry discoverability, proof gaps, and authority non-claims.
+`boundary-manifest.ts` defines the shared surface boundary table consumed by architecture tests. `activation-gate.ts` defines the evidence-scoped activation verdict report, required success criteria, and blocking anti-patterns used to decide whether local proof can unblock later operated-surface work. `release-proof.ts` defines public distribution release-state evidence for package readiness, publication, registry discoverability, proof gaps, and authority non-claims.
 
 ## Failure and scale posture
 

@@ -43,8 +43,10 @@ const adapterRailMarkers = [/\bx402\b/i] as const;
 const permittedStageLabelLiterals = ["not_enforced_local_metadata"] as const;
 const adapterRailAllowedFiles = new Set([
   "src/protocol/evidence-projections/projections.ts",
+  "src/runtime/ingress/families.ts",
   "src/runtime/ingress/index.ts",
   "src/runtime/ingress/registry.ts",
+  "src/runtime/ingress/schemas.ts",
   "docs/internal/protocol-notes.md",
 ]);
 

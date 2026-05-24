@@ -241,8 +241,6 @@ describe("root package exports", () => {
       "ExperimentalAuthMdRegistrationEvidenceSchema",
       "ExperimentalAuthMdRevocationEvidenceSchema",
       "ExperimentalPackageInstallParametersSchema",
-      "ExperimentalPreviewDeployParametersSchema",
-      "ExperimentalRepoWriteParametersSchema",
       "ExperimentalX402PaymentParametersSchema",
       "experimentalApplyAuthMdCredentialLifecycleIsolation",
       "experimentalAuthMdIsolationStateForRevocationEvent",
@@ -260,11 +258,11 @@ describe("root package exports", () => {
       "experimentalRunAuthMdProtectedApiCallGateway",
       "experimentalRunBypassProbeExecutors",
       "experimentalRunPackageInstallGateway",
-      "experimentalRunPreviewDeployGateway",
-      "experimentalRunRepoWriteGateway",
       "experimentalRunX402WalletGateway",
     ]);
     expect(experimental.experimentalRunPackageInstallGateway).toBeFunction();
+    expect(exportNames).not.toContain("experimentalRunPreviewDeployGateway");
+    expect(exportNames).not.toContain("experimentalRunRepoWriteGateway");
   });
 
   it("keeps conformance checks on an explicit conformance surface", async () => {

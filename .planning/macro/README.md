@@ -10,24 +10,24 @@ Invariant: this folder is scratch coordination for macro work. It must not becom
 
 ## Implemented
 
-- `implemented/2026-05-22-tier2-sdk-cli-mcp-surfaces/`: SDK, CLI, and MCP first-slice surfaces closed under explicit cut lines.
-- `implemented/2026-05-23-auth-md-integration/`: auth.md adapter integration plan closed with source-backed implementation status and gates.
-- `implemented/2026-05-23-pre-hosted-tier2-telemetry/`: response and telemetry posture hardening closed.
-- `implemented/2026-05-23-tier2-surface-hardening/`: Tier 2 surface hardening closed.
-- `implemented/2026-05-24-cli-mcp-publish-readiness/`: CLI/MCP package-readiness source gates closed; actual external publication remains owner-held.
-- `implemented/2026-05-24-tier2-x402-sandbox/`: local x402 sandbox proof closed under local/reference non-claims.
-- `implemented/2026-05-24-concerns-elimination/`: codebase concern elimination plan and validation closed.
-- `implemented/2026-05-24-tier2-macro-closeout/`: seven active macro plans source-closed with audit, review, GSD remap, and explicit external proof gaps.
+Closed implementation sprint artifacts have been moved out of the active
+workspace. Historical sprint packets live under
+`archive/implemented-sprints/`; historical macro run packets live under
+`archive/implemented-runs/`.
 
 ## Archive
 
 - `archive/strategy-studies/`: historical macro state, clearing-house, gbrain, and next-decision studies.
 - `archive/source-comparisons/`: source comparison studies such as Infisical/auth and vault adapter planning.
+- `archive/implemented-sprints/`: source-closed implementation sprint packets.
+- `archive/implemented-runs/`: closed macro run packets.
 - `archive/system-junk/`: moved local filesystem artifacts.
 
 ## Placement Rule
 
-- Move source-closed plans to `implemented/<date-slug>/`.
+- Move source-closed plans to `implemented/<date-slug>/` while they are being
+  validated, then archive them under `archive/implemented-sprints/` during
+  housekeeping.
 - Move superseded or historical studies to `archive/<category>/`.
 - Keep unresolved implementation plans in `active/<slug>/` or the root active register.
 - Do not use `.planning/` content as canonical truth unless a later source/doc change promotes and validates it.

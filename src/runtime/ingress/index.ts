@@ -1,5 +1,4 @@
-import { z } from "zod";
-import type { ActionContract } from "../../protocol/areas/action-contract";
+import type { ActionContract, ProposeActionContractInput } from "../../protocol/areas/action-contract";
 import type {
   CreateGeneratedExecutionGraphInput,
   GeneratedExecutionGraph,
@@ -7,7 +6,6 @@ import type {
   GraphEvidenceIssuerContext,
 } from "../../protocol/areas/generated-execution-graph";
 import type { CompileIntentInput, IntentCompilationRecord } from "../../protocol/areas/intent-compilation";
-import { CredentialCustodyStatusSchema } from "../../protocol/areas/catalog-envelope";
 import type { CreateRuntimeExecutionInput, RuntimeExecutionRecord } from "../../protocol/areas/runtime-evidence";
 import type {
   CreateToolCallDraftInput,
@@ -17,250 +15,37 @@ import type {
 import { digestCanonical, protectedActionParamsDigest } from "../../protocol/foundation/canonical";
 import type { JsonValue } from "../../protocol/foundation/schema-core";
 import {
-  buildPackageInstallCompileIntentInput,
-  refusalReasonCodesForCompilation,
-  type PackageInstallRuntimeConfig,
-  type PackageInstallRuntimeProtocol,
-  type PackageInstallToolCall,
-} from "../package-install/action-proposal";
+  buildCompileIntentInputForDispatch,
+  dispatchGeneratedCodeOrSpecRef,
+  dispatchSpecificRefusalReasonCodes,
+  isAmbiguousDispatch,
+  isRawSiblingDispatch,
+  runtimeConfigForDispatch,
+  runtimeIngressEvidenceRefs,
+  signingSecretForDispatch,
+  supportedGrammarVersionForBlock,
+  type RuntimeIngressConfig,
+} from "./families";
+import { runtimeIngressDispatchNodeId } from "./node-ids";
 import {
-  buildX402PaymentCompileIntentInput,
-  buildX402PaymentCompileIntentInputForRuntimeRefusal,
-  type X402PaymentAttempt,
-  type X402PaymentRuntimeConfig,
-} from "../../adapters/x402-payment/action-proposal";
-import {
-  authMdProtectedApiCallRefusalReasonCodes,
-  buildAuthMdProtectedApiCallCompileIntentInputForRuntimeRefusal,
-  type AuthMdProtectedApiCallAttempt,
-  type AuthMdProtectedApiCallRuntimeConfig,
-} from "../../adapters/auth-md/action-proposal";
-import { runtimeIngressFamilyIdForDispatchKind, runtimeIngressGrammarVersionForFamilySet } from "./registry";
-
-const RuntimeIngressIdSchema = z.string().min(1).max(160);
-const RuntimeIngressRefSchema = z.string().min(1).max(500);
-const RuntimeIngressUrlSchema = z.string().url().max(2_048);
-const RuntimeIngressSmallListSchema = <T extends z.ZodTypeAny>(schema: T) => z.array(schema).max(32);
-const RuntimeIngressDispatchLimit = 32;
-
-const PackageInstallDispatchParameterFields = {
-  package: RuntimeIngressIdSchema,
-  versionRange: RuntimeIngressIdSchema,
-  packageManager: RuntimeIngressIdSchema.default("bun"),
-  registryRef: RuntimeIngressRefSchema.default("registry:npmjs"),
-  workspaceRef: RuntimeIngressRefSchema.nullable().default(null),
-  manifestRef: RuntimeIngressRefSchema.nullable().default("manifest:package.json"),
-  lockfileRef: RuntimeIngressRefSchema.nullable().default("lockfile:bun.lock"),
-  installFlags: RuntimeIngressSmallListSchema(RuntimeIngressIdSchema).default([]),
-  lifecycleScriptPolicy: z.enum(["blocked", "allowed", "unknown"]).default("blocked"),
-  resolvedMaterialDigest: z
-    .string()
-    .regex(/^sha256:[a-f0-9]{64}$/)
-    .nullable()
-    .default(null),
-  resolvedMaterialEvidenceRefs: RuntimeIngressSmallListSchema(RuntimeIngressRefSchema).default([]),
-} as const;
-
-const X402PaymentDispatchParameterFields = {
-  endpointUrl: RuntimeIngressUrlSchema,
-  payee: RuntimeIngressRefSchema,
-  network: RuntimeIngressIdSchema,
-  token: RuntimeIngressIdSchema,
-  atomicAmount: z
-    .string()
-    .max(78)
-    .regex(/^(?:0|[1-9]\d*)$/),
-  x402EvidenceProfile: z.enum(["official_payment_required", "local_digest_profile"]).default("local_digest_profile"),
-  paymentRequirementsDigest: z.string().regex(/^sha256:[a-f0-9]{64}$/),
-  paymentRequiredEvidenceRef: RuntimeIngressRefSchema.optional(),
-  facilitatorRef: RuntimeIngressRefSchema.nullable().default(null),
-  intendedHttpMethod: RuntimeIngressIdSchema.nullable().default(null),
-  intendedRequestUrl: RuntimeIngressUrlSchema.nullable().default(null),
-  intendedRequestBodyPosture: z.enum(["no_body", "digest_bound", "omitted", "unsupported"]).default("no_body"),
-  intendedRequestBodyDigest: z
-    .string()
-    .regex(/^sha256:[a-f0-9]{64}$/)
-    .nullable()
-    .default(null),
-  selectedHeadersDigest: z
-    .string()
-    .regex(/^sha256:[a-f0-9]{64}$/)
-    .nullable()
-    .default(null),
-  providerEnvironmentPosture: z
-    .enum(["local_reference_sandbox", "external_sandbox", "live", "unknown"])
-    .default("local_reference_sandbox"),
-  providerEnvironmentRef: RuntimeIngressRefSchema.nullable().default(null),
-  x402Version: z.number().int().positive().nullable().default(null),
-  x402Scheme: RuntimeIngressIdSchema.nullable().default(null),
-  asset: RuntimeIngressIdSchema.nullable().default(null),
-  payTo: RuntimeIngressRefSchema.nullable().default(null),
-  maxTimeoutSeconds: z.number().positive().nullable().default(null),
-  selectedPaymentRequirementDigest: z
-    .string()
-    .regex(/^sha256:[a-f0-9]{64}$/)
-    .nullable()
-    .default(null),
-  selectedPaymentRequirementIndex: z.number().int().nonnegative().nullable().default(null),
-  sdkPackageVersions: z.record(RuntimeIngressIdSchema, RuntimeIngressIdSchema).default({}),
-  extensionKeys: RuntimeIngressSmallListSchema(RuntimeIngressIdSchema).default([]),
-} as const;
-
-const AuthMdProtectedApiCallDispatchParameterFields = {
-  protectedResource: RuntimeIngressUrlSchema,
-  protectedResourceMetadataDigest: z.string().regex(/^sha256:[a-f0-9]{64}$/),
-  authorizationServerMetadataDigest: z.string().regex(/^sha256:[a-f0-9]{64}$/),
-  authorizationServer: RuntimeIngressUrlSchema,
-  targetHttpMethod: RuntimeIngressIdSchema,
-  endpointUrl: RuntimeIngressUrlSchema,
-  pathTemplate: RuntimeIngressRefSchema,
-  requestBodyDigest: z
-    .string()
-    .regex(/^sha256:[a-f0-9]{64}$/)
-    .nullable()
-    .default(null),
-  selectedHeadersDigest: z.string().regex(/^sha256:[a-f0-9]{64}$/),
-  requiredScopes: RuntimeIngressSmallListSchema(RuntimeIngressIdSchema).min(1),
-  gatewayCredentialRefId: RuntimeIngressIdSchema,
-  gatewayCredentialRefDigest: z.string().regex(/^sha256:[a-f0-9]{64}$/),
-  providerRegistryRef: RuntimeIngressRefSchema,
-  providerRegistryDigest: z
-    .string()
-    .regex(/^sha256:[a-f0-9]{64}$/)
-    .nullable()
-    .default(null),
-  requiredCredentialCustodyStatus: CredentialCustodyStatusSchema.default("gateway_held"),
-  operationId: RuntimeIngressIdSchema,
-  idempotencyMaterialRef: RuntimeIngressRefSchema.nullable().default(null),
-  metadataCachePosture: z.enum(["fresh", "stale", "unknown"]).default("fresh"),
-  gatewayCredentialRefPosture: z.enum(["fresh", "stale", "revoked", "expired", "unknown"]).default("fresh"),
-  rawAuthorizationHeaderObserved: z.boolean().default(false),
-  dynamicEndpointConstructionObserved: z.boolean().default(false),
-  dynamicHostConstructionObserved: z.boolean().default(false),
-  retryAuthorityReuseDetected: z.boolean().default(false),
-} as const;
-
-const RuntimeIngressDispatchCommonFields = {
-  dispatchRef: RuntimeIngressRefSchema,
-  generatedCodeOrSpecRef: RuntimeIngressRefSchema.nullable().default(null),
-  dynamicToolConstructionDetected: z.boolean().default(false),
-  lateBoundParameterRefs: RuntimeIngressSmallListSchema(RuntimeIngressRefSchema).default([]),
-  retryOfDispatchRef: RuntimeIngressRefSchema.nullable().default(null),
-  branchRef: RuntimeIngressRefSchema.nullable().default(null),
-  loopIteration: z.number().int().nonnegative().nullable().default(null),
-  evidenceRefs: RuntimeIngressSmallListSchema(RuntimeIngressRefSchema).default([]),
-} as const;
-
-export const RuntimeIngressObservedDispatchSchema = z.discriminatedUnion("dispatchKind", [
-  z.strictObject({
-    dispatchKind: z.literal("wrapped_package_install"),
-    ...RuntimeIngressDispatchCommonFields,
-    ...PackageInstallDispatchParameterFields,
-  }),
-  z.strictObject({
-    dispatchKind: z.literal("raw_sibling_package_install"),
-    ...RuntimeIngressDispatchCommonFields,
-    rawCommandRef: RuntimeIngressRefSchema,
-    rawCommandSummary: RuntimeIngressSmallListSchema(RuntimeIngressRefSchema).default([
-      "package-manager command outside gateway",
-    ]),
-    ...PackageInstallDispatchParameterFields,
-  }),
-  z.strictObject({
-    dispatchKind: z.literal("ambiguous_package_install"),
-    ...RuntimeIngressDispatchCommonFields,
-    ambiguousReasonCodes: RuntimeIngressSmallListSchema(RuntimeIngressIdSchema).default([
-      "runtime_ingress_ambiguous_dispatch",
-    ]),
-    ...PackageInstallDispatchParameterFields,
-  }),
-  z.strictObject({
-    dispatchKind: z.literal("wrapped_x402_payment"),
-    ...RuntimeIngressDispatchCommonFields,
-    ...X402PaymentDispatchParameterFields,
-  }),
-  z.strictObject({
-    dispatchKind: z.literal("raw_sibling_x402_payment"),
-    ...RuntimeIngressDispatchCommonFields,
-    rawCommandRef: RuntimeIngressRefSchema,
-    rawCommandSummary: RuntimeIngressSmallListSchema(RuntimeIngressRefSchema).default([
-      "x402 payment command outside gateway",
-    ]),
-    ...X402PaymentDispatchParameterFields,
-  }),
-  z.strictObject({
-    dispatchKind: z.literal("ambiguous_x402_payment"),
-    ...RuntimeIngressDispatchCommonFields,
-    ambiguousReasonCodes: RuntimeIngressSmallListSchema(RuntimeIngressIdSchema).default([
-      "runtime_ingress_ambiguous_dispatch",
-    ]),
-    ...X402PaymentDispatchParameterFields,
-  }),
-  z.strictObject({
-    dispatchKind: z.literal("wrapped_auth_md_protected_api_call"),
-    ...RuntimeIngressDispatchCommonFields,
-    ...AuthMdProtectedApiCallDispatchParameterFields,
-  }),
-  z.strictObject({
-    dispatchKind: z.literal("raw_sibling_auth_md_protected_api_call"),
-    ...RuntimeIngressDispatchCommonFields,
-    rawCommandRef: RuntimeIngressRefSchema,
-    rawCommandSummary: RuntimeIngressSmallListSchema(RuntimeIngressRefSchema).default([
-      "auth.md protected API call outside gateway",
-    ]),
-    ...AuthMdProtectedApiCallDispatchParameterFields,
-  }),
-  z.strictObject({
-    dispatchKind: z.literal("ambiguous_auth_md_protected_api_call"),
-    ...RuntimeIngressDispatchCommonFields,
-    ambiguousReasonCodes: RuntimeIngressSmallListSchema(RuntimeIngressIdSchema).default([
-      "runtime_ingress_ambiguous_dispatch",
-    ]),
-    ...AuthMdProtectedApiCallDispatchParameterFields,
-  }),
-]);
-export type RuntimeIngressObservedDispatch = z.input<typeof RuntimeIngressObservedDispatchSchema>;
-
-export const RuntimeIngressDispatchBlockSchema = z.strictObject({
-  principalIntentRef: RuntimeIngressRefSchema,
-  generatedCodeOrSpecRef: RuntimeIngressRefSchema,
-  dispatchBoundaryRef: RuntimeIngressRefSchema,
-  executionBlockRef: RuntimeIngressRefSchema.nullable().default(null),
-  graphNonce: z.string().min(8).nullable().default(null),
-  truncationStatus: z.enum(["complete", "truncated", "over_limit", "unknown"]).default("complete"),
-  unobservedRegionRefs: RuntimeIngressSmallListSchema(RuntimeIngressRefSchema).default([]),
-  evidenceRefs: RuntimeIngressSmallListSchema(RuntimeIngressRefSchema).default([]),
-  dispatches: z.array(RuntimeIngressObservedDispatchSchema).min(1).max(RuntimeIngressDispatchLimit),
-});
-export type RuntimeIngressDispatchBlock = z.input<typeof RuntimeIngressDispatchBlockSchema>;
-
-type ParsedRuntimeIngressDispatchBlock = z.infer<typeof RuntimeIngressDispatchBlockSchema>;
-type ParsedRuntimeIngressObservedDispatch = ParsedRuntimeIngressDispatchBlock["dispatches"][number];
-type RuntimeIngressDispatchBlockRefs = Pick<
+  RuntimeIngressDispatchBlockSchema,
+  type ParsedRuntimeIngressDispatchBlock,
+  type ParsedRuntimeIngressObservedDispatch,
+  type RuntimeIngressDispatchBlock,
+} from "./schemas";
+export { RuntimeIngressDispatchBlockSchema, RuntimeIngressObservedDispatchSchema } from "./schemas";
+export { runtimeIngressDispatchNodeId } from "./node-ids";
+export type { RuntimeIngressConfig } from "./families";
+export type {
+  ParsedAuthMdProtectedApiCallDispatch,
+  ParsedPackageInstallDispatch,
   ParsedRuntimeIngressDispatchBlock,
-  "principalIntentRef" | "generatedCodeOrSpecRef"
->;
-type ParsedPackageInstallDispatch = Extract<
   ParsedRuntimeIngressObservedDispatch,
-  { dispatchKind: "wrapped_package_install" | "raw_sibling_package_install" | "ambiguous_package_install" }
->;
-type ParsedX402PaymentDispatch = Extract<
-  ParsedRuntimeIngressObservedDispatch,
-  { dispatchKind: "wrapped_x402_payment" | "raw_sibling_x402_payment" | "ambiguous_x402_payment" }
->;
-type ParsedAuthMdProtectedApiCallDispatch = Extract<
-  ParsedRuntimeIngressObservedDispatch,
-  {
-    dispatchKind:
-      | "wrapped_auth_md_protected_api_call"
-      | "raw_sibling_auth_md_protected_api_call"
-      | "ambiguous_auth_md_protected_api_call";
-  }
->;
-type RuntimeIngressFamilyConfig =
-  | PackageInstallRuntimeConfig
-  | X402PaymentRuntimeConfig
-  | AuthMdProtectedApiCallRuntimeConfig;
+  ParsedX402PaymentDispatch,
+  RuntimeIngressDispatchBlock,
+  RuntimeIngressDispatchBlockRefs,
+  RuntimeIngressObservedDispatch,
+} from "./schemas";
 
 export type RuntimeIngressResponsePosture = {
   schemaVersion: "handshake.runtime-ingress.outcome.v1";
@@ -288,13 +73,9 @@ export type RuntimeIngressResponsePosture = {
   dispatchCount: number;
 };
 
-export type RuntimeIngressConfig = {
-  packageInstall?: PackageInstallRuntimeConfig;
-  x402Payment?: X402PaymentRuntimeConfig;
-  authMdProtectedApiCall?: AuthMdProtectedApiCallRuntimeConfig;
-};
-
-export type RuntimeIngressProtocol = PackageInstallRuntimeProtocol & {
+export type RuntimeIngressProtocol = {
+  compileIntent(input: CompileIntentInput): Promise<IntentCompilationRecord>;
+  proposeActionContract(input: ProposeActionContractInput): Promise<ActionContract>;
   createRuntimeExecution(input: CreateRuntimeExecutionInput): Promise<RuntimeExecutionRecord>;
   createGeneratedExecutionGraph(
     input: CreateGeneratedExecutionGraphInput,
@@ -462,10 +243,6 @@ function runtimeIngressResponsePosture(
     refusalRefs: [],
     dispatchCount: block.dispatches.length,
   };
-}
-
-export function runtimeIngressDispatchNodeId(sequenceNumber: number): string {
-  return `runtime_dispatch_${sequenceNumber}`;
 }
 
 async function buildRuntimeIngressExecutionInput(
@@ -700,223 +477,6 @@ function runtimeIngressDispatchRefusalReasonCodes(block: ParsedRuntimeIngressDis
   return unique(block.dispatches.flatMap((dispatch) => dispatchSpecificRefusalReasonCodes(dispatch)));
 }
 
-function dispatchSpecificRefusalReasonCodes(dispatch: ParsedRuntimeIngressObservedDispatch): string[] {
-  if (isAuthMdProtectedApiCallDispatch(dispatch)) {
-    return authMdProtectedApiCallRefusalReasonCodes(
-      authMdProtectedApiCallAttemptForDispatch(
-        {
-          principalIntentRef: "runtime-ingress:preflight",
-          generatedCodeOrSpecRef: dispatch.generatedCodeOrSpecRef ?? "runtime-ingress:preflight",
-        },
-        dispatch,
-        1,
-        {
-          runtimeExecutionId: "runtime_execution_preflight",
-          generatedExecutionGraphId: "generated_execution_graph_preflight",
-        },
-      ),
-    );
-  }
-  if (isX402PaymentDispatch(dispatch)) return x402DispatchRefusalReasonCodes(dispatch);
-  return [];
-}
-
-async function buildCompileIntentInputForDispatch(
-  config: RuntimeIngressConfig,
-  block: ParsedRuntimeIngressDispatchBlock,
-  dispatch: ParsedRuntimeIngressObservedDispatch,
-  sequenceNumber: number,
-  graphRefs: { runtimeExecutionId: string; generatedExecutionGraphId: string },
-  requiredPriorActionContractIds: string[] = [],
-): Promise<CompileIntentInput> {
-  if (isPackageInstallDispatch(dispatch)) {
-    return buildPackageInstallCompileIntentInput(
-      requirePackageInstallConfig(config),
-      packageInstallToolCallForDispatch(block, dispatch, sequenceNumber, graphRefs, requiredPriorActionContractIds),
-    );
-  }
-  if (isAuthMdProtectedApiCallDispatch(dispatch)) {
-    return buildAuthMdProtectedApiCallCompileIntentInputForRuntimeRefusal(
-      requireAuthMdProtectedApiCallConfig(config),
-      authMdProtectedApiCallAttemptForDispatch(
-        block,
-        dispatch,
-        sequenceNumber,
-        graphRefs,
-        requiredPriorActionContractIds,
-      ),
-    );
-  }
-  const attempt = x402PaymentAttemptForDispatch(
-    block,
-    dispatch,
-    sequenceNumber,
-    graphRefs,
-    requiredPriorActionContractIds,
-  );
-  const buildX402CompileInput =
-    x402DispatchRefusalReasonCodes(dispatch).length > 0
-      ? buildX402PaymentCompileIntentInputForRuntimeRefusal
-      : buildX402PaymentCompileIntentInput;
-  return buildX402CompileInput(requireX402PaymentConfig(config), attempt);
-}
-
-function packageInstallToolCallForDispatch(
-  block: ParsedRuntimeIngressDispatchBlock,
-  dispatch: ParsedPackageInstallDispatch,
-  sequenceNumber: number,
-  graphRefs: { runtimeExecutionId: string; generatedExecutionGraphId: string },
-  requiredPriorActionContractIds: string[] = [],
-): PackageInstallToolCall {
-  return {
-    principalIntentRef: block.principalIntentRef,
-    generatedCodeOrSpecRef: dispatchGeneratedCodeOrSpecRef(block, dispatch, sequenceNumber),
-    runtimeExecutionId: graphRefs.runtimeExecutionId,
-    generatedExecutionGraphId: graphRefs.generatedExecutionGraphId,
-    generatedExecutionNodeId: runtimeIngressDispatchNodeId(sequenceNumber),
-    package: dispatch.package,
-    versionRange: dispatch.versionRange,
-    packageManager: dispatch.packageManager,
-    registryRef: dispatch.registryRef,
-    workspaceRef: dispatch.workspaceRef,
-    manifestRef: dispatch.manifestRef,
-    lockfileRef: dispatch.lockfileRef,
-    installFlags: dispatch.installFlags,
-    lifecycleScriptPolicy: dispatch.lifecycleScriptPolicy,
-    resolvedMaterialDigest: dispatch.resolvedMaterialDigest,
-    resolvedMaterialEvidenceRefs: dispatch.resolvedMaterialEvidenceRefs,
-    sequenceNumber,
-    requiredPriorActionContractIds,
-  };
-}
-
-function x402PaymentAttemptForDispatch(
-  block: ParsedRuntimeIngressDispatchBlock,
-  dispatch: ParsedX402PaymentDispatch,
-  sequenceNumber: number,
-  graphRefs: { runtimeExecutionId: string; generatedExecutionGraphId: string },
-  requiredPriorActionContractIds: string[] = [],
-): X402PaymentAttempt {
-  return {
-    principalIntentRef: block.principalIntentRef,
-    generatedCodeOrSpecRef: dispatchGeneratedCodeOrSpecRef(block, dispatch, sequenceNumber),
-    runtimeExecutionId: graphRefs.runtimeExecutionId,
-    generatedExecutionGraphId: graphRefs.generatedExecutionGraphId,
-    generatedExecutionNodeId: runtimeIngressDispatchNodeId(sequenceNumber),
-    endpointUrl: dispatch.endpointUrl,
-    payee: dispatch.payee,
-    network: dispatch.network,
-    token: dispatch.token,
-    atomicAmount: dispatch.atomicAmount,
-    x402EvidenceProfile: dispatch.x402EvidenceProfile,
-    paymentRequirementsDigest: dispatch.paymentRequirementsDigest,
-    paymentRequiredEvidenceRef: dispatch.paymentRequiredEvidenceRef,
-    facilitatorRef: dispatch.facilitatorRef,
-    intendedHttpMethod: dispatch.intendedHttpMethod,
-    intendedRequestUrl: dispatch.intendedRequestUrl,
-    intendedRequestBodyPosture: dispatch.intendedRequestBodyPosture,
-    intendedRequestBodyDigest: dispatch.intendedRequestBodyDigest,
-    selectedHeadersDigest: dispatch.selectedHeadersDigest,
-    providerEnvironmentPosture: dispatch.providerEnvironmentPosture,
-    providerEnvironmentRef: dispatch.providerEnvironmentRef,
-    x402Version: dispatch.x402Version,
-    x402Scheme: dispatch.x402Scheme,
-    asset: dispatch.asset,
-    payTo: dispatch.payTo,
-    maxTimeoutSeconds: dispatch.maxTimeoutSeconds,
-    selectedPaymentRequirementIndex: dispatch.selectedPaymentRequirementIndex,
-    selectedPaymentRequirementDigest: dispatch.selectedPaymentRequirementDigest,
-    sdkPackageVersions: dispatch.sdkPackageVersions,
-    extensionKeys: dispatch.extensionKeys,
-    sequenceNumber,
-    requiredPriorActionContractIds,
-  };
-}
-
-function x402DispatchRefusalReasonCodes(dispatch: ParsedX402PaymentDispatch): string[] {
-  const reasonCodes: string[] = [];
-  if (dispatch.intendedRequestBodyPosture === "digest_bound" && dispatch.intendedRequestBodyDigest === null) {
-    reasonCodes.push("x402_request_body_digest_missing");
-  }
-  if (["omitted", "unsupported"].includes(dispatch.intendedRequestBodyPosture)) {
-    reasonCodes.push("x402_request_body_posture_unsupported");
-  }
-  if (dispatch.intendedRequestBodyPosture === "no_body" && dispatch.intendedRequestBodyDigest !== null) {
-    reasonCodes.push("x402_request_body_posture_mismatch");
-  }
-  if (dispatch.providerEnvironmentPosture !== "local_reference_sandbox") {
-    reasonCodes.push("x402_provider_environment_not_sandboxed");
-  }
-  return unique(reasonCodes);
-}
-
-function authMdProtectedApiCallAttemptForDispatch(
-  block: RuntimeIngressDispatchBlockRefs,
-  dispatch: ParsedAuthMdProtectedApiCallDispatch,
-  sequenceNumber: number,
-  graphRefs: { runtimeExecutionId: string; generatedExecutionGraphId: string },
-  requiredPriorActionContractIds: string[] = [],
-): AuthMdProtectedApiCallAttempt {
-  return {
-    principalIntentRef: block.principalIntentRef,
-    generatedCodeOrSpecRef: dispatchGeneratedCodeOrSpecRef(block, dispatch, sequenceNumber),
-    runtimeExecutionId: graphRefs.runtimeExecutionId,
-    generatedExecutionGraphId: graphRefs.generatedExecutionGraphId,
-    generatedExecutionNodeId: runtimeIngressDispatchNodeId(sequenceNumber),
-    protectedResource: dispatch.protectedResource,
-    protectedResourceMetadataDigest: dispatch.protectedResourceMetadataDigest,
-    authorizationServerMetadataDigest: dispatch.authorizationServerMetadataDigest,
-    authorizationServer: dispatch.authorizationServer,
-    targetHttpMethod: dispatch.targetHttpMethod,
-    endpointUrl: dispatch.endpointUrl,
-    pathTemplate: dispatch.pathTemplate,
-    requestBodyDigest: dispatch.requestBodyDigest,
-    selectedHeadersDigest: dispatch.selectedHeadersDigest,
-    requiredScopes: dispatch.requiredScopes,
-    gatewayCredentialRefId: dispatch.gatewayCredentialRefId,
-    gatewayCredentialRefDigest: dispatch.gatewayCredentialRefDigest,
-    providerRegistryRef: dispatch.providerRegistryRef,
-    providerRegistryDigest: dispatch.providerRegistryDigest,
-    requiredCredentialCustodyStatus: dispatch.requiredCredentialCustodyStatus,
-    operationId: dispatch.operationId,
-    idempotencyMaterialRef: dispatch.idempotencyMaterialRef,
-    metadataCachePosture: dispatch.metadataCachePosture,
-    gatewayCredentialRefPosture: dispatch.gatewayCredentialRefPosture,
-    rawAuthorizationHeaderObserved: dispatch.rawAuthorizationHeaderObserved,
-    dynamicEndpointConstructionObserved: dispatch.dynamicEndpointConstructionObserved,
-    dynamicHostConstructionObserved: dispatch.dynamicHostConstructionObserved,
-    retryAuthorityReuseDetected: dispatch.retryAuthorityReuseDetected,
-    evidenceRefs: dispatch.evidenceRefs,
-    sequenceNumber,
-    requiredPriorActionContractIds,
-  };
-}
-
-function runtimeIngressEvidenceRefs(block: ParsedRuntimeIngressDispatchBlock): string[] {
-  return unique(
-    [
-      block.dispatchBoundaryRef,
-      ...block.evidenceRefs,
-      ...block.dispatches.flatMap((dispatch) => [
-        ...dispatch.evidenceRefs,
-        isX402PaymentDispatch(dispatch) ? dispatch.paymentRequiredEvidenceRef : null,
-        isAuthMdProtectedApiCallDispatch(dispatch)
-          ? `evidence:auth-md-discovery:${dispatch.protectedResourceMetadataDigest.slice(
-              "sha256:".length,
-              "sha256:".length + 16,
-            )}`
-          : null,
-        isAuthMdProtectedApiCallDispatch(dispatch)
-          ? `evidence:auth-md-authorization-server:${dispatch.authorizationServerMetadataDigest.slice(
-              "sha256:".length,
-              "sha256:".length + 16,
-            )}`
-          : null,
-      ]),
-    ].filter((value): value is string => Boolean(value)),
-  );
-}
-
 async function createFinalizedToolCallDraft(
   protocol: Pick<RuntimeIngressProtocol, "createToolCallDraft" | "transitionToolCallDraft">,
   compileInput: CompileIntentInput,
@@ -950,104 +510,19 @@ async function createFinalizedToolCallDraft(
   });
 }
 
-function dispatchGeneratedCodeOrSpecRef(
-  block: RuntimeIngressDispatchBlockRefs,
-  dispatch: ParsedRuntimeIngressObservedDispatch,
-  sequenceNumber: number,
-): string {
-  return dispatch.generatedCodeOrSpecRef ?? `${block.generatedCodeOrSpecRef}#dispatch-${sequenceNumber}`;
-}
-
 function firstDispatch(block: ParsedRuntimeIngressDispatchBlock): ParsedRuntimeIngressObservedDispatch {
   const dispatch = block.dispatches[0];
   if (!dispatch) throw new Error("Runtime ingress dispatch block must contain at least one dispatch.");
   return dispatch;
 }
 
-function runtimeConfigForDispatch(
-  config: RuntimeIngressConfig,
-  dispatch: ParsedRuntimeIngressObservedDispatch,
-): RuntimeIngressFamilyConfig {
-  switch (runtimeIngressFamilyIdForDispatchKind(dispatch.dispatchKind)) {
-    case "package_install":
-      return requirePackageInstallConfig(config);
-    case "x402_payment":
-      return requireX402PaymentConfig(config);
-    case "auth_md_protected_api_call":
-      return requireAuthMdProtectedApiCallConfig(config);
-    default:
-      throw new Error(`Runtime ingress dispatch family is not registered: ${dispatch.dispatchKind}`);
-  }
-}
-
-function requirePackageInstallConfig(config: RuntimeIngressConfig): PackageInstallRuntimeConfig {
-  if (!config.packageInstall)
-    throw new Error("Runtime ingress package-install dispatch requires packageInstall config.");
-  return config.packageInstall;
-}
-
-function requireX402PaymentConfig(config: RuntimeIngressConfig): X402PaymentRuntimeConfig {
-  if (!config.x402Payment) throw new Error("Runtime ingress x402 payment dispatch requires x402Payment config.");
-  return config.x402Payment;
-}
-
-function requireAuthMdProtectedApiCallConfig(config: RuntimeIngressConfig): AuthMdProtectedApiCallRuntimeConfig {
-  if (!config.authMdProtectedApiCall) {
-    throw new Error("Runtime ingress auth.md protected API call dispatch requires authMdProtectedApiCall config.");
-  }
-  return config.authMdProtectedApiCall;
-}
-
-function signingSecretForDispatch(
-  config: RuntimeIngressConfig,
-  dispatch: ParsedRuntimeIngressObservedDispatch,
-): string | undefined {
-  return runtimeConfigForDispatch(config, dispatch).signingSecret;
-}
-
-function supportedGrammarVersionForBlock(block: ParsedRuntimeIngressDispatchBlock): string {
-  return runtimeIngressGrammarVersionForFamilySet(
-    new Set(
-      block.dispatches.map((dispatch) => {
-        const familyId = runtimeIngressFamilyIdForDispatchKind(dispatch.dispatchKind);
-        if (!familyId) throw new Error(`Runtime ingress dispatch family is not registered: ${dispatch.dispatchKind}`);
-        return familyId;
-      }),
-    ),
-  );
-}
-
-function isPackageInstallDispatch(
-  dispatch: ParsedRuntimeIngressObservedDispatch,
-): dispatch is ParsedPackageInstallDispatch {
-  return runtimeIngressFamilyIdForDispatchKind(dispatch.dispatchKind) === "package_install";
-}
-
-function isX402PaymentDispatch(dispatch: ParsedRuntimeIngressObservedDispatch): dispatch is ParsedX402PaymentDispatch {
-  return runtimeIngressFamilyIdForDispatchKind(dispatch.dispatchKind) === "x402_payment";
-}
-
-function isAuthMdProtectedApiCallDispatch(
-  dispatch: ParsedRuntimeIngressObservedDispatch,
-): dispatch is ParsedAuthMdProtectedApiCallDispatch {
-  return runtimeIngressFamilyIdForDispatchKind(dispatch.dispatchKind) === "auth_md_protected_api_call";
-}
-
-function isRawSiblingDispatch(
-  dispatch: ParsedRuntimeIngressObservedDispatch,
-): dispatch is Extract<ParsedRuntimeIngressObservedDispatch, { rawCommandRef: string; rawCommandSummary: string[] }> {
-  return dispatch.dispatchKind.startsWith("raw_sibling_");
-}
-
-function isAmbiguousDispatch(
-  dispatch: ParsedRuntimeIngressObservedDispatch,
-): dispatch is Extract<ParsedRuntimeIngressObservedDispatch, { ambiguousReasonCodes: string[] }> {
-  return dispatch.dispatchKind.startsWith("ambiguous_");
-}
-
 function requireCandidateDigest(candidateDigest: string | null): string {
   if (!candidateDigest) throw new Error("Contractable candidate is missing candidateDigest.");
   return candidateDigest;
+}
+
+function refusalReasonCodesForCompilation(intentCompilation: IntentCompilationRecord): string[] {
+  return [...intentCompilation.uncertaintyMarkers, ...intentCompilation.overreachReasonCodes];
 }
 
 function unique(values: string[]): string[] {

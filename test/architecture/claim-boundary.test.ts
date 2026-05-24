@@ -13,6 +13,30 @@ type PackageJson = {
 };
 
 const pkg = packageJson as PackageJson;
+type ClaimSource = { name: string; text: string };
+type ClaimMatrixEntry = {
+  label: string;
+  sources: ClaimSource[];
+  required?: string[];
+  requiredPatterns?: RegExp[];
+  forbiddenPatterns?: RegExp[];
+};
+
+function expectClaimMatrix(entries: ClaimMatrixEntry[]) {
+  for (const entry of entries) {
+    for (const source of entry.sources) {
+      for (const phrase of entry.required ?? []) {
+        expect(source.text, `${entry.label} must be stated in ${source.name}`).toContain(phrase);
+      }
+      for (const pattern of entry.requiredPatterns ?? []) {
+        expect(source.text, `${entry.label} must match ${pattern} in ${source.name}`).toMatch(pattern);
+      }
+      for (const pattern of entry.forbiddenPatterns ?? []) {
+        expect(source.text, `${entry.label} must not match ${pattern} in ${source.name}`).not.toMatch(pattern);
+      }
+    }
+  }
+}
 
 describe("claim boundary", () => {
   it("keeps public entrypoints separated by authority boundary", async () => {
@@ -58,85 +82,142 @@ describe("claim boundary", () => {
     const runtimeLane = readFileSync("src/runtime/LANE.md", "utf8");
     const conformanceLane = readFileSync("src/conformance/LANE.md", "utf8");
     const adaptersLane = readFileSync("src/adapters/LANE.md", "utf8");
-    const canonicalDocs = [agents, readme, decisions, protocolNotes].join("\n--- canonical-doc-boundary ---\n");
+    const canonicalSources = [
+      { name: "AGENTS.md", text: agents },
+      { name: "README.md", text: readme },
+      { name: "docs/internal/decisions.md", text: decisions },
+      { name: "docs/internal/protocol-notes.md", text: protocolNotes },
+    ];
 
-    for (const doc of [agents, readme, decisions, protocolNotes]) {
-      expect(doc).toContain("protected actions for automated decision making");
-    }
-    expect(canonicalDocs).not.toMatch(/Handshake is contracted execution infrastructure for engineering agents/i);
-    expect(canonicalDocs).not.toMatch(/first (?:credible domain|wedge) (?:remains|is) engineering-agent actions/i);
-    expect(canonicalDocs).not.toMatch(/use case: convert generated engineering-agent execution/i);
-    expect(readme).toContain("narrow official x402 exact buyer-side proof path");
-    expect(readme).toContain("one official buyer-side `exact` per-call path");
-    expect(readme).toContain("package-install material adapter pack evidence/report projection");
-    expect(readme).toContain("first promoted non-payment adapter pack after x402 exact per-call");
-    expect(readme).toContain("package-manager local host-specific bypass manifest/proof-packet/report");
-    expect(readme).toContain("host-wide containment");
-    expect(readme).toContain("package-manager ecosystem protection");
-    expect(readme).toContain("package safety proof");
-    expect(readme).toContain("npm audit replacement");
-    expect(readme).toContain("Bun provenance verification");
-    expect(readme).toContain("external package-material attestation");
-    expect(readme).toContain("not broad x402 compatibility");
-    expect(readme).toContain("No adapter family defines the protocol");
-    expect(readme).toContain("public runtime ingress for local x402 payment and package-install dispatch boundaries");
-    expect(readme).toContain("not live provider custody, hosted mutation authority");
-    expect(readme).toContain("generic MCP/runtime control");
-    expect(readme).toContain("deployment-mode hosted admission config with read-entitlement split");
-    expect(readme).toContain("raw-read posture gates, non-secret readiness reporting");
-    expect(readme).toContain("production hosted readiness");
-    expect(readme).toContain("compliance-grade audit");
-    expect(readme).toContain("non-mutating hosted verifier metadata/key-set/JWKS/status/verify routes");
-    expect(readme).toContain("remote JWKS trust fetching, live revocation authority");
-    expect(readme).toContain("npm run demo:self-hosted");
-    expect(readme).toContain("source-owned local MCP stdio proposal/evidence process proof");
-    expect(readme).toContain("facilitator operation, seller middleware, unsupported x402 schemes");
-    expect(readme).toContain("cross-org AuthorityCertificate trust");
-    expect(readme).toContain("aggregate payment-budget management is intentionally outside the current remit");
-    expect(readme).not.toMatch(/session\/day\/review spend windows are metadata until a ledger exists/i);
-    expect(readme).not.toMatch(/\bx402 compatible\b/i);
-    expect(readme).not.toMatch(/package install (?:is|as) (?:the )?first wedge/i);
-    expect(canonicalDocs).not.toMatch(/Hosted operation adds policy management/i);
-    expect(decisions).toMatch(/read\s+entitlements are separate from transition custody/);
-    expect(decisions).toMatch(/it is not hosted mutation authority, production readiness/);
-    expect(protocolNotes).toMatch(/read-entitlement split for\s+redacted evidence reads/);
-    expect(protocolNotes).toContain("first host-specific bypass harness is a package-manager local fixture");
-    expect(protocolNotes).toContain("never proves host-wide containment");
-    expect(protocolArchitecture).toMatch(/The current hosted slice is\s+deployment-mode admission/);
-    expect(httpLane).toContain("not hosted mutation authority");
-    expect(httpLane).toContain("payment management, settlement, provider custody");
-    expect(runtimeLane).toContain("It must not issue policy decisions, greenlights, gateway checks, receipts");
-    expect(conformanceLane).toContain("does not prove provider-side enforcement");
-    expect(adaptersLane).toContain("must not imply generic adapters, hosted operation");
-    expect(adaptersLane).toContain("package-install/adapter-pack.ts");
-    expect(adaptersLane).toContain("protected-path-probes/host-fixture.ts");
-    expect(adaptersLane).toContain("named host/environment/adapter/action/path/raw-sibling routes");
-    expect(adaptersLane).toContain("host-wide containment, package-manager ecosystem protection");
-    expect(adaptersLane).toContain(
-      "Package-install material evidence proves exact evidence/report/proof-gap binding only",
-    );
-    expect(adaptersLane).toContain("supply-chain safety, npm audit replacement, Bun provenance verification");
-    expect(x402Walkthrough).toContain("one official buyer-side `x402_payment.exact` protected spend attempt");
-    expect(x402Walkthrough).toContain("Do not write raw protocol records");
-    expect(x402Walkthrough).toContain("The local/reference wallet gateway is the mutation credential holder");
-    expect(x402Walkthrough).toContain(
-      "official x402 signer and `PaymentPayload` creation stay outside the agent/runtime",
-    );
-    expect(x402Walkthrough).toContain("Official SDK parity");
-    expect(x402Walkthrough).toContain("VerifiedGatewayCheck");
-    expect(x402Walkthrough).toContain("Replay refusal");
-    expect(x402Walkthrough).toContain("Proof gap projection");
-    expect(x402Walkthrough).toContain("No aggregate payment-budget management");
-    expect(x402Walkthrough).not.toMatch(/aggregate x402 spend windows/i);
-    expect(x402Walkthrough).toContain("Do not classify `upto` as `x402_payment.exact`");
-    expect(x402Walkthrough).toContain("Do not classify batch settlement as `x402_payment.exact`");
-    expect(x402Walkthrough).toContain("signed offers");
-    expect(x402Walkthrough).toContain("seller middleware");
-    expect(x402Walkthrough).toContain("facilitator operation");
-    expect(x402Walkthrough).toContain("facilitator verify evidence as settlement finality");
-    expect(x402Walkthrough).not.toMatch(
-      /x402Client|privateKeyToAccount|SIGNING_PRIVATE_KEY|provider custody claim|hosted dashboard|cross-org certificate trust/i,
-    );
+    expectClaimMatrix([
+      {
+        label: "category boundary",
+        sources: canonicalSources,
+        required: ["protected actions for automated decision making"],
+        forbiddenPatterns: [
+          /Handshake is contracted execution infrastructure for engineering agents/i,
+          /first (?:credible domain|wedge) (?:remains|is) engineering-agent actions/i,
+          /use case: convert generated engineering-agent execution/i,
+        ],
+      },
+      {
+        label: "README local proof claims",
+        sources: [{ name: "README.md", text: readme }],
+        required: [
+          "narrow official x402 exact buyer-side proof path",
+          "one official buyer-side `exact` per-call path",
+          "package-install material adapter pack evidence/report projection",
+          "first promoted non-payment adapter pack after x402 exact per-call",
+          "package-manager local host-specific bypass manifest/proof-packet/report",
+          "public runtime ingress for local x402 payment and package-install dispatch boundaries",
+          "source-owned local MCP stdio proposal/evidence process proof",
+          "npm run demo:self-hosted",
+        ],
+        forbiddenPatterns: [/session\/day\/review spend windows are metadata until a ledger exists/i],
+      },
+      {
+        label: "README non-claims",
+        sources: [{ name: "README.md", text: readme }],
+        required: [
+          "No adapter family defines the protocol",
+          "not broad x402 compatibility",
+          "not live provider custody, hosted mutation authority",
+          "production hosted readiness",
+          "generic MCP/runtime control",
+          "host-wide containment",
+          "package-manager ecosystem protection",
+          "package safety proof",
+          "npm audit replacement",
+          "Bun provenance verification",
+          "external package-material attestation",
+          "cross-org AuthorityCertificate trust",
+          "remote JWKS trust fetching, live revocation authority",
+          "facilitator operation, seller middleware, unsupported x402 schemes",
+          "compliance-grade audit",
+          "aggregate payment-budget management is intentionally outside the current remit",
+        ],
+        forbiddenPatterns: [/\bx402 compatible\b/i, /package install (?:is|as) (?:the )?first wedge/i],
+      },
+      {
+        label: "README root teaching boundary",
+        sources: [{ name: "README.md", text: readme }],
+        required: [
+          'import { EvidenceClient, RuntimeClient } from "handshake-protocol-kernel/sdk/role-clients";',
+          "Use this subpath for runtime proposal and redacted evidence readback.",
+          "package root still exposes the lower-level",
+          "first-slice activation should",
+        ],
+      },
+      {
+        label: "hosted admission non-claim",
+        sources: [
+          { name: "docs/internal/decisions.md", text: decisions },
+          { name: "docs/internal/protocol-notes.md", text: protocolNotes },
+          { name: "docs/internal/protocol-kernel-architecture.md", text: protocolArchitecture },
+          { name: "src/http/LANE.md", text: httpLane },
+        ],
+        requiredPatterns: [
+          /read\s+entitlements are separate from transition custody|read-entitlement split for\s+redacted evidence reads|The current hosted slice is\s+deployment-mode admission|not hosted mutation authority/,
+        ],
+        forbiddenPatterns: [/Hosted operation adds policy management/i],
+      },
+      {
+        label: "lane authority boundaries",
+        sources: [
+          { name: "src/runtime/LANE.md", text: runtimeLane },
+          { name: "src/conformance/LANE.md", text: conformanceLane },
+          { name: "src/adapters/LANE.md", text: adaptersLane },
+        ],
+        requiredPatterns: [
+          /It must not issue policy decisions, greenlights, gateway checks, receipts|does not prove provider-side enforcement|must not imply generic adapters, hosted operation/,
+        ],
+      },
+      {
+        label: "package-install host harness boundary",
+        sources: [{ name: "docs/internal/protocol-notes.md", text: protocolNotes }],
+        required: [
+          "first host-specific bypass harness is a package-manager local fixture",
+          "never proves host-wide containment",
+        ],
+      },
+      {
+        label: "package-install adapter pack boundary",
+        sources: [{ name: "src/adapters/LANE.md", text: adaptersLane }],
+        required: [
+          "package-install/adapter-pack.ts",
+          "protected-path-probes/host-fixture.ts",
+          "named host/environment/adapter/action/path/raw-sibling routes",
+          "host-wide containment, package-manager ecosystem protection",
+          "Package-install material evidence proves exact evidence/report/proof-gap binding only",
+          "supply-chain safety, npm audit replacement, Bun provenance verification",
+        ],
+      },
+      {
+        label: "x402 walkthrough boundary",
+        sources: [{ name: "examples/x402-protected-spend/README.md", text: x402Walkthrough }],
+        required: [
+          "one official buyer-side `x402_payment.exact` protected spend attempt",
+          "Do not write raw protocol records",
+          "The local/reference wallet gateway is the mutation credential holder",
+          "official x402 signer and `PaymentPayload` creation stay outside the agent/runtime",
+          "Official SDK parity",
+          "VerifiedGatewayCheck",
+          "Replay refusal",
+          "Proof gap projection",
+          "No aggregate payment-budget management",
+          "Do not classify `upto` as `x402_payment.exact`",
+          "Do not classify batch settlement as `x402_payment.exact`",
+          "signed offers",
+          "seller middleware",
+          "facilitator operation",
+          "facilitator verify evidence as settlement finality",
+        ],
+        forbiddenPatterns: [
+          /aggregate x402 spend windows/i,
+          /x402Client|privateKeyToAccount|SIGNING_PRIVATE_KEY|provider custody claim|hosted dashboard|cross-org certificate trust/i,
+        ],
+      },
+    ]);
   });
 
   it("requires MCP docs to stay proposal/evidence only", () => {
