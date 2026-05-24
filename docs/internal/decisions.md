@@ -1,6 +1,6 @@
 # Decisions
 
-Last canonical audit: 2026-05-21.
+Last canonical audit: 2026-05-24.
 
 ## Canonical Source Set
 
@@ -71,8 +71,9 @@ The local foundation includes:
 - package-install observed supply-chain parameters bound at the gateway before
   mutation;
 - local x402 payment D1/HTTP establishment path through install, runtime
-  proposal, policy, gateway check, wallet fixture execution, proof gap, and
-  replay refusal;
+  proposal, policy, gateway check, local/reference 402 challenge evidence,
+  gateway-created payment signature evidence, local/reference signed retry
+  observation, proof gap, and replay refusal;
 - public runtime ingress for local x402 payment and package-install dispatch
   boundaries, including wrapped dispatch, dynamic/late-bound refusal, loop/retry
   sequencing, raw sibling bypass refusal, and truncated graph refusal;

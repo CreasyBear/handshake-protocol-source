@@ -17,6 +17,7 @@ import { verifiedGatewayCheckFromResult } from "../../src/protocol/areas/gateway
 import { recordRecoveryTerminalConflictProofGap } from "../../src/protocol/areas/recovery";
 import { HandshakeClient } from "../../src/sdk/client";
 import { proposePackageInstallActionContract } from "../../src/runtime/package-install/action-proposal";
+import type { ProtocolObjectType, StoredProtocolRecord } from "../../src/protocol/store/port";
 import { D1ProtocolStore } from "../../src/storage/d1";
 import { InMemoryProtocolStore } from "../../src/storage/memory";
 import {
@@ -129,6 +130,42 @@ describe("D1-backed Hono protocol surface", () => {
       expect(rows.map((row) => row.object_type)).toEqual(["action_type", "tool_capability"]);
       expect(JSON.parse(rows[0]?.payload_json ?? "{}")).toMatchObject({ actionTypeId: sharedId });
       expect(JSON.parse(rows[1]?.payload_json ?? "{}")).toMatchObject({ toolCapabilityId: sharedId });
+    } finally {
+      await harness.dispose();
+    }
+  });
+
+  it("persists D1 action-contract side refs for scoped evidence reads", async () => {
+    const harness = await createD1HttpHarness();
+    try {
+      const store = new D1ProtocolStore(harness.db);
+      await store.putRecord(
+        d1ScopedRecord("proof_gap", "pg_d1_scoped_target", {
+          proofGapId: "pg_d1_scoped_target",
+          affectedObjectRefs: ["act_d1_scoped"],
+        }),
+      );
+      await store.putRecord(
+        d1ScopedRecord("proof_gap", "pg_d1_scoped_sibling", {
+          proofGapId: "pg_d1_scoped_sibling",
+          affectedObjectRefs: ["act_d1_scoped_sibling"],
+        }),
+      );
+
+      const scoped = await store.listRecordsByActionContract("proof_gap", "act_d1_scoped", {
+        tenantId: "tenant_demo",
+        organizationId: "org_demo",
+      });
+      const indexRows = await harness.query<{ object_id: string }>(
+        `SELECT object_id
+         FROM protocol_record_action_contract_refs
+         WHERE action_contract_id = ?
+         ORDER BY object_id`,
+        "act_d1_scoped",
+      );
+
+      expect(scoped.map((record) => record.objectId)).toEqual(["pg_d1_scoped_target"]);
+      expect(indexRows.map((row) => row.object_id)).toEqual(["pg_d1_scoped_target"]);
     } finally {
       await harness.dispose();
     }
@@ -1428,6 +1465,38 @@ async function recordCount(harness: D1HttpHarness, objectType: string): Promise<
     objectType,
   );
   return rows[0]?.count ?? 0;
+}
+
+function d1ScopedRecord(
+  objectType: ProtocolObjectType,
+  objectId: string,
+  payload: Record<string, unknown>,
+): StoredProtocolRecord {
+  const createdAt = new Date(0).toISOString();
+  return {
+    objectId,
+    objectType,
+    tenantId: "tenant_demo",
+    organizationId: "org_demo",
+    schemaVersion: "0.2.4",
+    canonicalDigest: d1ScopedDigest(objectId),
+    payload: {
+      schemaVersion: "0.2.4",
+      tenantId: "tenant_demo",
+      organizationId: "org_demo",
+      createdAt,
+      ...payload,
+    },
+    createdAt,
+    sourceEventId: null,
+  };
+}
+
+function d1ScopedDigest(seed: string): `sha256:${string}` {
+  return `sha256:${seed
+    .replace(/[^a-z0-9]/gi, "0")
+    .padEnd(64, "0")
+    .slice(0, 64)}`;
 }
 
 async function recordUnknownProofGapThroughClient(

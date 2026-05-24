@@ -13,6 +13,8 @@ import type {
   ProtectedPathPosture,
   ProtectedSurfaceOperationClaim,
   Receipt,
+  StreamEventRange,
+  ProtocolRecordScope,
   StoredProtocolRecord,
   StreamTail,
 } from "../../src/protocol/store/port";
@@ -120,10 +122,19 @@ export class TransitionBudgetRecorder implements ProtocolStore {
 
   async listRecordsByType<T>(
     objectType: ProtocolObjectType,
-    scope: { tenantId?: string; organizationId?: string } = {},
+    scope: ProtocolRecordScope = {},
   ): Promise<StoredProtocolRecord<T>[]> {
     this.countRead("listRecordsByType");
     return this.delegate.listRecordsByType<T>(objectType, scope);
+  }
+
+  async listRecordsByActionContract<T>(
+    objectType: ProtocolObjectType,
+    actionContractId: string,
+    scope: ProtocolRecordScope = {},
+  ): Promise<StoredProtocolRecord<T>[]> {
+    this.countRead("listRecordsByActionContract");
+    return this.delegate.listRecordsByActionContract<T>(objectType, actionContractId, scope);
   }
 
   async getStreamTail(streamId: string, partitionKey: string): Promise<StreamTail> {
@@ -136,6 +147,16 @@ export class TransitionBudgetRecorder implements ProtocolStore {
     this.countRead("getStreamEvent");
     this.countPartition(streamId, partitionKey);
     return this.delegate.getStreamEvent(streamId, partitionKey, offset);
+  }
+
+  async listStreamEvents(
+    streamId: string,
+    partitionKey: string,
+    range: StreamEventRange = {},
+  ): Promise<ContractStreamEvent[]> {
+    this.countRead("listStreamEvents");
+    this.countPartition(streamId, partitionKey);
+    return this.delegate.listStreamEvents(streamId, partitionKey, range);
   }
 
   async getCurrentProtectedPathPosture(

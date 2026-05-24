@@ -1,6 +1,6 @@
 # Protocol Notes
 
-Last protocol audit: 2026-05-21.
+Last protocol audit: 2026-05-24.
 
 For the canonical definition, see `docs/internal/protocol-definition.md`. For the architecture and schema map, see `docs/internal/protocol-kernel-architecture.md`. For the plain-English translation, see `docs/internal/protocol-layman.md`. This file keeps implementation-facing protocol notes compact.
 
@@ -127,8 +127,11 @@ Protocol areas may depend on foundation/events/context/store and other area publ
   external package-material attestation.
 - Payment-specific protected-action packs live under adapter/plugin lanes, not protocol areas.
 - The payment adapter has a local D1/HTTP establishment path, runtime ingress,
+  local/reference paid-HTTP 402 challenge and post-gate signed retry evidence,
   and local hostile bypass/custody probe coverage under experimental/reference
-  adapter surfaces. It enforces per-call spend only; session/day/review windows
+  adapter surfaces. The signed retry is downstream fixture observation after
+  gateway-created signature evidence, not a policy, greenlight, gateway, or
+  signing authority. It enforces per-call spend only; session/day/review windows
   are metadata until a ledger exists. This is not live provider custody.
 - Protected mutation adapter conformance lives under the `./conformance` package subpath.
 - The auth.md adapter profile lives under the experimental/reference adapter

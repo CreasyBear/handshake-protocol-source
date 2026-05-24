@@ -52,6 +52,10 @@ export const protocolReasonCodes = [
   code("tool_call_draft_invalid_reason_missing", "transition_error", "intent_compilation"),
   code("x402_amount_exceeds_call_bound", "refusal", "intent_compilation"),
   code("x402_official_payment_required_evidence_incomplete", "refusal", "intent_compilation"),
+  code("x402_provider_environment_not_sandboxed", "refusal", "intent_compilation"),
+  code("x402_request_body_digest_missing", "refusal", "intent_compilation"),
+  code("x402_request_body_posture_mismatch", "refusal", "intent_compilation"),
+  code("x402_request_body_posture_unsupported", "refusal", "intent_compilation"),
   code("mcp_input_schema_invalid", "refusal", "intent_compilation"),
   code("mcp_candidate_not_contractable", "refusal", "intent_compilation"),
 

@@ -127,3 +127,50 @@ Proof obligations:
 - Host-wide interception checks are blocked until a concrete host harness exists.
 - Seller/facilitator/settlement checks are blocked until those adapters exist.
 - Actual npm/MCP Registry publication checks are blocked on owner-held external credentials.
+
+## Closeout Result: 2026-05-24
+
+Executed end-to-end against `macro-001` through `macro-019`.
+
+Closed source-owned concerns:
+
+- Runtime x402 posture is explicit in proposal input, candidate parameters, refusal evidence, and idempotency material.
+- MCP x402 posture is explicit in schema, reference transcript, idempotency material, and package-entrypoint smoke input.
+- Local/reference x402 sandbox retry evidence is labeled downstream fixture evidence only, with no authority, custody, settlement, seller, or facilitator claim.
+- Runtime ingress family coverage is behind a proposal-only registry and guarded against authority imports.
+- Unsupported x402 surfaces remain explicit future cuts, including settlement finality.
+- Evidence projection assembly now uses contract-scoped reads plus store range reads instead of broad tenant/org scans.
+- Memory and D1 stores preserve scoped-read and range-read parity, with D1 action-contract side refs and indexes.
+- Projection redaction covers raw signer refs, `PaymentPayload`, `PAYMENT-SIGNATURE`, bearer tokens, vault/Infisical/1Password paths, secret refs, facilitator secrets, and auth.md credential-looking refs.
+- Package and architecture gates exclude `.planning/`, tests, workspace junk, raw credential material, `PaymentPayload`, and `PAYMENT-SIGNATURE` from published surfaces.
+
+Closeout commands run:
+
+```bash
+npm run test -- test/runtime/runtime-ingress.test.ts test/adapters/x402-payment-action-proposal.test.ts
+npm run test -- test/mcp/mcp-schema-contract.test.ts test/mcp/mcp-x402-proposal.test.ts test/architecture/mcp-surface-posture.test.ts test/mcp/mcp-reference-transcript.test.ts test/mcp/mcp-stdio-process.test.ts
+npm run test -- test/adapters/x402-wallet-gateway.test.ts test/integration/x402-d1-http.test.ts test/protocol/evidence-projections.test.ts test/product/x402-protected-spend-demo-report.test.ts test/architecture/claim-boundary.test.ts
+npm run test -- test/runtime/runtime-ingress.test.ts test/runtime/auth-md-candidate-compilation.test.ts test/runtime/package-install-runtime.test.ts test/protocol/generated-execution-graph.test.ts test/architecture/import-posture.test.ts
+npm run test -- test/conformance/x402-payment-conformance.test.ts test/conformance/x402-upstream-exact-fixtures.test.ts test/adapters/x402-install-proposal.test.ts test/adapters/x402-bypass-probes.test.ts test/architecture/claim-boundary.test.ts
+npm run test -- test/protocol/evidence-projections.test.ts test/http/d1-http.test.ts test/protocol/protocol-store-atomicity-contract.test.ts
+npm run demo:aps
+npm run demo:mcp-transcript
+npm run quality:storage
+npm run quality:claims
+npm run quality:architecture
+npm run pack:check
+npm run check:repo
+```
+
+Final closeout gate:
+
+- `npm run check:repo` passed with `471 pass, 0 fail`, package build/surface smoke green, and `git diff --check` green.
+
+Still future, not claimed:
+
+- live provider/customer custody;
+- aggregate spend-window enforcement;
+- hosted verifier/JWKS/revocation/cross-org trust;
+- host-wide interception;
+- seller middleware, facilitator operation, settlement finality;
+- actual npm or MCP Registry publication.

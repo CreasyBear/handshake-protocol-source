@@ -11,12 +11,14 @@ import {
   runtimeIngressDispatchNodeId,
   type RuntimeIngressObservedDispatch,
 } from "../../src/runtime";
+import { runtimeIngressFamilyRegistry } from "../../src/runtime/ingress/registry";
 import { futureIso, makeKernelFixture, registerFixtureObjects } from "../support/fixtures";
 import { packageInstallRuntimeConfig } from "../support/package-install-flow";
 
 const x402Digest = `sha256:${"9".repeat(64)}` as const;
 const x402SelectedHeadersDigest = `sha256:${"8".repeat(64)}` as const;
 const x402SelectedPaymentRequirementDigest = `sha256:${"7".repeat(64)}` as const;
+const x402RequestBodyDigest = `sha256:${"6".repeat(64)}` as const;
 const x402SdkPackageVersions = {
   "@x402/core": "2.12.0",
   "@x402/evm": "2.12.0",
@@ -24,6 +26,66 @@ const x402SdkPackageVersions = {
 } as const;
 
 describe("runtime ingress adapter", () => {
+  it("declares proposal-only family coverage for each runtime ingress dispatch family", () => {
+    expect(runtimeIngressFamilyRegistry).toEqual([
+      expect.objectContaining({
+        familyId: "package_install",
+        configKey: "packageInstall",
+        dispatchKindSuffix: "_package_install",
+        grammarVersion: "runtime-dispatch-package-install-0.1",
+        authorityPosture: "proposal_only",
+        compileInputAuthority: "candidate_only",
+        rawBypassPosture: "bypass_evidence_only",
+      }),
+      expect.objectContaining({
+        familyId: "x402_payment",
+        configKey: "x402Payment",
+        dispatchKindSuffix: "_x402_payment",
+        grammarVersion: "runtime-dispatch-x402-payment-0.1",
+        authorityPosture: "proposal_only",
+        compileInputAuthority: "candidate_only",
+        rawBypassPosture: "bypass_evidence_only",
+      }),
+      expect.objectContaining({
+        familyId: "auth_md_protected_api_call",
+        configKey: "authMdProtectedApiCall",
+        dispatchKindSuffix: "_auth_md_protected_api_call",
+        grammarVersion: "runtime-dispatch-auth-md-protected-api-call-0.1",
+        authorityPosture: "proposal_only",
+        compileInputAuthority: "candidate_only",
+        rawBypassPosture: "bypass_evidence_only",
+      }),
+    ]);
+  });
+
+  it("fails closed when a dispatch family config is missing", async () => {
+    const fixture = makeKernelFixture();
+    await registerFixtureObjects(fixture);
+
+    await expect(
+      proposeRuntimeIngressActionContracts(
+        fixture.kernel,
+        {},
+        {
+          principalIntentRef: "intent:install hono without runtime config",
+          generatedCodeOrSpecRef: "runtime:dispatch-block-missing-config",
+          dispatchBoundaryRef: "dispatch-boundary:missing-config",
+          dispatches: [
+            {
+              dispatchKind: "wrapped_package_install",
+              dispatchRef: "dispatch:package-install:missing-config",
+              package: "hono",
+              versionRange: "^4.12.19",
+            },
+          ],
+        },
+      ),
+    ).rejects.toThrow("Runtime ingress package-install dispatch requires packageInstall config.");
+    expect(await recordCount(fixture.store, "runtime_execution")).toBe(0);
+    expect(await recordCount(fixture.store, "generated_execution_graph")).toBe(0);
+    expect(await recordCount(fixture.store, "action_contract")).toBe(0);
+  });
+
   it("observes supported dispatch and proposes a contract without policy or gateway authority", async () => {
     const fixture = makeKernelFixture();
     await registerFixtureObjects(fixture);
@@ -336,8 +398,11 @@ describe("runtime ingress adapter", () => {
       atomicAmount: "2500",
       intendedHttpMethod: "GET",
       intendedRequestUrl: proposal.endpointEvidence.endpointUrl,
+      intendedRequestBodyPosture: "no_body",
       intendedRequestBodyDigest: null,
       selectedHeadersDigest: x402SelectedHeadersDigest,
+      providerEnvironmentPosture: "local_reference_sandbox",
+      providerEnvironmentRef: null,
       x402Version: 2,
       x402Scheme: "exact",
       asset: "USDC",
@@ -355,6 +420,137 @@ describe("runtime ingress adapter", () => {
     expect(await recordCount(fixture.store, "generated_execution_graph")).toBe(1);
     expect(await recordCount(fixture.store, "tool_call_draft")).toBe(1);
     expect(await recordCount(fixture.store, "action_contract")).toBe(1);
+    await expectNoRuntimeAuthorityRecords(fixture.store);
+  });
+
+  it("retains mixed-family grammar while routing each dispatch through its family config", async () => {
+    const { fixture, x402RuntimeConfig, x402Proposal } = await installedMixedIngressFixture();
+
+    const result = await proposeRuntimeIngressActionContracts(
+      fixture.kernel,
+      {
+        packageInstall: packageInstallRuntimeConfig(fixture),
+        x402Payment: x402RuntimeConfig,
+      },
+      {
+        principalIntentRef: "intent:install package and fetch paid context",
+        generatedCodeOrSpecRef: "runtime:dispatch-block-mixed",
+        dispatchBoundaryRef: "dispatch-boundary:mixed",
+        dispatches: [
+          {
+            dispatchKind: "wrapped_package_install",
+            dispatchRef: "dispatch:package-install:mixed",
+            package: "hono",
+            versionRange: "^4.12.19",
+          },
+          x402Dispatch(x402Proposal, "dispatch:x402-payment:mixed", upstreamX402DispatchBinding(x402Proposal)),
+        ],
+      },
+    );
+
+    expect(result.outcome).toBe("action_contracts_proposed");
+    expect(result.generatedExecutionGraph.supportedGrammarVersion).toBe("runtime-dispatch-mixed-0.1");
+    expect(result.proposals.map((proposal) => proposal.actionContract?.actionClass)).toEqual([
+      "package.install",
+      "x402_payment.exact",
+    ]);
+    const packageActionContractId = result.proposals[0]?.actionContract?.actionContractId;
+    if (!packageActionContractId) throw new Error("expected package action contract before x402 dependency check");
+    expect(result.proposals[1]?.actionContract?.requiredPriorActionContractIds).toEqual([packageActionContractId]);
+    expect(await recordCount(fixture.store, "action_contract")).toBe(2);
+    await expectNoRuntimeAuthorityRecords(fixture.store);
+  });
+
+  it("propagates x402 body and provider posture into the exact runtime contract", async () => {
+    const { fixture, runtimeConfig, proposal } = await installedX402IngressFixture();
+
+    const result = await proposeRuntimeIngressActionContracts(
+      fixture.kernel,
+      { x402Payment: runtimeConfig },
+      {
+        principalIntentRef: "intent:post paid context through x402",
+        generatedCodeOrSpecRef: "runtime:dispatch-block-x402-posture",
+        dispatchBoundaryRef: "dispatch-boundary:x402-fetch-posture",
+        dispatches: [
+          x402Dispatch(proposal, "dispatch:x402-payment:posture", {
+            ...upstreamX402DispatchBinding(proposal),
+            intendedHttpMethod: "POST",
+            intendedRequestBodyPosture: "digest_bound",
+            intendedRequestBodyDigest: x402RequestBodyDigest,
+            providerEnvironmentPosture: "local_reference_sandbox",
+            providerEnvironmentRef: "provider-environment:x402-local-reference-sandbox",
+          }),
+        ],
+      },
+    );
+
+    expect(result.outcome).toBe("action_contracts_proposed");
+    const contract = result.proposals[0]?.actionContract;
+    if (!contract) throw new Error("expected x402 action contract");
+    expect(contract.parameters).toMatchObject({
+      intendedHttpMethod: "POST",
+      intendedRequestBodyPosture: "digest_bound",
+      intendedRequestBodyDigest: x402RequestBodyDigest,
+      providerEnvironmentPosture: "local_reference_sandbox",
+      providerEnvironmentRef: "provider-environment:x402-local-reference-sandbox",
+    });
+    expect(await recordCount(fixture.store, "action_contract")).toBe(1);
+    await expectNoRuntimeAuthorityRecords(fixture.store);
+  });
+
+  it("refuses unsupported x402 body or live provider posture before runtime contract authority", async () => {
+    const { fixture, runtimeConfig, proposal } = await installedX402IngressFixture();
+
+    const result = await proposeRuntimeIngressActionContracts(
+      fixture.kernel,
+      { x402Payment: runtimeConfig },
+      {
+        principalIntentRef: "intent:fetch paid live context through x402",
+        generatedCodeOrSpecRef: "runtime:dispatch-block-x402-live-posture",
+        dispatchBoundaryRef: "dispatch-boundary:x402-fetch-live-posture",
+        dispatches: [
+          x402Dispatch(proposal, "dispatch:x402-payment:live-posture", {
+            ...upstreamX402DispatchBinding(proposal),
+            intendedRequestBodyPosture: "unsupported",
+            providerEnvironmentPosture: "live",
+            providerEnvironmentRef: "provider-environment:x402-live",
+          }),
+        ],
+      },
+    );
+
+    expect(result.outcome).toBe("one_or_more_dispatches_refused");
+    expect(result.responsePosture).toMatchObject({
+      authorityCreated: false,
+      greenlightCreated: false,
+      gatewayCheckPerformed: false,
+      mutationAttempted: false,
+      actionContractRefs: [],
+      nextAction: "recraft_request",
+    });
+    expect(result.responsePosture.reasonCodes).toEqual(
+      expect.arrayContaining([
+        "x402_request_body_posture_unsupported",
+        "x402_provider_environment_not_sandboxed",
+        "generated_execution_graph_not_contractable",
+      ]),
+    );
+    expect(result.runtimeExecution.refusalReasonCodes).toEqual(
+      expect.arrayContaining(["x402_request_body_posture_unsupported", "x402_provider_environment_not_sandboxed"]),
+    );
+    expect(result.generatedExecutionGraph.coverageStatus).toBe("unsupported_or_ambiguous");
+    expect(result.generatedExecutionGraph.nodes[0]?.unsupportedReasonCodes).toEqual(
+      expect.arrayContaining(["x402_request_body_posture_unsupported", "x402_provider_environment_not_sandboxed"]),
+    );
+    const proposalResult = result.proposals[0];
+    if (!proposalResult || proposalResult.outcome !== "intent_compilation_refused") throw new Error("expected refusal");
+    expect(proposalResult.refusalReasonCodes).toEqual(
+      expect.arrayContaining([
+        "runtime_x402_request_body_posture_unsupported",
+        "runtime_x402_provider_environment_not_sandboxed",
+      ]),
+    );
+    expect(await recordCount(fixture.store, "action_contract")).toBe(0);
     await expectNoRuntimeAuthorityRecords(fixture.store);
   });
 
@@ -656,6 +852,43 @@ async function installedX402IngressFixture() {
       gatewayRegistryEntryId: records.gatewayRegistryEntry.gatewayRegistryEntryId,
       gatewayId: records.gatewayRegistryEntry.gatewayId,
       maxAtomicAmountPerCall: proposal.spendBounds.maxAtomicAmountPerCall,
+      contractExpiresAt: futureIso(),
+      signingSecret: "test-secret",
+    },
+  };
+}
+
+async function installedMixedIngressFixture() {
+  const fixture = makeKernelFixture();
+  await registerFixtureObjects(fixture);
+  const x402Proposal = await compileX402InstallProposal(validX402InstallInput());
+  const x402Records = requireX402Records(x402Proposal);
+  await fixture.kernel.putCatalogObject({ objectType: "tool_capability", payload: x402Records.toolCapability });
+  await fixture.kernel.putCatalogObject({ objectType: "action_type", payload: x402Records.actionType });
+  await fixture.kernel.putCatalogObject({
+    objectType: "gateway_registry_entry",
+    payload: x402Records.gatewayRegistryEntry,
+  });
+  await fixture.kernel.putCatalogObject({ objectType: "operating_envelope", payload: x402Records.operatingEnvelope });
+  return {
+    fixture,
+    x402Proposal,
+    x402RuntimeConfig: {
+      tenantId: x402Proposal.tenantId,
+      organizationId: x402Proposal.organizationId,
+      principalId: x402Records.operatingEnvelope.principalId,
+      agentId: x402Records.operatingEnvelope.agentId,
+      runId: "run_demo",
+      runtimeAdapterId: x402Records.toolCapability.runtimeAdapterId,
+      operatingEnvelopeId: x402Records.operatingEnvelope.envelopeId,
+      toolCatalogRef: `${x402Records.toolCapability.toolCatalogId}@${x402Records.toolCapability.toolCatalogVersion}`,
+      actionCatalogRef: `${x402Records.actionType.actionCatalogId}@${x402Records.actionType.actionCatalogVersion}`,
+      gatewayRegistryRef: `gateway_registry@${x402Records.gatewayRegistryEntry.gatewayRegistryVersion}`,
+      toolCapabilityId: x402Records.toolCapability.toolCapabilityId,
+      actionTypeId: x402Records.actionType.actionTypeId,
+      gatewayRegistryEntryId: x402Records.gatewayRegistryEntry.gatewayRegistryEntryId,
+      gatewayId: x402Records.gatewayRegistryEntry.gatewayId,
+      maxAtomicAmountPerCall: x402Proposal.spendBounds.maxAtomicAmountPerCall,
       contractExpiresAt: futureIso(),
       signingSecret: "test-secret",
     },

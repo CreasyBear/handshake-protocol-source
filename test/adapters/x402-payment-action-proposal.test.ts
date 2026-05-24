@@ -48,6 +48,7 @@ const officialX402SourceBasis = {
       "signed-receipts",
       "seller-middleware",
       "facilitator-operation",
+      "settlement-finality",
     ],
   },
 } as const;
@@ -119,6 +120,41 @@ describe("x402 payment runtime proposal", () => {
     expect(await store.listRecordsByType("greenlight")).toHaveLength(0);
   });
 
+  it("binds non-identifier idempotency to x402 provider posture material", async () => {
+    const { kernel, proposal } = await installedX402Kernel();
+    const records = requireCompiledRecords(proposal);
+    const baseAttempt = {
+      principalIntentRef: "intent:fetch paid context",
+      generatedCodeOrSpecRef: "code:x402-fetch-wrapper",
+      endpointUrl: proposal.endpointEvidence.endpointUrl,
+      payee: proposal.endpointEvidence.payee,
+      network: proposal.endpointEvidence.network,
+      token: proposal.endpointEvidence.token,
+      atomicAmount: "2500",
+      paymentRequirementsDigest: proposal.endpointEvidence.paymentRequirementsDigest,
+      paymentRequiredEvidenceRef: "evidence:x402-payment-required",
+      providerEnvironmentPosture: "local_reference_sandbox" as const,
+    };
+
+    const first = await proposeX402PaymentActionContract(kernel, runtimeConfig(proposal, records), baseAttempt);
+    const changedProviderRef = await proposeX402PaymentActionContract(kernel, runtimeConfig(proposal, records), {
+      ...baseAttempt,
+      providerEnvironmentRef: "provider-environment:x402-local-reference-sandbox",
+    });
+
+    expect(first.outcome).toBe("action_contract_proposed");
+    expect(changedProviderRef.outcome).toBe("action_contract_proposed");
+    if (first.outcome !== "action_contract_proposed") throw new Error("expected first contract");
+    if (changedProviderRef.outcome !== "action_contract_proposed") throw new Error("expected changed contract");
+    expect(first.actionContract.parameters.providerEnvironmentRef).toBeNull();
+    expect(changedProviderRef.actionContract.parameters.providerEnvironmentRef).toBe(
+      "provider-environment:x402-local-reference-sandbox",
+    );
+    expect(first.actionContract.idempotencyKey).toStartWith("x402-payment:");
+    expect(changedProviderRef.actionContract.idempotencyKey).toStartWith("x402-payment:");
+    expect(changedProviderRef.actionContract.idempotencyKey).not.toBe(first.actionContract.idempotencyKey);
+  });
+
   it("refuses an x402 payment attempt above the installed per-call bound before compilation", async () => {
     const { kernel, store, proposal } = await installedX402Kernel();
     const records = requireCompiledRecords(proposal);
@@ -163,8 +199,11 @@ describe("x402 payment runtime proposal", () => {
       endpointDomain: "api.example.com",
       intendedHttpMethod: "GET",
       intendedRequestUrl: officialPaymentRequired.resource.url,
+      intendedRequestBodyPosture: "no_body",
       intendedRequestBodyDigest: null,
       selectedHeadersDigest: officialSelectedHeadersDigest,
+      providerEnvironmentPosture: "local_reference_sandbox",
+      providerEnvironmentRef: null,
       x402Version: 2,
       x402Scheme: "exact",
       network: "eip155:84532",
@@ -300,6 +339,67 @@ describe("x402 payment runtime proposal", () => {
     expect(await store.listRecordsByType("action_contract")).toHaveLength(0);
     expect(await store.listRecordsByType("greenlight")).toHaveLength(0);
   });
+
+  it("refuses ambiguous request-body and live-environment posture before compilation", async () => {
+    const evidence = await officialPaymentRequiredEvidence(officialSelectedHeadersDigest, {
+      requestBodyPosture: "unsupported",
+      providerEnvironmentPosture: "live",
+      providerEnvironmentRef: "provider-environment:x402-live",
+    });
+    const { kernel, store, proposal } = await installedOfficialX402Kernel(evidence.selectedPaymentRequirementDigest);
+    const records = requireCompiledRecords(proposal);
+
+    const result = await proposeX402PaymentActionContract(
+      kernel,
+      runtimeConfig(proposal, records),
+      await buildX402PaymentAttemptFromRequiredEvidence({
+        evidence,
+        principalIntentRef: "intent:fetch paid context",
+        generatedCodeOrSpecRef: "code:official-x402-live-wrapper",
+      }),
+    );
+
+    expect(result).toEqual({
+      outcome: "payment_attempt_refused",
+      intentCompilation: null,
+      actionContract: null,
+      refusalReasonCodes: ["x402_provider_environment_not_sandboxed", "x402_request_body_posture_unsupported"],
+    });
+    expect(await store.listRecordsByType("intent_compilation")).toHaveLength(0);
+    expect(await store.listRecordsByType("action_contract")).toHaveLength(0);
+    expect(await store.listRecordsByType("greenlight")).toHaveLength(0);
+    expect(await store.listRecordsByType("gateway_check_attempt")).toHaveLength(0);
+  });
+
+  it("refuses external sandbox posture until the x402 path has a local/reference firewall", async () => {
+    const evidence = await officialPaymentRequiredEvidence(officialSelectedHeadersDigest, {
+      providerEnvironmentPosture: "external_sandbox",
+      providerEnvironmentRef: "provider-environment:x402-external-sandbox",
+    });
+    const { kernel, store, proposal } = await installedOfficialX402Kernel(evidence.selectedPaymentRequirementDigest);
+    const records = requireCompiledRecords(proposal);
+
+    const result = await proposeX402PaymentActionContract(
+      kernel,
+      runtimeConfig(proposal, records),
+      await buildX402PaymentAttemptFromRequiredEvidence({
+        evidence,
+        principalIntentRef: "intent:fetch paid context from external sandbox",
+        generatedCodeOrSpecRef: "code:official-x402-external-sandbox-wrapper",
+      }),
+    );
+
+    expect(result).toEqual({
+      outcome: "payment_attempt_refused",
+      intentCompilation: null,
+      actionContract: null,
+      refusalReasonCodes: ["x402_provider_environment_not_sandboxed"],
+    });
+    expect(await store.listRecordsByType("intent_compilation")).toHaveLength(0);
+    expect(await store.listRecordsByType("action_contract")).toHaveLength(0);
+    expect(await store.listRecordsByType("greenlight")).toHaveLength(0);
+    expect(await store.listRecordsByType("gateway_check_attempt")).toHaveLength(0);
+  });
 });
 
 async function installedX402Kernel(): Promise<{
@@ -405,7 +505,15 @@ async function proposeOfficialExactContract(selectedHeadersDigest: `sha256:${str
   return { evidence, result, store };
 }
 
-async function officialPaymentRequiredEvidence(selectedHeadersDigest: `sha256:${string}`) {
+async function officialPaymentRequiredEvidence(
+  selectedHeadersDigest: `sha256:${string}`,
+  overrides: Partial<{
+    requestBodyPosture: "no_body" | "digest_bound" | "omitted" | "unsupported";
+    bodyDigest: `sha256:${string}` | null;
+    providerEnvironmentPosture: "local_reference_sandbox" | "external_sandbox" | "live" | "unknown";
+    providerEnvironmentRef: string | null;
+  }> = {},
+) {
   return decodeX402PaymentRequiredEvidence({
     source: officialX402SourceBasis,
     paymentRequiredHeader: base64Json(officialPaymentRequired),
@@ -413,8 +521,11 @@ async function officialPaymentRequiredEvidence(selectedHeadersDigest: `sha256:${
     intendedRequest: {
       method: "GET",
       url: officialPaymentRequired.resource.url,
-      bodyDigest: null,
+      requestBodyPosture: overrides.requestBodyPosture ?? "no_body",
+      bodyDigest: overrides.bodyDigest ?? null,
       selectedHeadersDigest,
+      providerEnvironmentPosture: overrides.providerEnvironmentPosture ?? "local_reference_sandbox",
+      providerEnvironmentRef: overrides.providerEnvironmentRef ?? null,
     },
   });
 }

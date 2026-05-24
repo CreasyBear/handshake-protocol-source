@@ -3,6 +3,11 @@ node_modules/
 dist/
 .wrangler/
 .dev.vars
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
 
 # Local agent planning and technical working state.
 .planning/

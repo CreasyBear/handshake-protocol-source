@@ -14,7 +14,12 @@ import {
   runX402WalletGateway,
   type X402PaymentParameters,
   type X402PaymentSignatureCommand,
+  type X402PaymentSignatureEvidence,
 } from "../../src/adapters/x402-payment/wallet-gateway";
+import {
+  createLocalX402PaidHttpSandbox,
+  createLocalX402SandboxSigningSurface,
+} from "../../src/adapters/x402-payment/sandbox-http";
 import type { ProofGap } from "../../src/protocol/areas/proof-gap";
 import { HandshakeKernel } from "../../src/protocol/kernel";
 import { digestCanonical } from "../../src/protocol/foundation/canonical";
@@ -55,6 +60,7 @@ const officialX402SourceBasis = {
       "signed-receipts",
       "seller-middleware",
       "facilitator-operation",
+      "settlement-finality",
     ],
   },
 } as const;
@@ -247,6 +253,159 @@ describe("x402 wallet gateway adapter", () => {
     expect(JSON.stringify(result.signatureEvidence)).not.toContain('paymentSignature":"');
   });
 
+  it("records a local sandbox 402 challenge and signed retry only after gateway admission", async () => {
+    const fixture = await greenlitOfficialX402Contract();
+    const sandbox = createLocalX402PaidHttpSandbox({
+      source: officialX402SourceBasis,
+      paymentRequired: officialPaymentRequired,
+      selectedPaymentRequirementIndex: fixture.evidence.selectedPaymentRequirementIndex,
+      intendedRequest: {
+        method: "GET",
+        url: officialPaymentRequired.resource.url,
+        requestBodyPosture: "no_body",
+        bodyDigest: null,
+        selectedHeadersDigest: officialSelectedHeadersDigest,
+        providerEnvironmentPosture: "local_reference_sandbox",
+        providerEnvironmentRef: "provider-environment:x402-local-reference-sandbox",
+      },
+      paymentResponseEvidenceRef: "evidence:x402-local-sandbox-payment-response:test",
+      providerRequestRef: "provider-request:x402-local-sandbox:test",
+      providerOperationRef: "provider-operation:x402-local-sandbox:test",
+    });
+    const challenge = await sandbox.requestPaymentRequired();
+    expect(challenge).toMatchObject({
+      outcome: "payment_required",
+      status: 402,
+      authorityCreated: false,
+      providerRequestRef: "provider-request:x402-local-sandbox:test",
+      providerOperationRef: "provider-operation:x402-local-sandbox:test",
+      evidenceBoundary: {
+        boundaryKind: "x402_local_reference_sandbox",
+        evidenceProfile: "local_reference_downstream_fixture",
+        signedRetryPosture: "not_observed",
+        settlementFinalityClaimed: false,
+        facilitatorOperationClaimed: false,
+        sellerMiddlewareClaimed: false,
+        providerCustodyClaimed: false,
+      },
+    });
+    expect(challenge.evidence.authorityCreated).toBe(false);
+    expect(sandbox.snapshot()).toMatchObject({ challengeCount: 1, signedRetryCount: 0 });
+
+    const signer = trackedOfficialSigner();
+    const surface = createLocalX402SandboxSigningSurface({
+      sandbox,
+      signer: signer.surfaceSigner,
+      paymentRequired: officialPaymentRequired,
+      selectedPaymentRequirementIndex: fixture.evidence.selectedPaymentRequirementIndex,
+      selectedPaymentRequirementDigest: fixture.evidence.selectedPaymentRequirementDigest,
+    });
+    const input = {
+      protocol: fixture.kernel,
+      surface,
+      actionContractId: fixture.contract.actionContractId,
+      greenlightId: fixture.greenlight.greenlightId,
+      observedParameters: fixture.contract.parameters as X402PaymentParameters,
+    };
+
+    const first = await runX402WalletGateway({
+      ...input,
+      surfaceOperationRef: "surface-op:x402-local-sandbox:first",
+    });
+    const replay = await runX402WalletGateway({
+      ...input,
+      surfaceOperationRef: "surface-op:x402-local-sandbox:replay",
+    });
+
+    expect(first.outcome).toBe("payment_signature_reconciled");
+    expect(first.signatureEvidence).toMatchObject({
+      downstreamPaymentStatus: "succeeded",
+      paymentResponseEvidenceRef: "evidence:x402-local-sandbox-payment-response:test",
+      providerRequestRef: "provider-request:x402-local-sandbox:test",
+      providerOperationRef: "provider-operation:x402-local-sandbox:test",
+    });
+    expect(first.signatureEvidence?.additionalEvidenceRefs).toEqual(["evidence:x402-local-sandbox-signed-retry:1"]);
+    expect(first.signatureEvidence?.localReferenceSandboxBoundary).toMatchObject({
+      boundaryKind: "x402_local_reference_sandbox",
+      evidenceProfile: "local_reference_downstream_fixture",
+      signedRetryPosture: "post_gateway_check_observation_only",
+      authorityCreated: false,
+      paymentFinalityClaimed: false,
+      settlementFinalityClaimed: false,
+      facilitatorOperationClaimed: false,
+      sellerMiddlewareClaimed: false,
+      providerCustodyClaimed: false,
+      liveProviderOperationClaimed: false,
+    });
+    expect(first.reconciliation?.evidenceRefs).toContain("evidence:x402-local-sandbox-signed-retry:1");
+    expect(replay.outcome).toBe("gateway_check_refused");
+    expect(replay.signatureEvidence).toBeNull();
+    expect(replay.gatewayCheck.gateAttempt.gateDecisionReasonCode).toBe("already_consumed");
+    expect(signer.signatureCount()).toBe(1);
+    expect(sandbox.snapshot().signedRetryCount).toBe(1);
+  });
+
+  it("refuses local sandbox retry evidence gaps without incrementing signed retry count", async () => {
+    const fixture = await greenlitOfficialX402Contract();
+    const sandbox = createLocalX402PaidHttpSandbox({
+      source: officialX402SourceBasis,
+      paymentRequired: officialPaymentRequired,
+      selectedPaymentRequirementIndex: fixture.evidence.selectedPaymentRequirementIndex,
+      intendedRequest: {
+        method: "GET",
+        url: officialPaymentRequired.resource.url,
+        requestBodyPosture: "no_body",
+        bodyDigest: null,
+        selectedHeadersDigest: officialSelectedHeadersDigest,
+        providerEnvironmentPosture: "local_reference_sandbox",
+        providerEnvironmentRef: "provider-environment:x402-local-reference-sandbox",
+      },
+    });
+    const parameters = fixture.contract.parameters as X402PaymentParameters;
+    const validSignatureEvidence = await fakeLocalSignatureEvidence(parameters);
+
+    const missing = await sandbox.recordSignedRetry({ parameters, signatureEvidence: null });
+    const wrongHeader = await sandbox.recordSignedRetry({
+      parameters,
+      signatureEvidence: { ...validSignatureEvidence, paymentSignatureHeaderName: "X-PAYMENT-SIGNATURE" as never },
+    });
+    const nonReference = await sandbox.recordSignedRetry({
+      parameters: {
+        ...parameters,
+        providerEnvironmentPosture: "live",
+        providerEnvironmentRef: "provider-environment:x402-live",
+      },
+      signatureEvidence: validSignatureEvidence,
+    });
+    const ambiguousBody = await sandbox.recordSignedRetry({
+      parameters: { ...parameters, intendedRequestBodyPosture: "unsupported" },
+      signatureEvidence: validSignatureEvidence,
+    });
+
+    expect([missing, wrongHeader, nonReference, ambiguousBody].map((result) => result.outcome)).toEqual([
+      "signed_retry_refused",
+      "signed_retry_refused",
+      "signed_retry_refused",
+      "signed_retry_refused",
+    ]);
+    expect([missing, wrongHeader, nonReference, ambiguousBody].map((result) => result.retryCount)).toEqual([
+      0, 0, 0, 0,
+    ]);
+    expect([missing, wrongHeader, nonReference, ambiguousBody].map((result) => result.evidenceBoundary)).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          evidenceProfile: "local_reference_downstream_fixture",
+          signedRetryPosture: "not_observed",
+          settlementFinalityClaimed: false,
+          facilitatorOperationClaimed: false,
+          sellerMiddlewareClaimed: false,
+          providerCustodyClaimed: false,
+        }),
+      ]),
+    );
+    expect(sandbox.snapshot().signedRetryCount).toBe(0);
+  });
+
   it("binds Payment-Identifier into official gateway evidence and reconciliation refs", async () => {
     const fixture = await greenlitOfficialX402Contract({ paymentIdentifier: officialPaymentIdentifier });
     const signer = trackedOfficialSigner();
@@ -306,6 +465,36 @@ describe("x402 wallet gateway adapter", () => {
       actionContractId: fixture.contract.actionContractId,
       greenlightId: fixture.greenlight.greenlightId,
       observedParameters,
+    });
+
+    expect(result.outcome).toBe("gateway_check_refused");
+    expect(signer.signatureCount()).toBe(0);
+    expect(result.signatureEvidence).toBeNull();
+  });
+
+  it("refuses external sandbox posture before invoking the official signer", async () => {
+    const fixture = await greenlitOfficialX402Contract();
+    const signer = trackedOfficialSigner();
+    const surface = createOfficialExactX402SigningSurface({
+      signer: signer.surfaceSigner,
+      paymentRequired: officialPaymentRequired,
+      selectedPaymentRequirementIndex: fixture.evidence.selectedPaymentRequirementIndex,
+      selectedPaymentRequirementDigest: fixture.evidence.selectedPaymentRequirementDigest,
+      downstreamPaymentStatus: "unknown",
+    });
+    const observedParameters = {
+      ...(fixture.contract.parameters as X402PaymentParameters),
+      providerEnvironmentPosture: "external_sandbox" as const,
+      providerEnvironmentRef: "provider-environment:x402-external-sandbox",
+    };
+
+    const result = await runX402WalletGateway({
+      protocol: fixture.kernel,
+      surface,
+      actionContractId: fixture.contract.actionContractId,
+      greenlightId: fixture.greenlight.greenlightId,
+      observedParameters,
+      surfaceOperationRef: "surface-op:x402-official-external-sandbox",
     });
 
     expect(result.outcome).toBe("gateway_check_refused");
@@ -463,6 +652,26 @@ function fakeSigningSurface(downstreamPaymentStatus: "succeeded" | "unknown") {
         providerOperationRef: `provider-operation:x402:${command.verifiedGate.gateAttemptId}`,
       };
     },
+  };
+}
+
+async function fakeLocalSignatureEvidence(parameters: X402PaymentParameters): Promise<X402PaymentSignatureEvidence> {
+  const paymentSignature = `PAYMENT-SIGNATURE:fake:sandbox-refusal:${parameters.paymentRequirementsDigest.slice(
+    "sha256:".length,
+    "sha256:".length + 16,
+  )}`;
+  return {
+    evidenceRef: "evidence:x402-payment-signature:sandbox-refusal",
+    surfaceOperationRef: "surface-op:x402-sandbox-refusal",
+    paymentSignatureHeaderName: "PAYMENT-SIGNATURE",
+    paymentSignatureHeaderRef: "credential:x402-local-fixture-signature:sandbox-refusal",
+    paymentSignatureDigest: await digestCanonical({ paymentSignature }),
+    paymentPayloadShape: "local_fixture_payment_signature",
+    credentialMaterialPosture: "local_fixture",
+    downstreamPaymentStatus: "succeeded",
+    paymentResponseEvidenceRef: "evidence:x402-payment-response:sandbox-refusal",
+    providerRequestRef: "provider-request:x402:sandbox-refusal",
+    providerOperationRef: "provider-operation:x402:sandbox-refusal",
   };
 }
 

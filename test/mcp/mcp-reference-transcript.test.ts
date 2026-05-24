@@ -22,6 +22,8 @@ describe("MCP x402 reference transcript", () => {
       "install_not_ready",
       "gateway_offline",
       "amount_mismatch",
+      "unsupported_body_posture",
+      "live_provider_posture",
       "params_mismatch",
       "replay_refusal",
       "raw_sibling_bypass_shaped_input",
@@ -92,6 +94,12 @@ describe("MCP x402 reference transcript", () => {
       gatewayCheckRef: null,
       mutationAttemptRef: null,
     });
+    expect(byId.digest_bound_proposal?.toolResult?.structuredContent).toMatchObject({
+      outcome: "action_contract_proposed",
+      greenlightRef: null,
+      gatewayCheckRef: null,
+      mutationAttemptRef: null,
+    });
     expect(byId.evidence_readback?.resourceReads.map((read) => read.uri)).toEqual([
       "handshake://evidence/contracts/act_mcp_reference_x402",
       "handshake://evidence/envelopes/act_mcp_reference_x402",
@@ -109,6 +117,14 @@ describe("MCP x402 reference transcript", () => {
     expect(byId.amount_mismatch?.toolResult?.structuredContent).toMatchObject({
       outcome: "refused",
       reasonCodes: ["x402_amount_exceeds_call_bound"],
+    });
+    expect(byId.unsupported_body_posture?.toolResult?.structuredContent).toMatchObject({
+      outcome: "refused",
+      reasonCodes: ["x402_request_body_posture_unsupported"],
+    });
+    expect(byId.live_provider_posture?.toolResult?.structuredContent).toMatchObject({
+      outcome: "refused",
+      reasonCodes: ["x402_provider_environment_not_sandboxed"],
     });
     expect(byId.params_mismatch?.toolResult?.structuredContent).toMatchObject({
       outcome: "refused",

@@ -21,6 +21,7 @@ import {
 type CliCommandErrorCode =
   | "cli_command_unsupported"
   | "cli_required_argument_missing"
+  | "cli_input_file_unreadable"
   | "cli_input_json_invalid"
   | "cli_input_schema_invalid"
   | "cli_command_failed";
@@ -54,14 +55,46 @@ export async function runCliCommand(argv: readonly string[]): Promise<unknown> {
   if (group === "evidence" && subcommand === "aps-report" && maybePath) {
     return renderApsReportCommand(await readJsonFile(maybePath));
   }
+  if (group === "evidence" && subcommand === "aps-report") {
+    return cliCommandErrorOutput({
+      argv,
+      errorCode: "cli_required_argument_missing",
+      message: "evidence aps-report requires <path>.",
+      nextAction: "fix_arguments",
+    });
+  }
   if (group === "evidence" && subcommand === "contract-view" && maybePath) {
     return evidenceContractViewCommand(await readJsonFile(maybePath));
+  }
+  if (group === "evidence" && subcommand === "contract-view") {
+    return cliCommandErrorOutput({
+      argv,
+      errorCode: "cli_required_argument_missing",
+      message: "evidence contract-view requires <path>.",
+      nextAction: "fix_arguments",
+    });
   }
   if (group === "evidence" && subcommand === "receipt-timeline" && maybePath) {
     return evidenceReceiptTimelineCommand(await readJsonFile(maybePath));
   }
+  if (group === "evidence" && subcommand === "receipt-timeline") {
+    return cliCommandErrorOutput({
+      argv,
+      errorCode: "cli_required_argument_missing",
+      message: "evidence receipt-timeline requires <path>.",
+      nextAction: "fix_arguments",
+    });
+  }
   if (group === "support" && subcommand === "bundle" && maybePath) {
     return supportBundleCommand(await readJsonFile(maybePath));
+  }
+  if (group === "support" && subcommand === "bundle") {
+    return cliCommandErrorOutput({
+      argv,
+      errorCode: "cli_required_argument_missing",
+      message: "support bundle requires <path>.",
+      nextAction: "fix_arguments",
+    });
   }
   if (group === "cert" && subcommand === "verify" && maybePath) {
     const trustBundleFlagIndex = rest.indexOf("--trust-bundle");
@@ -79,6 +112,14 @@ export async function runCliCommand(argv: readonly string[]): Promise<unknown> {
       trustMaterial: await readJsonFile(trustBundlePath),
     });
   }
+  if (group === "cert" && subcommand === "verify") {
+    return cliCommandErrorOutput({
+      argv,
+      errorCode: "cli_required_argument_missing",
+      message: "cert verify requires <certificate-path> --trust-bundle <path>.",
+      nextAction: "fix_arguments",
+    });
+  }
   if (group === "conformance" && subcommand === "x402-payment") {
     const posturePath = optionValue(argv, "--posture");
     return x402PaymentConformanceCommand(posturePath ? await readJsonFile(posturePath) : undefined);
@@ -90,6 +131,14 @@ export async function runCliCommand(argv: readonly string[]): Promise<unknown> {
       recordLocal: argv.includes("--record-local"),
     });
   }
+  if (group === "install" && subcommand === "x402-payment") {
+    return cliCommandErrorOutput({
+      argv,
+      errorCode: "cli_required_argument_missing",
+      message: "install x402-payment requires <path>.",
+      nextAction: "fix_arguments",
+    });
+  }
   if (group === "install" && subcommand === "health") {
     if (maybePath && !maybePath.startsWith("--")) return installHealthProjectionCommand(await readJsonFile(maybePath));
     return installHealthCommand({ cwd: optionValue(argv, "--cwd") ?? process.cwd() });
@@ -99,6 +148,14 @@ export async function runCliCommand(argv: readonly string[]): Promise<unknown> {
       cwd: optionValue(argv, "--cwd") ?? process.cwd(),
       postureValue: await readJsonFile(maybePath),
       recordLocal: argv.includes("--record-local"),
+    });
+  }
+  if (group === "probes" && subcommand === "x402-payment") {
+    return cliCommandErrorOutput({
+      argv,
+      errorCode: "cli_required_argument_missing",
+      message: "probes x402-payment requires <path>.",
+      nextAction: "fix_arguments",
     });
   }
   return cliCommandErrorOutput({
@@ -142,7 +199,13 @@ function cliCommandExceptionOutput(argv: readonly string[], error: unknown) {
 }
 
 async function readJsonFile(path: string): Promise<unknown> {
-  return JSON.parse(await readFile(path, "utf8"));
+  let text: string;
+  try {
+    text = await readFile(path, "utf8");
+  } catch {
+    throw new CliInputFileUnreadableError();
+  }
+  return JSON.parse(text);
 }
 
 function optionValue(argv: readonly string[], flag: string): string | null {
@@ -184,6 +247,13 @@ function safeCliCommandError(error: unknown): {
       nextAction: "fix_input_json",
     };
   }
+  if (error instanceof CliInputFileUnreadableError) {
+    return {
+      errorCode: "cli_input_file_unreadable",
+      message: "Input JSON file could not be read.",
+      nextAction: "fix_arguments",
+    };
+  }
   if (error instanceof Error && error.name === "ZodError") {
     return {
       errorCode: "cli_input_schema_invalid",
@@ -196,6 +266,13 @@ function safeCliCommandError(error: unknown): {
     message: error instanceof Error && error.message ? error.message : "Command failed.",
     nextAction: "fix_arguments",
   };
+}
+
+class CliInputFileUnreadableError extends Error {
+  constructor() {
+    super("Input JSON file could not be read.");
+    this.name = "CliInputFileUnreadableError";
+  }
 }
 
 if (import.meta.main) {

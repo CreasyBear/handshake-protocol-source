@@ -19,12 +19,15 @@ export const MCP_X402_REFERENCE_TRANSCRIPT_VERSION = "handshake.mcp.x402.referen
 export const mcpX402ReferenceTranscriptCaseIds = [
   "metadata_read",
   "valid_proposal",
+  "digest_bound_proposal",
   "evidence_readback",
   "stale_metadata",
   "tools_list_changed",
   "install_not_ready",
   "gateway_offline",
   "amount_mismatch",
+  "unsupported_body_posture",
+  "live_provider_posture",
   "params_mismatch",
   "replay_refusal",
   "raw_sibling_bypass_shaped_input",
@@ -175,6 +178,22 @@ export async function buildMcpX402ReferenceTranscript(): Promise<McpReferenceTra
     runtimeClient: validRuntime.client,
     trustedMaxAtomicAmountPerCall: MCP_REFERENCE_TRUSTED_MAX_ATOMIC_AMOUNT,
   });
+  const digestBoundRuntime = referenceRuntimeClient();
+  const digestBoundProposal = await proposeMcpX402Payment(
+    {
+      ...validInput,
+      requestId: "req_mcp_x402_digest_bound",
+      dispatchRef: "dispatch:mcp:digest-bound",
+      intendedHttpMethod: "POST",
+      intendedRequestBodyPosture: "digest_bound",
+      intendedRequestBodyDigest: await digestMcp({ body: "digest-bound-reference" }),
+      providerEnvironmentRef: "provider-environment:x402-local-reference-sandbox",
+    },
+    {
+      runtimeClient: digestBoundRuntime.client,
+      trustedMaxAtomicAmountPerCall: MCP_REFERENCE_TRUSTED_MAX_ATOMIC_AMOUNT,
+    },
+  );
   const actionContractId = actionContractIdFrom(validProposal);
   const contractUri = `handshake://evidence/contracts/${encodeURIComponent(actionContractId)}`;
   const envelopeUri = `handshake://evidence/envelopes/${encodeURIComponent(actionContractId)}`;
@@ -216,6 +235,35 @@ export async function buildMcpX402ReferenceTranscript(): Promise<McpReferenceTra
     { ...validInput, requestId: "req_mcp_x402_amount", atomicAmount: "3000" },
     {
       runtimeClient: amountRuntime.client,
+      trustedMaxAtomicAmountPerCall: MCP_REFERENCE_TRUSTED_MAX_ATOMIC_AMOUNT,
+    },
+  );
+
+  const unsupportedBodyRuntime = referenceRuntimeClient();
+  const unsupportedBodyProposal = await proposeMcpX402Payment(
+    {
+      ...validInput,
+      requestId: "req_mcp_x402_unsupported_body",
+      dispatchRef: "dispatch:mcp:unsupported-body",
+      intendedRequestBodyPosture: "unsupported",
+    },
+    {
+      runtimeClient: unsupportedBodyRuntime.client,
+      trustedMaxAtomicAmountPerCall: MCP_REFERENCE_TRUSTED_MAX_ATOMIC_AMOUNT,
+    },
+  );
+
+  const liveProviderRuntime = referenceRuntimeClient();
+  const liveProviderProposal = await proposeMcpX402Payment(
+    {
+      ...validInput,
+      requestId: "req_mcp_x402_live_provider",
+      dispatchRef: "dispatch:mcp:live-provider",
+      providerEnvironmentPosture: "live",
+      providerEnvironmentRef: "provider-environment:x402-live",
+    },
+    {
+      runtimeClient: liveProviderRuntime.client,
       trustedMaxAtomicAmountPerCall: MCP_REFERENCE_TRUSTED_MAX_ATOMIC_AMOUNT,
     },
   );
@@ -291,6 +339,22 @@ export async function buildMcpX402ReferenceTranscript(): Promise<McpReferenceTra
       resourceReads: [],
       toolResult: validProposal,
       runtimeCallNames: validRuntime.calls.map((call) => call.name),
+    }),
+    row({
+      id: "digest_bound_proposal",
+      title: "Digest-bound exact proposal records a contract candidate only",
+      generatedExecutionShape: "model_facing_mcp_tool_call",
+      protectedActionPath: "x402_payment.exact",
+      expectedOutcome: digestBoundProposal.structuredContent.outcome,
+      expectedNextAction: digestBoundProposal.structuredContent.nextAction,
+      sourceBindings: [
+        { kind: "mcp_tool", source: "proposeMcpX402Payment", toolName: MCP_X402_PAYMENT_PROPOSE_TOOL },
+        { kind: "cli_readback", source: "cliCommandManifest", commandId: "evidence.contract-view" },
+      ],
+      cliReadbacks: ["evidence.contract-view"],
+      resourceReads: [],
+      toolResult: digestBoundProposal,
+      runtimeCallNames: digestBoundRuntime.calls.map((call) => call.name),
     }),
     row({
       id: "evidence_readback",
@@ -394,6 +458,38 @@ export async function buildMcpX402ReferenceTranscript(): Promise<McpReferenceTra
       runtimeCallNames: amountRuntime.calls.map((call) => call.name),
     }),
     row({
+      id: "unsupported_body_posture",
+      title: "Unsupported body posture refuses before runtime recording",
+      generatedExecutionShape: "model_facing_mcp_tool_call",
+      protectedActionPath: "x402_payment.exact",
+      expectedOutcome: unsupportedBodyProposal.structuredContent.outcome,
+      expectedNextAction: unsupportedBodyProposal.structuredContent.nextAction,
+      sourceBindings: [
+        { kind: "mcp_tool", source: "proposeMcpX402Payment", toolName: MCP_X402_PAYMENT_PROPOSE_TOOL },
+        { kind: "cli_readback", source: "cliCommandManifest", commandId: "schema" },
+      ],
+      cliReadbacks: ["schema"],
+      resourceReads: [],
+      toolResult: unsupportedBodyProposal,
+      runtimeCallNames: unsupportedBodyRuntime.calls.map((call) => call.name),
+    }),
+    row({
+      id: "live_provider_posture",
+      title: "Live provider posture refuses before runtime recording",
+      generatedExecutionShape: "model_facing_mcp_tool_call",
+      protectedActionPath: "x402_payment.exact",
+      expectedOutcome: liveProviderProposal.structuredContent.outcome,
+      expectedNextAction: liveProviderProposal.structuredContent.nextAction,
+      sourceBindings: [
+        { kind: "mcp_tool", source: "proposeMcpX402Payment", toolName: MCP_X402_PAYMENT_PROPOSE_TOOL },
+        { kind: "cli_readback", source: "cliCommandManifest", commandId: "schema" },
+      ],
+      cliReadbacks: ["schema"],
+      resourceReads: [],
+      toolResult: liveProviderProposal,
+      runtimeCallNames: liveProviderRuntime.calls.map((call) => call.name),
+    }),
+    row({
       id: "params_mismatch",
       title: "Idempotency parameter drift maps to protocol refusal",
       generatedExecutionShape: "model_facing_mcp_tool_call",
@@ -466,7 +562,11 @@ export async function buildMcpX402ReferenceTranscript(): Promise<McpReferenceTra
     transcriptContract: mcpX402ReferenceTranscriptContract,
     hostileMatrix: rows
       .filter(
-        (entry) => entry.id !== "metadata_read" && entry.id !== "valid_proposal" && entry.id !== "evidence_readback",
+        (entry) =>
+          entry.id !== "metadata_read" &&
+          entry.id !== "valid_proposal" &&
+          entry.id !== "digest_bound_proposal" &&
+          entry.id !== "evidence_readback",
       )
       .map((entry) => ({
         caseId: entry.id,

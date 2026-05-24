@@ -486,15 +486,20 @@ function redactedProjectionRefs(refs: readonly string[]): string[] {
 function looksLikeRawPaymentCredential(value: string): boolean {
   return [
     /BEGIN\s+(?:RSA\s+|EC\s+|OPENSSH\s+)?PRIVATE KEY/i,
-    /secretref:/i,
+    /secret[-_]?ref:/i,
     /private[_-]?key/i,
+    /signer[_-]?ref/i,
+    /raw[_-]?signer/i,
+    /signing[_-]?key/i,
     /api[_-]?key\s*=/i,
     /access[_-]?token\s*=/i,
+    /aws[_-]?secret[_-]?access[_-]?key\s*[:=]\s*\S+/i,
     /secret\s*=/i,
     /password\s*=/i,
-    /vault:\/\/.*\/secret/i,
-    /infisical:\/\/.*\/secret/i,
-    /PAYMENT-SIGNATURE\s*:/,
+    /vault:\/\/\S+/i,
+    /infisical:\/\/\S+/i,
+    /op:\/\/\S+/i,
+    /^PAYMENT[-_ ]?SIGNATURE\b/i,
     /PaymentPayload/,
     /raw_payment_signature/i,
     /token[_-]?passthrough/i,
@@ -591,7 +596,9 @@ function gatewayCredentialEvidenceRefs(refs: readonly string[]): string[] {
 }
 
 function downstreamEvidenceRefs(refs: readonly string[]): string[] {
-  return refs.filter((ref) => ref.startsWith("evidence:") && ref.includes("payment-response")).filter(unique);
+  return refs
+    .filter((ref) => ref.startsWith("evidence:") && (ref.includes("payment-response") || ref.includes("signed-retry")))
+    .filter(unique);
 }
 
 function surfaceOperationEvidenceLabels(input: {
@@ -617,6 +624,12 @@ function surfaceOperationEvidenceLabels(input: {
     labels.push("payment_response_received");
   } else if (input.latestReconciliation?.observedDownstreamStatus === "unknown") {
     labels.push("payment_response_missing");
+  }
+  if (input.surfaceOperationEvidenceRefs.some((ref) => ref.includes("signed-retry"))) {
+    labels.push("signed_retry_recorded");
+  }
+  if (input.surfaceOperationEvidenceRefs.some((ref) => ref.includes("x402-local-sandbox-signed-retry"))) {
+    labels.push("local_reference_downstream_fixture");
   }
   labels.push(...facilitatorEvidenceLabels(input.surfaceOperationEvidenceRefs));
   return labels.filter(unique);

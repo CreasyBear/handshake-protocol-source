@@ -15,6 +15,8 @@ import type {
   ProtectedPathPosture,
   ProtectedSurfaceOperationClaim,
   Receipt,
+  StreamEventRange,
+  ProtocolRecordScope,
   StoredProtocolRecord,
   StreamTail,
 } from "../../src/protocol/store/port";
@@ -151,11 +153,19 @@ export class FaultInjectingProtocolStore implements ProtocolStore {
 
   async listRecordsByType<T>(
     objectType: ProtocolObjectType,
-    scope: { tenantId?: string; organizationId?: string } = {},
+    scope: ProtocolRecordScope = {},
   ): Promise<StoredProtocolRecord<T>[]> {
     const fault = takeFirst(this.listReadFaults, (candidate) => candidate.objectType === objectType);
     if (fault) return [];
     return this.delegate.listRecordsByType<T>(objectType, scope);
+  }
+
+  async listRecordsByActionContract<T>(
+    objectType: ProtocolObjectType,
+    actionContractId: string,
+    scope: ProtocolRecordScope = {},
+  ): Promise<StoredProtocolRecord<T>[]> {
+    return this.delegate.listRecordsByActionContract<T>(objectType, actionContractId, scope);
   }
 
   async getStreamTail(streamId: string, partitionKey: string): Promise<StreamTail> {
@@ -164,6 +174,14 @@ export class FaultInjectingProtocolStore implements ProtocolStore {
 
   async getStreamEvent(streamId: string, partitionKey: string, offset: number): Promise<ContractStreamEvent | null> {
     return this.delegate.getStreamEvent(streamId, partitionKey, offset);
+  }
+
+  async listStreamEvents(
+    streamId: string,
+    partitionKey: string,
+    range: StreamEventRange = {},
+  ): Promise<ContractStreamEvent[]> {
+    return this.delegate.listStreamEvents(streamId, partitionKey, range);
   }
 
   async getCurrentProtectedPathPosture(

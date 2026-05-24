@@ -23,16 +23,29 @@ describe("x402 protected spend demo report", () => {
     expect(stdout).toContain("Wrote: examples/x402-protected-spend/output/latest.md");
 
     const output = await Bun.file(outputJsonPath).json();
+    const challengePhase = output.phases.find(
+      (phase: { phase: string }) => phase.phase === "0_sandbox_payment_required_challenge",
+    ) as { evidence: Record<string, unknown> } | undefined;
     const runtimePhase = output.phases.find((phase: { phase: string }) => phase.phase === "1_runtime_proposal") as
       | { evidence: Record<string, string> }
       | undefined;
+    expect(challengePhase?.evidence.authorityCreated).toBe(false);
+    expect(challengePhase?.evidence.signedRetryCountBeforeGateway).toBe(0);
+    expect(challengePhase?.evidence.evidenceBoundary).toMatchObject({
+      evidenceProfile: "local_reference_downstream_fixture",
+      signedRetryPosture: "not_observed",
+      settlementFinalityClaimed: false,
+      facilitatorOperationClaimed: false,
+      sellerMiddlewareClaimed: false,
+      providerCustodyClaimed: false,
+    });
     expect(runtimePhase?.evidence.runtimeExecutionId).toStartWith("rex_");
     expect(runtimePhase?.evidence.toolCallDraftId).toStartWith("tcd_");
     expect(runtimePhase?.evidence.intentCompilationId).toStartWith("icr_");
     expect(output.report).toMatchObject({
       schemaVersion: "handshake.demo.aps-report.v1",
       proofObject: {
-        name: "local x402 protected-spend authority envelope",
+        name: "x402_paid_http_call.exact",
         proofBoundary: "local_reference",
       },
       protectedAction: {
@@ -40,6 +53,8 @@ describe("x402 protected spend demo report", () => {
         protectedSurfaceKind: "x402_payment",
         endpointDomain: "api.example.com",
         intendedHttpMethod: "GET",
+        intendedRequestBodyPosture: "no_body",
+        providerEnvironmentPosture: "local_reference_sandbox",
         x402EvidenceProfile: "official_payment_required",
         x402Scheme: "exact",
         network: "eip155:84532",
@@ -56,15 +71,18 @@ describe("x402 protected spend demo report", () => {
         credentialCustodyStatus: "gateway_held",
         runtimeCredentialMaterialVisible: "absent",
         signerInvocationBoundary: "after_verified_gateway_check_only",
+        signedRetryBoundary: "adapter_fixture_observation_after_gateway_signature_only",
       },
       authorityPath: {
         runtimeProposalOutcome: "action_contracts_proposed",
         policyDecision: "greenlight",
         gateDecision: "passed",
         signerInvocationsAfterGatewayAdmission: 1,
+        signedRetryCountAfterGatewayAdmission: 1,
         replayDecision: "refused",
         replayReasonCode: "already_consumed",
         signerInvocationsAfterReplay: 1,
+        signedRetryCountAfterReplay: 1,
       },
       evidencePosture: {
         gatewayAdmissionStatus: "admitted",
@@ -72,6 +90,21 @@ describe("x402 protected spend demo report", () => {
         idempotencyLedgerState: "terminal_succeeded",
         idempotencyDispositionMeaning: "authority_idempotency_only_not_payment_settlement",
         rawCredentialMaterialVisible: false,
+        localSandbox: {
+          providerEnvironmentPosture: "local_reference_sandbox",
+          signedRetryCount: 1,
+          signedRetryIsAuthority: false,
+          evidenceBoundary: {
+            evidenceProfile: "local_reference_downstream_fixture",
+            signedRetryPosture: "post_gateway_check_observation_only",
+            paymentFinalityClaimed: false,
+            settlementFinalityClaimed: false,
+            facilitatorOperationClaimed: false,
+            sellerMiddlewareClaimed: false,
+            providerCustodyClaimed: false,
+            liveProviderOperationClaimed: false,
+          },
+        },
       },
       terminalPosture: {
         terminalKind: "receipt",
@@ -93,6 +126,16 @@ describe("x402 protected spend demo report", () => {
       authorityCertificate: 0,
     });
     expect(output.report.evidencePosture.omittedFields).toContain("actionContract.parameters");
+    expect(output.report.evidencePosture.surfaceOperationEvidenceLabels).toContain("signed_retry_recorded");
+    expect(output.report.evidencePosture.surfaceOperationEvidenceLabels).toContain(
+      "local_reference_downstream_fixture",
+    );
+    expect(output.report.evidencePosture.surfaceOperationEvidenceRefs).toContain(
+      "evidence:x402-local-sandbox-signed-retry:1",
+    );
+    expect(output.report.evidencePosture.downstreamEvidenceRefs).toContain(
+      "evidence:x402-local-sandbox-signed-retry:1",
+    );
     expect(output.report.nonClaims).toContain("clearing-house readiness");
     expect(output.report.missingProofObjects.map((entry: { proofObject: string }) => entry.proofObject)).toContain(
       "spend reservation ledger",

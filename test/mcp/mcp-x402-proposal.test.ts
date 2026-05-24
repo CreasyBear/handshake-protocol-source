@@ -46,6 +46,27 @@ describe("MCP x402 proposal bridge", () => {
     expect(JSON.stringify(calls)).not.toContain("receiptExport");
     expect(JSON.stringify(calls)).not.toContain("PaymentPayload");
     expect(JSON.stringify(calls)).not.toContain("PAYMENT-SIGNATURE");
+
+    const createDraftInput = callInput(calls, "createToolCallDraft") as { parameters: Record<string, unknown> };
+    const transitionDraftInput = callInput(calls, "transitionToolCallDraft") as {
+      parameters: Record<string, unknown>;
+      nonSecretParamsSummary: Record<string, unknown>;
+    };
+    const compileCandidate = compileIntentCandidate(calls);
+    for (const parameters of [
+      createDraftInput.parameters,
+      transitionDraftInput.parameters,
+      transitionDraftInput.nonSecretParamsSummary,
+      compileCandidate.parameters,
+      compileCandidate.nonSecretParamsSummary,
+    ]) {
+      expect(parameters).toMatchObject({
+        intendedRequestBodyPosture: "no_body",
+        intendedRequestBodyDigest: null,
+        providerEnvironmentPosture: "local_reference_sandbox",
+        providerEnvironmentRef: null,
+      });
+    }
   });
 
   it("refuses stale metadata, not-ready install, offline gateway, unknown gateway, and amount overrun before runtime calls", async () => {
@@ -92,6 +113,59 @@ describe("MCP x402 proposal bridge", () => {
         outcome: "tool_execution_error",
         phase: "tool_execution",
         authorityCreated: false,
+        mutationAttempted: false,
+      });
+      expect(calls).toEqual([]);
+    }
+  });
+
+  it("refuses unsafe x402 posture before runtime calls", async () => {
+    for (const [input, reasonCodes] of [
+      [
+        { ...validProposalInput(), intendedRequestBodyPosture: "digest_bound", intendedRequestBodyDigest: null },
+        ["x402_request_body_digest_missing"],
+      ],
+      [
+        { ...validProposalInput(), intendedRequestBodyPosture: "unsupported" },
+        ["x402_request_body_posture_unsupported"],
+      ],
+      [{ ...validProposalInput(), intendedRequestBodyPosture: "omitted" }, ["x402_request_body_posture_unsupported"]],
+      [
+        {
+          ...validProposalInput(),
+          providerEnvironmentPosture: "external_sandbox",
+          providerEnvironmentRef: "provider-environment:x402-external-sandbox",
+        },
+        ["x402_provider_environment_not_sandboxed"],
+      ],
+      [
+        {
+          ...validProposalInput(),
+          providerEnvironmentPosture: "live",
+          providerEnvironmentRef: "provider-environment:x402-live",
+        },
+        ["x402_provider_environment_not_sandboxed"],
+      ],
+      [
+        {
+          ...validProposalInput(),
+          providerEnvironmentPosture: "unknown",
+          providerEnvironmentRef: "provider-environment:x402-unknown",
+        },
+        ["x402_provider_environment_not_sandboxed"],
+      ],
+    ] as const) {
+      const calls: Array<{ name: string; input: unknown }> = [];
+      const result = await proposeMcpX402Payment(input, trustedOptions(fakeRuntimeClient(calls)));
+
+      expect(result.isError).toBe(true);
+      expect(result.structuredContent).toMatchObject({
+        outcome: "refused",
+        phase: "proposal",
+        reasonCodes,
+        authorityCreated: false,
+        greenlightCreated: false,
+        gatewayCheckPerformed: false,
         mutationAttempted: false,
       });
       expect(calls).toEqual([]);
@@ -192,6 +266,24 @@ describe("MCP x402 proposal bridge", () => {
     expect(firstCandidate.idempotencyKey).not.toBe("caller-key:second");
     expect(first.structuredContent.idempotencyKey).toBe(firstCandidate.idempotencyKey);
     expect(second.structuredContent.idempotencyKey).toBe(secondCandidate.idempotencyKey);
+  });
+
+  it("derives distinct idempotency keys when accepted x402 posture material changes", async () => {
+    const firstCalls: Array<{ name: string; input: unknown }> = [];
+    const changedCalls: Array<{ name: string; input: unknown }> = [];
+
+    await proposeMcpX402Payment(validProposalInput(), trustedOptions(fakeRuntimeClient(firstCalls)));
+    await proposeMcpX402Payment(
+      {
+        ...validProposalInput(),
+        providerEnvironmentRef: "provider-environment:x402-local-reference-sandbox",
+      },
+      trustedOptions(fakeRuntimeClient(changedCalls)),
+    );
+
+    expect(compileIntentCandidate(changedCalls).idempotencyKey).not.toBe(
+      compileIntentCandidate(firstCalls).idempotencyKey,
+    );
   });
 
   it("maps protocol replay and idempotency failures to structured non-authority outcomes", async () => {
@@ -346,7 +438,17 @@ function compileIntentCandidate(calls: Array<{ name: string; input: unknown }>) 
   if (!call || typeof call.input !== "object" || call.input === null || !("candidate" in call.input)) {
     throw new Error("expected compileIntent candidate");
   }
-  return call.input.candidate as { idempotencyKey: string };
+  return call.input.candidate as {
+    idempotencyKey: string;
+    parameters: Record<string, unknown>;
+    nonSecretParamsSummary: Record<string, unknown>;
+  };
+}
+
+function callInput(calls: Array<{ name: string; input: unknown }>, name: string): unknown {
+  const call = calls.find((entry) => entry.name === name);
+  if (!call) throw new Error(`expected ${name} call`);
+  return call.input;
 }
 
 function fakeRuntimeClient(

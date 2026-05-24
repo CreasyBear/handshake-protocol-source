@@ -26,6 +26,8 @@ import type { EvidenceReadRouteDefinition } from "../routes/evidence-read-route-
 import { transitionErrorResult, type TransitionErrorContext } from "../errors/transition-error-envelope";
 import { storeFor } from "../store/resolution";
 
+const RECEIPT_TIMELINE_EVENT_BATCH_SIZE = 100;
+
 export async function handleEvidenceRead(
   c: Context<{ Bindings: WorkerBindings }>,
   options: AppOptions,
@@ -97,8 +99,9 @@ export async function handleEvidenceRead(
           return recordNotFound(c, errorContext);
         }
         const events = await loadReceiptTimelineEvents(store, receiptRecord.payload);
-        const reconciliations = await store.listRecordsByType<SurfaceOperationReconciliation>(
+        const reconciliations = await store.listRecordsByActionContract<SurfaceOperationReconciliation>(
           "surface_operation_reconciliation",
+          receiptRecord.payload.actionContractId,
           {
             tenantId: receiptRecord.tenantId,
             organizationId: receiptRecord.organizationId,
@@ -160,16 +163,24 @@ async function loadReceiptTimelineEvents(
   const events: ContractStreamEvent[] = [];
   let missingEventCount = 0;
   for (const reference of receipt.streamOffsets) {
-    for (let offset = reference.offsetStart; offset <= reference.offsetEnd; offset += 1) {
-      const event = await store.getStreamEvent(reference.streamId, reference.partitionKey, offset);
-      if (event) {
-        events.push(event);
-      } else {
-        missingEventCount += 1;
-      }
+    for (let startOffset = reference.offsetStart; startOffset <= reference.offsetEnd; ) {
+      const endOffset = Math.min(reference.offsetEnd, startOffset + RECEIPT_TIMELINE_EVENT_BATCH_SIZE - 1);
+      const batch = await store.listStreamEvents(reference.streamId, reference.partitionKey, {
+        startOffset,
+        endOffset,
+        limit: RECEIPT_TIMELINE_EVENT_BATCH_SIZE,
+      });
+      events.push(...batch);
+      const observedOffsets = new Set(batch.map((event) => event.offset));
+      missingEventCount += expectedOffsetCount(startOffset, endOffset) - observedOffsets.size;
+      startOffset = endOffset + 1;
     }
   }
   return { events, missingEventCount };
+}
+
+function expectedOffsetCount(startOffset: number, endOffset: number): number {
+  return Math.max(0, endOffset - startOffset + 1);
 }
 
 function recordNotFound(c: Context, context: TransitionErrorContext): Response {

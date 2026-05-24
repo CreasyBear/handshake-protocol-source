@@ -14,12 +14,11 @@ import {
   type X402PaymentAttempt,
   type X402PaymentRuntimeConfig,
 } from "../../src/adapters/x402-payment/action-proposal";
-import { decodeX402PaymentRequiredEvidence } from "../../src/adapters/x402-payment/upstream-evidence";
+import { runX402WalletGateway, type X402PaymentParameters } from "../../src/adapters/x402-payment/wallet-gateway";
 import {
-  createOfficialExactX402SigningSurface,
-  runX402WalletGateway,
-  type X402PaymentParameters,
-} from "../../src/adapters/x402-payment/wallet-gateway";
+  createLocalX402PaidHttpSandbox,
+  createLocalX402SandboxSigningSurface,
+} from "../../src/adapters/x402-payment/sandbox-http";
 import { type AuthorityCertificateSignerInput } from "../../src";
 import type { ActionContract, IntentCompilationRecord, RuntimeExecutionRecord, ToolCallDraft } from "../../src";
 import { digestCanonical } from "../../src/protocol/foundation/canonical";
@@ -68,6 +67,7 @@ const officialX402SourceBasis = {
       "signed-receipts",
       "seller-middleware",
       "facilitator-operation",
+      "settlement-finality",
     ],
   },
 } as const;
@@ -103,17 +103,27 @@ const officialPaymentRequired = {
 
 const store = new InMemoryProtocolStore();
 const kernel = new HandshakeKernel(store);
-const evidence = await decodeX402PaymentRequiredEvidence({
+const sandbox = createLocalX402PaidHttpSandbox({
   source: officialX402SourceBasis,
-  paymentRequiredHeader: base64Json(officialPaymentRequired),
   selectedPaymentRequirementIndex: 0,
+  paymentRequired: officialPaymentRequired,
   intendedRequest: {
     method: "GET",
     url: officialPaymentRequired.resource.url,
+    requestBodyPosture: "no_body",
     bodyDigest: null,
     selectedHeadersDigest,
+    providerEnvironmentPosture: "local_reference_sandbox",
+    providerEnvironmentRef: "provider-environment:x402-local-reference-sandbox",
   },
+  paymentRequiredEvidenceRef: "evidence:x402-payment-required:demo-local-sandbox",
+  paymentResponseEvidenceRef: "evidence:x402-payment-response:demo-local-sandbox",
+  providerRequestRef: "provider-request:x402:demo-local-sandbox",
+  providerOperationRef: "provider-operation:x402:demo-local-sandbox",
 });
+const sandboxChallenge = await sandbox.requestPaymentRequired();
+const sandboxSnapshotAfterChallenge = sandbox.snapshot();
+const evidence = sandboxChallenge.evidence;
 const attempt = await buildX402PaymentAttemptFromRequiredEvidence({
   evidence,
   principalIntentRef: "intent:fetch paid context as generated agent code",
@@ -149,15 +159,12 @@ if (!policy.greenlight) throw new Error(`Expected greenlight, got ${policy.decis
 const greenlight = policy.greenlight;
 
 const signer = trackedOfficialSigner();
-const surface = createOfficialExactX402SigningSurface({
+const surface = createLocalX402SandboxSigningSurface({
+  sandbox,
   signer: signer.surfaceSigner,
   paymentRequired: officialPaymentRequired,
   selectedPaymentRequirementIndex: evidence.selectedPaymentRequirementIndex,
   selectedPaymentRequirementDigest: evidence.selectedPaymentRequirementDigest,
-  downstreamPaymentStatus: "succeeded",
-  paymentResponseEvidenceRef: "evidence:x402-payment-response:demo-official",
-  providerRequestRef: "provider-request:x402:demo-official",
-  providerOperationRef: "provider-operation:x402:demo-official",
 });
 const gateway = await runX402WalletGateway({
   protocol: kernel,
@@ -194,6 +201,21 @@ const replay = await runX402WalletGateway({
 });
 
 const phases = [
+  {
+    phase: "0_sandbox_payment_required_challenge",
+    verdict: "pass",
+    evidence: {
+      outcome: sandboxChallenge.outcome,
+      status: sandboxChallenge.status,
+      paymentRequiredEvidenceRef: sandboxChallenge.paymentRequiredEvidenceRef,
+      providerRequestRef: sandboxChallenge.providerRequestRef,
+      providerOperationRef: sandboxChallenge.providerOperationRef,
+      requestDigest: sandboxChallenge.requestDigest,
+      authorityCreated: sandboxChallenge.authorityCreated,
+      evidenceBoundary: sandboxChallenge.evidenceBoundary,
+      signedRetryCountBeforeGateway: sandboxSnapshotAfterChallenge.signedRetryCount,
+    },
+  },
   {
     phase: "1_runtime_proposal",
     verdict: "pass",
@@ -234,7 +256,22 @@ const phases = [
     },
   },
   {
-    phase: "4_redacted_evidence_envelope",
+    phase: "4_sandbox_paid_retry",
+    verdict: "pass",
+    evidence: {
+      signedRetryCount: sandbox.snapshot().signedRetryCount,
+      lastRetry: sandbox.snapshot().lastRetry,
+      signedRetryEvidenceBoundary:
+        gateway.signatureEvidence?.localReferenceSandboxBoundary ??
+        sandbox.snapshot().lastRetry?.evidenceBoundary ??
+        null,
+      paymentResponseEvidenceRef: gateway.signatureEvidence?.paymentResponseEvidenceRef ?? null,
+      providerRequestRef: gateway.signatureEvidence?.providerRequestRef ?? null,
+      providerOperationRef: gateway.signatureEvidence?.providerOperationRef ?? null,
+    },
+  },
+  {
+    phase: "5_redacted_evidence_envelope",
     verdict: "pass",
     evidence: {
       gatewayAdmissionStatus: envelope.gatewayAdmissionStatus,
@@ -247,7 +284,7 @@ const phases = [
     },
   },
   {
-    phase: "5_terminal_certificate",
+    phase: "6_terminal_certificate",
     verdict: "pass",
     evidence: {
       authorityCertificateId: certificate.authorityCertificateId,
@@ -257,13 +294,14 @@ const phases = [
     },
   },
   {
-    phase: "6_replay_refusal",
+    phase: "7_replay_refusal",
     verdict: "pass",
     evidence: {
       outcome: replay.outcome,
       gateDecision: replay.gatewayCheck.gateAttempt.gateDecision,
       reasonCode: replay.gatewayCheck.gateAttempt.gateDecisionReasonCode,
       signerInvocationsAfterReplay: signer.signatureCount(),
+      signedRetryCountAfterReplay: sandbox.snapshot().signedRetryCount,
     },
   },
 ] as const;
@@ -294,7 +332,7 @@ function buyerReadableApsReport() {
   return {
     schemaVersion: "handshake.demo.aps-report.v1",
     proofObject: {
-      name: "local x402 protected-spend authority envelope",
+      name: "x402_paid_http_call.exact",
       activationSurface: "Self-hosted activation over local foundation kernel evidence",
       currentClaim:
         "One generated x402 exact spend attempt was reduced to an exact contract, greenlit once, checked by the gateway before signer use, recorded as redacted evidence, locally certified, and replay-refused.",
@@ -307,6 +345,9 @@ function buyerReadableApsReport() {
       endpointDomain: new URL(attempt.endpointUrl).hostname,
       intendedHttpMethod: attempt.intendedHttpMethod,
       intendedRequestUrl: attempt.intendedRequestUrl,
+      intendedRequestBodyPosture: contract.parameters.intendedRequestBodyPosture,
+      providerEnvironmentPosture: contract.parameters.providerEnvironmentPosture,
+      providerEnvironmentRef: contract.parameters.providerEnvironmentRef,
       x402EvidenceProfile: contract.parameters.x402EvidenceProfile,
       x402Version: contract.parameters.x402Version,
       x402Scheme: contract.parameters.x402Scheme,
@@ -335,8 +376,9 @@ function buyerReadableApsReport() {
       enforcementMode: contract.enforcementMode,
       counterpartyRef: contract.parameters.payee,
       facilitatorRef: contract.parameters.facilitatorRef,
-      runtimeCredentialMaterialVisible: phases[0].evidence.credentialMaterialVisibleToRuntime,
+      runtimeCredentialMaterialVisible: JSON.stringify(runtime).includes("PAYMENT-SIGNATURE") ? "leaked" : "absent",
       signerInvocationBoundary: "after_verified_gateway_check_only",
+      signedRetryBoundary: "adapter_fixture_observation_after_gateway_signature_only",
     },
     authorityPath: {
       runtimeProposalOutcome: runtime.outcome,
@@ -351,10 +393,12 @@ function buyerReadableApsReport() {
       mutationAttemptId: gateway.gatewayCheck.mutationAttempt?.mutationAttemptId ?? null,
       receiptId: receipt.receiptId,
       authorityRecordsBeforePolicy: beforePolicyCounts,
-      signerInvocationsAfterGatewayAdmission: phases[2].evidence.signerInvocations,
+      signerInvocationsAfterGatewayAdmission: signer.signatureCount(),
+      signedRetryCountAfterGatewayAdmission: sandbox.snapshot().signedRetryCount,
       replayDecision: replay.gatewayCheck.gateAttempt.gateDecision,
       replayReasonCode: replay.gatewayCheck.gateAttempt.gateDecisionReasonCode,
       signerInvocationsAfterReplay: signer.signatureCount(),
+      signedRetryCountAfterReplay: sandbox.snapshot().signedRetryCount,
     },
     evidencePosture: {
       envelopeDigest: envelope.envelopeDigest,
@@ -374,6 +418,16 @@ function buyerReadableApsReport() {
       refusalReasonCodes: envelope.refusalReasonCodes,
       omittedFields: envelope.omittedFields,
       rawCredentialMaterialVisible: false,
+      localSandbox: {
+        paymentRequiredEvidenceRef: sandboxChallenge.paymentRequiredEvidenceRef,
+        providerEnvironmentPosture: contract.parameters.providerEnvironmentPosture,
+        signedRetryCount: sandbox.snapshot().signedRetryCount,
+        signedRetryIsAuthority: false,
+        evidenceBoundary:
+          gateway.signatureEvidence?.localReferenceSandboxBoundary ??
+          sandbox.snapshot().lastRetry?.evidenceBoundary ??
+          sandboxChallenge.evidenceBoundary,
+      },
     },
     terminalPosture: {
       terminalKind: certificate.terminal.terminalKind,
@@ -728,10 +782,6 @@ function requireRecords(installProposal: X402InstallProposal): NonNullable<X402I
 
 function futureIso(minutes = 10): string {
   return new Date(Date.now() + minutes * 60_000).toISOString();
-}
-
-function base64Json(value: unknown): string {
-  return btoa(JSON.stringify(value));
 }
 
 type FixtureEd25519Signer = {

@@ -205,6 +205,80 @@ for (const factory of storeFactories) {
         await dispose();
       }
     });
+
+    it("lists protocol records by action contract without returning sibling contract evidence", async () => {
+      const { store, dispose } = await factory.create();
+      try {
+        await store.putRecord(
+          recordWithPayload("credential_resolution_evidence", "cre_scope_target", {
+            credentialResolutionEvidenceId: "cre_scope_target",
+            actionContractId: "act_scope_target",
+          }),
+        );
+        await store.putRecord(
+          recordWithPayload("credential_resolution_evidence", "cre_scope_sibling", {
+            credentialResolutionEvidenceId: "cre_scope_sibling",
+            actionContractId: "act_scope_sibling",
+          }),
+        );
+        await store.putRecord(
+          recordWithPayload("proof_gap", "pg_scope_target", {
+            proofGapId: "pg_scope_target",
+            affectedObjectRefs: ["action_contract:act_scope_target"],
+          }),
+        );
+        await store.putRecord(
+          recordWithPayload("recovery_recommendation", "rr_scope_target", {
+            recoveryRecommendationId: "rr_scope_target",
+            sourceActionContractId: "act_scope_target",
+          }),
+        );
+
+        const credentialEvidence = await store.listRecordsByActionContract(
+          "credential_resolution_evidence",
+          "act_scope_target",
+          { tenantId: "tenant_demo", organizationId: "org_demo" },
+        );
+        const proofGaps = await store.listRecordsByActionContract("proof_gap", "act_scope_target", {
+          tenantId: "tenant_demo",
+          organizationId: "org_demo",
+        });
+        const recovery = await store.listRecordsByActionContract("recovery_recommendation", "act_scope_target", {
+          tenantId: "tenant_demo",
+          organizationId: "org_demo",
+        });
+
+        expect(credentialEvidence.map((entry) => entry.objectId)).toEqual(["cre_scope_target"]);
+        expect(proofGaps.map((entry) => entry.objectId)).toEqual(["pg_scope_target"]);
+        expect(recovery.map((entry) => entry.objectId)).toEqual(["rr_scope_target"]);
+      } finally {
+        await dispose();
+      }
+    });
+
+    it("lists stream events by offset range for batched receipt timelines", async () => {
+      const { store, dispose } = await factory.create();
+      try {
+        const events = await actionPartitionEvents(store, "act_stream_range", 125);
+        await expectCommit(store, { records: [], events });
+
+        const firstBatch = await store.listStreamEvents(events[0]?.streamId ?? "", events[0]?.partitionKey ?? "", {
+          startOffset: 40,
+          endOffset: 89,
+          limit: 25,
+        });
+        const secondBatch = await store.listStreamEvents(events[0]?.streamId ?? "", events[0]?.partitionKey ?? "", {
+          startOffset: 65,
+          endOffset: 89,
+          limit: 25,
+        });
+
+        expect(firstBatch.map((event) => event.offset)).toEqual([...Array(25).keys()].map((index) => index + 40));
+        expect(secondBatch.map((event) => event.offset)).toEqual([...Array(25).keys()].map((index) => index + 65));
+      } finally {
+        await dispose();
+      }
+    });
   });
 }
 
@@ -235,6 +309,37 @@ function record(objectType: ProtocolObjectType, objectId: string): StoredProtoco
     createdAt,
     sourceEventId: null,
   };
+}
+
+function recordWithPayload(
+  objectType: ProtocolObjectType,
+  objectId: string,
+  payload: Record<string, unknown>,
+): StoredProtocolRecord {
+  const base = record(objectType, objectId);
+  return {
+    ...base,
+    payload: {
+      ...(base.payload as Record<string, unknown>),
+      ...payload,
+    },
+  };
+}
+
+async function actionPartitionEvents(
+  store: ProtocolStore,
+  actionContractId: string,
+  count: number,
+): Promise<ContractStreamEvent[]> {
+  return buildEventChain(
+    store,
+    [...Array(count).keys()].map((index) => ({
+      source: { tenantId: "tenant_demo", organizationId: "org_demo", createdAt: nowIso() },
+      eventType: "gateway_checked" as const,
+      objectRefs: [actionContractId, `gca_stream_range_${index}`],
+      payload: { index },
+    })),
+  );
 }
 
 async function event(

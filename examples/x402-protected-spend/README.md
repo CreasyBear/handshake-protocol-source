@@ -2,6 +2,7 @@
 
 Status: local/reference official exact walkthrough
 Scope: one official buyer-side `x402_payment.exact` protected spend attempt from generated engineering-agent execution evidence
+Report proof object: `x402_paid_http_call.exact` as a buyer-readable label; source code still uses `x402_payment.exact`.
 
 ## Invariant At Stake
 
@@ -11,11 +12,13 @@ This walkthrough exercises the local proof path:
 
 ```text
 generated wrapped_x402_payment dispatch
+-> local/reference 402 PAYMENT-REQUIRED challenge evidence
 -> runtime ingress proposal evidence
 -> ActionContract
 -> PolicyDecision and one-use Greenlight
 -> x402 wallet gateway check
 -> gateway-held official SDK signing surface after verified gate
+-> local signed retry evidence
 -> receipt, replay refusal, or proof gap projection
 -> optional terminal AuthorityCertificate evidence
 ```
@@ -23,6 +26,7 @@ generated wrapped_x402_payment dispatch
 ## What This Proves
 
 - A generated x402 dispatch can reach an exact `ActionContract`.
+- A local/reference paid HTTP sandbox can emit official-shaped `PAYMENT-REQUIRED` evidence and observe one signed retry only after gateway-created signature evidence exists.
 - Runtime ingress creates no policy decision, greenlight, gateway check, mutation attempt, receipt, or certificate.
 - The official x402 signer and `PaymentPayload` creation stay outside the agent/runtime and run only after a verified gateway check.
 - Parameter mismatch and consumed-greenlight replay refuse before signer use.
@@ -62,9 +66,12 @@ It prints and writes named phases:
 1. `1_runtime_proposal`
 2. `2_policy_greenlight`
 3. `3_gateway_admission_and_signature`
-4. `4_redacted_evidence_envelope`
-5. `5_terminal_certificate`
-6. `6_replay_refusal`
+4. `4_sandbox_paid_retry`
+5. `5_redacted_evidence_envelope`
+6. `6_terminal_certificate`
+7. `7_replay_refusal`
+
+The report also includes `0_sandbox_payment_required_challenge` before authority exists.
 
 For the assertion-backed proof suite:
 
@@ -75,7 +82,7 @@ npm run test -- test/product/agent-proof-slice.test.ts test/adapters/x402-wallet
 Expected measurement:
 
 ```text
-19 pass
+20 pass
 0 fail
 ```
 
@@ -87,6 +94,7 @@ Those tests cover:
 | First receipt projection | The same product slice reads `getAgentTransactionEnvelopeProjection()` after gateway admission and verifies redaction.                                                    |
 | Replay refusal           | `test/adapters/x402-wallet-gateway.test.ts` and `test/integration/x402-d1-http.test.ts` prove a consumed greenlight refuses before another signer call or mutation.       |
 | Official SDK parity      | D1 and wallet-gateway tests create official SDK `PaymentPayload` evidence only after gateway admission, then expose redacted refs/digests.                                |
+| Local sandbox retry      | Wallet-gateway tests prove the local paid HTTP sandbox records one signed retry only after gateway signature evidence exists.                                             |
 | Proof gap projection     | Product and D1 tests prove missing downstream payment response evidence records a proof gap.                                                                              |
 | Signer custody           | Wallet-gateway tests assert `signPayment()` receives a `VerifiedGatewayCheck`, not raw agent authority.                                                                   |
 | Package parity           | Product slice passes `package.install` through the same projection spine with no package-material attestation claim.                                                      |
@@ -102,8 +110,9 @@ Use source-owned APIs and helpers. Do not write raw protocol records.
 5. Treat the resulting `ActionContract` as proposal evidence only.
 6. Evaluate policy separately.
 7. Run the local/reference wallet gateway with `runX402WalletGateway()`.
-8. Read the redacted transaction envelope projection.
-9. Optionally mint an `AuthorityCertificate` only after receipt, durable refusal, proof gap, or replay refusal exists.
+8. Record the local/reference sandbox signed retry as downstream fixture evidence only.
+9. Read the redacted transaction envelope projection.
+10. Optionally mint an `AuthorityCertificate` only after receipt, durable refusal, proof gap, or replay refusal exists.
 
 ## Signer Custody
 

@@ -64,6 +64,7 @@ const officialX402SourceBasis = {
       "signed-receipts",
       "seller-middleware",
       "facilitator-operation",
+      "settlement-finality",
     ],
   },
 } as const;

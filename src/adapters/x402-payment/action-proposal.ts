@@ -14,6 +14,8 @@ const PaymentIdentifierSchema = z
   .regex(/^[a-zA-Z0-9_-]+$/);
 const X402EvidenceProfileSchema = z.enum(["official_payment_required", "local_digest_profile"]);
 const PaymentIdentifierPostureSchema = z.enum(["not_advertised", "advertised_absent", "bound"]);
+const X402RequestBodyPostureSchema = z.enum(["no_body", "digest_bound", "omitted", "unsupported"]);
+const X402ProviderEnvironmentPostureSchema = z.enum(["local_reference_sandbox", "external_sandbox", "live", "unknown"]);
 
 export const X402PaymentAttemptSchema = z.strictObject({
   principalIntentRef: z.string().min(1),
@@ -33,8 +35,11 @@ export const X402PaymentAttemptSchema = z.strictObject({
   facilitatorRef: z.string().min(1).nullable().default(null),
   intendedHttpMethod: z.string().min(1).nullable().default(null),
   intendedRequestUrl: z.string().url().nullable().default(null),
+  intendedRequestBodyPosture: X402RequestBodyPostureSchema.default("no_body"),
   intendedRequestBodyDigest: DigestSchema.nullable().default(null),
   selectedHeadersDigest: DigestSchema.nullable().default(null),
+  providerEnvironmentPosture: X402ProviderEnvironmentPostureSchema.default("local_reference_sandbox"),
+  providerEnvironmentRef: z.string().min(1).nullable().default(null),
   x402Version: z.number().int().positive().nullable().default(null),
   x402Scheme: z.string().min(1).nullable().default(null),
   asset: z.string().min(1).nullable().default(null),
@@ -177,8 +182,11 @@ export async function buildX402PaymentAttemptFromRequiredEvidence(
     facilitatorRef: input.facilitatorRef ?? null,
     intendedHttpMethod: evidence.intendedRequest.method,
     intendedRequestUrl: evidence.intendedRequest.url,
+    intendedRequestBodyPosture: requestBodyPostureFor(evidence.intendedRequest),
     intendedRequestBodyDigest: evidence.intendedRequest.bodyDigest,
     selectedHeadersDigest: evidence.intendedRequest.selectedHeadersDigest,
+    providerEnvironmentPosture: evidence.intendedRequest.providerEnvironmentPosture ?? "local_reference_sandbox",
+    providerEnvironmentRef: evidence.intendedRequest.providerEnvironmentRef ?? null,
     x402Version: evidence.paymentRequired.x402Version,
     x402Scheme: selected.scheme,
     asset: selected.asset,
@@ -215,6 +223,22 @@ export async function buildX402PaymentCompileIntentInput(
   const runtimeConfig = X402PaymentRuntimeConfigSchema.parse(config);
   const attempt = X402PaymentAttemptSchema.parse(attemptValue);
   assertX402PaymentAttemptWithinRuntimeBounds(runtimeConfig, attempt);
+  return buildX402PaymentCompileIntentInputUnchecked(runtimeConfig, attempt);
+}
+
+export async function buildX402PaymentCompileIntentInputForRuntimeRefusal(
+  config: X402PaymentRuntimeConfig,
+  attemptValue: X402PaymentAttempt,
+): Promise<CompileIntentInput> {
+  const runtimeConfig = X402PaymentRuntimeConfigSchema.parse(config);
+  const attempt = X402PaymentAttemptSchema.parse(attemptValue);
+  return buildX402PaymentCompileIntentInputUnchecked(runtimeConfig, attempt);
+}
+
+async function buildX402PaymentCompileIntentInputUnchecked(
+  runtimeConfig: z.infer<typeof X402PaymentRuntimeConfigSchema>,
+  attempt: z.infer<typeof X402PaymentAttemptSchema>,
+): Promise<CompileIntentInput> {
   const endpointDomain = new URL(attempt.endpointUrl).hostname;
   const paymentIdentifierDigest = await paymentIdentifierDigestFor(attempt.paymentIdentifier);
   const paymentIdentifierPosture = paymentIdentifierPostureForAttempt(attempt);
@@ -228,8 +252,11 @@ export async function buildX402PaymentCompileIntentInput(
     endpointDomain,
     intendedHttpMethod: attempt.intendedHttpMethod,
     intendedRequestUrl: attempt.intendedRequestUrl,
+    intendedRequestBodyPosture: attempt.intendedRequestBodyPosture,
     intendedRequestBodyDigest: attempt.intendedRequestBodyDigest,
     selectedHeadersDigest: attempt.selectedHeadersDigest,
+    providerEnvironmentPosture: attempt.providerEnvironmentPosture,
+    providerEnvironmentRef: attempt.providerEnvironmentRef,
     x402Version: attempt.x402Version,
     x402Scheme: attempt.x402Scheme,
     payee: attempt.payee,
@@ -257,8 +284,11 @@ export async function buildX402PaymentCompileIntentInput(
         endpointUrl: attempt.endpointUrl,
         intendedHttpMethod: attempt.intendedHttpMethod,
         intendedRequestUrl: attempt.intendedRequestUrl,
+        intendedRequestBodyPosture: attempt.intendedRequestBodyPosture,
         intendedRequestBodyDigest: attempt.intendedRequestBodyDigest,
         selectedHeadersDigest: attempt.selectedHeadersDigest,
+        providerEnvironmentPosture: attempt.providerEnvironmentPosture,
+        providerEnvironmentRef: attempt.providerEnvironmentRef,
         x402Version: attempt.x402Version,
         x402Scheme: attempt.x402Scheme,
         payee: attempt.payee,
@@ -343,13 +373,26 @@ export function x402PaymentAttemptRefusalReasonCodes(
 ): string[] {
   const config = X402PaymentRuntimeConfigSchema.parse(configValue);
   const attempt = X402PaymentAttemptSchema.parse(attemptValue);
+  const reasonCodes: string[] = [];
   if (compareAtomic(attempt.atomicAmount, config.maxAtomicAmountPerCall) > 0) {
-    return ["x402_amount_exceeds_call_bound"];
+    reasonCodes.push("x402_amount_exceeds_call_bound");
   }
   if (attempt.x402EvidenceProfile === "official_payment_required" && officialEvidenceMissing(attempt)) {
-    return ["x402_official_payment_required_evidence_incomplete"];
+    reasonCodes.push("x402_official_payment_required_evidence_incomplete");
   }
-  return [];
+  if (attempt.intendedRequestBodyPosture === "digest_bound" && attempt.intendedRequestBodyDigest === null) {
+    reasonCodes.push("x402_request_body_digest_missing");
+  }
+  if (["omitted", "unsupported"].includes(attempt.intendedRequestBodyPosture)) {
+    reasonCodes.push("x402_request_body_posture_unsupported");
+  }
+  if (attempt.intendedRequestBodyPosture === "no_body" && attempt.intendedRequestBodyDigest !== null) {
+    reasonCodes.push("x402_request_body_posture_mismatch");
+  }
+  if (attempt.providerEnvironmentPosture !== "local_reference_sandbox") {
+    reasonCodes.push("x402_provider_environment_not_sandboxed");
+  }
+  return [...new Set(reasonCodes)].sort();
 }
 
 function officialEvidenceMissing(attempt: z.infer<typeof X402PaymentAttemptSchema>): boolean {
@@ -397,6 +440,10 @@ function paymentIdentifierPostureForAttempt(attempt: z.infer<typeof X402PaymentA
 
 function paymentRequiredAdvertisesPaymentIdentifier(paymentRequired: X402PaymentRequiredEvidence["paymentRequired"]) {
   return Object.hasOwn(paymentRequired.extensions ?? {}, "payment-identifier");
+}
+
+function requestBodyPostureFor(intendedRequest: X402PaymentRequiredEvidence["intendedRequest"]) {
+  return intendedRequest.requestBodyPosture ?? (intendedRequest.bodyDigest ? "digest_bound" : "no_body");
 }
 
 function toJsonValue(value: unknown) {

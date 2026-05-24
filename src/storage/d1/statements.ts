@@ -11,6 +11,7 @@ import type {
   RecoveryTerminalClaim,
   StoredProtocolRecord,
 } from "../../protocol/store/port";
+import { actionContractIdsForRecord } from "../../protocol/store/action-contract-index";
 
 type ProtocolCommitStatementOptions = Pick<
   ProtocolCommit,
@@ -62,12 +63,12 @@ export class D1ProtocolStatements {
       statements.push(this.receiptMutationAttemptIndexStatement(entry));
     }
     for (const record of records) {
-      statements.push(this.recordStatement(record));
+      statements.push(...this.recordReplacementStatements(record));
     }
     for (const event of events) {
       statements.push(this.streamEventStatement(event));
       statements.push(
-        this.recordStatement({
+        ...this.recordReplacementStatements({
           objectId: event.streamEventId,
           objectType: "contract_stream_event",
           tenantId: event.tenantId,
@@ -81,6 +82,18 @@ export class D1ProtocolStatements {
       );
     }
     return statements;
+  }
+
+  recordReplacementStatements(record: StoredProtocolRecord): D1PreparedStatement[] {
+    return [
+      this.recordStatement(record),
+      this.recordActionContractRefDeleteStatement(record),
+      ...this.recordActionContractRefStatements(record),
+    ];
+  }
+
+  recordAbsentStatements(record: StoredProtocolRecord): D1PreparedStatement[] {
+    return [this.recordIfAbsentStatement(record), ...this.recordActionContractRefStatements(record)];
   }
 
   greenlightConsumptionStatement(consumption: GreenlightConsumption): D1PreparedStatement {
@@ -190,6 +203,34 @@ export class D1ProtocolStatements {
         record.createdAt,
         record.sourceEventId,
       );
+  }
+
+  private recordActionContractRefDeleteStatement(record: StoredProtocolRecord): D1PreparedStatement {
+    return this.db
+      .prepare(
+        `DELETE FROM protocol_record_action_contract_refs
+         WHERE object_type = ? AND object_id = ?`,
+      )
+      .bind(record.objectType, record.objectId);
+  }
+
+  private recordActionContractRefStatements(record: StoredProtocolRecord): D1PreparedStatement[] {
+    return actionContractIdsForRecord(record).map((actionContractId) =>
+      this.db
+        .prepare(
+          `INSERT OR REPLACE INTO protocol_record_action_contract_refs
+            (object_type, object_id, tenant_id, organization_id, action_contract_id, created_at)
+           VALUES (?, ?, ?, ?, ?, ?)`,
+        )
+        .bind(
+          record.objectType,
+          record.objectId,
+          record.tenantId,
+          record.organizationId,
+          actionContractId,
+          record.createdAt,
+        ),
+    );
   }
 
   private streamEventStatement(event: ContractStreamEvent): D1PreparedStatement {

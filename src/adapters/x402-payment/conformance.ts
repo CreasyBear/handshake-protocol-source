@@ -10,6 +10,7 @@ export const x402FirstWedgeUnsupportedSurfaces = [
   "signed-receipts",
   "seller-middleware",
   "facilitator-operation",
+  "settlement-finality",
 ] as const;
 
 export const X402FirstWedgeUnsupportedSurfaceSchema = z.enum(x402FirstWedgeUnsupportedSurfaces);
@@ -24,6 +25,7 @@ const x402FirstWedgeUnsupportedSurfaceReasonCodes = {
   "lifecycle-hooks": "x402_cut_unsupported_lifecycle_hooks",
   "mcp-auto-pay": "x402_cut_unsupported_mcp_auto_pay",
   "seller-middleware": "x402_cut_unsupported_seller_middleware",
+  "settlement-finality": "x402_cut_unsupported_settlement_finality",
   "signed-offers": "x402_cut_unsupported_signed_offers",
   "signed-receipts": "x402_cut_unsupported_signed_receipts",
   upto: "x402_cut_unsupported_upto",
@@ -54,6 +56,7 @@ export const X402FirstWedgeEvidenceLabelSchema = z.enum([
   "downstream_reconciliation_recorded",
   "payment_response_received",
   "payment_response_missing",
+  "local_reference_downstream_fixture",
   "facilitator_verify_attempted",
   "facilitator_verify_succeeded",
   "facilitator_verify_failed",
@@ -71,6 +74,7 @@ export type X402FirstWedgeEvidenceLabelClassification = {
     | "gateway_held_payment_credential"
     | "downstream_reconciliation"
     | "payment_response"
+    | "local_reference_fixture"
     | "facilitator_verify"
     | "facilitator_settlement";
   firstWedgeOperation: "supported_evidence_only" | "unsupported_facilitator_operation";
@@ -87,6 +91,7 @@ const x402FirstWedgeEvidenceLabelClassifications = {
   facilitator_verify_failed: evidenceLabel("facilitator_verify_failed", "facilitator_verify"),
   facilitator_verify_succeeded: evidenceLabel("facilitator_verify_succeeded", "facilitator_verify"),
   local_gateway_check: evidenceLabel("local_gateway_check", "gateway_check"),
+  local_reference_downstream_fixture: evidenceLabel("local_reference_downstream_fixture", "local_reference_fixture"),
   downstream_reconciliation_recorded: evidenceLabel("downstream_reconciliation_recorded", "downstream_reconciliation"),
   payment_payload_created: evidenceLabel("payment_payload_created", "gateway_held_payment_credential"),
   payment_response_missing: evidenceLabel("payment_response_missing", "payment_response", {

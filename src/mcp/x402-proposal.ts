@@ -13,6 +13,13 @@ const McpIdSchema = z.string().min(1).max(160);
 const McpRefSchema = z.string().min(1).max(500);
 const McpUrlSchema = z.string().url().max(2_048);
 const McpSmallListSchema = <T extends z.ZodTypeAny>(schema: T) => z.array(schema).max(32);
+const McpX402RequestBodyPostureSchema = z.enum(["no_body", "digest_bound", "omitted", "unsupported"]);
+const McpX402ProviderEnvironmentPostureSchema = z.enum([
+  "local_reference_sandbox",
+  "external_sandbox",
+  "live",
+  "unknown",
+]);
 
 export const McpInstallPostureSchema = z.enum(["ready", "missing", "stale", "unsafe", "unknown"]);
 export const McpGatewayPostureSchema = z.enum(["online", "offline", "unknown"]);
@@ -48,8 +55,11 @@ export const McpX402PaymentProposalInputSchema = z.strictObject({
   endpointUrl: McpUrlSchema,
   intendedHttpMethod: McpIdSchema,
   intendedRequestUrl: McpUrlSchema,
+  intendedRequestBodyPosture: McpX402RequestBodyPostureSchema,
   intendedRequestBodyDigest: DigestSchema.nullable(),
   selectedHeadersDigest: DigestSchema,
+  providerEnvironmentPosture: McpX402ProviderEnvironmentPostureSchema,
+  providerEnvironmentRef: McpRefSchema.nullable(),
   payee: McpRefSchema,
   payTo: McpRefSchema,
   network: McpIdSchema,
@@ -218,6 +228,22 @@ export async function proposeMcpX402Payment(
     });
   }
 
+  const postureRefusalReasonCodes = mcpX402PostureRefusalReasonCodes(input);
+  if (postureRefusalReasonCodes.length > 0) {
+    return mcpNonContractOutcome({
+      outcome: "refused",
+      phase: "proposal",
+      reasonCodes: postureRefusalReasonCodes,
+      nextAction: "recraft_request",
+      retryability: "retryable_after_recraft",
+      metadataRef: input.metadataRef,
+      evidenceRefs: [input.paymentRequiredEvidenceRef],
+      challengeRef: `handshake://challenges/x402-posture/${encodeURIComponent(input.requestId)}`,
+      correlationRef: input.correlationRef,
+      idempotencyKey,
+    });
+  }
+
   try {
     return await proposeContract(input, idempotencyKey, options.runtimeClient, options.trustedMaxAtomicAmountPerCall);
   } catch (error) {
@@ -316,6 +342,10 @@ async function proposeContract(
     dispatchBoundaryRef: input.dispatchBoundaryRef,
     dispatchRef: input.dispatchRef,
     paymentRequirementsDigest: input.paymentRequirementsDigest,
+    intendedRequestBodyPosture: input.intendedRequestBodyPosture,
+    intendedRequestBodyDigest: input.intendedRequestBodyDigest,
+    providerEnvironmentPosture: input.providerEnvironmentPosture,
+    providerEnvironmentRef: input.providerEnvironmentRef,
     selectedPaymentRequirementIndex: input.selectedPaymentRequirementIndex,
     selectedPaymentRequirementDigest: input.selectedPaymentRequirementDigest,
   });
@@ -522,8 +552,11 @@ async function deriveMcpX402IdempotencyKey(input: ParsedMcpX402PaymentProposalIn
     endpointUrl: input.endpointUrl,
     intendedHttpMethod: input.intendedHttpMethod,
     intendedRequestUrl: input.intendedRequestUrl,
+    intendedRequestBodyPosture: input.intendedRequestBodyPosture,
     intendedRequestBodyDigest: input.intendedRequestBodyDigest,
     selectedHeadersDigest: input.selectedHeadersDigest,
+    providerEnvironmentPosture: input.providerEnvironmentPosture,
+    providerEnvironmentRef: input.providerEnvironmentRef,
     x402Version: input.x402Version,
     x402Scheme: input.x402Scheme,
     payee: input.payee,
@@ -547,8 +580,11 @@ function x402Parameters(input: ParsedMcpX402PaymentProposalInput): Record<string
     endpointDomain: new URL(input.endpointUrl).hostname,
     intendedHttpMethod: input.intendedHttpMethod,
     intendedRequestUrl: input.intendedRequestUrl,
+    intendedRequestBodyPosture: input.intendedRequestBodyPosture,
     intendedRequestBodyDigest: input.intendedRequestBodyDigest,
     selectedHeadersDigest: input.selectedHeadersDigest,
+    providerEnvironmentPosture: input.providerEnvironmentPosture,
+    providerEnvironmentRef: input.providerEnvironmentRef,
     x402Version: input.x402Version,
     x402Scheme: input.x402Scheme,
     payee: input.payee,
@@ -570,6 +606,23 @@ function x402Parameters(input: ParsedMcpX402PaymentProposalInput): Record<string
     toolCatalogDigest: input.toolCatalogDigest,
     gatewayRegistryDigest: input.gatewayRegistryDigest,
   };
+}
+
+function mcpX402PostureRefusalReasonCodes(input: ParsedMcpX402PaymentProposalInput): string[] {
+  const reasonCodes: string[] = [];
+  if (input.intendedRequestBodyPosture === "digest_bound" && input.intendedRequestBodyDigest === null) {
+    reasonCodes.push("x402_request_body_digest_missing");
+  }
+  if (["omitted", "unsupported"].includes(input.intendedRequestBodyPosture)) {
+    reasonCodes.push("x402_request_body_posture_unsupported");
+  }
+  if (input.intendedRequestBodyPosture === "no_body" && input.intendedRequestBodyDigest !== null) {
+    reasonCodes.push("x402_request_body_posture_mismatch");
+  }
+  if (input.providerEnvironmentPosture !== "local_reference_sandbox") {
+    reasonCodes.push("x402_provider_environment_not_sandboxed");
+  }
+  return [...new Set(reasonCodes)].sort();
 }
 
 function x402ResourceRef(input: ParsedMcpX402PaymentProposalInput): string {

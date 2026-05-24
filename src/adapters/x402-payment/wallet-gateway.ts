@@ -36,14 +36,19 @@ const PaymentIdentifierSchema = z
   .max(128)
   .regex(/^[a-zA-Z0-9_-]+$/);
 const X402EvidenceProfileSchema = z.enum(["official_payment_required", "local_digest_profile"]);
+const X402RequestBodyPostureSchema = z.enum(["no_body", "digest_bound", "omitted", "unsupported"]);
+const X402ProviderEnvironmentPostureSchema = z.enum(["local_reference_sandbox", "external_sandbox", "live", "unknown"]);
 
 export const X402PaymentParametersSchema = z.strictObject({
   endpointUrl: z.string().url(),
   endpointDomain: z.string().min(1),
   intendedHttpMethod: z.string().min(1).nullable().default(null),
   intendedRequestUrl: z.string().url().nullable().default(null),
+  intendedRequestBodyPosture: X402RequestBodyPostureSchema.default("no_body"),
   intendedRequestBodyDigest: DigestSchema.nullable().default(null),
   selectedHeadersDigest: DigestSchema.nullable().default(null),
+  providerEnvironmentPosture: X402ProviderEnvironmentPostureSchema.default("local_reference_sandbox"),
+  providerEnvironmentRef: z.string().min(1).nullable().default(null),
   x402Version: z.number().int().positive().nullable().default(null),
   x402Scheme: z.string().min(1).nullable().default(null),
   payee: z.string().min(1),
@@ -71,6 +76,21 @@ export type X402PaymentSignatureCommand = {
   parameters: X402PaymentParameters;
 };
 
+export type X402LocalReferenceSandboxEvidenceBoundary = {
+  boundaryKind: "x402_local_reference_sandbox";
+  evidenceProfile: "local_reference_downstream_fixture";
+  providerEnvironmentPosture: "local_reference_sandbox";
+  fixtureScope: "local_reference_only";
+  signedRetryPosture: "not_observed" | "post_gateway_check_observation_only";
+  authorityCreated: false;
+  paymentFinalityClaimed: false;
+  settlementFinalityClaimed: false;
+  facilitatorOperationClaimed: false;
+  sellerMiddlewareClaimed: false;
+  providerCustodyClaimed: false;
+  liveProviderOperationClaimed: false;
+};
+
 export type X402PaymentSignatureEvidence = {
   evidenceRef: string;
   surfaceOperationRef: string;
@@ -87,6 +107,8 @@ export type X402PaymentSignatureEvidence = {
   paymentResponseEvidenceRef: string | null;
   providerRequestRef: string | null;
   providerOperationRef: string | null;
+  additionalEvidenceRefs?: string[];
+  localReferenceSandboxBoundary?: X402LocalReferenceSandboxEvidenceBoundary;
 };
 
 export interface X402WalletSigningSurface {
@@ -179,6 +201,7 @@ export async function runX402WalletGateway(input: X402WalletGatewayInput): Promi
       signatureEvidence.paymentIdentifierRef ?? null,
       signatureEvidence.paymentIdentifierDigest ? `digest:${signatureEvidence.paymentIdentifierDigest}` : null,
       signatureEvidence.paymentResponseEvidenceRef,
+      ...(signatureEvidence.additionalEvidenceRefs ?? []),
     ].filter((value): value is string => value !== null);
     const { reconciliation } = await input.protocol.reconcileSurfaceOperation({
       mutationAttemptId: verifiedGate.mutationAttemptId,
@@ -354,6 +377,8 @@ async function verifyOfficialExactSigningInput(input: {
   if (parameters.x402EvidenceProfile !== "official_payment_required") {
     throw new Error("Official x402 gateway signing refused non-official payment evidence.");
   }
+  assertRequestBodyPosture(parameters);
+  assertSandboxProviderEnvironment(parameters);
   if (parameters.x402Version !== paymentRequired.x402Version) {
     throw new Error("Official x402 gateway signing refused x402 version drift.");
   }
@@ -399,6 +424,24 @@ async function verifyOfficialExactSigningInput(input: {
     throw new Error("Official x402 gateway signing refused observed payment requirement drift.");
   }
   return selectedRequirement;
+}
+
+function assertRequestBodyPosture(parameters: X402PaymentParameters): void {
+  if (parameters.intendedRequestBodyPosture === "digest_bound" && parameters.intendedRequestBodyDigest === null) {
+    throw new Error("Official x402 gateway signing refused missing request body digest.");
+  }
+  if (["omitted", "unsupported"].includes(parameters.intendedRequestBodyPosture)) {
+    throw new Error("Official x402 gateway signing refused ambiguous request body posture.");
+  }
+  if (parameters.intendedRequestBodyPosture === "no_body" && parameters.intendedRequestBodyDigest !== null) {
+    throw new Error("Official x402 gateway signing refused request body posture mismatch.");
+  }
+}
+
+function assertSandboxProviderEnvironment(parameters: X402PaymentParameters): void {
+  if (parameters.providerEnvironmentPosture !== "local_reference_sandbox") {
+    throw new Error("Official x402 gateway signing refused non-reference provider environment posture.");
+  }
 }
 
 function paymentRequirementMatchesObservedParameters(

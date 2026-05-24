@@ -142,16 +142,27 @@ export type StreamTail = {
   eventDigest: string;
 } | null;
 
+export type ProtocolRecordScope = { tenantId?: string; organizationId?: string };
+
+export type StreamEventRange = {
+  startOffset?: number;
+  endOffset?: number;
+  limit?: number;
+};
+
 export interface ProtocolStore {
   putRecord(record: StoredProtocolRecord): Promise<void>;
   putRecordIfAbsentOrSame(record: StoredProtocolRecord): Promise<"inserted" | "unchanged" | "conflict">;
   getRecord<T>(objectType: ProtocolObjectType, objectId: string): Promise<StoredProtocolRecord<T> | null>;
-  listRecordsByType<T>(
+  listRecordsByType<T>(objectType: ProtocolObjectType, scope?: ProtocolRecordScope): Promise<StoredProtocolRecord<T>[]>;
+  listRecordsByActionContract<T>(
     objectType: ProtocolObjectType,
-    scope?: { tenantId?: string; organizationId?: string },
+    actionContractId: string,
+    scope?: ProtocolRecordScope,
   ): Promise<StoredProtocolRecord<T>[]>;
   getStreamTail(streamId: string, partitionKey: string): Promise<StreamTail>;
   getStreamEvent(streamId: string, partitionKey: string, offset: number): Promise<ContractStreamEvent | null>;
+  listStreamEvents(streamId: string, partitionKey: string, range?: StreamEventRange): Promise<ContractStreamEvent[]>;
   getCurrentProtectedPathPosture(postureScopeKey: string): Promise<StoredProtocolRecord<ProtectedPathPosture> | null>;
   getCurrentIdempotencyLedgerEntry(
     ledgerKeyDigest: string,

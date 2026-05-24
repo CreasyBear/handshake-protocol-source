@@ -2,7 +2,7 @@
 
 Handshake is contracted execution infrastructure for engineering agents.
 
-Last canonical audit: 2026-05-20.
+Last canonical audit: 2026-05-24.
 
 This checkout is the TypeScript protocol kernel for protected action control:
 
@@ -22,7 +22,7 @@ vague principal intent
 
 The kernel does not claim hosted operation, provider-side enforcement, broad agent governance, or downstream business success. A path is protected only when the gateway owns the mutation credential and verifies the exact greenlight before mutation.
 
-Current local foundation status: source and tests cover the protected-action kernel chain, derived lifecycle evidence, idempotency ledger, redacted evidence projections including agent transaction envelopes, terminal AuthorityCertificate minting and offline pinned-key verification, package-install supply-chain gate binding, the narrow official x402 exact buyer-side proof path through D1/HTTP durable evidence, official x402 SDK signer-custody/bypass probes, public runtime ingress for local x402 payment and package-install dispatch boundaries, a source-owned local MCP stdio proposal/evidence process proof, and publishable Node-bundled CLI/MCP entrypoints with MCP Registry metadata. x402 coverage is one official buyer-side `exact` per-call path with gateway-held `PaymentPayload` / `PAYMENT-SIGNATURE` creation after `VerifiedGatewayCheck`; package install remains a regression fixture. No adapter family defines the protocol. This is local kernel foundation, not broad x402 compatibility, not live provider custody, hosted operation, generic MCP/runtime control, external package-material attestation, cross-org AuthorityCertificate trust, live JWKS/revocation, hosted verifier operation, facilitator operation, seller middleware, unsupported x402 schemes, marketplace/certification, or spend-window ledger enforcement. Runtime ingress and MCP are observer/compiler/proposal evidence surfaces and current x402 spend enforcement is per-call only; session/day/review spend windows are metadata until a ledger exists.
+Current local foundation status: source and tests cover the protected-action kernel chain, derived lifecycle evidence, idempotency ledger, redacted evidence projections including agent transaction envelopes, terminal AuthorityCertificate minting and offline pinned-key verification, package-install supply-chain gate binding, the narrow official x402 exact buyer-side proof path through D1/HTTP durable evidence, a local/reference paid-HTTP sandbox that emits an official-shaped 402 challenge and observes one signed retry only after gateway-created signature evidence, official x402 SDK signer-custody/bypass probes, public runtime ingress for local x402 payment and package-install dispatch boundaries, a source-owned local MCP stdio proposal/evidence process proof, and publishable Node-bundled CLI/MCP entrypoints with MCP Registry metadata. x402 coverage is one official buyer-side `exact` per-call path with local/reference sandbox challenge/retry evidence and gateway-held `PaymentPayload` / `PAYMENT-SIGNATURE` creation after `VerifiedGatewayCheck`; package install remains a regression fixture. No adapter family defines the protocol. This is local kernel foundation, not broad x402 compatibility, not live provider custody, hosted operation, generic MCP/runtime control, external package-material attestation, cross-org AuthorityCertificate trust, live JWKS/revocation, hosted verifier operation, facilitator operation, seller middleware, unsupported x402 schemes, marketplace/certification, or spend-window ledger enforcement. Runtime ingress and MCP are observer/compiler/proposal evidence surfaces and current x402 spend enforcement is per-call only; session/day/review spend windows are metadata until a ledger exists.
 
 ## Repo Truth
 
@@ -161,12 +161,12 @@ examples/x402-protected-spend/output/latest.md
 examples/x402-protected-spend/output/latest.json
 ```
 
-Inspect the report for the exact runtime proposal, action contract, policy
-decision, gateway check, replay refusal, proof-gap posture, redacted evidence
-refs, and local terminal certificate verification. This is local/reference
-evidence only: not hosted operation, not broad x402 compatibility, not provider
-custody, not aggregate spend enforcement, not cross-org trust, and not a
-clearing-house claim.
+Inspect the report for the local 402 challenge, exact runtime proposal, action
+contract, policy decision, gateway check, post-gate signed retry evidence,
+replay refusal, proof-gap posture, redacted evidence refs, and local terminal
+certificate verification. This is local/reference evidence only: not hosted
+operation, not broad x402 compatibility, not provider custody, not aggregate
+spend enforcement, not cross-org trust, and not a clearing-house claim.
 
 Role-scoped SDK activation imports:
 

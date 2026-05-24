@@ -18,11 +18,13 @@ import type {
   ProtectedSurfaceOperationClaimIndexEntry,
   Receipt,
   ReceiptMutationAttemptIndexEntry,
+  StreamEventRange,
   GatewayCheckCommit,
   GatewayCheckCommitResult,
   StoredProtocolRecord,
   StreamTail,
 } from "../../protocol/store/port";
+import { recordMatchesActionContract } from "../../protocol/store/action-contract-index";
 
 export class InMemoryProtocolStore implements ProtocolStore {
   private records = new Map<string, StoredProtocolRecord>();
@@ -70,6 +72,22 @@ export class InMemoryProtocolStore implements ProtocolStore {
     return records;
   }
 
+  async listRecordsByActionContract<T>(
+    objectType: ProtocolObjectType,
+    actionContractId: string,
+    scope: { tenantId?: string; organizationId?: string } = {},
+  ): Promise<StoredProtocolRecord<T>[]> {
+    const records: StoredProtocolRecord<T>[] = [];
+    for (const record of this.records.values()) {
+      if (record.objectType !== objectType) continue;
+      if (scope.tenantId && record.tenantId !== scope.tenantId) continue;
+      if (scope.organizationId && record.organizationId !== scope.organizationId) continue;
+      if (!recordMatchesActionContract(record, actionContractId)) continue;
+      records.push(structuredClone(record) as StoredProtocolRecord<T>);
+    }
+    return records;
+  }
+
   async getStreamTail(streamId: string, partitionKey: string): Promise<StreamTail> {
     const tail = this.events
       .filter((event) => event.streamId === streamId && event.partitionKey === partitionKey)
@@ -83,6 +101,26 @@ export class InMemoryProtocolStore implements ProtocolStore {
         candidate.streamId === streamId && candidate.partitionKey === partitionKey && candidate.offset === offset,
     );
     return event ? structuredClone(event) : null;
+  }
+
+  async listStreamEvents(
+    streamId: string,
+    partitionKey: string,
+    range: StreamEventRange = {},
+  ): Promise<ContractStreamEvent[]> {
+    const startOffset = range.startOffset ?? 0;
+    const endOffset = range.endOffset ?? Number.MAX_SAFE_INTEGER;
+    const events = this.events
+      .filter(
+        (event) =>
+          event.streamId === streamId &&
+          event.partitionKey === partitionKey &&
+          event.offset >= startOffset &&
+          event.offset <= endOffset,
+      )
+      .sort((a, b) => a.offset - b.offset)
+      .map((event) => structuredClone(event));
+    return typeof range.limit === "number" ? events.slice(0, range.limit) : events;
   }
 
   async getCurrentProtectedPathPosture(

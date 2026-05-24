@@ -268,6 +268,18 @@ describe("protocol module import posture", () => {
     expect(violations).toEqual([]);
   });
 
+  it("keeps runtime ingress family registry proposal-only", () => {
+    const registry = readFileSync("src/runtime/ingress/registry.ts", "utf8");
+
+    expect(importsFrom(registry)).toEqual([]);
+    expect(registry).toContain(`authorityPosture: "proposal_only"`);
+    expect(registry).toContain(`compileInputAuthority: "candidate_only"`);
+    expect(registry).toContain(`rawBypassPosture: "bypass_evidence_only"`);
+    expect(registry).not.toMatch(
+      /gatewayCheck|greenlight|policyDecision|receiptExport|authorityCertificate|signPayment/,
+    );
+  });
+
   it("keeps official x402 signer and paid-client imports inside the wallet gateway", () => {
     const allowedOfficialSignerImportFile = "src/adapters/x402-payment/wallet-gateway.ts";
     const forbiddenOutsideGateway = new Set(["@x402/core/client", "@x402/fetch", "@x402/axios"]);

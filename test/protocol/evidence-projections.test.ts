@@ -17,6 +17,12 @@ import {
 } from "../../src/protocol/areas/idempotency-ledger";
 import type { ProofGap } from "../../src/protocol/areas/proof-gap";
 import type { Refusal } from "../../src/protocol/areas/refusal";
+import type {
+  ProtocolObjectType,
+  ProtocolRecordScope,
+  ProtocolStore,
+  StoredProtocolRecord,
+} from "../../src/protocol/store/port";
 import {
   createGreenlitContract,
   futureIso,
@@ -251,10 +257,20 @@ describe("protocol evidence projections", () => {
     ];
     const rawCredentialRefs = [
       "PAYMENT-SIGNATURE:raw-header-must-not-project",
+      "PAYMENT-SIGNATURE raw-header-must-not-project",
       'PaymentPayload:{"payload":{"signature":"0xraw"}}',
       "secretref:x402-wallet-gateway",
+      "secret-ref:x402-wallet-gateway",
+      "signerRef:x402-wallet-gateway",
+      "raw_signer:x402-wallet-gateway",
       "token_passthrough:raw-bearer",
+      "Authorization: Bearer sk_live_x402_secret_must_not_project",
+      "vault://team/prod/x402-wallet",
+      "infisical://project/prod/X402_PAYMENT_SIGNATURE",
+      "op://engineering/x402-wallet/password",
+      "aws_secret_access_key=must-not-project",
       "facilitator_secret:raw",
+      "auth-md-credential=Bearer authmd-secret-claim-token",
     ];
 
     const reconciliation = await fixture.kernel.reconcileSurfaceOperation({
@@ -375,7 +391,9 @@ describe("protocol evidence projections", () => {
       retryNotBefore: futureIso(),
     });
 
-    const assembly = await assembleAgentTransactionEnvelope(fixture.store, contract);
+    await insertUnrelatedProjectionClutter(fixture.store, 25);
+
+    const assembly = await assembleAgentTransactionEnvelope(guardBroadProjectionReads(fixture.store), contract);
     const projection = await projectAgentTransactionEnvelope(assembly.input);
 
     expect(projection.credentialResolutionEvidenceRefs).toContain(
@@ -396,6 +414,7 @@ describe("protocol evidence projections", () => {
         "surface_operation_reconciliation",
       ]),
     );
+    expect(JSON.stringify(assembly.supplementalRecords)).not.toContain("act_projection_clutter");
   });
 
   it("keeps facilitator verify evidence distinct from settlement finality", async () => {
@@ -443,6 +462,59 @@ describe("protocol evidence projections", () => {
     expect(projection.reconciliationFinalityStatus).toBe("unknown");
     expect(projection.downstreamEvidenceRefs).toEqual([]);
     expect(projection.surfaceOperationEvidenceLabels).not.toContain("settlement_succeeded");
+  });
+
+  it("classifies x402 local sandbox signed retry as reference downstream fixture evidence only", async () => {
+    const fixture = await createGreenlitContract();
+    const gate = await fixture.kernel.gatewayCheck({
+      actionContractId: fixture.contract.actionContractId,
+      greenlightId: fixture.greenlight.greenlightId,
+      observedParameters: fixture.contract.parameters,
+      surfaceOperationRef: "surface-op:x402-local-sandbox",
+    });
+    if (!gate.mutationAttempt) throw new Error("expected mutation attempt before local sandbox reconciliation");
+
+    const reconciliation = await fixture.kernel.reconcileSurfaceOperation({
+      mutationAttemptId: gate.mutationAttempt.mutationAttemptId,
+      idempotencyKey: fixture.contract.idempotencyKey,
+      observedSurfaceOperationRef: "surface-op:x402-local-sandbox",
+      observedDownstreamStatus: "succeeded",
+      downstreamRetryability: "non_retryable",
+      providerRequestRef: "provider-request:x402-local-sandbox",
+      providerOperationRef: "provider-operation:x402-local-sandbox",
+      diagnosticsRedactionPosture: "redacted",
+      evidenceRefs: ["evidence:x402-local-sandbox-signed-retry:1", "evidence:x402-local-sandbox-payment-response:1"],
+      resolvedProofGapIds: [],
+    });
+
+    const projection = await projectAgentTransactionEnvelope({
+      contract: { ...fixture.contract, actionClass: "x402_payment.exact" },
+      policyDecision: fixture.decision,
+      greenlight: fixture.greenlight,
+      gateAttempt: gate.gateAttempt,
+      mutationAttempt: gate.mutationAttempt,
+      receipt: gate.receipt,
+      ledger: await currentLedgerForContract(fixture),
+      reconciliations: [reconciliation.reconciliation],
+    });
+
+    expect(projection.surfaceOperationEvidenceLabels).toEqual(
+      expect.arrayContaining([
+        "local_gateway_check",
+        "downstream_reconciliation_recorded",
+        "payment_response_received",
+        "signed_retry_recorded",
+        "local_reference_downstream_fixture",
+      ]),
+    );
+    expect(projection.downstreamEvidenceRefs).toEqual(
+      expect.arrayContaining([
+        "evidence:x402-local-sandbox-signed-retry:1",
+        "evidence:x402-local-sandbox-payment-response:1",
+      ]),
+    );
+    expect(projection.surfaceOperationEvidenceLabels).not.toContain("settlement_succeeded");
+    expect(projection.surfaceOperationEvidenceLabels).not.toContain("facilitator_settle_attempted");
   });
 
   it("generalizes protected-path health beyond package install action classes", async () => {
@@ -509,4 +581,96 @@ function envelopeCredentialBindingFor(credentialRef: GatewayCredentialRef) {
     requiredCredentialCustodyStatus: credentialRef.custodyStatus,
     evidenceExpectationRefs: credentialRef.evidenceExpectationRefs,
   };
+}
+
+const broadProjectionReadTypes = new Set<ProtocolObjectType>([
+  "policy_decision",
+  "greenlight",
+  "gateway_check_attempt",
+  "mutation_attempt",
+  "receipt",
+  "surface_operation_reconciliation",
+  "authority_certificate",
+  "credential_resolution_evidence",
+  "recovery_recommendation",
+  "recovery_recommendation_status_transition",
+  "proof_gap",
+  "refusal",
+  "isolation_state",
+]);
+
+function guardBroadProjectionReads(store: ProtocolStore): ProtocolStore {
+  return new Proxy(store, {
+    get(target, prop) {
+      if (prop === "listRecordsByType") {
+        return async <T>(
+          objectType: ProtocolObjectType,
+          scope: ProtocolRecordScope = {},
+        ): Promise<StoredProtocolRecord<T>[]> => {
+          if (broadProjectionReadTypes.has(objectType)) {
+            throw new Error(`Projection assembly used broad listRecordsByType for ${objectType}.`);
+          }
+          return target.listRecordsByType<T>(objectType, scope);
+        };
+      }
+      const value = Reflect.get(target, prop, target);
+      return typeof value === "function" ? value.bind(target) : value;
+    },
+  }) as ProtocolStore;
+}
+
+async function insertUnrelatedProjectionClutter(store: ProtocolStore, count: number): Promise<void> {
+  for (let index = 0; index < count; index += 1) {
+    const actionContractId = `act_projection_clutter_${index}`;
+    await store.putRecord(
+      projectionClutterRecord("credential_resolution_evidence", `cre_projection_clutter_${index}`, {
+        credentialResolutionEvidenceId: `cre_projection_clutter_${index}`,
+        actionContractId,
+      }),
+    );
+    await store.putRecord(
+      projectionClutterRecord("surface_operation_reconciliation", `sor_projection_clutter_${index}`, {
+        reconciliationId: `sor_projection_clutter_${index}`,
+        actionContractId,
+      }),
+    );
+    await store.putRecord(
+      projectionClutterRecord("proof_gap", `pg_projection_clutter_${index}`, {
+        proofGapId: `pg_projection_clutter_${index}`,
+        affectedObjectRefs: [actionContractId],
+      }),
+    );
+  }
+}
+
+function projectionClutterRecord(
+  objectType: ProtocolObjectType,
+  objectId: string,
+  payload: Record<string, unknown>,
+): StoredProtocolRecord {
+  const createdAt = new Date(0).toISOString();
+  return {
+    objectId,
+    objectType,
+    tenantId: "tenant_demo",
+    organizationId: "org_demo",
+    schemaVersion: "0.2.4",
+    canonicalDigest: digestForProjectionClutter(objectId),
+    payload: {
+      schemaVersion: "0.2.4",
+      tenantId: "tenant_demo",
+      organizationId: "org_demo",
+      createdAt,
+      ...payload,
+    },
+    createdAt,
+    sourceEventId: null,
+  };
+}
+
+function digestForProjectionClutter(seed: string): `sha256:${string}` {
+  return `sha256:${seed
+    .replace(/[^a-z0-9]/gi, "0")
+    .padEnd(64, "0")
+    .slice(0, 64)}`;
 }

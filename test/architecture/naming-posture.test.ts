@@ -41,7 +41,12 @@ const vagueProtocolMutationPattern =
   /\b(handle(?!Id\b)[A-Z]\w*|process(?!Id\b)[A-Z]\w*|do(?!Id\b)[A-Z]\w*|run(?!Id\b)[A-Z]\w*)\s*(?:\(|:|=|<)/;
 const adapterRailMarkers = [/\bx402\b/i] as const;
 const permittedStageLabelLiterals = ["not_enforced_local_metadata"] as const;
-const adapterRailAllowedFiles = new Set(["src/runtime/ingress/index.ts", "docs/internal/protocol-notes.md"]);
+const adapterRailAllowedFiles = new Set([
+  "src/protocol/evidence-projections/projections.ts",
+  "src/runtime/ingress/index.ts",
+  "src/runtime/ingress/registry.ts",
+  "docs/internal/protocol-notes.md",
+]);
 
 describe("repo naming posture", () => {
   it("keeps workspace metadata junk out of active repo surfaces", () => {
@@ -156,6 +161,19 @@ describe("repo naming posture", () => {
 
     expect(workflow).toContain("name: check");
     expect(workflow).toContain("npm run check:repo");
+  });
+
+  it("keeps CI actions pinned to immutable commit SHAs", () => {
+    const workflow = readFileSync(".github/workflows/check.yml", "utf8");
+    const violations: string[] = [];
+    for (const match of workflow.matchAll(/uses:\s*([^\s#]+)/g)) {
+      const action = match[1] ?? "";
+      const pinnedRef = action.split("@").at(1) ?? "";
+      if (!/^[0-9a-f]{40}$/.test(pinnedRef)) violations.push(action);
+    }
+
+    expect(violations).toEqual([]);
+    expect(workflow).not.toContain("pull_request_target");
   });
 });
 

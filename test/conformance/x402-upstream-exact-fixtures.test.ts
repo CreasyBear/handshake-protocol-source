@@ -31,6 +31,7 @@ const officialX402SourceBasis = {
       "signed-receipts",
       "seller-middleware",
       "facilitator-operation",
+      "settlement-finality",
     ],
   },
 } as const;
@@ -147,6 +148,7 @@ describe("upstream x402 exact fixture parity", () => {
       "signed-receipts",
       "seller-middleware",
       "facilitator-operation",
+      "settlement-finality",
     ]);
   });
 
@@ -346,6 +348,7 @@ describe("upstream x402 exact fixture parity", () => {
       "lifecycle-hooks": "x402_cut_unsupported_lifecycle_hooks",
       "mcp-auto-pay": "x402_cut_unsupported_mcp_auto_pay",
       "seller-middleware": "x402_cut_unsupported_seller_middleware",
+      "settlement-finality": "x402_cut_unsupported_settlement_finality",
       "signed-offers": "x402_cut_unsupported_signed_offers",
       "signed-receipts": "x402_cut_unsupported_signed_receipts",
       upto: "x402_cut_unsupported_upto",

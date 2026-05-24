@@ -11,8 +11,10 @@ import type {
   ProtectedPathPosture,
   ProtectedSurfaceOperationClaim,
   Receipt,
+  StreamEventRange,
   GatewayCheckCommit,
   GatewayCheckCommitResult,
+  ProtocolRecordScope,
   StoredProtocolRecord,
   StreamTail,
 } from "../../protocol/store/port";
@@ -26,14 +28,14 @@ export class D1ProtocolStore implements ProtocolStore {
   }
 
   async putRecord(record: StoredProtocolRecord): Promise<void> {
-    await this.statements.recordStatement(record).run();
+    await this.db.batch(this.statements.recordReplacementStatements(record));
   }
 
   async putRecordIfAbsentOrSame(record: StoredProtocolRecord): Promise<"inserted" | "unchanged" | "conflict"> {
     const before = await this.getRecord(record.objectType, record.objectId);
     if (before) return before.canonicalDigest === record.canonicalDigest ? "unchanged" : "conflict";
 
-    await this.statements.recordIfAbsentStatement(record).run();
+    await this.db.batch(this.statements.recordAbsentStatements(record));
 
     const existing = await this.getRecord(record.objectType, record.objectId);
     if (!existing) return "conflict";
@@ -66,7 +68,7 @@ export class D1ProtocolStore implements ProtocolStore {
 
   async listRecordsByType<T>(
     objectType: ProtocolObjectType,
-    scope: { tenantId?: string; organizationId?: string } = {},
+    scope: ProtocolRecordScope = {},
   ): Promise<StoredProtocolRecord<T>[]> {
     const where = ["object_type = ?"];
     const bindings: string[] = [objectType];
@@ -86,17 +88,37 @@ export class D1ProtocolStore implements ProtocolStore {
       )
       .bind(...bindings)
       .all<RecordRow>();
-    return result.results.map((row) => ({
-      objectId: row.object_id,
-      objectType: row.object_type as ProtocolObjectType,
-      tenantId: row.tenant_id,
-      organizationId: row.organization_id,
-      schemaVersion: row.schema_version,
-      canonicalDigest: row.canonical_digest,
-      payload: JSON.parse(row.payload_json) as T,
-      createdAt: row.created_at,
-      sourceEventId: row.source_event_id,
-    }));
+    return result.results.map(rowToRecord<T>);
+  }
+
+  async listRecordsByActionContract<T>(
+    objectType: ProtocolObjectType,
+    actionContractId: string,
+    scope: ProtocolRecordScope = {},
+  ): Promise<StoredProtocolRecord<T>[]> {
+    const where = ["ref.object_type = ?", "ref.action_contract_id = ?"];
+    const bindings: Array<string | number> = [objectType, actionContractId];
+    if (scope.tenantId) {
+      where.push("ref.tenant_id = ?");
+      bindings.push(scope.tenantId);
+    }
+    if (scope.organizationId) {
+      where.push("ref.organization_id = ?");
+      bindings.push(scope.organizationId);
+    }
+    const result = await this.db
+      .prepare(
+        `SELECT r.object_id, r.object_type, r.tenant_id, r.organization_id, r.schema_version, r.canonical_digest, r.payload_json, r.created_at, r.source_event_id
+         FROM protocol_record_action_contract_refs ref
+         JOIN protocol_records r
+           ON r.object_type = ref.object_type
+          AND r.object_id = ref.object_id
+         WHERE ${where.join(" AND ")}
+         ORDER BY r.created_at DESC, r.object_id DESC`,
+      )
+      .bind(...bindings)
+      .all<RecordRow>();
+    return result.results.map(rowToRecord<T>);
   }
 
   async getStreamTail(streamId: string, partitionKey: string): Promise<StreamTail> {
@@ -124,6 +146,35 @@ export class D1ProtocolStore implements ProtocolStore {
       .bind(streamId, partitionKey, offset)
       .first<{ payload_json: string }>();
     return row ? (JSON.parse(row.payload_json) as ContractStreamEvent) : null;
+  }
+
+  async listStreamEvents(
+    streamId: string,
+    partitionKey: string,
+    range: StreamEventRange = {},
+  ): Promise<ContractStreamEvent[]> {
+    const where = ["stream_id = ?", "partition_key = ?"];
+    const bindings: Array<string | number> = [streamId, partitionKey];
+    if (range.startOffset !== undefined) {
+      where.push('"offset" >= ?');
+      bindings.push(range.startOffset);
+    }
+    if (range.endOffset !== undefined) {
+      where.push('"offset" <= ?');
+      bindings.push(range.endOffset);
+    }
+    const limit = range.limit !== undefined ? " LIMIT ?" : "";
+    if (range.limit !== undefined) bindings.push(range.limit);
+    const result = await this.db
+      .prepare(
+        `SELECT payload_json
+         FROM stream_events
+         WHERE ${where.join(" AND ")}
+         ORDER BY "offset" ASC${limit}`,
+      )
+      .bind(...bindings)
+      .all<{ payload_json: string }>();
+    return result.results.map((row) => JSON.parse(row.payload_json) as ContractStreamEvent);
   }
 
   async getCurrentProtectedPathPosture(
@@ -304,6 +355,20 @@ type RecordRow = {
   created_at: string;
   source_event_id: string | null;
 };
+
+function rowToRecord<T>(row: RecordRow): StoredProtocolRecord<T> {
+  return {
+    objectId: row.object_id,
+    objectType: row.object_type as ProtocolObjectType,
+    tenantId: row.tenant_id,
+    organizationId: row.organization_id,
+    schemaVersion: row.schema_version,
+    canonicalDigest: row.canonical_digest,
+    payload: JSON.parse(row.payload_json) as T,
+    createdAt: row.created_at,
+    sourceEventId: row.source_event_id,
+  };
+}
 
 function uniqueIsolationScopeRefs(scopeRefs: IsolationScopeRef[]): IsolationScopeRef[] {
   const seen = new Set<string>();

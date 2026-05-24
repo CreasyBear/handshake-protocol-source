@@ -43,19 +43,33 @@ export async function assembleAgentTransactionEnvelope(
     credentialResolutionEvidenceRecords,
     recoveryRecommendationRecords,
     recoveryRecommendationStatusTransitionRecords,
-    isolationStateRecords,
   ] = await Promise.all([
-    store.listRecordsByType<PolicyDecision>("policy_decision", scope),
-    store.listRecordsByType<Greenlight>("greenlight", scope),
-    store.listRecordsByType<GatewayCheckAttempt>("gateway_check_attempt", scope),
-    store.listRecordsByType<MutationAttempt>("mutation_attempt", scope),
-    store.listRecordsByType<Receipt>("receipt", scope),
-    store.listRecordsByType<SurfaceOperationReconciliation>("surface_operation_reconciliation", scope),
-    store.listRecordsByType<AuthorityCertificate>("authority_certificate", scope),
-    store.listRecordsByType<CredentialResolutionEvidence>("credential_resolution_evidence", scope),
-    store.listRecordsByType<RecoveryRecommendation>("recovery_recommendation", scope),
-    store.listRecordsByType<RecoveryRecommendationStatusTransition>("recovery_recommendation_status_transition", scope),
-    store.listRecordsByType<IsolationState>("isolation_state", scope),
+    store.listRecordsByActionContract<PolicyDecision>("policy_decision", contract.actionContractId, scope),
+    store.listRecordsByActionContract<Greenlight>("greenlight", contract.actionContractId, scope),
+    store.listRecordsByActionContract<GatewayCheckAttempt>("gateway_check_attempt", contract.actionContractId, scope),
+    store.listRecordsByActionContract<MutationAttempt>("mutation_attempt", contract.actionContractId, scope),
+    store.listRecordsByActionContract<Receipt>("receipt", contract.actionContractId, scope),
+    store.listRecordsByActionContract<SurfaceOperationReconciliation>(
+      "surface_operation_reconciliation",
+      contract.actionContractId,
+      scope,
+    ),
+    store.listRecordsByActionContract<AuthorityCertificate>("authority_certificate", contract.actionContractId, scope),
+    store.listRecordsByActionContract<CredentialResolutionEvidence>(
+      "credential_resolution_evidence",
+      contract.actionContractId,
+      scope,
+    ),
+    store.listRecordsByActionContract<RecoveryRecommendation>(
+      "recovery_recommendation",
+      contract.actionContractId,
+      scope,
+    ),
+    store.listRecordsByActionContract<RecoveryRecommendationStatusTransition>(
+      "recovery_recommendation_status_transition",
+      contract.actionContractId,
+      scope,
+    ),
   ]);
 
   const receipts = latestFirst(receiptRecords.map((record) => record.payload)).filter(
@@ -103,7 +117,7 @@ export async function assembleAgentTransactionEnvelope(
   );
   const proofGaps = await scopedProofGaps(store, contract);
   const refusals = scopedPayloads(
-    await store.listRecordsByType<Refusal>("refusal", scope),
+    await store.listRecordsByActionContract<Refusal>("refusal", contract.actionContractId, scope),
     (refusal) => refusal.actionContractId === contract.actionContractId,
   );
   const credentialResolutionEvidence = scopedRecords(
@@ -122,9 +136,13 @@ export async function assembleAgentTransactionEnvelope(
   const activeIsolationStateIds = new Set(
     isolationStates.filter((state) => state.clearedAt === null).map((state) => state.isolationStateId),
   );
-  const activeIsolationStateRecords = scopedRecords(isolationStateRecords, (record) =>
-    activeIsolationStateIds.has(record.payload.isolationStateId),
-  );
+  const activeIsolationStateRecords = (
+    await Promise.all(
+      [...activeIsolationStateIds].map((isolationStateId) =>
+        store.getRecord<IsolationState>("isolation_state", isolationStateId),
+      ),
+    )
+  ).filter((record): record is StoredProtocolRecord<IsolationState> => record !== null);
   const scopedReconciliationRecords = scopedRecords(
     reconciliationRecords,
     (record) => record.payload.actionContractId === contract.actionContractId,
@@ -170,7 +188,7 @@ async function recordPayload<T>(
 
 async function scopedProofGaps(store: ProtocolStore, contract: ActionContract): Promise<ProofGap[]> {
   return (
-    await store.listRecordsByType<ProofGap>("proof_gap", {
+    await store.listRecordsByActionContract<ProofGap>("proof_gap", contract.actionContractId, {
       tenantId: contract.tenantId,
       organizationId: contract.organizationId,
     })

@@ -18,6 +18,19 @@ CREATE TABLE IF NOT EXISTS protocol_records (
 CREATE INDEX IF NOT EXISTS idx_protocol_records_type
   ON protocol_records (tenant_id, organization_id, object_type, created_at);
 
+CREATE TABLE IF NOT EXISTS protocol_record_action_contract_refs (
+  object_type TEXT NOT NULL,
+  object_id TEXT NOT NULL,
+  tenant_id TEXT NOT NULL,
+  organization_id TEXT NOT NULL,
+  action_contract_id TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  PRIMARY KEY (object_type, object_id, action_contract_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_protocol_record_action_contract_refs_scope
+  ON protocol_record_action_contract_refs (tenant_id, organization_id, action_contract_id, object_type, created_at);
+
 CREATE TABLE IF NOT EXISTS greenlight_consumptions (
   greenlight_id TEXT PRIMARY KEY,
   gate_attempt_id TEXT NOT NULL,

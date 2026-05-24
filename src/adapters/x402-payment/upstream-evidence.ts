@@ -18,8 +18,11 @@ export type X402OfficialSourceBasis = {
 export type X402IntendedRequestEvidence = {
   method: string;
   url: string;
+  requestBodyPosture?: "no_body" | "digest_bound" | "omitted" | "unsupported";
   bodyDigest: `sha256:${string}` | null;
   selectedHeadersDigest: `sha256:${string}`;
+  providerEnvironmentPosture?: "local_reference_sandbox" | "external_sandbox" | "live" | "unknown";
+  providerEnvironmentRef?: string | null;
 };
 
 export type X402PaymentRequiredEvidence = {

@@ -200,8 +200,45 @@ describe("CLI evidence surface", () => {
         nextAction: "fix_arguments",
       },
     });
+
+    await expect(runCliCommand(["cert", "verify"])).resolves.toMatchObject({
+      command: "cert verify",
+      ok: false,
+      reasonCodes: ["cli_required_argument_missing"],
+      nextAction: "fix_arguments",
+      result: {
+        errorCode: "cli_required_argument_missing",
+        message: "cert verify requires <certificate-path> --trust-bundle <path>.",
+      },
+    });
+
+    const missingFile = await runCliProcess("evidence", "aps-report", "/tmp/handshake-missing-input.json");
+    expect(missingFile.exitCode).toBe(1);
+    expect(missingFile.output).toMatchObject({
+      command: "evidence aps-report",
+      ok: false,
+      reasonCodes: ["cli_input_file_unreadable"],
+      nextAction: "fix_arguments",
+      result: {
+        errorCode: "cli_input_file_unreadable",
+        message: "Input JSON file could not be read.",
+      },
+    });
   });
 });
+
+async function runCliProcess(...argv: string[]): Promise<{ exitCode: number; output: unknown }> {
+  const proc = Bun.spawn([process.execPath, "run", "./src/cli/main.ts", ...argv], {
+    stdout: "pipe",
+    stderr: "pipe",
+  });
+  const stdoutPromise = proc.stdout ? new Response(proc.stdout).text() : Promise.resolve("");
+  const stderrPromise = proc.stderr ? new Response(proc.stderr).text() : Promise.resolve("");
+  const exitCode = await proc.exited;
+  const stdout = await stdoutPromise;
+  const stderr = await stderrPromise;
+  return { exitCode, output: JSON.parse(stderr || stdout) };
+}
 
 async function writeJson(prefix: string, value: unknown): Promise<string> {
   const dir = await mkdtemp(join(tmpdir(), `handshake-cli-${prefix}-`));

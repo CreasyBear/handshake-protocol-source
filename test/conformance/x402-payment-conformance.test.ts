@@ -15,6 +15,7 @@ const unsupportedFirstWedgeCases = [
   ["signed-receipts", "x402_cut_unsupported_signed_receipts"],
   ["seller-middleware", "x402_cut_unsupported_seller_middleware"],
   ["facilitator-operation", "x402_cut_unsupported_facilitator_operation"],
+  ["settlement-finality", "x402_cut_unsupported_settlement_finality"],
 ] as const;
 
 describe("x402 payment install conformance", () => {
@@ -132,6 +133,12 @@ describe("x402 first-wedge evidence taxonomy", () => {
       authorityCreated: false,
       evidenceRole: "payment_response",
       settlementFinality: "settlement_unknown",
+    });
+    expect(classifyX402FirstWedgeEvidenceLabel("local_reference_downstream_fixture")).toMatchObject({
+      authorityCreated: false,
+      evidenceRole: "local_reference_fixture",
+      firstWedgeOperation: "supported_evidence_only",
+      settlementFinality: "not_settlement_finality",
     });
   });
 

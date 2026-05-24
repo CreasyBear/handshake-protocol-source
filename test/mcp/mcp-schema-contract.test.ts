@@ -57,6 +57,28 @@ describe("MCP schema contract", () => {
     }
   });
 
+  it("requires explicit x402 request-body and provider posture", () => {
+    const valid = validProposalInput();
+    expect(McpX402PaymentProposalInputSchema.safeParse(valid).success).toBe(true);
+    expect(valid).toMatchObject({
+      intendedRequestBodyPosture: "no_body",
+      intendedRequestBodyDigest: null,
+      providerEnvironmentPosture: "local_reference_sandbox",
+      providerEnvironmentRef: null,
+    });
+
+    const missingBodyPosture: Partial<ReturnType<typeof validProposalInput>> = { ...valid };
+    const missingProviderPosture: Partial<ReturnType<typeof validProposalInput>> = { ...valid };
+    const missingProviderRef: Partial<ReturnType<typeof validProposalInput>> = { ...valid };
+    delete missingBodyPosture.intendedRequestBodyPosture;
+    delete missingProviderPosture.providerEnvironmentPosture;
+    delete missingProviderRef.providerEnvironmentRef;
+
+    expect(McpX402PaymentProposalInputSchema.safeParse(missingBodyPosture).success).toBe(false);
+    expect(McpX402PaymentProposalInputSchema.safeParse(missingProviderPosture).success).toBe(false);
+    expect(McpX402PaymentProposalInputSchema.safeParse(missingProviderRef).success).toBe(false);
+  });
+
   it("keeps every structured outcome non-authority and model-parseable", () => {
     const outcomes = [
       "refused",
@@ -135,8 +157,11 @@ export function validProposalInput() {
     endpointUrl: "https://seller.example/protected",
     intendedHttpMethod: "GET",
     intendedRequestUrl: "https://seller.example/protected",
+    intendedRequestBodyPosture: "no_body",
     intendedRequestBodyDigest: null,
     selectedHeadersDigest: digest(4),
+    providerEnvironmentPosture: "local_reference_sandbox",
+    providerEnvironmentRef: null,
     payee: "0x0000000000000000000000000000000000000001",
     payTo: "0x0000000000000000000000000000000000000001",
     network: "base-sepolia",

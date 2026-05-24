@@ -25,6 +25,7 @@ import {
 } from "../package-install/action-proposal";
 import {
   buildX402PaymentCompileIntentInput,
+  buildX402PaymentCompileIntentInputForRuntimeRefusal,
   type X402PaymentAttempt,
   type X402PaymentRuntimeConfig,
 } from "../../adapters/x402-payment/action-proposal";
@@ -34,6 +35,7 @@ import {
   type AuthMdProtectedApiCallAttempt,
   type AuthMdProtectedApiCallRuntimeConfig,
 } from "../../adapters/auth-md/action-proposal";
+import { runtimeIngressFamilyIdForDispatchKind, runtimeIngressGrammarVersionForFamilySet } from "./registry";
 
 const RuntimeIngressIdSchema = z.string().min(1).max(160);
 const RuntimeIngressRefSchema = z.string().min(1).max(500);
@@ -74,6 +76,7 @@ const X402PaymentDispatchParameterFields = {
   facilitatorRef: RuntimeIngressRefSchema.nullable().default(null),
   intendedHttpMethod: RuntimeIngressIdSchema.nullable().default(null),
   intendedRequestUrl: RuntimeIngressUrlSchema.nullable().default(null),
+  intendedRequestBodyPosture: z.enum(["no_body", "digest_bound", "omitted", "unsupported"]).default("no_body"),
   intendedRequestBodyDigest: z
     .string()
     .regex(/^sha256:[a-f0-9]{64}$/)
@@ -84,6 +87,10 @@ const X402PaymentDispatchParameterFields = {
     .regex(/^sha256:[a-f0-9]{64}$/)
     .nullable()
     .default(null),
+  providerEnvironmentPosture: z
+    .enum(["local_reference_sandbox", "external_sandbox", "live", "unknown"])
+    .default("local_reference_sandbox"),
+  providerEnvironmentRef: RuntimeIngressRefSchema.nullable().default(null),
   x402Version: z.number().int().positive().nullable().default(null),
   x402Scheme: RuntimeIngressIdSchema.nullable().default(null),
   asset: RuntimeIngressIdSchema.nullable().default(null),
@@ -694,21 +701,24 @@ function runtimeIngressDispatchRefusalReasonCodes(block: ParsedRuntimeIngressDis
 }
 
 function dispatchSpecificRefusalReasonCodes(dispatch: ParsedRuntimeIngressObservedDispatch): string[] {
-  if (!isAuthMdProtectedApiCallDispatch(dispatch)) return [];
-  return authMdProtectedApiCallRefusalReasonCodes(
-    authMdProtectedApiCallAttemptForDispatch(
-      {
-        principalIntentRef: "runtime-ingress:preflight",
-        generatedCodeOrSpecRef: dispatch.generatedCodeOrSpecRef ?? "runtime-ingress:preflight",
-      },
-      dispatch,
-      1,
-      {
-        runtimeExecutionId: "runtime_execution_preflight",
-        generatedExecutionGraphId: "generated_execution_graph_preflight",
-      },
-    ),
-  );
+  if (isAuthMdProtectedApiCallDispatch(dispatch)) {
+    return authMdProtectedApiCallRefusalReasonCodes(
+      authMdProtectedApiCallAttemptForDispatch(
+        {
+          principalIntentRef: "runtime-ingress:preflight",
+          generatedCodeOrSpecRef: dispatch.generatedCodeOrSpecRef ?? "runtime-ingress:preflight",
+        },
+        dispatch,
+        1,
+        {
+          runtimeExecutionId: "runtime_execution_preflight",
+          generatedExecutionGraphId: "generated_execution_graph_preflight",
+        },
+      ),
+    );
+  }
+  if (isX402PaymentDispatch(dispatch)) return x402DispatchRefusalReasonCodes(dispatch);
+  return [];
 }
 
 async function buildCompileIntentInputForDispatch(
@@ -737,10 +747,18 @@ async function buildCompileIntentInputForDispatch(
       ),
     );
   }
-  return buildX402PaymentCompileIntentInput(
-    requireX402PaymentConfig(config),
-    x402PaymentAttemptForDispatch(block, dispatch, sequenceNumber, graphRefs, requiredPriorActionContractIds),
+  const attempt = x402PaymentAttemptForDispatch(
+    block,
+    dispatch,
+    sequenceNumber,
+    graphRefs,
+    requiredPriorActionContractIds,
   );
+  const buildX402CompileInput =
+    x402DispatchRefusalReasonCodes(dispatch).length > 0
+      ? buildX402PaymentCompileIntentInputForRuntimeRefusal
+      : buildX402PaymentCompileIntentInput;
+  return buildX402CompileInput(requireX402PaymentConfig(config), attempt);
 }
 
 function packageInstallToolCallForDispatch(
@@ -796,8 +814,11 @@ function x402PaymentAttemptForDispatch(
     facilitatorRef: dispatch.facilitatorRef,
     intendedHttpMethod: dispatch.intendedHttpMethod,
     intendedRequestUrl: dispatch.intendedRequestUrl,
+    intendedRequestBodyPosture: dispatch.intendedRequestBodyPosture,
     intendedRequestBodyDigest: dispatch.intendedRequestBodyDigest,
     selectedHeadersDigest: dispatch.selectedHeadersDigest,
+    providerEnvironmentPosture: dispatch.providerEnvironmentPosture,
+    providerEnvironmentRef: dispatch.providerEnvironmentRef,
     x402Version: dispatch.x402Version,
     x402Scheme: dispatch.x402Scheme,
     asset: dispatch.asset,
@@ -810,6 +831,23 @@ function x402PaymentAttemptForDispatch(
     sequenceNumber,
     requiredPriorActionContractIds,
   };
+}
+
+function x402DispatchRefusalReasonCodes(dispatch: ParsedX402PaymentDispatch): string[] {
+  const reasonCodes: string[] = [];
+  if (dispatch.intendedRequestBodyPosture === "digest_bound" && dispatch.intendedRequestBodyDigest === null) {
+    reasonCodes.push("x402_request_body_digest_missing");
+  }
+  if (["omitted", "unsupported"].includes(dispatch.intendedRequestBodyPosture)) {
+    reasonCodes.push("x402_request_body_posture_unsupported");
+  }
+  if (dispatch.intendedRequestBodyPosture === "no_body" && dispatch.intendedRequestBodyDigest !== null) {
+    reasonCodes.push("x402_request_body_posture_mismatch");
+  }
+  if (dispatch.providerEnvironmentPosture !== "local_reference_sandbox") {
+    reasonCodes.push("x402_provider_environment_not_sandboxed");
+  }
+  return unique(reasonCodes);
 }
 
 function authMdProtectedApiCallAttemptForDispatch(
@@ -930,9 +968,16 @@ function runtimeConfigForDispatch(
   config: RuntimeIngressConfig,
   dispatch: ParsedRuntimeIngressObservedDispatch,
 ): RuntimeIngressFamilyConfig {
-  if (isPackageInstallDispatch(dispatch)) return requirePackageInstallConfig(config);
-  if (isAuthMdProtectedApiCallDispatch(dispatch)) return requireAuthMdProtectedApiCallConfig(config);
-  return requireX402PaymentConfig(config);
+  switch (runtimeIngressFamilyIdForDispatchKind(dispatch.dispatchKind)) {
+    case "package_install":
+      return requirePackageInstallConfig(config);
+    case "x402_payment":
+      return requireX402PaymentConfig(config);
+    case "auth_md_protected_api_call":
+      return requireAuthMdProtectedApiCallConfig(config);
+    default:
+      throw new Error(`Runtime ingress dispatch family is not registered: ${dispatch.dispatchKind}`);
+  }
 }
 
 function requirePackageInstallConfig(config: RuntimeIngressConfig): PackageInstallRuntimeConfig {
@@ -961,30 +1006,31 @@ function signingSecretForDispatch(
 }
 
 function supportedGrammarVersionForBlock(block: ParsedRuntimeIngressDispatchBlock): string {
-  const families = new Set(
-    block.dispatches.map((dispatch) =>
-      isPackageInstallDispatch(dispatch) ? "package" : isAuthMdProtectedApiCallDispatch(dispatch) ? "auth-md" : "x402",
+  return runtimeIngressGrammarVersionForFamilySet(
+    new Set(
+      block.dispatches.map((dispatch) => {
+        const familyId = runtimeIngressFamilyIdForDispatchKind(dispatch.dispatchKind);
+        if (!familyId) throw new Error(`Runtime ingress dispatch family is not registered: ${dispatch.dispatchKind}`);
+        return familyId;
+      }),
     ),
   );
-  if (families.size > 1) return "runtime-dispatch-mixed-0.1";
-  if (families.has("auth-md")) return "runtime-dispatch-auth-md-protected-api-call-0.1";
-  return families.has("x402") ? "runtime-dispatch-x402-payment-0.1" : "runtime-dispatch-package-install-0.1";
 }
 
 function isPackageInstallDispatch(
   dispatch: ParsedRuntimeIngressObservedDispatch,
 ): dispatch is ParsedPackageInstallDispatch {
-  return dispatch.dispatchKind.endsWith("_package_install");
+  return runtimeIngressFamilyIdForDispatchKind(dispatch.dispatchKind) === "package_install";
 }
 
 function isX402PaymentDispatch(dispatch: ParsedRuntimeIngressObservedDispatch): dispatch is ParsedX402PaymentDispatch {
-  return dispatch.dispatchKind.endsWith("_x402_payment");
+  return runtimeIngressFamilyIdForDispatchKind(dispatch.dispatchKind) === "x402_payment";
 }
 
 function isAuthMdProtectedApiCallDispatch(
   dispatch: ParsedRuntimeIngressObservedDispatch,
 ): dispatch is ParsedAuthMdProtectedApiCallDispatch {
-  return dispatch.dispatchKind.endsWith("_auth_md_protected_api_call");
+  return runtimeIngressFamilyIdForDispatchKind(dispatch.dispatchKind) === "auth_md_protected_api_call";
 }
 
 function isRawSiblingDispatch(
