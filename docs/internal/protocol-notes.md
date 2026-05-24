@@ -200,15 +200,19 @@ These are proof lanes, not provider-side enforcement claims.
 ## AuthorityCertificate
 
 `AuthorityCertificate` and `verifyAuthorityCertificate()` are landed source
-objects for the local foundation kernel. The certificate is a Layer 8 terminal proof
-object emitted only after receipt, durable refusal, proof gap, or replay
+objects for the local foundation kernel. The certificate is a Layer 8 terminal
+proof object emitted only after receipt, durable refusal, proof gap, or replay
 refusal. Verification rebuilds canonical `signingInput`, checks envelope digest
 binding, verifies pinned Ed25519 signer roles, rejects production
 HMAC/propose-time signatures as portable trust, and works without the protocol
-store.
+store. The local verifier response is structured as `verified`, `refused`, or
+`proof_gap`; it separates cryptographic, artifact, terminal, gateway-admission,
+trust-material, and status checks. Native verifier key-set and JWKS projections
+are public-material projections only, not trust decisions.
 
-This is still local foundation trust. Cross-org JWKS, revocation, hosted verify
-APIs, marketplace certification, and provider custody remain outside this local foundation.
+This is still local foundation trust. Cross-org JWKS fetch, hosted revocation
+lookup, hosted verify APIs, marketplace certification, and provider custody
+remain outside this local foundation.
 
 ## Pressure Review Notes
 

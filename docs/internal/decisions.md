@@ -111,7 +111,10 @@ The verifier recomputes canonical `signingInput`, checks envelope digest
 binding, verifies pinned Ed25519 signer material, rejects production
 HMAC/propose-time `contractSignature` as portable trust, fails tamper,
 missing-signer, replay/terminal-binding mismatches, and verifies exported cert
-JSON without the protocol store.
+JSON without the protocol store. The local trust read model now separates
+`verified`, `refused`, and `proof_gap` outcomes, issuer/key/status failures,
+and public verifier key-set/JWKS projections. Those projections expose only
+public verification material and create no authority or cross-org trust.
 
 The local foundation does not prove:
 
@@ -121,8 +124,8 @@ The local foundation does not prove:
 - external package-manager material attestation;
 - broad MCP, CLI, browser, shell, network, package-manager, or generated-tool-stream
   interception beyond the local x402 payment and package-install dispatch boundaries;
-- portable cross-org verification, live JWKS, revocation, marketplace
-  certification, or provider custody from local fixture keys.
+- portable cross-org verification, live JWKS fetch, hosted revocation lookup,
+  marketplace certification, or provider custody from local fixture keys.
 
 ## Current Bought Product
 

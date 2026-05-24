@@ -6,6 +6,8 @@ import { pathToFileURL } from "node:url";
 import {
   authorityCertificateSigningInputDigest,
   buildAuthorityCertificateSigningInput,
+  projectAuthorityCertificateJwks,
+  projectAuthorityCertificateVerifierKeySet,
   verifyAuthorityCertificate,
   type AuthorityCertificate,
 } from "../../src";
@@ -55,6 +57,10 @@ describe("AuthorityCertificate foundation", () => {
     expect(buildAuthorityCertificateSigningInput(certificate)).not.toHaveProperty("signatures");
     expect(buildAuthorityCertificateSigningInput(certificate)).not.toHaveProperty("signingInputDigest");
     expect(result.valid).toBe(true);
+    expect(result.outcome).toBe("verified");
+    expect(result.authorityCreated).toBe(false);
+    expect(result.checks.trustMaterial).toBe("passed");
+    expect(result.checks.status).toBe("passed");
     expect(result.failures).toEqual([]);
     expect(result.envelope?.clearingEvidenceRefs.obligationRef).toBe("obligation:test-hono-install");
   });
@@ -374,6 +380,126 @@ describe("AuthorityCertificate foundation", () => {
     expect(result.valid).toBe(false);
     expect(result.failures.map((failure) => failure.code)).toContain("signature_invalid");
     expect(productionResult.failures.map((failure) => failure.code)).toContain("hmac_not_allowed");
+  });
+
+  it("separates issuer, role, retired, revoked, stale, and status-unavailable trust failures", async () => {
+    const { certificate, signers } = await receiptCertificateFixture();
+    const baseTrust = trustMaterial(signers);
+
+    const cases: {
+      name: string;
+      trust: Parameters<typeof verifyAuthorityCertificate>[1];
+      expectedOutcome: "refused" | "proof_gap";
+      expectedCode: Awaited<ReturnType<typeof verifyAuthorityCertificate>>["failures"][number]["code"];
+    }[] = [
+      {
+        name: "unknown issuer",
+        trust: {
+          ...baseTrust,
+          keys: baseTrust.keys.map((key) => ({ ...key, issuerRef: "issuer:missing" })),
+          issuers: [],
+        },
+        expectedOutcome: "refused",
+        expectedCode: "trust_issuer_unknown",
+      },
+      {
+        name: "role mismatch",
+        trust: {
+          ...baseTrust,
+          keys: baseTrust.keys.map((key) => ({
+            ...key,
+            signerRole: key.signerRole === "gateway" ? "operator_policy" : "gateway",
+          })),
+        },
+        expectedOutcome: "refused",
+        expectedCode: "trust_key_role_mismatch",
+      },
+      {
+        name: "retired key",
+        trust: { ...baseTrust, keys: baseTrust.keys.map((key) => ({ ...key, status: "retired" as const })) },
+        expectedOutcome: "refused",
+        expectedCode: "trust_key_retired",
+      },
+      {
+        name: "revoked key",
+        trust: { ...baseTrust, keys: baseTrust.keys.map((key) => ({ ...key, status: "revoked" as const })) },
+        expectedOutcome: "refused",
+        expectedCode: "trust_key_revoked",
+      },
+      {
+        name: "stale key",
+        trust: { ...baseTrust, keys: baseTrust.keys.map((key) => ({ ...key, status: "stale" as const })) },
+        expectedOutcome: "refused",
+        expectedCode: "trust_key_stale",
+      },
+      {
+        name: "status unavailable",
+        trust: {
+          ...baseTrust,
+          keys: baseTrust.keys.map((key) => ({ ...key, status: "status_unavailable" as const })),
+        },
+        expectedOutcome: "proof_gap",
+        expectedCode: "trust_status_unavailable",
+      },
+    ];
+
+    for (const testCase of cases) {
+      const result = await verifyAuthorityCertificate(certificate, testCase.trust);
+      expect(result.outcome, testCase.name).toBe(testCase.expectedOutcome);
+      expect(
+        result.failures.map((failure) => failure.code),
+        testCase.name,
+      ).toContain(testCase.expectedCode);
+      if (testCase.expectedCode === "trust_status_unavailable") {
+        expect(result.checks.status, testCase.name).toBe("proof_gap");
+      } else {
+        expect(result.checks.trustMaterial, testCase.name).not.toBe("passed");
+      }
+    }
+  });
+
+  it("projects verifier key sets and JWKS as public material only, not trust or authority", async () => {
+    const signers = await fixtureEd25519Signers();
+    const trust = {
+      ...trustMaterial(signers),
+      keys: [
+        ...trustMaterial(signers).keys,
+        {
+          keyIdentityRef: "fixture:hmac:dev",
+          signerRole: null,
+          algorithm: "hmac-sha256" as const,
+          publicKeyEd25519: null,
+          hmacSecret: "dev-secret-must-not-project",
+          status: "active" as const,
+        },
+      ],
+      issuers: [
+        {
+          issuerRef: "issuer:fixture",
+          issuerDigest: `sha256:${"7".repeat(64)}`,
+          status: "active" as const,
+          validFrom: null,
+          validUntil: null,
+          metadataRefs: ["evidence:issuer-fixture"],
+        },
+      ],
+    };
+
+    const keySet = projectAuthorityCertificateVerifierKeySet(trust);
+    const jwks = projectAuthorityCertificateJwks(trust);
+    const rendered = JSON.stringify({ keySet, jwks });
+
+    expect(keySet.authorityCreated).toBe(false);
+    expect(keySet.trustDecision).toBe("caller_pinned_trust_material_only");
+    expect(keySet.keys).toHaveLength(2);
+    expect(keySet.omittedPrivateKeyCount).toBe(1);
+    expect(jwks.authorityCreated).toBe(false);
+    expect(jwks.trustDecision).toBe("jwks_projection_only");
+    expect(jwks.jwks.keys).toHaveLength(2);
+    expect(jwks.jwks.keys[0]).toMatchObject({ kty: "OKP", crv: "Ed25519", alg: "EdDSA", use: "sig" });
+    expect(rendered).not.toContain("dev-secret-must-not-project");
+    expect(rendered).not.toContain("privateKey");
+    expect(rendered).not.toContain("hmacSecret");
   });
 });
 

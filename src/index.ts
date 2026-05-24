@@ -40,6 +40,8 @@ export {
 export {
   authorityCertificateSigningInputDigest,
   buildAuthorityCertificateSigningInput,
+  projectAuthorityCertificateJwks,
+  projectAuthorityCertificateVerifierKeySet,
   verifyAuthorityCertificate,
   type VerifyAuthorityCertificateResult,
 } from "./protocol/areas/authority-certificate";

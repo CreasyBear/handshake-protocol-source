@@ -22,9 +22,11 @@ export async function verifyCertificateCommand(input: { certificate: unknown; tr
     refusalRefs: verification.envelope?.refusalRefs ?? [],
     result: {
       verificationValid: verification.valid,
+      verificationOutcome: verification.outcome,
       signingInputDigest: verification.signingInputDigest,
       actionClass: verification.envelope?.actionClass ?? null,
       receiptRef: verification.envelope?.receiptRef ?? null,
+      checks: verification.checks,
       failureCodes: verification.failures.map((failure) => failure.code),
       failureRefs: verification.failures.map((failure) => failure.ref),
     },

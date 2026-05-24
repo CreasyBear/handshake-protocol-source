@@ -175,7 +175,12 @@ the derived signing-input digest.
 
 `verifyAuthorityCertificate()` verifies the exported certificate with pinned
 trust material and no protocol-store dependency. Production verification rejects
-HMAC and propose-time `contractSignature` as portable authority.
+HMAC and propose-time `contractSignature` as portable authority. The verifier
+reports `verified`, `refused`, or `proof_gap` with explicit cryptographic,
+artifact-binding, terminal-binding, gateway-admission, trust-material, and
+status checks. Native verifier key-set and JWKS projections expose public
+verification material only; they do not fetch remote trust, mutate status, or
+create cross-org trust.
 
 ## Conflict Semantics
 
