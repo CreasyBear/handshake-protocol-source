@@ -8,6 +8,7 @@ const decisions = readFileSync("docs/internal/decisions.md", "utf8");
 
 assert.match(pkg.description, /protected action infrastructure for automated decision making/i);
 assert.doesNotMatch(pkg.description, /engineering agents/i);
+assert.equal(pkg.license, "Apache-2.0");
 assert.ok(pkg.keywords.includes("protected-actions"));
 assert.ok(pkg.keywords.includes("automated-decision-making"));
 assert.notEqual(pkg.private, true);
@@ -27,6 +28,7 @@ for (const state of ["ready_to_publish", "actually_published", "registry_discove
 }
 
 assert.match(decisions, /PackageReleaseProof/);
+assert.match(decisions, /Apache-2\.0/);
 assert.match(decisions, /npm publish has occurred for the exact package\s+and\s+version/);
 assert.match(decisions, /MCP Registry metadata has been accepted/);
 assert.match(decisions, /Publication does not create authority/);

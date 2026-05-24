@@ -4,23 +4,11 @@ import { readFileSync } from "node:fs";
 const requiredFiles = [
   "package.json",
   "server.json",
+  "LICENSE",
+  "NOTICE",
   "bin/handshake",
   "bin/handshake-mcp",
   "README.md",
-  "QUALITY.md",
-  "STRUCTURE.md",
-  "docs/internal/decisions.md",
-  "docs/internal/protocol-definition.md",
-  "docs/internal/protocol-kernel-architecture.md",
-  "docs/internal/protocol-layman.md",
-  "docs/internal/protocol-notes.md",
-  "src/index.ts",
-  "src/conformance/index.ts",
-  "src/runtime/index.ts",
-  "src/sdk/surface-clients/index.ts",
-  "src/cli/index.ts",
-  "src/mcp/index.ts",
-  "src/experimental.ts",
   "dist/index.mjs",
   "dist/conformance/index.mjs",
   "dist/runtime/index.mjs",
@@ -44,7 +32,12 @@ const forbiddenPathFragments = [
   ".planning/",
   ".agents/",
   "skills-lock.json",
+  "src/",
   "test/",
+  "scripts/",
+  "examples/",
+  "migrations/",
+  "docs/internal/",
   "docs/adr/",
   "docs/audits/",
   "docs/business/",
@@ -53,7 +46,16 @@ const forbiddenPathFragments = [
   "docs/protocol/",
   "docs/reference/",
   "docs/specs/",
+  "QUALITY.md",
+  "STRUCTURE.md",
+  "AGENTS.md",
+  "bun.lock",
+  "tsconfig",
+  ".github/",
 ];
+
+const allowedExactFiles = new Set(["package.json", "server.json", "LICENSE", "NOTICE", "README.md"]);
+const allowedPathPrefixes = ["bin/", "dist/"];
 
 const pack = spawnSync("npm", ["pack", "--dry-run", "--json"], {
   encoding: "utf8",
@@ -73,18 +75,29 @@ const missingFiles = requiredFiles.filter((file) => !packageFiles.has(file));
 const forbiddenFiles = [...packageFiles].filter((file) =>
   forbiddenPathFragments.some((fragment) => file.includes(fragment)),
 );
+const nonAllowlistedFiles = [...packageFiles].filter(
+  (file) => !allowedExactFiles.has(file) && !allowedPathPrefixes.some((prefix) => file.startsWith(prefix)),
+);
 
 if (packageJson.private === true) {
   process.stderr.write("Package dry-run cannot be publish-ready while package.json private is true.\n");
   process.exit(1);
 }
 
-if (missingFiles.length > 0 || forbiddenFiles.length > 0) {
+if (packageJson.license !== "Apache-2.0") {
+  process.stderr.write("Package license must be Apache-2.0 before public distribution.\n");
+  process.exit(1);
+}
+
+if (missingFiles.length > 0 || forbiddenFiles.length > 0 || nonAllowlistedFiles.length > 0) {
   if (missingFiles.length > 0) {
     process.stderr.write(`Package dry-run is missing required files:\n${missingFiles.join("\n")}\n`);
   }
   if (forbiddenFiles.length > 0) {
     process.stderr.write(`Package dry-run includes forbidden files:\n${forbiddenFiles.join("\n")}\n`);
+  }
+  if (nonAllowlistedFiles.length > 0) {
+    process.stderr.write(`Package dry-run includes non-allowlisted files:\n${nonAllowlistedFiles.join("\n")}\n`);
   }
   process.exit(1);
 }

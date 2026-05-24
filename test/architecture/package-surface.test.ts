@@ -4,13 +4,13 @@ import serverJson from "../../server.json";
 
 type PackageExport = {
   types: string;
-  bun: string;
   import: string;
   default: string;
 };
 
 type PackageJson = {
   description: string;
+  license: string;
   private?: boolean;
   keywords: string[];
   types: string;
@@ -34,6 +34,7 @@ const deletedBusinessDocsPath = ["docs", "business"].join("/");
 describe("package surface", () => {
   it("declares publishable protocol, CLI, and MCP entrypoints without exposing source-only authority", () => {
     expect(pkg.private).not.toBe(true);
+    expect(pkg.license).toBe("Apache-2.0");
     expect(pkg.description).toContain("Protected action infrastructure for automated decision making");
     expect(pkg.description).not.toMatch(/engineering agents/i);
     expect(pkg.keywords).toEqual(expect.arrayContaining(["protected-actions", "automated-decision-making"]));
@@ -46,67 +47,53 @@ describe("package surface", () => {
     });
     expect(pkg.exports["."]).toEqual({
       types: "./dist/index.d.ts",
-      bun: "./src/index.ts",
       import: "./dist/index.mjs",
       default: "./dist/index.mjs",
     });
     expect(pkg.exports["./conformance"]).toEqual({
       types: "./dist/conformance/index.d.ts",
-      bun: "./src/conformance/index.ts",
       import: "./dist/conformance/index.mjs",
       default: "./dist/conformance/index.mjs",
     });
     expect(pkg.exports["./runtime"]).toEqual({
       types: "./dist/runtime/index.d.ts",
-      bun: "./src/runtime/index.ts",
       import: "./dist/runtime/index.mjs",
       default: "./dist/runtime/index.mjs",
     });
     expect(pkg.exports["./sdk/role-clients"]).toEqual({
       types: "./dist/sdk/surface-clients/index.d.ts",
-      bun: "./src/sdk/surface-clients/index.ts",
       import: "./dist/sdk/surface-clients/index.mjs",
       default: "./dist/sdk/surface-clients/index.mjs",
     });
     expect(pkg.exports["./cli"]).toEqual({
       types: "./dist/cli/index.d.ts",
-      bun: "./src/cli/index.ts",
       import: "./dist/cli/index.mjs",
       default: "./dist/cli/index.mjs",
     });
     expect(pkg.exports["./mcp"]).toEqual({
       types: "./dist/mcp/index.d.ts",
-      bun: "./src/mcp/index.ts",
       import: "./dist/mcp/index.mjs",
       default: "./dist/mcp/index.mjs",
     });
     expect(pkg.exports["./experimental"]).toEqual({
       types: "./dist/experimental.d.ts",
-      bun: "./src/experimental.ts",
       import: "./dist/experimental.mjs",
       default: "./dist/experimental.mjs",
     });
     expect(pkg.exports["./package.json"]).toBe("./package.json");
   });
 
-  it("keeps packable files to source, generated declarations, and compact canon", () => {
-    expect(pkg.files).toEqual([
-      "bin",
-      "src",
-      "dist",
-      "server.json",
-      "README.md",
-      "QUALITY.md",
-      "STRUCTURE.md",
-      "docs/internal/decisions.md",
-      "docs/internal/protocol-definition.md",
-      "docs/internal/protocol-kernel-architecture.md",
-      "docs/internal/protocol-layman.md",
-      "docs/internal/protocol-notes.md",
-    ]);
+  it("keeps packable files to runtime artifacts, metadata, README, and license notices", () => {
+    expect(pkg.files).toEqual(["bin", "dist", "server.json", "README.md", "LICENSE", "NOTICE"]);
+    expect(pkg.files).not.toContain("src");
     expect(pkg.files).not.toContain("test");
+    expect(pkg.files).not.toContain("examples");
+    expect(pkg.files).not.toContain("scripts");
     expect(pkg.files).not.toContain(".planning");
     expect(pkg.files).not.toContain(".agents");
+    expect(pkg.files).not.toContain("docs/internal/decisions.md");
+    expect(pkg.files).not.toContain("QUALITY.md");
+    expect(pkg.files).not.toContain("STRUCTURE.md");
     expect(pkg.files).not.toContain(deletedBusinessDocsPath);
   });
 

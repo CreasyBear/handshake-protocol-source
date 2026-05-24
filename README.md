@@ -196,6 +196,18 @@ package installs have a server-shaped default executable. Both entrypoints run
 from bundled Node artifacts under `dist/`; they are not source-only Bun
 shortcuts.
 
+Public npm package contents are intentionally slim. The package includes only
+`bin/`, bundled/generated `dist/` artifacts, `server.json`, `README.md`,
+`LICENSE`, and `NOTICE`. It does not ship `src/`, tests, examples, scripts,
+`.planning/`, repo-internal docs, or local quality/structure manifests. The
+repo remains the source-of-truth workbench; the npm package is the installable
+runtime, CLI, MCP metadata, and typed import surface.
+
+The package is licensed under Apache-2.0. The license covers the distributed
+software package; it does not create any hosted enforcement, provider custody,
+marketplace certification, trust service, or trademark grant beyond the
+license terms.
+
 MCP Registry publication metadata:
 
 ```text
@@ -214,19 +226,20 @@ hosted operation, and not provider custody.
 Public release proof states are source-owned and separate:
 
 - `ready_to_publish`: local pack shape, metadata sync, CLI/MCP smoke, account
-  namespace posture, provenance posture, and authority-boundary checks have
-  evidence.
+  namespace posture, provenance posture, license posture, package-surface
+  allowlist, and authority-boundary checks have evidence.
 - `actually_published`: npm publish has occurred for the exact package/version
   and a clean installed-artifact smoke has passed.
 - `registry_discoverable`: MCP Registry metadata has been accepted and
   discoverability has been verified.
 
-These states are tracked by `PackageReleaseProof`. Publication distributes
-proposal, evidence, read surfaces, and metadata only; it does not create
-authority, policy decisions, greenlights, gateway checks, mutations, custody,
-hosted operation, marketplace certification, settlement, payment management,
-trust, or host-wide enforcement. Missing account, 2FA, provenance, publish, or
-registry evidence is a proof gap, not release success.
+These states are tracked by `PackageReleaseProof`. Publication distributes the
+Apache-2.0 package artifacts, proposal/evidence/read surfaces, and metadata
+only; it does not create authority, policy decisions, greenlights, gateway
+checks, mutations, custody, hosted operation, marketplace certification,
+settlement, payment management, trust, or host-wide enforcement. Missing
+account, 2FA, provenance, license, package-surface, publish, or registry
+evidence is a proof gap, not release success.
 
 Model-facing MCP reference transcript:
 

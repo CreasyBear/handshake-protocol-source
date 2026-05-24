@@ -4,7 +4,6 @@ import packageJson from "../../package.json";
 
 type PackageExport = {
   types: string;
-  bun: string;
   import: string;
   default: string;
 };
@@ -25,7 +24,6 @@ describe("claim boundary", () => {
 
     expect(pkg.exports["./runtime"]).toEqual({
       types: "./dist/runtime/index.d.ts",
-      bun: "./src/runtime/index.ts",
       import: "./dist/runtime/index.mjs",
       default: "./dist/runtime/index.mjs",
     });

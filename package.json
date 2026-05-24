@@ -1,8 +1,8 @@
 {
   "name": "handshake-protocol-kernel",
-  "version": "0.2.4",
+  "version": "0.2.5",
   "description": "Protected action infrastructure for automated decision making: protocol kernel, CLI evidence views, and local MCP proposal/evidence server.",
-  "license": "UNLICENSED",
+  "license": "Apache-2.0",
   "mcpName": "io.github.joelchan/handshake-protocol-kernel",
   "keywords": [
     "agents",
@@ -14,8 +14,7 @@
     "x402"
   ],
   "engines": {
-    "node": ">=20",
-    "bun": ">=1.3.9"
+    "node": ">=20"
   },
   "type": "module",
   "types": "./dist/index.d.ts",
@@ -27,43 +26,36 @@
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "bun": "./src/index.ts",
       "import": "./dist/index.mjs",
       "default": "./dist/index.mjs"
     },
     "./conformance": {
       "types": "./dist/conformance/index.d.ts",
-      "bun": "./src/conformance/index.ts",
       "import": "./dist/conformance/index.mjs",
       "default": "./dist/conformance/index.mjs"
     },
     "./runtime": {
       "types": "./dist/runtime/index.d.ts",
-      "bun": "./src/runtime/index.ts",
       "import": "./dist/runtime/index.mjs",
       "default": "./dist/runtime/index.mjs"
     },
     "./sdk/role-clients": {
       "types": "./dist/sdk/surface-clients/index.d.ts",
-      "bun": "./src/sdk/surface-clients/index.ts",
       "import": "./dist/sdk/surface-clients/index.mjs",
       "default": "./dist/sdk/surface-clients/index.mjs"
     },
     "./cli": {
       "types": "./dist/cli/index.d.ts",
-      "bun": "./src/cli/index.ts",
       "import": "./dist/cli/index.mjs",
       "default": "./dist/cli/index.mjs"
     },
     "./mcp": {
       "types": "./dist/mcp/index.d.ts",
-      "bun": "./src/mcp/index.ts",
       "import": "./dist/mcp/index.mjs",
       "default": "./dist/mcp/index.mjs"
     },
     "./experimental": {
       "types": "./dist/experimental.d.ts",
-      "bun": "./src/experimental.ts",
       "import": "./dist/experimental.mjs",
       "default": "./dist/experimental.mjs"
     },
@@ -71,17 +63,11 @@
   },
   "files": [
     "bin",
-    "src",
     "dist",
     "server.json",
     "README.md",
-    "QUALITY.md",
-    "STRUCTURE.md",
-    "docs/internal/decisions.md",
-    "docs/internal/protocol-definition.md",
-    "docs/internal/protocol-kernel-architecture.md",
-    "docs/internal/protocol-layman.md",
-    "docs/internal/protocol-notes.md"
+    "LICENSE",
+    "NOTICE"
   ],
   "packageManager": "bun@1.3.9",
   "scripts": {
