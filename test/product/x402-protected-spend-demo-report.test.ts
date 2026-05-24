@@ -137,8 +137,15 @@ describe("x402 protected spend demo report", () => {
       "evidence:x402-local-sandbox-signed-retry:1",
     );
     expect(output.report.nonClaims).toContain("clearing-house readiness");
-    expect(output.report.missingProofObjects.map((entry: { proofObject: string }) => entry.proofObject)).toContain(
+    expect(output.report.nonClaims).toContain("aggregate payment-budget management");
+    expect(output.report.missingProofObjects.map((entry: { proofObject: string }) => entry.proofObject)).not.toContain(
       "spend reservation ledger",
+    );
+    expect(
+      output.report.missingProofObjects.map((entry: { requiredBeforeClaim: string }) => entry.requiredBeforeClaim),
+    ).not.toContain("session/day/review aggregate spend enforcement");
+    expect(JSON.stringify(output.report)).not.toMatch(
+      /spend reservation ledger|session\/day\/review aggregate spend enforcement/i,
     );
     expect(JSON.stringify(output.report)).not.toContain(`0x${"a".repeat(130)}`);
 

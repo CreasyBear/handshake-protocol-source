@@ -223,7 +223,7 @@ and package-install dispatch boundaries, and provider-neutral gateway credential
 ref/resolution evidence records. It enforces x402 per-call spend only. It does
 not prove live provider custody, live vault-provider operation, broad
 MCP/CLI/browser/shell/network runtime interception, hosted operation, external
-package-material verification, x402 spend-window ledger enforcement, cross-org
+package-material verification, aggregate payment-budget management, cross-org
 AuthorityCertificate trust, live JWKS/revocation, or hosted verifier operation.
 The local source foundation does include AuthorityCertificate minting and
 offline pinned-key verification.

@@ -8,6 +8,8 @@ For the canonical definition, see `docs/internal/protocol-definition.md`. For th
 
 Every consequential mutation attempt must be reduced to an exact, inspectable, policy-evaluated, gateway-bound action contract before consequence.
 
+Handshake's category is protected actions for automated decision making.
+
 ## Required Separation
 
 - Vague intent is not an operating envelope.
@@ -36,7 +38,7 @@ runtime execution evidence
 
 ## System Design Posture
 
-Use case: reduce generated engineering-agent execution into exact protected-action authority decisions.
+Use case: reduce automated-decision execution, including generated engineering-agent execution, into exact protected-action authority decisions.
 
 Constraints and assumptions:
 
@@ -131,8 +133,9 @@ Protocol areas may depend on foundation/events/context/store and other area publ
   and local hostile bypass/custody probe coverage under experimental/reference
   adapter surfaces. The signed retry is downstream fixture observation after
   gateway-created signature evidence, not a policy, greenlight, gateway, or
-  signing authority. It enforces per-call spend only; session/day/review windows
-  are metadata until a ledger exists. This is not live provider custody.
+  signing authority. It enforces per-call spend only; aggregate payment-budget
+  management is intentionally outside the current remit, and any local spend
+  window fields are non-enforced metadata. This is not live provider custody.
 - Protected mutation adapter conformance lives under the `./conformance` package subpath.
 - The auth.md adapter profile lives under the experimental/reference adapter
   surface. It treats the OAuth protected-resource to authorization-server

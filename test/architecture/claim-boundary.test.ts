@@ -50,12 +50,22 @@ describe("claim boundary", () => {
   });
 
   it("requires docs to state local runtime ingress without provider or hosted claims", () => {
+    const agents = readFileSync("AGENTS.md", "utf8");
     const readme = readFileSync("README.md", "utf8");
+    const decisions = readFileSync("docs/internal/decisions.md", "utf8");
+    const protocolNotes = readFileSync("docs/internal/protocol-notes.md", "utf8");
     const x402Walkthrough = readFileSync("examples/x402-protected-spend/README.md", "utf8");
     const runtimeLane = readFileSync("src/runtime/LANE.md", "utf8");
     const conformanceLane = readFileSync("src/conformance/LANE.md", "utf8");
     const adaptersLane = readFileSync("src/adapters/LANE.md", "utf8");
+    const canonicalDocs = [agents, readme, decisions, protocolNotes].join("\n--- canonical-doc-boundary ---\n");
 
+    for (const doc of [agents, readme, decisions, protocolNotes]) {
+      expect(doc).toContain("protected actions for automated decision making");
+    }
+    expect(canonicalDocs).not.toMatch(/Handshake is contracted execution infrastructure for engineering agents/i);
+    expect(canonicalDocs).not.toMatch(/first (?:credible domain|wedge) (?:remains|is) engineering-agent actions/i);
+    expect(canonicalDocs).not.toMatch(/use case: convert generated engineering-agent execution/i);
     expect(readme).toContain("narrow official x402 exact buyer-side proof path");
     expect(readme).toContain("one official buyer-side `exact` per-call path");
     expect(readme).toContain("package install remains a regression fixture");
@@ -68,7 +78,8 @@ describe("claim boundary", () => {
     expect(readme).toContain("source-owned local MCP stdio proposal/evidence process proof");
     expect(readme).toContain("facilitator operation, seller middleware, unsupported x402 schemes");
     expect(readme).toContain("cross-org AuthorityCertificate trust, live JWKS/revocation, hosted verifier operation");
-    expect(readme).toContain("session/day/review spend windows are metadata until a ledger exists");
+    expect(readme).toContain("aggregate payment-budget management is intentionally outside the current remit");
+    expect(readme).not.toMatch(/session\/day\/review spend windows are metadata until a ledger exists/i);
     expect(readme).not.toMatch(/\bx402 compatible\b/i);
     expect(readme).not.toMatch(/package install (?:is|as) (?:the )?first wedge/i);
     expect(runtimeLane).toContain("It must not issue policy decisions, greenlights, gateway checks, receipts");
@@ -84,6 +95,8 @@ describe("claim boundary", () => {
     expect(x402Walkthrough).toContain("VerifiedGatewayCheck");
     expect(x402Walkthrough).toContain("Replay refusal");
     expect(x402Walkthrough).toContain("Proof gap projection");
+    expect(x402Walkthrough).toContain("No aggregate payment-budget management");
+    expect(x402Walkthrough).not.toMatch(/aggregate x402 spend windows/i);
     expect(x402Walkthrough).toContain("Do not classify `upto` as `x402_payment.exact`");
     expect(x402Walkthrough).toContain("Do not classify batch settlement as `x402_payment.exact`");
     expect(x402Walkthrough).toContain("signed offers");

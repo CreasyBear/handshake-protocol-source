@@ -76,7 +76,7 @@ const officialPaymentRequired = {
   x402Version: 2,
   resource: {
     url: "https://api.example.com/mcp/premium-context",
-    description: "Premium context for one generated engineering-agent request",
+    description: "Premium context for one generated automated-decision request",
     mimeType: "application/json",
   },
   accepts: [
@@ -455,7 +455,7 @@ function buyerReadableApsReport() {
       "hosted operation",
       "provider custody",
       "customer custody",
-      "aggregate spend-window enforcement",
+      "aggregate payment-budget management",
       "payment settlement finality",
       "broad x402 compatibility",
       "seller middleware",
@@ -469,10 +469,6 @@ function buyerReadableApsReport() {
       {
         proofObject: "external custody proof packet",
         requiredBeforeClaim: "provider/customer gateway custody",
-      },
-      {
-        proofObject: "spend reservation ledger",
-        requiredBeforeClaim: "session/day/review aggregate spend enforcement",
       },
       {
         proofObject: "hosted verifier and trust material distribution",
@@ -930,7 +926,7 @@ function demoMarkdown(outputValue: typeof output): string {
   lines.push("## Cut Line");
   lines.push("");
   lines.push(
-    "This output is local evidence only. It does not claim hosted operation, provider custody, aggregate spend-window enforcement, settlement finality, or cross-org certificate trust.",
+    "This output is local evidence only. It does not claim hosted operation, provider custody, aggregate payment-budget management, settlement finality, or cross-org certificate trust.",
   );
   lines.push("");
   return `${lines.join("\n")}\n`;

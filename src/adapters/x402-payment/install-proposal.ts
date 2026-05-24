@@ -316,7 +316,7 @@ function buildHumanSummary(input: z.infer<typeof X402InstallProposalInputSchema>
   return [
     `This agent/runtime may propose x402 payments to ${endpointDomain} for payee ${endpointEvidence.payee}.`,
     `Payments must use ${endpointEvidence.token} on ${endpointEvidence.network} through wallet gateway ${walletGatewayProfile.gatewayId}.`,
-    `The enforced per-call bound is ${spendBounds.maxAtomicAmountPerCall} atomic units, session/day/review windows are metadata, and the agent will not receive signing authority.`,
+    `The enforced per-call bound is ${spendBounds.maxAtomicAmountPerCall} atomic units, aggregate payment-budget management is outside current remit, local spend-window fields are non-enforced metadata, and the agent will not receive signing authority.`,
   ].join(" ");
 }
 

@@ -4,7 +4,7 @@ export const cliNonClaims = [
   "hosted operation",
   "provider custody",
   "payment settlement finality",
-  "aggregate spend-window enforcement",
+  "aggregate payment-budget management",
   "broad x402 compatibility",
   "broad MCP/CLI/browser/shell/network control",
   "marketplace certification",

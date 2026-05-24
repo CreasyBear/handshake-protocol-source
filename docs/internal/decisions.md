@@ -33,7 +33,8 @@ Files under `.agents/skills` are tool assets. They are not product truth.
 
 ## Product Kernel
 
-Handshake is contracted execution infrastructure for engineering agents.
+Handshake is protected action infrastructure for automated decision making.
+The category is protected actions for automated decision making.
 
 The current kernel centers on protected action control:
 
@@ -45,11 +46,13 @@ exact action contract
 -> receipt, refusal, or proof gap
 ```
 
-The first credible domain remains engineering-agent actions: x402 payments,
-preview deploys, package installs, CI/release changes, repository writes with
-downstream consequence, cloud configuration mutations, and database/data-plane
-operations. Current adapter families are proof profiles and regression lanes.
-No adapter family defines the protocol shape.
+The first official wedge is one buyer-side `x402_payment.exact` per-call
+protected action. Engineering-agent actions remain an adoption context and
+generated-execution stress case: preview deploys, package installs, CI/release
+changes, repository writes with downstream consequence, cloud configuration
+mutations, and database/data-plane operations are adjacent proof contexts, not
+the category boundary. Current adapter families are proof profiles and
+regression lanes. No adapter family defines the protocol shape.
 
 ## Foundation Status
 

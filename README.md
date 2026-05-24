@@ -1,6 +1,7 @@
 # Handshake Protocol Kernel
 
-Handshake is contracted execution infrastructure for engineering agents.
+Handshake is protected action infrastructure for automated decision making.
+The category is protected actions for automated decision making; engineering-agent workflows are an adoption and generated-execution stress context, not the product boundary.
 
 Last canonical audit: 2026-05-24.
 
@@ -22,7 +23,7 @@ vague principal intent
 
 The kernel does not claim hosted operation, provider-side enforcement, broad agent governance, or downstream business success. A path is protected only when the gateway owns the mutation credential and verifies the exact greenlight before mutation.
 
-Current local foundation status: source and tests cover the protected-action kernel chain, derived lifecycle evidence, idempotency ledger, redacted evidence projections including agent transaction envelopes, terminal AuthorityCertificate minting and offline pinned-key verification, package-install supply-chain gate binding, the narrow official x402 exact buyer-side proof path through D1/HTTP durable evidence, a local/reference paid-HTTP sandbox that emits an official-shaped 402 challenge and observes one signed retry only after gateway-created signature evidence, official x402 SDK signer-custody/bypass probes, public runtime ingress for local x402 payment and package-install dispatch boundaries, a source-owned local MCP stdio proposal/evidence process proof, and publishable Node-bundled CLI/MCP entrypoints with MCP Registry metadata. x402 coverage is one official buyer-side `exact` per-call path with local/reference sandbox challenge/retry evidence and gateway-held `PaymentPayload` / `PAYMENT-SIGNATURE` creation after `VerifiedGatewayCheck`; package install remains a regression fixture. No adapter family defines the protocol. This is local kernel foundation, not broad x402 compatibility, not live provider custody, hosted operation, generic MCP/runtime control, external package-material attestation, cross-org AuthorityCertificate trust, live JWKS/revocation, hosted verifier operation, facilitator operation, seller middleware, unsupported x402 schemes, marketplace/certification, or spend-window ledger enforcement. Runtime ingress and MCP are observer/compiler/proposal evidence surfaces and current x402 spend enforcement is per-call only; session/day/review spend windows are metadata until a ledger exists.
+Current local foundation status: source and tests cover the protected-action kernel chain, derived lifecycle evidence, idempotency ledger, redacted evidence projections including agent transaction envelopes, terminal AuthorityCertificate minting and offline pinned-key verification, package-install supply-chain gate binding, the narrow official x402 exact buyer-side proof path through D1/HTTP durable evidence, a local/reference paid-HTTP sandbox that emits an official-shaped 402 challenge and observes one signed retry only after gateway-created signature evidence, official x402 SDK signer-custody/bypass probes, public runtime ingress for local x402 payment and package-install dispatch boundaries, a source-owned local MCP stdio proposal/evidence process proof, and publishable Node-bundled CLI/MCP entrypoints with MCP Registry metadata. x402 coverage is one official buyer-side `exact` per-call path with local/reference sandbox challenge/retry evidence and gateway-held `PaymentPayload` / `PAYMENT-SIGNATURE` creation after `VerifiedGatewayCheck`; package install remains a regression fixture. No adapter family defines the protocol. This is local kernel foundation, not broad x402 compatibility, not live provider custody, hosted operation, generic MCP/runtime control, external package-material attestation, cross-org AuthorityCertificate trust, live JWKS/revocation, hosted verifier operation, facilitator operation, seller middleware, unsupported x402 schemes, marketplace/certification, or aggregate payment-budget management. Runtime ingress and MCP are observer/compiler/proposal evidence surfaces and current x402 spend enforcement is per-call only; aggregate payment-budget management is intentionally outside the current remit.
 
 ## Repo Truth
 
@@ -50,7 +51,7 @@ Operational enforcement surfaces:
 
 This repo treats platform aesthetics as system design clarity:
 
-- use case: convert generated engineering-agent execution into exact protected-action authority decisions;
+- use case: convert automated-decision execution, including generated engineering-agent execution, into exact protected-action authority decisions;
 - constraints: generated code may branch, retry, overreach, or hide consequence inside tool calls;
 - high-level design: runtime evidence -> protocol kernel -> durable store -> HTTP transport -> gateway adapters;
 - tradeoff: consistency beats availability for authority-bearing transitions;
@@ -145,7 +146,7 @@ check, replay refusal, proof-gap posture, CLI evidence readbacks, local terminal
 certificate verification, MCP reference transcript, and real local MCP stdio
 process proof. This is a self-hosted local packet only: not hosted operation,
 not provider/customer custody, not broad MCP/browser/shell/network/package
-manager protection, not spend-window ledger enforcement, not WorkOS/auth.md
+manager protection, not aggregate payment-budget management, not WorkOS/auth.md
 attestation, not cross-org certificate trust, and not a clearing-house claim.
 
 Component x402 protected-action walkthrough:
@@ -166,7 +167,7 @@ contract, policy decision, gateway check, post-gate signed retry evidence,
 replay refusal, proof-gap posture, redacted evidence refs, and local terminal
 certificate verification. This is local/reference evidence only: not hosted
 operation, not broad x402 compatibility, not provider custody, not aggregate
-spend enforcement, not cross-org trust, and not a clearing-house claim.
+payment-budget management, not cross-org trust, and not a clearing-house claim.
 
 Role-scoped SDK activation imports:
 

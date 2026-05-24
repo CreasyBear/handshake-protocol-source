@@ -133,7 +133,7 @@ permission.
 
 It does not prove a live hosted service, a real external payment provider
 gateway, live vault-provider custody, generic MCP/runtime control, x402
-spend-window ledger enforcement, or independent package-material verification.
+aggregate payment-budget management, or independent package-material verification.
 It does include local AuthorityCertificate minting and offline pinned-key
 verification, but not cross-org trust, live key revocation, hosted verify APIs,
 marketplace certification, or provider custody.

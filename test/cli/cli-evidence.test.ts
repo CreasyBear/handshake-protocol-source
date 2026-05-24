@@ -274,8 +274,8 @@ function apsReport() {
         terminalKind: "receipt",
         verificationValid: true,
       },
-      nonClaims: ["hosted operation", "clearing-house readiness"],
-      missingProofObjects: [{ proofObject: "spend reservation ledger" }],
+      nonClaims: ["hosted operation", "clearing-house readiness", "aggregate payment-budget management"],
+      missingProofObjects: [],
     },
     phases: [
       { phase: "1_runtime_proposal", verdict: "pass" },

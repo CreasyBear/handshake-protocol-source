@@ -1,7 +1,7 @@
 # x402 Protected Spend Local Walkthrough
 
 Status: local/reference official exact walkthrough
-Scope: one official buyer-side `x402_payment.exact` protected spend attempt from generated engineering-agent execution evidence
+Scope: one official buyer-side `x402_payment.exact` protected spend attempt from generated automated-decision execution evidence
 Report proof object: `x402_paid_http_call.exact` as a buyer-readable label; source code still uses `x402_payment.exact`.
 
 ## Invariant At Stake
@@ -38,7 +38,7 @@ generated wrapped_x402_payment dispatch
 
 - No hosted operation.
 - No provider custody.
-- No aggregate x402 spend windows.
+- No aggregate payment-budget management.
 - No broad x402 compatibility.
 - No facilitator operation, seller middleware, `upto`, or batch settlement support.
 - No external customer gateway installation.
@@ -147,7 +147,7 @@ npm run test -- test/protocol/representation-contract.test.ts
 ## Cut Lines
 
 - Do not turn x402 into the protocol.
-- Do not describe session/day/review spend bounds as enforced until a ledger exists.
+- Do not frame session/day/review spend bounds as a pending product requirement; aggregate payment-budget management is outside the current remit.
 - Do not classify `upto` as `x402_payment.exact`; it needs max authorization plus actual-settlement evidence.
 - Do not classify batch settlement as `x402_payment.exact`; it needs channel, voucher, claim, and refund state.
 - Do not include lifecycle hooks, MCP auto-pay, signed offers, signed receipts, seller middleware, or facilitator operation in this first wedge.

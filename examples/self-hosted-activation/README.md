@@ -15,4 +15,4 @@ The command writes:
 
 It composes the existing x402 protected-spend proof, CLI evidence readbacks, the MCP reference transcript, and a real local MCP stdio process proof.
 
-This packet is still local reference evidence. It does not claim hosted operation, provider custody, customer custody, cross-org certificate trust, aggregate spend-window enforcement, WorkOS/auth.md attestation, clearing-house readiness, or broad MCP/browser/shell/network/package-manager protection.
+This packet is still local reference evidence. It does not claim hosted operation, provider custody, customer custody, cross-org certificate trust, aggregate payment-budget management, WorkOS/auth.md attestation, clearing-house readiness, or broad MCP/browser/shell/network/package-manager protection.
