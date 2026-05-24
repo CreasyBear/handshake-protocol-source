@@ -8,7 +8,7 @@ and gateway-bound credential use. Mutation-capable adapters run only after a
 
 ## Current proof claim
 
-Reference gateway fixtures and adapter-pack proofs for package install, repo write, preview deploy, external payment signing behavior, and auth.md credential-registration/protected-call profiles. The package-install material adapter pack projects exact action, authority, contract, evidence, outcome, proof-gap, reconstruction, and bypass-posture evidence after gateway observed-parameter validation. The auth.md lane now includes a protected API-call gateway fixture that records redacted credential-resolution evidence only after a verified gate, adapter-owned lifecycle isolation mapping, and hostile bypass probe executors. These are proof lanes, not production provider integrations or standards certification claims.
+Reference gateway fixtures and adapter-pack proofs for package install, repo write, preview deploy, external payment signing behavior, and auth.md credential-registration/protected-call profiles. The package-install material adapter pack projects exact action, authority, contract, evidence, outcome, proof-gap, reconstruction, and bypass-posture evidence after gateway observed-parameter validation. The package-manager local host harness binds one named wrapper path, named raw sibling routes, wrapper integrity, gateway binding, freshness, redaction, proof gaps, and non-claims into a fixture-specific bypass proof packet. The auth.md lane now includes a protected API-call gateway fixture that records redacted credential-resolution evidence only after a verified gate, adapter-owned lifecycle isolation mapping, and hostile bypass probe executors. These are proof lanes, not production provider integrations or standards certification claims.
 
 ## Use cases
 
@@ -20,7 +20,7 @@ Adapters that hold consequence must re-check observed parameters against exact c
 
 ## Core components
 
-`auth-md/profiles.ts`, `auth-md/action-proposal.ts`, `auth-md/gateway.ts`, `auth-md/revocation.ts`, `auth-md/bypass-probes.ts`, `package-install/adapter-pack.ts`, `package-install/gateway.ts`, `repo-write/gateway.ts`, `preview-deploy/gateway.ts`, `x402-payment/install-proposal.ts`, `x402-payment/action-proposal.ts`, `x402-payment/wallet-gateway.ts`, `x402-payment/conformance.ts`, and adapter conformance tests.
+`auth-md/profiles.ts`, `auth-md/action-proposal.ts`, `auth-md/gateway.ts`, `auth-md/revocation.ts`, `auth-md/bypass-probes.ts`, `package-install/adapter-pack.ts`, `package-install/gateway.ts`, `package-install/host-harness.ts`, `protected-path-probes/host-fixture.ts`, `repo-write/gateway.ts`, `preview-deploy/gateway.ts`, `x402-payment/install-proposal.ts`, `x402-payment/action-proposal.ts`, `x402-payment/wallet-gateway.ts`, `x402-payment/conformance.ts`, and adapter conformance tests.
 
 ## Failure and scale posture
 
@@ -52,4 +52,4 @@ Extract or rename only after source-lane manifests are guarded, the adapter-lane
 
 ## Scope boundary
 
-This lane proves gateway-side mutation discipline and upstream adapter profile boundaries for fixtures. Package-install material evidence proves exact evidence/report/proof-gap binding only; it must not imply generic adapters, hosted operation, supply-chain safety, npm audit replacement, Bun provenance verification, provider-side enforcement, certification, or mutation authority without a verified gateway check.
+This lane proves gateway-side mutation discipline and upstream adapter profile boundaries for fixtures. Package-install material evidence proves exact evidence/report/proof-gap binding only; host harness evidence proves only the named host/environment/adapter/action/path/raw-sibling routes at the recorded freshness state. It must not imply generic adapters, hosted operation, host-wide containment, package-manager ecosystem protection, supply-chain safety, npm audit replacement, Bun provenance verification, provider-side enforcement, certification, or mutation authority without a verified gateway check.

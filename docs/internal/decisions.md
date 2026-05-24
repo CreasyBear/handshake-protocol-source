@@ -75,6 +75,9 @@ The local foundation includes:
   observed package manager, registry, manifest/lockfile, install flags,
   lifecycle-script posture, resolved material refs, exact gateway binding,
   bypass probe requirements, and proof gaps;
+- package-manager local host-specific bypass manifest and proof packet for one
+  named package-install wrapper, named raw sibling routes, wrapper integrity,
+  freshness, gateway binding, and non-claim posture;
 - local x402 payment D1/HTTP establishment path through install, runtime
   proposal, policy, gateway check, local/reference 402 challenge evidence,
   gateway-created payment signature evidence, local/reference signed retry
@@ -164,7 +167,9 @@ Handshake must not claim:
 - downstream business success from a receipt;
 - portable verification from local HMAC fields;
 - cross-org verifier trust from local fixture keys;
-- control over raw sibling tools, browser paths, shell paths, or credentials outside the installed gateway.
+- control over raw sibling tools, browser paths, shell paths, or credentials outside the installed gateway;
+- host-wide containment or package-manager ecosystem protection from one
+  host-specific bypass harness.
 
 ## Repo Boundary
 

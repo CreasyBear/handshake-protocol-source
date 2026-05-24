@@ -131,6 +131,13 @@ Protocol areas may depend on foundation/events/context/store and other area publ
   proof-gap, reconstruction, and bypass-posture report. This is local evidence
   and proof-gap projection, not package safety, npm-audit replacement, Bun
   provenance verification, or external package-material attestation.
+- The first host-specific bypass harness is a package-manager local fixture. It
+  binds one host, environment, adapter, action type, protected path, wrapper
+  digest, named raw sibling routes, gateway registry, policy, freshness,
+  redaction, and non-claims into a bypass proof packet and report. Its `READY`
+  state is fixture-specific and never proves host-wide containment, package
+  manager ecosystem protection, MCP/CLI/browser/shell/network protection, or
+  x402 ecosystem coverage.
 - Payment-specific protected-action packs live under adapter/plugin lanes, not protocol areas.
 - The payment adapter has a local D1/HTTP establishment path, runtime ingress,
   local/reference paid-HTTP 402 challenge and post-gate signed retry evidence,

@@ -72,6 +72,9 @@ describe("claim boundary", () => {
     expect(readme).toContain("one official buyer-side `exact` per-call path");
     expect(readme).toContain("package-install material adapter pack evidence/report projection");
     expect(readme).toContain("first promoted non-payment adapter pack after x402 exact per-call");
+    expect(readme).toContain("package-manager local host-specific bypass manifest/proof-packet/report");
+    expect(readme).toContain("host-wide containment");
+    expect(readme).toContain("package-manager ecosystem protection");
     expect(readme).toContain("package safety proof");
     expect(readme).toContain("npm audit replacement");
     expect(readme).toContain("Bun provenance verification");
@@ -99,6 +102,8 @@ describe("claim boundary", () => {
     expect(decisions).toMatch(/read\s+entitlements are separate from transition custody/);
     expect(decisions).toMatch(/it is not hosted mutation authority, production readiness/);
     expect(protocolNotes).toMatch(/read-entitlement split for\s+redacted evidence reads/);
+    expect(protocolNotes).toContain("first host-specific bypass harness is a package-manager local fixture");
+    expect(protocolNotes).toContain("never proves host-wide containment");
     expect(protocolArchitecture).toMatch(/The current hosted slice is\s+deployment-mode admission/);
     expect(httpLane).toContain("not hosted mutation authority");
     expect(httpLane).toContain("payment management, settlement, provider custody");
@@ -106,6 +111,9 @@ describe("claim boundary", () => {
     expect(conformanceLane).toContain("does not prove provider-side enforcement");
     expect(adaptersLane).toContain("must not imply generic adapters, hosted operation");
     expect(adaptersLane).toContain("package-install/adapter-pack.ts");
+    expect(adaptersLane).toContain("protected-path-probes/host-fixture.ts");
+    expect(adaptersLane).toContain("named host/environment/adapter/action/path/raw-sibling routes");
+    expect(adaptersLane).toContain("host-wide containment, package-manager ecosystem protection");
     expect(adaptersLane).toContain(
       "Package-install material evidence proves exact evidence/report/proof-gap binding only",
     );
