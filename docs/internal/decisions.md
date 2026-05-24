@@ -210,13 +210,29 @@ Rejected: flat protocol files, compatibility shims, and generic helper buckets. 
 
 Accepted: HTTP admission, caller custody, OpenAPI projection, and route-scope resolution are protocol transport seams. They may model deployment-mode custody and caller roles, but they do not prove hosted operation, production org auth, provider enforcement, or customer gateway installation.
 
-A hosted claim requires a real deployment boundary, credential custody model, customer or provider gateway check, and receipts that distinguish gateway check evidence from downstream execution evidence.
+Current hosted-mode support is explicitly narrower: a deployment-mode config is
+required before hosted routes run, transition roles are allowlisted, read
+entitlements are separate from transition custody, raw reads obey a declared
+raw-read posture, and readiness reports binding/secret posture without secret
+values. This admits exact protected-action transitions and redacted evidence
+reads; it is not hosted mutation authority, production readiness, payment
+management, settlement, provider custody, retention certification, or compliance
+audit.
+
+A hosted operation claim requires a real deployment boundary, credential custody
+model, customer or provider gateway check, D1/KV migration proof, secret
+management proof, and receipts that distinguish gateway check evidence from
+downstream execution evidence.
 
 ## Evidence Read Boundary
 
 Accepted: local HTTP and SDK evidence reads are redacted diagnostic projections,
-not hosted audit/search product surfaces. The active projections are generated
-graph evidence, contract view, agent transaction envelope, receipt timeline,
+not hosted audit/search product surfaces. Hosted mode can require explicit
+read roles and scopes for those same redacted projections, but that
+authorization is a read entitlement only. It is not transition custody, policy
+authority, gateway authority, raw evidence access, receipt export, or proof of
+downstream business success. The active projections are generated graph
+evidence, contract view, agent transaction envelope, receipt timeline,
 idempotency recovery, credential custody/resolution evidence refs, and
 protected-path health.
 

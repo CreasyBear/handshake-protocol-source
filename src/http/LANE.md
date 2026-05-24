@@ -6,15 +6,15 @@ Hono/Worker transition transport: caller custody checks, hosted route admission,
 
 ## Current proof claim
 
-Reference transport proof for local and D1-shaped protocol routes. Hosted caller identity is a provider-agnostic route-admission seam only.
+Reference transport proof for local and D1-shaped protocol routes. Hosted caller identity is a provider-agnostic route-admission seam only; hosted deployment config, read entitlements, raw-read posture, and readiness reports are read/admission posture, not hosted mutation authority.
 
 ## Use cases
 
-Expose protocol transitions and read-only diagnostic evidence, including redacted agent transaction envelopes, over HTTP while preserving custody checks, request context, route metadata, typed errors, and OpenAPI projection.
+Expose protocol transitions and read-only diagnostic evidence, including redacted agent transaction envelopes and hosted readiness posture, over HTTP while preserving custody checks, request context, route metadata, typed errors, and OpenAPI projection.
 
 ## Constraints and assumptions
 
-HTTP callers are not authority by default. Hosted admission can reject or contextualize requests, but policy meaning, gateway authority, and mutation proof remain protocol concerns.
+HTTP callers are not authority by default. Hosted admission can reject or contextualize requests, but policy meaning, gateway authority, mutation proof, payment management, settlement, provider custody, retention certification, and production hosted readiness remain outside this lane.
 
 ## Core components
 
@@ -42,7 +42,7 @@ Protocol area internals, reference gateway implementations, runtime wrappers as 
 
 ## Public surface
 
-`createApp`, `AppOptions`, `WorkerBindings`, role-scoped bearer custody helpers, hosted caller verifier types, OpenAPI document, and public transition/evidence routes.
+`createApp`, `AppOptions`, `WorkerBindings`, role-scoped bearer custody helpers, hosted admission config/readiness types, hosted caller verifier types, OpenAPI document, and public transition/evidence/readiness routes.
 
 ## Extraction trigger
 

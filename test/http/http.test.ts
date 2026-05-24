@@ -34,10 +34,12 @@ import {
   recordUnknownDownstreamProofGap,
 } from "../support/fixtures";
 import { FaultInjectingProtocolStore } from "../support/fault-injecting-protocol-store";
+import { createD1HttpHarness } from "../support/d1-http-harness";
 import {
   DIGEST_B,
   DIGEST_C,
   createGeneratedGraphEvidenceFixture,
+  hostedAdmissionConfig,
   headerHostedVerifier,
   hostedIdentity,
   runtimeExecutionBody,
@@ -571,6 +573,28 @@ describe("Hono protocol surface", () => {
 
     expect(response.status).toBe(503);
     expect(await response.json()).toMatchObject({
+      error: { code: "hosted_admission_config_not_configured", commitState: "not_started" },
+    });
+    expect(store.countRecordsOfType("runtime_execution")).toBe(0);
+    expect(store.countRecordsOfType("transition_request_context")).toBe(0);
+  });
+
+  it("hosted mode refuses missing server verifier after deployment config before parsing request bodies", async () => {
+    const store = new InMemoryProtocolStore();
+    const app = createApp({
+      store,
+      authMode: "hosted",
+      hostedAdmissionConfig: hostedAdmissionConfig(),
+    });
+
+    const response = await app.request("/v0.2/runtime-executions", {
+      method: "POST",
+      headers: jsonHeaders("runtime_evidence"),
+      body: JSON.stringify({ invalid: true }),
+    });
+
+    expect(response.status).toBe(503);
+    expect(await response.json()).toMatchObject({
       error: { code: "hosted_caller_verifier_not_configured", commitState: "not_started" },
     });
     expect(store.countRecordsOfType("runtime_execution")).toBe(0);
@@ -582,6 +606,7 @@ describe("Hono protocol surface", () => {
     const app = createApp({
       store,
       authMode: "hosted",
+      hostedAdmissionConfig: hostedAdmissionConfig(),
       hostedCallerVerifier: headerHostedVerifier(),
     });
 
@@ -609,6 +634,7 @@ describe("Hono protocol surface", () => {
     const app = createApp({
       store,
       authMode: "hosted",
+      hostedAdmissionConfig: hostedAdmissionConfig(),
       hostedCallerVerifier: staticHostedVerifier(hostedIdentity({ custodyRoles: ["control_plane"] })),
     });
 
@@ -632,6 +658,7 @@ describe("Hono protocol surface", () => {
     const app = createApp({
       store,
       authMode: "hosted",
+      hostedAdmissionConfig: hostedAdmissionConfig(),
       hostedCallerVerifier: staticHostedVerifier(
         hostedIdentity({ tenantId: "tenant_other", custodyRoles: ["runtime_evidence"] }),
       ),
@@ -656,6 +683,7 @@ describe("Hono protocol surface", () => {
     const app = createApp({
       store,
       authMode: "hosted",
+      hostedAdmissionConfig: hostedAdmissionConfig(),
       hostedCallerVerifier: staticHostedVerifier(
         hostedIdentity({
           custodyRoles: ["runtime_evidence"],
@@ -678,11 +706,66 @@ describe("Hono protocol surface", () => {
     expect(store.countRecordsOfType("transition_request_context")).toBe(0);
   });
 
+  it("hosted mode rejects stale caller identity using configured freshness before body parsing", async () => {
+    const store = new InMemoryProtocolStore();
+    const app = createApp({
+      store,
+      authMode: "hosted",
+      hostedAdmissionConfig: hostedAdmissionConfig({ maxIdentityAgeSeconds: 30 }),
+      hostedCallerVerifier: staticHostedVerifier(
+        hostedIdentity({
+          custodyRoles: ["runtime_evidence"],
+          issuedAt: new Date(Date.now() - 60_000).toISOString(),
+          expiresAt: futureIso(),
+        }),
+      ),
+    });
+
+    const response = await app.request("/v0.2/runtime-executions", {
+      method: "POST",
+      headers: jsonHeaders("runtime_evidence"),
+      body: JSON.stringify({ invalid: true }),
+    });
+
+    expect(response.status).toBe(412);
+    expect(await response.json()).toMatchObject({
+      error: { code: "hosted_caller_identity_stale", commitState: "not_started" },
+    });
+    expect(store.countRecordsOfType("runtime_execution")).toBe(0);
+    expect(store.countRecordsOfType("transition_request_context")).toBe(0);
+  });
+
+  it("hosted mode rejects transition roles excluded by deployment config before body parsing", async () => {
+    const store = new InMemoryProtocolStore();
+    const app = createApp({
+      store,
+      authMode: "hosted",
+      hostedAdmissionConfig: hostedAdmissionConfig({
+        rolePolicy: { admittedTransitionRoles: ["control_plane"] },
+      }),
+      hostedCallerVerifier: staticHostedVerifier(hostedIdentity({ custodyRoles: ["runtime_evidence"] })),
+    });
+
+    const response = await app.request("/v0.2/runtime-executions", {
+      method: "POST",
+      headers: jsonHeaders("runtime_evidence"),
+      body: JSON.stringify({ invalid: true }),
+    });
+
+    expect(response.status).toBe(403);
+    expect(await response.json()).toMatchObject({
+      error: { code: "hosted_transition_role_not_admitted", commitState: "not_started" },
+    });
+    expect(store.countRecordsOfType("runtime_execution")).toBe(0);
+    expect(store.countRecordsOfType("transition_request_context")).toBe(0);
+  });
+
   it("hosted mode propagates revoked caller refusal with zero records", async () => {
     const store = new InMemoryProtocolStore();
     const app = createApp({
       store,
       authMode: "hosted",
+      hostedAdmissionConfig: hostedAdmissionConfig(),
       hostedCallerVerifier: {
         async verify() {
           throw new HandshakeProtocolError(
@@ -715,6 +798,7 @@ describe("Hono protocol surface", () => {
     const app = createApp({
       store,
       authMode: "hosted",
+      hostedAdmissionConfig: hostedAdmissionConfig(),
       hostedCallerVerifier: staticHostedVerifier(hostedIdentity({ custodyRoles: ["runtime_evidence"] })),
     });
 
@@ -753,6 +837,7 @@ describe("Hono protocol surface", () => {
     const app = createApp({
       store: fixture.store,
       authMode: "hosted",
+      hostedAdmissionConfig: hostedAdmissionConfig(),
       hostedCallerVerifier: staticHostedVerifier(
         hostedIdentity({ tenantId: "tenant_other", custodyRoles: ["control_plane"] }),
       ),
@@ -1149,6 +1234,7 @@ describe("Hono protocol surface", () => {
     const app = createApp({
       store,
       authMode: "hosted",
+      hostedAdmissionConfig: hostedAdmissionConfig(),
       hostedCallerVerifier: staticHostedVerifier(
         hostedIdentity({ tenantId: "tenant_other", custodyRoles: ["review_custody"] }),
       ),
@@ -1163,6 +1249,246 @@ describe("Hono protocol surface", () => {
       error: { code: "record_not_found", commitState: "not_applicable" },
     });
     expect(store.countRecordsOfType("transition_request_context")).toBe(0);
+  });
+
+  it("hosted evidence reads require read role and scope instead of transition custody", async () => {
+    const { graph, store } = await createGeneratedGraphEvidenceFixture();
+    const missingEntitlementApp = createApp({
+      store,
+      authMode: "hosted",
+      hostedAdmissionConfig: hostedAdmissionConfig(),
+      hostedCallerVerifier: staticHostedVerifier(
+        hostedIdentity({
+          custodyRoles: ["review_custody"],
+          hostedRoles: [],
+          hostedScopes: [],
+        }),
+      ),
+    });
+    const forbidden = await missingEntitlementApp.request(
+      `/v0.2/evidence/generated-execution-graphs/${graph.generatedExecutionGraphId}`,
+      { headers: jsonHeaders("review_custody") },
+    );
+    expect(forbidden.status).toBe(403);
+    expect(await forbidden.json()).toMatchObject({
+      error: { code: "hosted_read_entitlement_forbidden", commitState: "not_started" },
+    });
+
+    const readEntitledApp = createApp({
+      store,
+      authMode: "hosted",
+      hostedAdmissionConfig: hostedAdmissionConfig(),
+      hostedCallerVerifier: staticHostedVerifier(
+        hostedIdentity({
+          custodyRoles: ["control_plane"],
+          hostedRoles: ["viewer"],
+          hostedScopes: ["evidence:redacted:read"],
+        }),
+      ),
+    });
+    const allowed = await readEntitledApp.request(
+      `/v0.2/evidence/generated-execution-graphs/${graph.generatedExecutionGraphId}`,
+      { headers: jsonHeaders("control_plane") },
+    );
+
+    expect(allowed.status).toBe(200);
+    expect(await allowed.json()).toMatchObject({
+      graphRef: graph.generatedExecutionGraphId,
+      graphDigest: graph.graphDigest,
+      redactionPosture: "redacted",
+    });
+    expect(store.countRecordsOfType("transition_request_context")).toBe(0);
+  });
+
+  it("hosted raw record reads obey raw-read posture, purpose bounds, and tenant hiding", async () => {
+    const { graph, store } = await createGeneratedGraphEvidenceFixture();
+    const rawReader = hostedIdentity({
+      custodyRoles: ["review_custody"],
+      hostedRoles: ["rawEvidenceReader"],
+      hostedScopes: ["evidence:raw:request", "evidence:raw:read"],
+    });
+    const unavailableApp = createApp({
+      store,
+      authMode: "hosted",
+      hostedAdmissionConfig: hostedAdmissionConfig({ rawReadPosture: "unavailable" }),
+      hostedCallerVerifier: staticHostedVerifier(rawReader),
+    });
+    const unavailable = await unavailableApp.request(
+      `/v0.2/records/generated_execution_graph/${graph.generatedExecutionGraphId}`,
+      { headers: jsonHeaders("review_custody") },
+    );
+    expect(unavailable.status).toBe(403);
+    expect(await unavailable.json()).toMatchObject({
+      error: { code: "hosted_raw_read_unavailable", commitState: "not_started" },
+    });
+
+    const gatedApp = createApp({
+      store,
+      authMode: "hosted",
+      hostedAdmissionConfig: hostedAdmissionConfig({ rawReadPosture: "gated" }),
+      hostedCallerVerifier: staticHostedVerifier(rawReader),
+    });
+    const missingPurpose = await gatedApp.request(
+      `/v0.2/records/generated_execution_graph/${graph.generatedExecutionGraphId}`,
+      { headers: jsonHeaders("review_custody") },
+    );
+    expect(missingPurpose.status).toBe(403);
+    expect(await missingPurpose.json()).toMatchObject({
+      error: { code: "hosted_raw_read_purpose_required", commitState: "not_started" },
+    });
+
+    const allowed = await gatedApp.request(
+      `/v0.2/records/generated_execution_graph/${graph.generatedExecutionGraphId}`,
+      {
+        headers: {
+          ...jsonHeaders("review_custody"),
+          "x-handshake-raw-read-purpose": "break-glass evidence reconstruction",
+          "x-handshake-raw-read-expires-at": new Date(Date.now() + 60_000).toISOString(),
+        },
+      },
+    );
+    expect(allowed.status).toBe(200);
+    expect(await allowed.json()).toMatchObject({
+      objectType: "generated_execution_graph",
+      objectId: graph.generatedExecutionGraphId,
+    });
+
+    const crossTenantApp = createApp({
+      store,
+      authMode: "hosted",
+      hostedAdmissionConfig: hostedAdmissionConfig({ rawReadPosture: "gated" }),
+      hostedCallerVerifier: staticHostedVerifier(hostedIdentity({ ...rawReader, tenantId: "tenant_other" })),
+    });
+    const crossTenant = await crossTenantApp.request(
+      `/v0.2/records/generated_execution_graph/${graph.generatedExecutionGraphId}`,
+      {
+        headers: {
+          ...jsonHeaders("review_custody"),
+          "x-handshake-raw-read-purpose": "break-glass evidence reconstruction",
+          "x-handshake-raw-read-expires-at": new Date(Date.now() + 60_000).toISOString(),
+        },
+      },
+    );
+    expect(crossTenant.status).toBe(404);
+    expect(await crossTenant.json()).toMatchObject({
+      error: { code: "record_not_found", commitState: "not_applicable" },
+    });
+  });
+
+  it("reports hosted readiness without leaking secret values or claiming mutation authority", async () => {
+    const store = new InMemoryProtocolStore();
+    const localApp = createApp({ store, callerAuthTokens: TEST_CALLER_AUTH_TOKENS });
+    const missingConfig = await localApp.request("/v0.2/hosted/readiness", {
+      headers: jsonHeaders("control_plane"),
+    });
+    expect(missingConfig.status).toBe(200);
+    expect(await missingConfig.json()).toMatchObject({
+      configured: false,
+      readinessState: "missing",
+      hostedMutationAuthorityCreated: false,
+      paymentManagementCreated: false,
+      settlementAuthorityCreated: false,
+      providerCustodyCreated: false,
+    });
+
+    const hostedApp = createApp({
+      store,
+      authMode: "hosted",
+      hostedAdmissionConfig: hostedAdmissionConfig(),
+      hostedCallerVerifier: staticHostedVerifier(
+        hostedIdentity({
+          custodyRoles: ["review_custody"],
+          hostedRoles: ["operator"],
+          hostedScopes: ["hosted:readiness:read"],
+        }),
+      ),
+    });
+    const ready = await hostedApp.request(
+      "/v0.2/hosted/readiness",
+      { headers: jsonHeaders("review_custody") },
+      {
+        HANDSHAKE_HOSTED_TEST_SECRET: "must-not-leak",
+        HANDSHAKE_HOSTED_MODE: "test",
+      },
+    );
+    expect(ready.status).toBe(200);
+    const readinessText = await ready.text();
+    expect(readinessText).not.toContain("must-not-leak");
+    expect(JSON.parse(readinessText)).toMatchObject({
+      configured: true,
+      deploymentMode: "test",
+      readinessState: "configured_but_unverified",
+      authorityClass: "hosted_admission_and_redacted_evidence_read_only",
+      hostedMutationAuthorityCreated: false,
+      storage: {
+        d1: {
+          bindingName: "DB",
+          present: false,
+          authority: "structured_evidence",
+          environmentPosture: "local_or_injected",
+          schema: { checked: false, status: "not_checked" },
+        },
+        kv: { bindingName: "CACHE", present: false, authority: "non_authoritative_cache" },
+      },
+      secrets: [{ name: "HANDSHAKE_HOSTED_TEST_SECRET", present: true }],
+      publicVars: [{ name: "HANDSHAKE_HOSTED_MODE", present: true }],
+      rawReadPosture: "unavailable",
+      unsupportedCapabilities: expect.arrayContaining([
+        "hosted_mutation_authority_not_provided",
+        "payment_management_not_provided",
+        "injected_store_not_production_d1_proof",
+      ]),
+    });
+  });
+
+  it("reports D1 schema posture in hosted readiness without promoting local D1 to production proof", async () => {
+    const harness = await createD1HttpHarness();
+    try {
+      const app = createApp({
+        authMode: "hosted",
+        hostedAdmissionConfig: hostedAdmissionConfig({
+          storage: {
+            d1: { bindingName: "DB", required: true, authority: "structured_evidence" },
+            kv: { bindingName: "CACHE", required: false, authority: "non_authoritative_cache" },
+          },
+        }),
+        hostedCallerVerifier: staticHostedVerifier(
+          hostedIdentity({
+            custodyRoles: ["review_custody"],
+            hostedRoles: ["operator"],
+            hostedScopes: ["hosted:readiness:read"],
+          }),
+        ),
+      });
+      const response = await app.request(
+        "/v0.2/hosted/readiness",
+        { headers: jsonHeaders("review_custody") },
+        { DB: harness.db },
+      );
+
+      expect(response.status).toBe(200);
+      expect(await response.json()).toMatchObject({
+        configured: true,
+        deploymentMode: "test",
+        readinessState: "read_only",
+        storage: {
+          d1: {
+            present: true,
+            authority: "structured_evidence",
+            environmentPosture: "local_or_injected",
+            schema: {
+              checked: true,
+              status: "present",
+              missingTableRefs: [],
+            },
+          },
+          kv: { present: false, authority: "non_authoritative_cache" },
+        },
+        unsupportedCapabilities: expect.arrayContaining(["hosted_mutation_authority_not_provided"]),
+      });
+    } finally {
+      await harness.dispose();
+    }
   });
 
   it("SDK sets protocol headers, routes per-role tokens, and preserves fallback token behavior", async () => {

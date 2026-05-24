@@ -4,6 +4,7 @@ import { HandshakeProtocolError } from "../../protocol/foundation/errors";
 import { DigestSchema, IdSchema, IsoDateSchema, type JsonValue } from "../../protocol/public/schemas";
 import type { TransitionRequestCallerEvidence } from "../../protocol/context/request-contexts";
 import type { TransitionCallerRole } from "./caller-auth";
+import { HostedReadRoleSchema, HostedScopeSchema } from "./hosted-admission-config";
 
 export const TransitionCallerIdentitySchema = z
   .strictObject({
@@ -11,7 +12,10 @@ export const TransitionCallerIdentitySchema = z
     callerSubjectDigest: DigestSchema,
     tenantId: IdSchema,
     organizationId: IdSchema,
+    projectId: IdSchema.nullable().default(null),
     custodyRoles: z.array(z.enum(["control_plane", "runtime_evidence", "gateway_custody", "review_custody"])).min(1),
+    hostedRoles: z.array(HostedReadRoleSchema).default([]),
+    hostedScopes: z.array(HostedScopeSchema).default([]),
     authProviderRef: z.string().min(1).max(500),
     authSessionDigest: DigestSchema.nullable().default(null),
     serviceCredentialDigest: DigestSchema.nullable().default(null),
@@ -91,7 +95,11 @@ export function assertHostedCallerAnyRole(
   }
 }
 
-export function assertHostedCallerFresh(identity: TransitionCallerIdentity, now: string): void {
+export function assertHostedCallerFresh(
+  identity: TransitionCallerIdentity,
+  now: string,
+  maxIdentityAgeSeconds?: number,
+): void {
   const issuedAt = Date.parse(identity.issuedAt);
   const expiresAt = Date.parse(identity.expiresAt);
   const nowMs = Date.parse(now);
@@ -107,6 +115,14 @@ export function assertHostedCallerFresh(identity: TransitionCallerIdentity, now:
     throw new HandshakeProtocolError(
       "hosted_caller_identity_expired",
       "Hosted caller identity is not valid at the transition admission time.",
+      412,
+      { retryability: "terminal", commitState: "not_started" },
+    );
+  }
+  if (maxIdentityAgeSeconds !== undefined && nowMs - issuedAt > maxIdentityAgeSeconds * 1000) {
+    throw new HandshakeProtocolError(
+      "hosted_caller_identity_stale",
+      "Hosted caller identity is older than the configured freshness window.",
       412,
       { retryability: "terminal", commitState: "not_started" },
     );
@@ -132,7 +148,10 @@ export async function transitionCallerEvidenceFromIdentity(
     callerSubjectDigest: identity.callerSubjectDigest,
     tenantId: identity.tenantId,
     organizationId: identity.organizationId,
+    projectId: identity.projectId,
     custodyRoles: identity.custodyRoles,
+    hostedRoles: identity.hostedRoles,
+    hostedScopes: identity.hostedScopes,
     authProviderRef: identity.authProviderRef,
     authSessionDigest: identity.authSessionDigest,
     serviceCredentialDigest: identity.serviceCredentialDigest,

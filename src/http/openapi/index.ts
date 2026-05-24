@@ -1,5 +1,6 @@
 import { z, type ZodType } from "zod";
 import { transitionCallerSecuritySchemeName, type TransitionCallerRole } from "../admission/caller-auth";
+import { HostedReadinessReportSchema } from "../admission/hosted-admission-config";
 import { PROTOCOL_VERSION } from "../../protocol/public/schemas";
 import { TransitionErrorResponseSchema } from "../errors/transition-error-envelope";
 import { evidenceReadRouteDefinitions } from "../routes/evidence-read-route-registry";
@@ -40,6 +41,21 @@ export const openApiDocument = {
   paths: {
     "/health": {
       get: { summary: "Health check", responses: { "200": jsonResponse("Worker is alive", HealthResponseSchema) } },
+    },
+    "/v0.2/hosted/readiness": {
+      get: {
+        summary: "Read hosted admission and redacted evidence readiness posture",
+        description:
+          "Readiness posture only; not hosted mutation authority, payment management, settlement, provider custody, or compliance certification.",
+        security: transitionSecurity("control_plane"),
+        responses: {
+          "200": jsonResponse("Hosted readiness posture report", HostedReadinessReportSchema),
+          "401": errorResponse,
+          "403": errorResponse,
+          "500": errorResponse,
+          "503": errorResponse,
+        },
+      },
     },
     ...Object.fromEntries(transitionRouteDefinitions.map((route) => [route.path, openApiPathFor(route)])),
     ...Object.fromEntries(

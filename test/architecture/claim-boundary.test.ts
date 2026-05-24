@@ -53,8 +53,10 @@ describe("claim boundary", () => {
     const agents = readFileSync("AGENTS.md", "utf8");
     const readme = readFileSync("README.md", "utf8");
     const decisions = readFileSync("docs/internal/decisions.md", "utf8");
+    const protocolArchitecture = readFileSync("docs/internal/protocol-kernel-architecture.md", "utf8");
     const protocolNotes = readFileSync("docs/internal/protocol-notes.md", "utf8");
     const x402Walkthrough = readFileSync("examples/x402-protected-spend/README.md", "utf8");
+    const httpLane = readFileSync("src/http/LANE.md", "utf8");
     const runtimeLane = readFileSync("src/runtime/LANE.md", "utf8");
     const conformanceLane = readFileSync("src/conformance/LANE.md", "utf8");
     const adaptersLane = readFileSync("src/adapters/LANE.md", "utf8");
@@ -73,7 +75,12 @@ describe("claim boundary", () => {
     expect(readme).toContain("not broad x402 compatibility");
     expect(readme).toContain("No adapter family defines the protocol");
     expect(readme).toContain("public runtime ingress for local x402 payment and package-install dispatch boundaries");
-    expect(readme).toContain("not live provider custody, hosted mutation authority, generic MCP/runtime control");
+    expect(readme).toContain("not live provider custody, hosted mutation authority");
+    expect(readme).toContain("generic MCP/runtime control");
+    expect(readme).toContain("deployment-mode hosted admission config with read-entitlement split");
+    expect(readme).toContain("raw-read posture gates, non-secret readiness reporting");
+    expect(readme).toContain("production hosted readiness");
+    expect(readme).toContain("compliance-grade audit");
     expect(readme).toContain("non-mutating hosted verifier metadata/key-set/JWKS/status/verify routes");
     expect(readme).toContain("remote JWKS trust fetching, live revocation authority");
     expect(readme).toContain("npm run demo:self-hosted");
@@ -84,6 +91,13 @@ describe("claim boundary", () => {
     expect(readme).not.toMatch(/session\/day\/review spend windows are metadata until a ledger exists/i);
     expect(readme).not.toMatch(/\bx402 compatible\b/i);
     expect(readme).not.toMatch(/package install (?:is|as) (?:the )?first wedge/i);
+    expect(canonicalDocs).not.toMatch(/Hosted operation adds policy management/i);
+    expect(decisions).toMatch(/read\s+entitlements are separate from transition custody/);
+    expect(decisions).toMatch(/it is not hosted mutation authority, production readiness/);
+    expect(protocolNotes).toMatch(/read-entitlement split for\s+redacted evidence reads/);
+    expect(protocolArchitecture).toMatch(/The current hosted slice is\s+deployment-mode admission/);
+    expect(httpLane).toContain("not hosted mutation authority");
+    expect(httpLane).toContain("payment management, settlement, provider custody");
     expect(runtimeLane).toContain("It must not issue policy decisions, greenlights, gateway checks, receipts");
     expect(conformanceLane).toContain("does not prove provider-side enforcement");
     expect(adaptersLane).toContain("must not imply generic adapters, hosted operation");

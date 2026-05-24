@@ -1,3 +1,4 @@
+import type { HostedAdmissionConfigInput } from "../../src/http/admission/hosted-admission-config";
 import type { HostedCallerVerifier, TransitionCallerIdentity } from "../../src/http/admission/hosted-caller-identity";
 import { HandshakeProtocolError } from "../../src/protocol/foundation/errors";
 import type { GeneratedExecutionGraph } from "../../src/protocol/public/schemas";
@@ -45,7 +46,10 @@ export function hostedIdentity(overrides: Partial<TransitionCallerIdentity> = {}
     callerSubjectDigest: DIGEST_B,
     tenantId: "tenant_demo",
     organizationId: "org_demo",
+    projectId: "project_demo",
     custodyRoles: ["runtime_evidence"],
+    hostedRoles: ["auditor"],
+    hostedScopes: ["evidence:redacted:read", "hosted:readiness:read"],
     authProviderRef: "provider:test",
     authSessionDigest: DIGEST_C,
     serviceCredentialDigest: null,
@@ -53,6 +57,46 @@ export function hostedIdentity(overrides: Partial<TransitionCallerIdentity> = {}
     expiresAt: futureIso(),
     revocationEpochRef: "revocation-epoch:test",
     claimsDigest: DIGEST_D,
+    ...overrides,
+  };
+}
+
+export function hostedAdmissionConfig(overrides: Partial<HostedAdmissionConfigInput> = {}): HostedAdmissionConfigInput {
+  return {
+    deploymentMode: "test",
+    verifierStrategy: "local_test_verifier",
+    maxIdentityAgeSeconds: 300,
+    rolePolicy: {
+      admittedTransitionRoles: ["control_plane", "runtime_evidence", "gateway_custody", "review_custody"],
+    },
+    readPolicy: {
+      redactedEvidence: {
+        allowedRoles: ["viewer", "auditor", "operator"],
+        requiredScopes: ["evidence:redacted:read"],
+      },
+      rawEvidence: {
+        allowedRoles: ["rawEvidenceReader"],
+        requiredScopes: ["evidence:raw:request", "evidence:raw:read"],
+      },
+      readiness: {
+        allowedRoles: ["operator", "auditor"],
+        requiredScopes: ["hosted:readiness:read"],
+      },
+    },
+    tenantSource: "verifier_claims",
+    storage: {
+      d1: { bindingName: "DB", required: false, authority: "structured_evidence" },
+      kv: { bindingName: "CACHE", required: false, authority: "non_authoritative_cache" },
+    },
+    secretNames: ["HANDSHAKE_HOSTED_TEST_SECRET"],
+    publicVarNames: ["HANDSHAKE_HOSTED_MODE"],
+    rawReadPosture: "unavailable",
+    redactionProfileRefs: ["hosted-redacted-evidence:v0.2"],
+    retentionPosture: "declared_non_certified",
+    exportPosture: "disabled",
+    readinessExpectations: [
+      "test mode requires explicit hostedAdmissionConfig; D1/KV presence is reported, not inferred",
+    ],
     ...overrides,
   };
 }

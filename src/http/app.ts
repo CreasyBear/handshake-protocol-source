@@ -8,6 +8,7 @@ import { authorizeTransitionAdmission } from "./admission";
 import type { AppOptions, WorkerBindings } from "./app-options";
 import { evidenceReadRouteDefinitions } from "./routes/evidence-read-route-registry";
 import { handleEvidenceRead } from "./handlers/evidence-read";
+import { handleHostedReadiness } from "./handlers/hosted-readiness";
 import {
   handleHostedAuthorityCertificateVerify,
   handleVerifierJwks,
@@ -53,6 +54,7 @@ export function createApp(options: AppOptions = {}) {
     app.get(route.honoPath, (c) => handleEvidenceRead(c, options, fallbackStore, route));
   }
 
+  app.get("/v0.2/hosted/readiness", (c) => handleHostedReadiness(c, options, fallbackStore));
   app.get("/v0.2/verifier/metadata", (c) => handleVerifierMetadata(c));
   app.get("/v0.2/verifier/key-set", (c) => handleVerifierKeySet(c, options));
   app.get("/v0.2/verifier/jwks.json", (c) => handleVerifierJwks(c, options));

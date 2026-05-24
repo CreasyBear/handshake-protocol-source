@@ -210,11 +210,16 @@ store. The local verifier response is structured as `verified`, `refused`, or
 trust-material, and status checks. Native verifier key-set and JWKS projections
 are public-material projections only, not trust decisions. Non-mutating hosted
 verifier routes expose metadata, key-set/JWKS, status lookup, and structured
-verification against configured local trust material only.
+verification against configured local trust material only. Hosted-mode
+admission also has an explicit deployment config and read-entitlement split for
+redacted evidence reads; missing config, excluded roles, stale identities,
+missing scopes, disabled raw-read posture, and missing read-purpose bounds fail
+closed before the route can be treated as authority.
 
 This is still local foundation trust. Cross-org trust, remote JWKS trust fetch,
-live revocation authority, hosted mutation authority, marketplace
-certification, and provider custody remain outside this local foundation.
+live revocation authority, hosted mutation authority, production hosted
+readiness, marketplace certification, compliance-grade audit, and provider
+custody remain outside this local foundation.
 
 ## Pressure Review Notes
 
@@ -243,6 +248,12 @@ Raw HTTP record reads must consult object registry `rawReadPosture`.
 bypass probes, and tool-call drafts, are not exposed through the generic record
 route. Reconstruction that needs internal records must use store-level test
 helpers or purpose-built redacted projections.
+
+In hosted mode, raw record reads are additionally controlled by deployment
+`rawReadPosture`: unavailable/disabled refuses, gated/allowed requires a
+`rawEvidenceReader` entitlement with `evidence:raw:read`, and each read must
+carry purpose and bounded expiry headers. Missing and cross-tenant records use
+the same not-found shape.
 
 ## Naming Rules
 

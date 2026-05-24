@@ -3,6 +3,7 @@ import { protocolObjectRegistry } from "../../protocol/areas/object-registry";
 import { HandshakeProtocolError } from "../../protocol/foundation/errors";
 import { ProtocolObjectTypeSchema } from "../../protocol/public/schemas";
 import type { ProtocolStore } from "../../protocol/store/port";
+import { authorizeHostedRawRecordReadAdmission } from "../admission";
 import { authorizeTransitionCaller } from "../admission/caller-auth";
 import type { AppOptions, WorkerBindings } from "../app-options";
 import { storeFor } from "../store/resolution";
@@ -18,8 +19,15 @@ export async function handleInternalRecordRead(
     callerCustodyRole: "control_plane",
     requestIdentity: null,
   };
-  const authFailure = authorizeTransitionCaller(c, options.callerAuthTokens, "control_plane", errorContext);
-  if (authFailure) return authFailure;
+  const admission =
+    options.authMode === "hosted"
+      ? await authorizeHostedRawRecordReadAdmission(c, options)
+      : {
+          failure: authorizeTransitionCaller(c, options.callerAuthTokens, "control_plane", errorContext),
+          hostedIdentity: null,
+          callerEvidence: undefined,
+        };
+  if (admission.failure) return admission.failure;
   const objectTypeResult = ProtocolObjectTypeSchema.safeParse(c.req.param("objectType"));
   if (!objectTypeResult.success) {
     const result = transitionErrorResult(
@@ -39,7 +47,12 @@ export async function handleInternalRecordRead(
     return recordNotFound(c, errorContext);
   }
   const record = await storeFor(c, fallbackStore).getRecord(objectTypeResult.data, objectId);
-  if (!record) {
+  if (
+    !record ||
+    (admission.hostedIdentity &&
+      (admission.hostedIdentity.tenantId !== record.tenantId ||
+        admission.hostedIdentity.organizationId !== record.organizationId))
+  ) {
     return recordNotFound(c, errorContext);
   }
   return c.json(record);

@@ -440,15 +440,22 @@ prove downstream business success, expose provider secret paths, or expose raw
 
 The generic raw record route enforces `rawReadPosture`. Internal records such
 as stream events, idempotency ledger entries, bypass probes, and tool-call
-drafts remain inaccessible through raw HTTP reads.
+drafts remain inaccessible through raw HTTP reads. Hosted mode adds
+deployment-mode read entitlements, raw-read posture, purpose/expiry headers, and
+tenant/org hiding for raw record access; this is a read/admission boundary, not
+hosted mutation authority or hosted audit/search operation.
 
 ## Extension Boundary
 
-Self-hosted operation adds installable protected-action loops around this
+Self-hosted operation can add installable protected-action loops around this
 kernel.
 
-Hosted operation adds policy management, receipt retention, search, rollout,
-audit, and recovery operations around this kernel.
+Future hosted operation can add policy management, receipt retention, search,
+rollout, audit, and recovery operations around this kernel only after
+deployment boundary, D1/KV migration, secret posture, reader authorization,
+gateway custody, and receipt evidence are proven. The current hosted slice is
+deployment-mode admission, redacted reads, raw-read gating, and readiness
+posture only.
 
 Bilateral ecosystem operation may add negotiation and linked agreements, but
 each party's obligation must still become its own normal `ActionContract`,
