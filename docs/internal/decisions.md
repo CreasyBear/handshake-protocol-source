@@ -270,6 +270,22 @@ MCP Registry metadata is source-owned through `server.json` and `package.json#mc
 
 The package check builds declarations and Node bundles, runs an npm dry-run, verifies the package surface includes source, generated types, bundled JS, bins, MCP registry metadata, and compact canon, excludes tests/planning scratch/deleted doc trees, and smoke-tests the packaged CLI plus MCP stdio server through the official MCP client SDK.
 
+`PackageReleaseProof` is the release-state contract for public distribution:
+
+- `ready_to_publish` means local package shape, metadata sync, CLI/MCP smoke,
+  account namespace posture, provenance posture, rollback posture, and
+  authority-boundary checks have source-owned evidence.
+- `actually_published` means npm publish has occurred for the exact package and
+  version, and a clean installed-artifact smoke has passed.
+- `registry_discoverable` means MCP Registry metadata has been accepted and
+  post-registry discoverability has been verified.
+
+Publication does not create authority, policy decisions, greenlights, gateway
+checks, mutations, custody, hosted operation, marketplace certification,
+settlement, payment management, trust, or host-wide enforcement. Missing
+account, namespace, 2FA, provenance, publish, clean-install, or registry
+evidence remains a proof gap.
+
 CI must run the same command through `.github/workflows/check.yml`.
 
 ## Naming Decision

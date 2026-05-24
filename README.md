@@ -211,6 +211,23 @@ server remains proposal/evidence only: not policy, not greenlight, not gateway
 check, not mutation, not receipt export, not authority-certificate minting, not
 hosted operation, and not provider custody.
 
+Public release proof states are source-owned and separate:
+
+- `ready_to_publish`: local pack shape, metadata sync, CLI/MCP smoke, account
+  namespace posture, provenance posture, and authority-boundary checks have
+  evidence.
+- `actually_published`: npm publish has occurred for the exact package/version
+  and a clean installed-artifact smoke has passed.
+- `registry_discoverable`: MCP Registry metadata has been accepted and
+  discoverability has been verified.
+
+These states are tracked by `PackageReleaseProof`. Publication distributes
+proposal, evidence, read surfaces, and metadata only; it does not create
+authority, policy decisions, greenlights, gateway checks, mutations, custody,
+hosted operation, marketplace certification, settlement, payment management,
+trust, or host-wide enforcement. Missing account, 2FA, provenance, publish, or
+registry evidence is a proof gap, not release success.
+
 Model-facing MCP reference transcript:
 
 ```bash

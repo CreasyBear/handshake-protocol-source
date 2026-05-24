@@ -10,7 +10,9 @@ type PackageExport = {
 };
 
 type PackageJson = {
+  description: string;
   private?: boolean;
+  keywords: string[];
   types: string;
   bin: Record<string, string>;
   mcpName: string;
@@ -32,6 +34,9 @@ const deletedBusinessDocsPath = ["docs", "business"].join("/");
 describe("package surface", () => {
   it("declares publishable protocol, CLI, and MCP entrypoints without exposing source-only authority", () => {
     expect(pkg.private).not.toBe(true);
+    expect(pkg.description).toContain("Protected action infrastructure for automated decision making");
+    expect(pkg.description).not.toMatch(/engineering agents/i);
+    expect(pkg.keywords).toEqual(expect.arrayContaining(["protected-actions", "automated-decision-making"]));
     expect(pkg.mcpName).toBe("io.github.joelchan/handshake-protocol-kernel");
     expect(pkg.types).toBe("./dist/index.d.ts");
     expect(pkg.bin).toEqual({
@@ -111,7 +116,7 @@ describe("package surface", () => {
     expect(pkg.scripts["build:bundles"]).toBe("node scripts/build-package-bundles.mjs");
     expect(pkg.scripts["demo:self-hosted"]).toBe("bun run ./examples/self-hosted-activation/run.ts");
     expect(pkg.scripts["pack:check"]).toBe(
-      "npm run build && node scripts/check-package-surface.mjs && node scripts/check-published-entrypoints.mjs",
+      "npm run build && node scripts/check-package-surface.mjs && node scripts/check-published-entrypoints.mjs && node scripts/check-release-proof.mjs",
     );
     expect(pkg.scripts["check:repo"]).toContain("npm run pack:check");
   });

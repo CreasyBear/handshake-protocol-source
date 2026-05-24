@@ -1,14 +1,16 @@
 {
   "name": "handshake-protocol-kernel",
   "version": "0.2.4",
-  "description": "Contracted execution infrastructure for engineering agents: protocol kernel, CLI evidence views, and local MCP proposal/evidence server.",
+  "description": "Protected action infrastructure for automated decision making: protocol kernel, CLI evidence views, and local MCP proposal/evidence server.",
   "license": "UNLICENSED",
   "mcpName": "io.github.joelchan/handshake-protocol-kernel",
   "keywords": [
     "agents",
+    "automated-decision-making",
     "execution-control",
     "handshake",
     "mcp",
+    "protected-actions",
     "x402"
   ],
   "engines": {
@@ -96,7 +98,7 @@
     "format:check": "prettier --check .",
     "lint": "eslint src test --max-warnings=0",
     "check:types": "tsc --noEmit --pretty false",
-    "pack:check": "npm run build && node scripts/check-package-surface.mjs && node scripts/check-published-entrypoints.mjs",
+    "pack:check": "npm run build && node scripts/check-package-surface.mjs && node scripts/check-published-entrypoints.mjs && node scripts/check-release-proof.mjs",
     "check:repo": "npm run check:types && npm run lint && npm run format:check && npm run test && npm run pack:check && git diff --check",
     "quality:architecture": "npm run test -- test/architecture/import-posture.test.ts test/architecture/naming-posture.test.ts test/architecture/package-surface.test.ts test/architecture/root-exports.test.ts test/architecture/surface-boundary-posture.test.ts test/architecture/cli-command-posture.test.ts test/architecture/mcp-surface-posture.test.ts test/conformance/protected-mutation-adapter-conformance.test.ts",
     "quality:claims": "npm run test -- test/architecture/active-vocabulary.test.ts test/architecture/claim-boundary.test.ts",
