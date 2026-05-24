@@ -8,7 +8,11 @@ import {
   OperatingEnvelopeSchema,
   ToolCapabilitySchema,
 } from "../catalog-envelope/schemas";
-import { CredentialResolutionEvidenceSchema, GatewayCredentialRefSchema } from "../credential-custody/schemas";
+import {
+  CredentialResolutionEvidenceSchema,
+  GatewayCredentialRefSchema,
+  GatewayCustodyProofPacketSchema,
+} from "../credential-custody/schemas";
 import { ContractStreamEventSchema } from "../../events/schemas";
 import { GatewayCheckAttemptSchema, MutationAttemptSchema } from "../gateway-gate/schemas";
 import { GeneratedExecutionGraphSchema } from "../generated-execution-graph/schemas";
@@ -83,6 +87,13 @@ export const protocolObjectRegistry = {
     "gateway_credential_ref",
     GatewayCredentialRefSchema,
     (record) => record.payload.gatewayCredentialRefId,
+    "transition_evidence",
+    "audit_read",
+  ),
+  gateway_custody_proof_packet: entry(
+    "gateway_custody_proof_packet",
+    GatewayCustodyProofPacketSchema,
+    (record) => record.payload.gatewayCustodyProofPacketId,
     "transition_evidence",
     "audit_read",
   ),

@@ -105,6 +105,7 @@ Core objects:
 - `GatewayRegistryEntry`
 - `OperatingEnvelope`
 - `GatewayCredentialRef`
+- `GatewayCustodyProofPacket`
 - `CredentialResolutionEvidence`
 - `RuntimeExecution`
 - `GeneratedExecutionGraph`

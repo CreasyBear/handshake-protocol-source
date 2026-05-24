@@ -20,6 +20,7 @@ export const transitionInvokers = {
     return body;
   },
   registerGatewayCredentialRef: (kernel, body) => kernel.registerGatewayCredentialRef(body as never),
+  recordGatewayCustodyProofPacket: (kernel, body) => kernel.recordGatewayCustodyProofPacket(body as never),
   recordCredentialResolutionEvidence: (kernel, body) => kernel.recordCredentialResolutionEvidence(body as never),
   compileIntent: (kernel, body) => kernel.compileIntent(body as never),
   createRuntimeExecution: (kernel, body) => kernel.createRuntimeExecution(body as never),

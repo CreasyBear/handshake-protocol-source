@@ -106,6 +106,77 @@ export const CredentialResolutionEvidenceSchema = ProtocolBaseSchema.extend({
 });
 export type CredentialResolutionEvidence = z.infer<typeof CredentialResolutionEvidenceSchema>;
 
+export const GatewayCustodyClaimLevelSchema = z.enum([
+  "local_fixture",
+  "customer_gateway_evidence",
+  "provider_gateway_evidence",
+  "proof_gap",
+]);
+export type GatewayCustodyClaimLevel = z.infer<typeof GatewayCustodyClaimLevelSchema>;
+
+export const GatewayCustodyDriftStatusSchema = z.enum([
+  "current",
+  "stale",
+  "provider_drift",
+  "resolver_drift",
+  "unsafe_custody",
+  "proof_gap",
+]);
+export type GatewayCustodyDriftStatus = z.infer<typeof GatewayCustodyDriftStatusSchema>;
+
+export const GatewayCustodyExternalVerificationStatusSchema = z.enum([
+  "not_required",
+  "required_before_live_claim",
+  "verified_by_official_source",
+]);
+export type GatewayCustodyExternalVerificationStatus = z.infer<typeof GatewayCustodyExternalVerificationStatusSchema>;
+
+export const GatewayCustodyProofPacketSchema = ProtocolBaseSchema.extend({
+  gatewayCustodyProofPacketId: IdSchema,
+  gatewayCustodyProofPacketDigest: DigestSchema,
+  gatewayCredentialRefId: IdSchema,
+  gatewayCredentialRefDigest: DigestSchema,
+  protectedPathPostureId: IdSchema,
+  protectedPathPostureDigest: DigestSchema,
+  gatewayInstallEvidenceRefs: z.array(CredentialSafeStringSchema).default([]),
+  gatewayInstallEvidenceDigests: z.array(DigestSchema).default([]),
+  bypassProbeIds: z.array(IdSchema).default([]),
+  bypassProbeDigests: z.array(DigestSchema).default([]),
+  gatewayId: IdSchema,
+  gatewayRegistryEntryId: IdSchema,
+  protectedSurfaceKind: z.string().min(1),
+  actionClasses: z.array(z.string().min(1)).min(1),
+  resourceRefs: z.array(ResourceRefSchema).min(1),
+  custodyProviderClass: CredentialSafeStringSchema,
+  custodyProviderRegistryRef: CredentialSafeStringSchema,
+  custodyProviderRegistryDigest: DigestSchema.nullable().default(null),
+  opaqueKeyHandleRef: CredentialSafeStringSchema,
+  opaqueKeyHandleDigest: DigestSchema,
+  credentialKind: CredentialSafeStringSchema,
+  credentialCustodyStatus: CredentialCustodyStatusSchema,
+  custodyClaimLevel: GatewayCustodyClaimLevelSchema,
+  resolverRef: CredentialSafeStringSchema,
+  resolverVersion: z.string().min(1),
+  leaseRef: CredentialSafeStringSchema.nullable().default(null),
+  leaseVersion: z.string().min(1).nullable().default(null),
+  leaseIssuedAt: IsoDateSchema.nullable().default(null),
+  leaseExpiresAt: IsoDateSchema.nullable().default(null),
+  attestationRefs: z.array(CredentialSafeStringSchema).default([]),
+  attestationDigests: z.array(DigestSchema).default([]),
+  redactedAuditRefs: z.array(CredentialSafeStringSchema).default([]),
+  redactedAuditDigest: DigestSchema.nullable().default(null),
+  custodyDriftStatus: GatewayCustodyDriftStatusSchema,
+  resolverDriftStatus: GatewayCustodyDriftStatusSchema,
+  redactionStatus: CredentialResolutionRedactionStatusSchema,
+  externalVerificationStatus: GatewayCustodyExternalVerificationStatusSchema,
+  redactionProfileRef: z.literal("gateway-custody-proof-packet:v0.2-redacted"),
+  secretMaterialIncluded: z.literal(false),
+  authorityCreated: z.literal(false),
+  recordedAt: IsoDateSchema,
+  expiresAt: IsoDateSchema,
+});
+export type GatewayCustodyProofPacket = z.infer<typeof GatewayCustodyProofPacketSchema>;
+
 function looksLikeCredentialMaterial(value: string): boolean {
   return credentialMaterialVariants(value).some((variant) =>
     [

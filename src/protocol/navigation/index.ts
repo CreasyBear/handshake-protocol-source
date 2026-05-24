@@ -7,6 +7,7 @@ export type KernelTransitionMethod =
   | "createRuntimeExecution"
   | "createGeneratedExecutionGraph"
   | "registerGatewayCredentialRef"
+  | "recordGatewayCustodyProofPacket"
   | "recordCredentialResolutionEvidence"
   | "createBypassProbe"
   | "createToolCallDraft"
@@ -35,6 +36,7 @@ export type ProtocolTransitionId =
   | "createRuntimeExecution"
   | "createGeneratedExecutionGraph"
   | "registerGatewayCredentialRef"
+  | "recordGatewayCustodyProofPacket"
   | "recordCredentialResolutionEvidence"
   | "createBypassProbe"
   | "createToolCallDraft"
@@ -138,6 +140,17 @@ export const protocolNavigation = [
     eventsEmitted: ["gateway_credential_ref_registered"],
     authorityBoundary: "gateway credential custody evidence only",
     evidenceObligation: "record opaque gateway credential ref without exposing secret material or minting authority",
+  },
+  {
+    transitionId: "recordGatewayCustodyProofPacket",
+    kernelMethod: "recordGatewayCustodyProofPacket",
+    phase: "credential_custody",
+    outcomeClasses: ["recorded", "refusal", "proof_gap"],
+    recordsWritten: ["gateway_custody_proof_packet", "contract_stream_event"],
+    eventsEmitted: ["gateway_custody_proof_packet_recorded"],
+    authorityBoundary: "redacted gateway custody proof evidence only",
+    evidenceObligation:
+      "bind credential ref, protected-path posture, bypass probes, drift, and redaction posture without issuing policy, greenlight, gate, or mutation authority",
   },
   {
     transitionId: "recordCredentialResolutionEvidence",

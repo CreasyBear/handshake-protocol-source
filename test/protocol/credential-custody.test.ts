@@ -3,9 +3,13 @@ import { digestCanonical } from "../../src/protocol/foundation/canonical";
 import { projectAgentTransactionEnvelope } from "../../src/protocol/evidence-projections";
 import {
   GatewayCredentialRefSchema,
+  GatewayCustodyProofPacketSchema,
+  RecordGatewayCustodyProofPacketInputSchema,
   RegisterGatewayCredentialRefInputSchema,
   type CredentialResolutionEvidence,
   type GatewayCredentialRef,
+  type GatewayCustodyProofPacket,
+  type RecordGatewayCustodyProofPacketInput,
   type RegisterGatewayCredentialRefInput,
 } from "../../src/protocol/areas/credential-custody";
 import type { Refusal } from "../../src/protocol/areas/refusal";
@@ -14,6 +18,7 @@ import {
   makeKernelFixture,
   makePackageInstallCandidate,
   proposalInputForCompilation,
+  recordSafeBypassProbes,
   registerFixtureObjects,
 } from "../support/fixtures";
 
@@ -262,6 +267,100 @@ describe("credential custody protocol records", () => {
     expect(JSON.stringify(projection)).not.toMatch(/api[_-]?key|private[_-]?key|PAYMENT-SIGNATURE/);
     expect(JSON.stringify(projection)).not.toContain("package-token");
   });
+
+  it("rejects raw credential material in gateway custody proof packet inputs and records", async () => {
+    const input = custodyProofPacketInput({
+      opaqueKeyHandleRef: "PAYMENT-SIGNATURE: raw",
+    });
+
+    expect(() => RecordGatewayCustodyProofPacketInputSchema.parse(input)).toThrow(
+      "credential custody records must not contain raw credential material",
+    );
+
+    expect(() =>
+      RecordGatewayCustodyProofPacketInputSchema.parse(
+        custodyProofPacketInput({
+          redactedAuditRefs: ["vault://workspace/secret/payment-signer"],
+        }),
+      ),
+    ).toThrow("credential custody records must not contain raw credential material");
+
+    expect(() =>
+      GatewayCustodyProofPacketSchema.parse({
+        ...validCustodyProofPacketRecord(),
+        opaqueKeyHandleRef: "private_key=raw",
+      }),
+    ).toThrow("credential custody records must not contain raw credential material");
+  });
+
+  it("records a source-owned custody proof packet as redacted evidence, not authority", async () => {
+    const fixture = makeKernelFixture();
+    const credentialRef = await registerFixtureCredentialRef(fixture);
+    const posture = await recordGatewayCheckedPosture(fixture);
+
+    const packet = await fixture.kernel.recordGatewayCustodyProofPacket(
+      custodyProofPacketInput({
+        gatewayCredentialRefId: credentialRef.gatewayCredentialRefId,
+        gatewayCredentialRefDigest: credentialRef.gatewayCredentialRefDigest,
+        protectedPathPostureId: posture.protectedPathPostureId,
+        protectedPathPostureDigest: posture.postureDigest,
+        bypassProbeIds: posture.bypassProbeIds,
+        bypassProbeDigests: posture.bypassProbeDigests,
+      }),
+    );
+
+    expect(packet).toMatchObject({
+      gatewayCredentialRefId: credentialRef.gatewayCredentialRefId,
+      protectedPathPostureId: posture.protectedPathPostureId,
+      gatewayId: credentialRef.gatewayId,
+      credentialKind: credentialRef.credentialKind,
+      credentialCustodyStatus: credentialRef.custodyStatus,
+      custodyClaimLevel: "local_fixture",
+      custodyDriftStatus: "current",
+      redactionStatus: "redacted",
+      externalVerificationStatus: "not_required",
+      secretMaterialIncluded: false,
+      authorityCreated: false,
+      redactionProfileRef: "gateway-custody-proof-packet:v0.2-redacted",
+    } satisfies Partial<GatewayCustodyProofPacket>);
+    expect(packet.gatewayCustodyProofPacketDigest).toMatch(/^sha256:/);
+    expect(packet.gatewayInstallEvidenceDigests).toContain(`sha256:${"b".repeat(64)}`);
+    expect(JSON.stringify(packet)).not.toMatch(/private[_-]?key|PAYMENT-SIGNATURE|PaymentPayload|package-token/);
+  });
+
+  it("changes the custody proof digest when resolver, lease, or attestation material changes", async () => {
+    const fixture = makeKernelFixture();
+    const credentialRef = await registerFixtureCredentialRef(fixture);
+    const posture = await recordGatewayCheckedPosture(fixture);
+    const base = {
+      gatewayCredentialRefId: credentialRef.gatewayCredentialRefId,
+      gatewayCredentialRefDigest: credentialRef.gatewayCredentialRefDigest,
+      protectedPathPostureId: posture.protectedPathPostureId,
+      protectedPathPostureDigest: posture.postureDigest,
+      bypassProbeIds: posture.bypassProbeIds,
+      bypassProbeDigests: posture.bypassProbeDigests,
+      recordedAt: "2026-05-24T00:00:00.000Z",
+    } satisfies Partial<RecordGatewayCustodyProofPacketInput>;
+
+    const first = await fixture.kernel.recordGatewayCustodyProofPacket(
+      custodyProofPacketInput({
+        ...base,
+        gatewayCustodyProofPacketId: "gcpp_digest_first",
+        leaseVersion: "lease-v1",
+        attestationDigests: [`sha256:${"c".repeat(64)}`],
+      }),
+    );
+    const second = await fixture.kernel.recordGatewayCustodyProofPacket(
+      custodyProofPacketInput({
+        ...base,
+        gatewayCustodyProofPacketId: "gcpp_digest_second",
+        leaseVersion: "lease-v2",
+        attestationDigests: [`sha256:${"d".repeat(64)}`],
+      }),
+    );
+
+    expect(first.gatewayCustodyProofPacketDigest).not.toBe(second.gatewayCustodyProofPacketDigest);
+  });
 });
 
 async function registerFixtureCredentialRef(
@@ -330,4 +429,85 @@ function credentialBindingFor(credentialRef: GatewayCredentialRef) {
     requiredCredentialCustodyStatus: credentialRef.custodyStatus,
     evidenceExpectationRefs: credentialRef.evidenceExpectationRefs,
   };
+}
+
+async function recordGatewayCheckedPosture(fixture: ReturnType<typeof makeKernelFixture>) {
+  const bypassProbeIds = await recordSafeBypassProbes(fixture);
+  return fixture.kernel.createProtectedPathPosture({
+    tenantId: "tenant_demo",
+    organizationId: "org_demo",
+    runtimeAdapterId: "runtime_codex",
+    gatewayId: fixture.gateway.gatewayId,
+    actionClass: "package.install",
+    resourceRef: "npm:hono",
+    protectedSurfaceKind: "package_manager",
+    postureState: "gateway_checked",
+    credentialCustodyStatus: "gateway_resolved_from_vault",
+    rawSiblingToolStatus: "blocked",
+    sourceAuthority: "gateway_probe",
+    reasonCodes: ["test_gateway_probe_passed"],
+    evidenceRefs: ["evidence:posture:gateway-probe"],
+    bypassProbeIds,
+    expiresAt: futureIso(),
+  });
+}
+
+function custodyProofPacketInput(
+  overrides: Partial<RecordGatewayCustodyProofPacketInput> = {},
+): RecordGatewayCustodyProofPacketInput {
+  return {
+    tenantId: "tenant_demo",
+    organizationId: "org_demo",
+    gatewayCredentialRefId: "gcr_package_manager_token",
+    gatewayCredentialRefDigest: `sha256:${"a".repeat(64)}`,
+    protectedPathPostureId: "ppp_gateway_checked",
+    protectedPathPostureDigest: `sha256:${"b".repeat(64)}`,
+    gatewayInstallEvidenceRefs: ["evidence:install:package-manager"],
+    gatewayInstallEvidenceDigests: [`sha256:${"b".repeat(64)}`],
+    bypassProbeIds: ["bypass_probe_credential_custody"],
+    bypassProbeDigests: [`sha256:${"c".repeat(64)}`],
+    custodyClaimLevel: "local_fixture",
+    custodyProviderClass: "local_fixture_gateway",
+    custodyProviderRegistryRef: "provider-registry:local-fixture",
+    custodyProviderRegistryDigest: `sha256:${"d".repeat(64)}`,
+    opaqueKeyHandleRef: "opaque-key-handle:package-manager-token",
+    opaqueKeyHandleDigest: `sha256:${"e".repeat(64)}`,
+    leaseRef: "lease:package-manager-token",
+    leaseVersion: "lease-v1",
+    leaseIssuedAt: "2026-05-24T00:00:00.000Z",
+    leaseExpiresAt: futureIso(),
+    attestationRefs: ["attestation:local-fixture"],
+    attestationDigests: [`sha256:${"f".repeat(64)}`],
+    redactedAuditRefs: ["audit:redacted:local-fixture"],
+    redactedAuditDigest: `sha256:${"1".repeat(64)}`,
+    custodyDriftStatus: "current",
+    resolverDriftStatus: "current",
+    redactionStatus: "redacted",
+    externalVerificationStatus: "not_required",
+    recordedAt: "2026-05-24T00:00:00.000Z",
+    expiresAt: futureIso(),
+    ...overrides,
+  };
+}
+
+function validCustodyProofPacketRecord(): GatewayCustodyProofPacket {
+  return GatewayCustodyProofPacketSchema.parse({
+    ...custodyProofPacketInput(),
+    schemaVersion: "0.2.4",
+    createdAt: "2026-05-24T00:00:00.000Z",
+    gatewayCustodyProofPacketId: "gcpp_test",
+    gatewayCustodyProofPacketDigest: `sha256:${"9".repeat(64)}`,
+    gatewayId: "gateway_package_manager",
+    gatewayRegistryEntryId: "gateway_registry_package",
+    protectedSurfaceKind: "package_manager",
+    actionClasses: ["package.install"],
+    resourceRefs: ["npm:hono"],
+    credentialKind: "package_manager_token",
+    credentialCustodyStatus: "gateway_resolved_from_vault",
+    resolverRef: "resolver:local-vault",
+    resolverVersion: "v1",
+    secretMaterialIncluded: false,
+    authorityCreated: false,
+    redactionProfileRef: "gateway-custody-proof-packet:v0.2-redacted",
+  });
 }

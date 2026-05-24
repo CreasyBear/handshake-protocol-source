@@ -97,7 +97,7 @@ Protocol areas may depend on foundation/events/context/store and other area publ
 ## Protocol Areas
 
 - `catalog-envelope`: declared tool, action, gateway, and envelope records; catalog presence is not authorization. Envelopes may carry provider-neutral participant identity bindings, but those bindings are evidence-only links to the opaque principal/agent refs.
-- `credential-custody`: opaque gateway credential refs and post-gate resolution evidence; no provider clients or secret retrieval API.
+- `credential-custody`: opaque gateway credential refs, redacted gateway custody proof packets, and post-gate resolution evidence; no provider clients or secret retrieval API.
 - `runtime-evidence`: generated execution evidence; evidence can propose but cannot authorize.
 - `generated-execution-graph`: normalized generated-code/spec evidence and action candidates.
 - `tool-call-draft`: opened, streaming, finalized, invalid, or abandoned generated tool-call input state.
@@ -186,6 +186,11 @@ Protocol areas may depend on foundation/events/context/store and other area publ
   are landed as foundation kernel primitives. They bind vault-backed custody into
   contracts, policy/gateway checks, isolation, and redacted projections without
   importing provider SDKs or exposing `getSecret`-style APIs.
+- Gateway custody proof packets are landed as redacted evidence objects that bind
+  credential refs, protected-path posture, bypass probes, resolver/lease
+  posture, drift status, and redaction status. They do not create permission,
+  policy, greenlights, gateway checks, signer invocation, custody, or downstream
+  success.
 - Credential resolution is post-gate evidence. It cannot retrieve secrets through
   the protocol API, issue authority, or turn provider resolution failure into
   downstream success.

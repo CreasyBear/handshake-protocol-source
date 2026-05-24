@@ -5,12 +5,15 @@ import type { AuthorityCertificate, CreateAuthorityCertificateInput } from "./ar
 import { guardCatalogRegistration } from "./areas/catalog-envelope";
 import {
   recordCredentialResolutionEvidence as recordCredentialResolutionEvidenceTransition,
+  recordGatewayCustodyProofPacket as recordGatewayCustodyProofPacketTransition,
   registerGatewayCredentialRef as registerGatewayCredentialRefTransition,
 } from "./areas/credential-custody";
 import type {
   CredentialResolutionEvidence,
   GatewayCredentialRef,
+  GatewayCustodyProofPacket,
   RecordCredentialResolutionEvidenceInput,
+  RecordGatewayCustodyProofPacketInput,
   RegisterGatewayCredentialRefInput,
 } from "./areas/credential-custody";
 import { HandshakeProtocolError } from "./foundation/errors";
@@ -145,6 +148,10 @@ export class HandshakeKernel {
     input: RecordCredentialResolutionEvidenceInput,
   ): Promise<CredentialResolutionEvidence> {
     return recordCredentialResolutionEvidenceTransition(this.recorder, input);
+  }
+
+  recordGatewayCustodyProofPacket(input: RecordGatewayCustodyProofPacketInput): Promise<GatewayCustodyProofPacket> {
+    return recordGatewayCustodyProofPacketTransition(this.recorder, input);
   }
 
   createAuthorityCertificate(input: CreateAuthorityCertificateInput): Promise<AuthorityCertificate> {

@@ -12,6 +12,7 @@ export const ContractStreamEventSchema = ProtocolBaseSchema.extend({
     "runtime_execution_recorded",
     "generated_execution_graph_recorded",
     "gateway_credential_ref_registered",
+    "gateway_custody_proof_packet_recorded",
     "credential_resolution_recorded",
     "idempotency_ledger_recorded",
     "bypass_probe_recorded",

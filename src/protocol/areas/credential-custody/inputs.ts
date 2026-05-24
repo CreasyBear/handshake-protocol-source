@@ -5,6 +5,7 @@ import {
   GatewayCredentialRefSchema,
   CredentialResolutionRedactionStatusSchema,
   CredentialResolutionResultClassSchema,
+  GatewayCustodyProofPacketSchema,
 } from "./schemas";
 
 export const RegisterGatewayCredentialRefInputSchema = z.strictObject({
@@ -49,3 +50,38 @@ export const RecordCredentialResolutionEvidenceInputSchema = z.strictObject({
   recordedAt: z.string().datetime({ offset: true }).optional(),
 });
 export type RecordCredentialResolutionEvidenceInput = z.input<typeof RecordCredentialResolutionEvidenceInputSchema>;
+
+export const RecordGatewayCustodyProofPacketInputSchema = z.strictObject({
+  tenantId: z.string().min(1),
+  organizationId: z.string().min(1),
+  gatewayCustodyProofPacketId: z.string().min(1).optional(),
+  gatewayCredentialRefId: z.string().min(1),
+  gatewayCredentialRefDigest: DigestSchema,
+  protectedPathPostureId: z.string().min(1),
+  protectedPathPostureDigest: DigestSchema,
+  gatewayInstallEvidenceRefs: GatewayCustodyProofPacketSchema.shape.gatewayInstallEvidenceRefs,
+  gatewayInstallEvidenceDigests: GatewayCustodyProofPacketSchema.shape.gatewayInstallEvidenceDigests,
+  bypassProbeIds: GatewayCustodyProofPacketSchema.shape.bypassProbeIds,
+  bypassProbeDigests: GatewayCustodyProofPacketSchema.shape.bypassProbeDigests,
+  custodyClaimLevel: GatewayCustodyProofPacketSchema.shape.custodyClaimLevel,
+  custodyProviderClass: GatewayCustodyProofPacketSchema.shape.custodyProviderClass,
+  custodyProviderRegistryRef: GatewayCustodyProofPacketSchema.shape.custodyProviderRegistryRef,
+  custodyProviderRegistryDigest: GatewayCustodyProofPacketSchema.shape.custodyProviderRegistryDigest,
+  opaqueKeyHandleRef: GatewayCustodyProofPacketSchema.shape.opaqueKeyHandleRef,
+  opaqueKeyHandleDigest: GatewayCustodyProofPacketSchema.shape.opaqueKeyHandleDigest,
+  leaseRef: GatewayCustodyProofPacketSchema.shape.leaseRef,
+  leaseVersion: GatewayCustodyProofPacketSchema.shape.leaseVersion,
+  leaseIssuedAt: GatewayCustodyProofPacketSchema.shape.leaseIssuedAt,
+  leaseExpiresAt: GatewayCustodyProofPacketSchema.shape.leaseExpiresAt,
+  attestationRefs: GatewayCustodyProofPacketSchema.shape.attestationRefs,
+  attestationDigests: GatewayCustodyProofPacketSchema.shape.attestationDigests,
+  redactedAuditRefs: GatewayCustodyProofPacketSchema.shape.redactedAuditRefs,
+  redactedAuditDigest: GatewayCustodyProofPacketSchema.shape.redactedAuditDigest,
+  custodyDriftStatus: GatewayCustodyProofPacketSchema.shape.custodyDriftStatus,
+  resolverDriftStatus: GatewayCustodyProofPacketSchema.shape.resolverDriftStatus,
+  redactionStatus: GatewayCustodyProofPacketSchema.shape.redactionStatus,
+  externalVerificationStatus: GatewayCustodyProofPacketSchema.shape.externalVerificationStatus,
+  recordedAt: z.string().datetime({ offset: true }).optional(),
+  expiresAt: z.string().datetime({ offset: true }),
+});
+export type RecordGatewayCustodyProofPacketInput = z.input<typeof RecordGatewayCustodyProofPacketInputSchema>;

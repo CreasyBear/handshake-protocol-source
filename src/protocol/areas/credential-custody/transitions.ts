@@ -5,23 +5,28 @@ import type { ActionContract } from "../action-contract";
 import type { EventDescriptor } from "../../events/chains";
 import type { GatewayCheckAttempt } from "../gateway-gate";
 import type { Greenlight } from "../policy-greenlight";
+import type { ProtectedPathPosture } from "../protected-path-posture";
 import type { ProtocolRecorder } from "../../events/records";
 import type { ProtocolRecord } from "../object-registry";
 import type { ProtocolStore, StoredProtocolRecord } from "../../store/port";
 import {
   RecordCredentialResolutionEvidenceInputSchema,
+  RecordGatewayCustodyProofPacketInputSchema,
   RegisterGatewayCredentialRefInputSchema,
   type RecordCredentialResolutionEvidenceInput,
+  type RecordGatewayCustodyProofPacketInput,
   type RegisterGatewayCredentialRefInput,
 } from "./types";
 import { credentialCustodyCanSatisfyGatewayChecked } from "./custody-posture";
 import {
   CredentialResolutionEvidenceSchema,
   GatewayCredentialRefSchema,
+  GatewayCustodyProofPacketSchema,
   PROTOCOL_VERSION,
   type CredentialResolutionEvidence,
   type GatewayCredentialBinding,
   type GatewayCredentialRef,
+  type GatewayCustodyProofPacket,
   type JsonValue,
 } from "./types";
 
@@ -29,6 +34,7 @@ type ParsedRegisterGatewayCredentialRefInput = ReturnType<typeof RegisterGateway
 type ParsedRecordCredentialResolutionEvidenceInput = ReturnType<
   typeof RecordCredentialResolutionEvidenceInputSchema.parse
 >;
+type ParsedRecordGatewayCustodyProofPacketInput = ReturnType<typeof RecordGatewayCustodyProofPacketInputSchema.parse>;
 
 export type GatewayCredentialBindingEvaluation = {
   records: StoredProtocolRecord<GatewayCredentialRef>[];
@@ -75,6 +81,20 @@ export async function recordCredentialResolutionEvidence(
     credentialResolutionEvidenceEvent(evidence),
   ]);
   return evidence;
+}
+
+export async function recordGatewayCustodyProofPacket(
+  recorder: ProtocolRecorder,
+  inputValue: RecordGatewayCustodyProofPacketInput,
+): Promise<GatewayCustodyProofPacket> {
+  const input = RecordGatewayCustodyProofPacketInputSchema.parse(inputValue);
+  const context = await loadCustodyProofPacketContext(recorder, input);
+  assertCustodyProofPacketContext(context);
+  const packet = await buildGatewayCustodyProofPacket(context);
+  await recorder.commitRecordsWithEvents(gatewayCustodyProofPacketRecords(packet), [
+    gatewayCustodyProofPacketEvent(packet),
+  ]);
+  return packet;
 }
 
 export async function evaluateGatewayCredentialBindings(
@@ -290,6 +310,13 @@ type ResolutionEvidenceContext = {
   now: string;
 };
 
+type CustodyProofPacketContext = {
+  input: ParsedRecordGatewayCustodyProofPacketInput;
+  gatewayCredentialRefRecord: StoredProtocolRecord<GatewayCredentialRef>;
+  protectedPathPostureRecord: StoredProtocolRecord<ProtectedPathPosture>;
+  now: string;
+};
+
 async function loadResolutionEvidenceContext(
   recorder: ProtocolRecorder,
   input: ParsedRecordCredentialResolutionEvidenceInput,
@@ -309,6 +336,145 @@ async function loadResolutionEvidenceContext(
     ),
   ]);
   return { input, contractRecord, greenlightRecord, gateAttemptRecord, gatewayCredentialRefRecord, now: nowIso() };
+}
+
+async function loadCustodyProofPacketContext(
+  recorder: ProtocolRecorder,
+  input: ParsedRecordGatewayCustodyProofPacketInput,
+): Promise<CustodyProofPacketContext> {
+  const [gatewayCredentialRefRecord, protectedPathPostureRecord] = await Promise.all([
+    recorder.requiredRecord<GatewayCredentialRef>(
+      "gateway_credential_ref",
+      input.gatewayCredentialRefId,
+      "gateway_credential_ref_missing",
+    ),
+    recorder.requiredRecord<ProtectedPathPosture>(
+      "protected_path_posture",
+      input.protectedPathPostureId,
+      "protected_path_posture_missing",
+    ),
+  ]);
+  return { input, gatewayCredentialRefRecord, protectedPathPostureRecord, now: nowIso() };
+}
+
+function assertCustodyProofPacketContext(context: CustodyProofPacketContext): void {
+  const { input, gatewayCredentialRefRecord, protectedPathPostureRecord, now } = context;
+  const credentialRef = gatewayCredentialRefRecord.payload;
+  const posture = protectedPathPostureRecord.payload;
+  if (
+    credentialRef.tenantId !== input.tenantId ||
+    credentialRef.organizationId !== input.organizationId ||
+    posture.tenantId !== input.tenantId ||
+    posture.organizationId !== input.organizationId
+  ) {
+    throw new HandshakeProtocolError(
+      "gateway_custody_proof_scope_mismatch",
+      "Gateway custody proof packet tenant or organization does not match its evidence records.",
+      409,
+    );
+  }
+  if (credentialRef.gatewayCredentialRefDigest !== input.gatewayCredentialRefDigest) {
+    throw new HandshakeProtocolError(
+      "gateway_credential_ref_digest_mismatch",
+      "Gateway custody proof packet saw a gateway credential ref digest that does not match the durable ref.",
+      409,
+    );
+  }
+  if (posture.postureDigest !== input.protectedPathPostureDigest) {
+    throw new HandshakeProtocolError(
+      "protected_path_posture_digest_mismatch",
+      "Gateway custody proof packet saw a protected-path posture digest that does not match the durable posture.",
+      409,
+    );
+  }
+  if (
+    posture.gatewayId !== credentialRef.gatewayId ||
+    posture.protectedSurfaceKind !== credentialRef.protectedSurfaceKind ||
+    !credentialRef.actionClasses.includes(posture.actionClass) ||
+    (!credentialRef.resourceRefs.includes("*") && !credentialRef.resourceRefs.includes(posture.resourceRef))
+  ) {
+    throw new HandshakeProtocolError(
+      "gateway_custody_proof_binding_mismatch",
+      "Gateway custody proof packet must bind the same gateway, action class, protected surface, and resource.",
+      409,
+    );
+  }
+  if (posture.postureState !== "gateway_checked") {
+    throw new HandshakeProtocolError(
+      "gateway_custody_proof_posture_not_gateway_checked",
+      "Gateway custody proof packet requires gateway-checked protected-path posture.",
+      409,
+    );
+  }
+  if (posture.sourceAuthority !== "gateway_probe") {
+    throw new HandshakeProtocolError(
+      "gateway_custody_proof_source_authority_weak",
+      "Gateway custody proof packet requires gateway-owned protected-path posture evidence.",
+      409,
+    );
+  }
+  if (Date.parse(posture.expiresAt) <= Date.parse(now)) {
+    throw new HandshakeProtocolError(
+      "gateway_custody_proof_posture_stale",
+      "Gateway custody proof packet cannot use stale protected-path posture.",
+      409,
+    );
+  }
+  if (!credentialCustodyCanSatisfyGatewayChecked(credentialRef.custodyStatus)) {
+    throw new HandshakeProtocolError(
+      "gateway_custody_proof_unsafe_custody",
+      "Gateway custody proof packet cannot use unsafe credential custody.",
+      409,
+    );
+  }
+  if (posture.credentialCustodyStatus !== credentialRef.custodyStatus) {
+    throw new HandshakeProtocolError(
+      "gateway_custody_proof_custody_mismatch",
+      "Gateway custody proof packet posture custody must match the gateway credential ref.",
+      409,
+    );
+  }
+  if (
+    !sameStringSet(input.bypassProbeIds, posture.bypassProbeIds) ||
+    !sameStringSet(input.bypassProbeDigests, posture.bypassProbeDigests)
+  ) {
+    throw new HandshakeProtocolError(
+      "gateway_custody_proof_bypass_probe_mismatch",
+      "Gateway custody proof packet bypass probe refs and digests must match the protected-path posture.",
+      409,
+    );
+  }
+  if (
+    input.custodyClaimLevel !== "local_fixture" &&
+    input.externalVerificationStatus !== "verified_by_official_source"
+  ) {
+    throw new HandshakeProtocolError(
+      "gateway_custody_proof_external_verification_required",
+      "Customer/provider custody proof requires official external verification evidence.",
+      409,
+    );
+  }
+  if (input.custodyClaimLevel !== "local_fixture" && credentialRef.custodyStatus === "fixture_gateway_held") {
+    throw new HandshakeProtocolError(
+      "gateway_custody_proof_fixture_cannot_claim_customer_custody",
+      "Fixture custody cannot satisfy customer or provider custody claims.",
+      409,
+    );
+  }
+  if (input.custodyDriftStatus !== "current" || input.resolverDriftStatus !== "current") {
+    throw new HandshakeProtocolError(
+      "gateway_custody_proof_drifted",
+      "Gateway custody proof packet cannot be recorded as current when custody or resolver drift is present.",
+      409,
+    );
+  }
+  if (input.redactionStatus === "redaction_failed") {
+    throw new HandshakeProtocolError(
+      "gateway_custody_proof_redaction_failed",
+      "Gateway custody proof packet cannot expose failed redaction as usable evidence.",
+      409,
+    );
+  }
 }
 
 function assertResolutionEvidenceContext(context: ResolutionEvidenceContext): void {
@@ -401,8 +567,70 @@ async function buildCredentialResolutionEvidence(
   return CredentialResolutionEvidenceSchema.parse({ ...evidenceSeed, evidenceDigest });
 }
 
+async function buildGatewayCustodyProofPacket(context: CustodyProofPacketContext): Promise<GatewayCustodyProofPacket> {
+  const { input, gatewayCredentialRefRecord, protectedPathPostureRecord, now } = context;
+  const credentialRef = gatewayCredentialRefRecord.payload;
+  const posture = protectedPathPostureRecord.payload;
+  const recordedAt = input.recordedAt ?? now;
+  const gatewayCustodyProofPacketId = input.gatewayCustodyProofPacketId ?? createId("gcpp");
+  const packetSeed = {
+    schemaVersion: PROTOCOL_VERSION,
+    tenantId: input.tenantId,
+    organizationId: input.organizationId,
+    createdAt: now,
+    gatewayCustodyProofPacketId,
+    gatewayCustodyProofPacketDigest: null,
+    gatewayCredentialRefId: credentialRef.gatewayCredentialRefId,
+    gatewayCredentialRefDigest: credentialRef.gatewayCredentialRefDigest,
+    protectedPathPostureId: posture.protectedPathPostureId,
+    protectedPathPostureDigest: posture.postureDigest,
+    gatewayInstallEvidenceRefs: input.gatewayInstallEvidenceRefs,
+    gatewayInstallEvidenceDigests: input.gatewayInstallEvidenceDigests,
+    bypassProbeIds: input.bypassProbeIds,
+    bypassProbeDigests: input.bypassProbeDigests,
+    gatewayId: credentialRef.gatewayId,
+    gatewayRegistryEntryId: credentialRef.gatewayRegistryEntryId,
+    protectedSurfaceKind: credentialRef.protectedSurfaceKind,
+    actionClasses: credentialRef.actionClasses,
+    resourceRefs: credentialRef.resourceRefs,
+    custodyProviderClass: input.custodyProviderClass,
+    custodyProviderRegistryRef: input.custodyProviderRegistryRef,
+    custodyProviderRegistryDigest: input.custodyProviderRegistryDigest,
+    opaqueKeyHandleRef: input.opaqueKeyHandleRef,
+    opaqueKeyHandleDigest: input.opaqueKeyHandleDigest,
+    credentialKind: credentialRef.credentialKind,
+    credentialCustodyStatus: credentialRef.custodyStatus,
+    custodyClaimLevel: input.custodyClaimLevel,
+    resolverRef: credentialRef.resolverRef,
+    resolverVersion: credentialRef.resolverVersion,
+    leaseRef: input.leaseRef,
+    leaseVersion: input.leaseVersion,
+    leaseIssuedAt: input.leaseIssuedAt,
+    leaseExpiresAt: input.leaseExpiresAt,
+    attestationRefs: input.attestationRefs,
+    attestationDigests: input.attestationDigests,
+    redactedAuditRefs: input.redactedAuditRefs,
+    redactedAuditDigest: input.redactedAuditDigest,
+    custodyDriftStatus: input.custodyDriftStatus,
+    resolverDriftStatus: input.resolverDriftStatus,
+    redactionStatus: input.redactionStatus,
+    externalVerificationStatus: input.externalVerificationStatus,
+    redactionProfileRef: "gateway-custody-proof-packet:v0.2-redacted" as const,
+    secretMaterialIncluded: false as const,
+    authorityCreated: false as const,
+    recordedAt,
+    expiresAt: input.expiresAt,
+  };
+  const gatewayCustodyProofPacketDigest = await digestCanonical(packetSeed);
+  return GatewayCustodyProofPacketSchema.parse({ ...packetSeed, gatewayCustodyProofPacketDigest });
+}
+
 function credentialResolutionEvidenceRecords(record: CredentialResolutionEvidence): ProtocolRecord[] {
   return [{ objectType: "credential_resolution_evidence", payload: record }];
+}
+
+function gatewayCustodyProofPacketRecords(record: GatewayCustodyProofPacket): ProtocolRecord[] {
+  return [{ objectType: "gateway_custody_proof_packet", payload: record }];
 }
 
 function credentialResolutionEvidenceEvent(record: CredentialResolutionEvidence): EventDescriptor {
@@ -422,4 +650,30 @@ function credentialResolutionEvidenceEvent(record: CredentialResolutionEvidence)
       redactionStatus: record.redactionStatus,
     },
   };
+}
+
+function gatewayCustodyProofPacketEvent(record: GatewayCustodyProofPacket): EventDescriptor {
+  return {
+    source: record,
+    eventType: "gateway_custody_proof_packet_recorded",
+    objectRefs: [
+      record.gatewayCustodyProofPacketId,
+      record.gatewayCredentialRefId,
+      record.protectedPathPostureId,
+      record.gatewayCustodyProofPacketDigest,
+    ],
+    payload: {
+      gatewayId: record.gatewayId,
+      custodyClaimLevel: record.custodyClaimLevel,
+      custodyDriftStatus: record.custodyDriftStatus,
+      redactionStatus: record.redactionStatus,
+      authorityCreated: record.authorityCreated,
+    },
+  };
+}
+
+function sameStringSet(left: readonly string[], right: readonly string[]): boolean {
+  if (left.length !== right.length) return false;
+  const rightSet = new Set(right);
+  return left.every((value) => rightSet.has(value));
 }

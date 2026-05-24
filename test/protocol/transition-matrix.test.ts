@@ -70,6 +70,7 @@ describe("foundation transition matrix", () => {
       "createRuntimeExecution",
       "createGeneratedExecutionGraph",
       "createBypassProbe",
+      "recordGatewayCustodyProofPacket",
       "createToolCallDraft",
       "transitionToolCallDraft",
       "createProtectedPathPosture",

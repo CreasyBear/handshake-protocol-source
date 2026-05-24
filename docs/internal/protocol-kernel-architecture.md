@@ -87,6 +87,7 @@ surface:
 | `createRuntimeExecution`                  | runtime evidence          | Records execution-block shape without authority.                                                      |
 | `createGeneratedExecutionGraph`           | generated execution graph | Records generated-code/spec graph evidence and coverage posture.                                      |
 | `registerGatewayCredentialRef`            | credential custody        | Records opaque gateway-side credential custody evidence without secret material.                      |
+| `recordGatewayCustodyProofPacket`         | credential custody        | Records redacted custody proof evidence; it does not approve, sign, or execute protected mutations.   |
 | `recordCredentialResolutionEvidence`      | credential custody        | Records post-gate credential resolution/use evidence; it does not retrieve secrets or mint authority. |
 | `createBypassProbe`                       | bypass probe              | Records protected-path bypass evidence without creating posture or authority.                         |
 | `createToolCallDraft`                     | tool-call draft           | Records streamed/generated tool-call input state before candidate construction.                       |
@@ -111,41 +112,42 @@ surface:
 Every durable object is stored as a `ProtocolRecord` discriminated by
 `objectType`.
 
-| Object type                                 | Schema owner                | Role                                                                        |
-| ------------------------------------------- | --------------------------- | --------------------------------------------------------------------------- |
-| `tool_capability`                           | `catalog-envelope`          | Callable runtime capability and bypass posture.                             |
-| `action_type`                               | `catalog-envelope`          | Declared consequential action type.                                         |
-| `gateway_registry_entry`                    | `catalog-envelope`          | Gateway adapter, policy version, credential custody, and enforcement mode.  |
-| `operating_envelope`                        | `catalog-envelope`          | Attempt bounds for principal, agent, resources, gateways, and policy pack.  |
-| `gateway_credential_ref`                    | `credential-custody`        | Opaque gateway-side credential ref bound into exact contracts.              |
-| `credential_resolution_evidence`            | `credential-custody`        | Redacted post-gate credential resolution/use evidence.                      |
-| `transition_request_context`                | `context`                   | Caller and request context evidence.                                        |
-| `runtime_execution`                         | `runtime-evidence`          | Runtime execution-block evidence.                                           |
-| `generated_execution_graph`                 | `generated-execution-graph` | Generated-code/spec evidence and coverage posture.                          |
-| `bypass_probe`                              | `bypass-probe`              | Named bypass/custody/drift/failure-closed probe evidence.                   |
-| `tool_call_draft`                           | `tool-call-draft`           | Generated tool-call input state before candidate finalization.              |
-| `protected_path_posture`                    | `protected-path-posture`    | Installed, bypass, drift, or unknown posture for a protected path.          |
-| `intent_compilation`                        | `intent-compilation`        | Candidate action, assumptions, uncertainty, and compiler refusal posture.   |
-| `action_contract`                           | `action-contract`           | Exact proposed protected action.                                            |
-| `authority_certificate`                     | `authority-certificate`     | Terminal signed evidence for receipt, refusal, proof gap, or replay.        |
-| `policy_decision`                           | `policy-greenlight`         | Decision against one exact contract.                                        |
-| `greenlight`                                | `policy-greenlight`         | One-use gateway-bound pass.                                                 |
-| `idempotency_ledger_entry`                  | `idempotency-ledger`        | Duplicate-authority ledger entry for one protected idempotency scope.       |
-| `review_artifact`                           | `review-binding`            | Rendered review artifact bound to exact digests.                            |
-| `review_decision`                           | `review-binding`            | Reviewer decision bound to artifact and contract.                           |
-| `breaker_decision`                          | `isolation-breaker`         | Control decision that changes future authority posture.                     |
-| `isolation_state`                           | `isolation-breaker`         | Persistent block or reduction for future policy/gateway checks.             |
-| `gateway_check_attempt`                     | `gateway-gate`              | Pre-mutation gateway verification result.                                   |
-| `mutation_attempt`                          | `gateway-gate`              | Protected mutation attempt evidence.                                        |
-| `protected_surface_operation_claim`         | `operation-lifecycle`       | Claim over downstream protected-surface operation state.                    |
-| `surface_operation_reconciliation`          | `operation-lifecycle`       | Downstream finality observation.                                            |
-| `proof_gap`                                 | `proof-gap`                 | Missing, ambiguous, expired, unavailable, or contradictory evidence.        |
-| `refusal`                                   | `refusal`                   | Durable denial evidence that creates no authority and attempts no mutation. |
-| `receipt`                                   | `receipt-export`            | Reconstructable action chain evidence.                                      |
-| `receipt_export`                            | `receipt-export`            | Export package of existing receipt evidence.                                |
-| `recovery_recommendation`                   | `recovery`                  | Follow-up recommendation after refusal, gap, or ambiguous outcome.          |
-| `recovery_recommendation_status_transition` | `recovery`                  | Recovery lifecycle state change.                                            |
-| `contract_stream_event`                     | `events`                    | Ordered event evidence for reconstruction.                                  |
+| Object type                                 | Schema owner                | Role                                                                                            |
+| ------------------------------------------- | --------------------------- | ----------------------------------------------------------------------------------------------- |
+| `tool_capability`                           | `catalog-envelope`          | Callable runtime capability and bypass posture.                                                 |
+| `action_type`                               | `catalog-envelope`          | Declared consequential action type.                                                             |
+| `gateway_registry_entry`                    | `catalog-envelope`          | Gateway adapter, policy version, credential custody, and enforcement mode.                      |
+| `operating_envelope`                        | `catalog-envelope`          | Attempt bounds for principal, agent, resources, gateways, and policy pack.                      |
+| `gateway_credential_ref`                    | `credential-custody`        | Opaque gateway-side credential ref bound into exact contracts.                                  |
+| `gateway_custody_proof_packet`              | `credential-custody`        | Redacted packet tying credential ref, protected-path posture, probes, drift, and custody proof. |
+| `credential_resolution_evidence`            | `credential-custody`        | Redacted post-gate credential resolution/use evidence.                                          |
+| `transition_request_context`                | `context`                   | Caller and request context evidence.                                                            |
+| `runtime_execution`                         | `runtime-evidence`          | Runtime execution-block evidence.                                                               |
+| `generated_execution_graph`                 | `generated-execution-graph` | Generated-code/spec evidence and coverage posture.                                              |
+| `bypass_probe`                              | `bypass-probe`              | Named bypass/custody/drift/failure-closed probe evidence.                                       |
+| `tool_call_draft`                           | `tool-call-draft`           | Generated tool-call input state before candidate finalization.                                  |
+| `protected_path_posture`                    | `protected-path-posture`    | Installed, bypass, drift, or unknown posture for a protected path.                              |
+| `intent_compilation`                        | `intent-compilation`        | Candidate action, assumptions, uncertainty, and compiler refusal posture.                       |
+| `action_contract`                           | `action-contract`           | Exact proposed protected action.                                                                |
+| `authority_certificate`                     | `authority-certificate`     | Terminal signed evidence for receipt, refusal, proof gap, or replay.                            |
+| `policy_decision`                           | `policy-greenlight`         | Decision against one exact contract.                                                            |
+| `greenlight`                                | `policy-greenlight`         | One-use gateway-bound pass.                                                                     |
+| `idempotency_ledger_entry`                  | `idempotency-ledger`        | Duplicate-authority ledger entry for one protected idempotency scope.                           |
+| `review_artifact`                           | `review-binding`            | Rendered review artifact bound to exact digests.                                                |
+| `review_decision`                           | `review-binding`            | Reviewer decision bound to artifact and contract.                                               |
+| `breaker_decision`                          | `isolation-breaker`         | Control decision that changes future authority posture.                                         |
+| `isolation_state`                           | `isolation-breaker`         | Persistent block or reduction for future policy/gateway checks.                                 |
+| `gateway_check_attempt`                     | `gateway-gate`              | Pre-mutation gateway verification result.                                                       |
+| `mutation_attempt`                          | `gateway-gate`              | Protected mutation attempt evidence.                                                            |
+| `protected_surface_operation_claim`         | `operation-lifecycle`       | Claim over downstream protected-surface operation state.                                        |
+| `surface_operation_reconciliation`          | `operation-lifecycle`       | Downstream finality observation.                                                                |
+| `proof_gap`                                 | `proof-gap`                 | Missing, ambiguous, expired, unavailable, or contradictory evidence.                            |
+| `refusal`                                   | `refusal`                   | Durable denial evidence that creates no authority and attempts no mutation.                     |
+| `receipt`                                   | `receipt-export`            | Reconstructable action chain evidence.                                                          |
+| `receipt_export`                            | `receipt-export`            | Export package of existing receipt evidence.                                                    |
+| `recovery_recommendation`                   | `recovery`                  | Follow-up recommendation after refusal, gap, or ambiguous outcome.                              |
+| `recovery_recommendation_status_transition` | `recovery`                  | Recovery lifecycle state change.                                                                |
+| `contract_stream_event`                     | `events`                    | Ordered event evidence for reconstruction.                                                      |
 
 ## Schema Backbone
 
@@ -228,6 +230,11 @@ The contract is exact proposed commitment. It is not execution authority.
   resources, provider registry ref/digest, resolver ref/version, and evidence
   expectations. It includes no raw credential material and creates no
   permission.
+- `GatewayCustodyProofPacket` is redacted evidence. It binds a gateway
+  credential ref, protected-path posture, bypass probe refs/digests, install
+  evidence, resolver/lease/attestation posture, drift status, and redaction
+  status. It creates no permission, policy decision, greenlight, gateway check,
+  signer invocation, custody, or downstream success.
 - `CredentialResolutionEvidence` is recorded only after a passed
   `GatewayCheckAttempt`. It binds credential use to the exact contract,
   greenlight, gate attempt, mutation attempt, gateway credential ref digest,

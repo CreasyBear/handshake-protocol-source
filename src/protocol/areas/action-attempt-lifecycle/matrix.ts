@@ -186,6 +186,33 @@ export const actionAttemptLifecycleMatrix: Partial<Record<ActionAttemptLifecycle
     },
     "gateway credential ref records custody evidence only and cannot expose credential material",
   ),
+  "recordGatewayCustodyProofPacket:recorded": entry(
+    {
+      phase: "observation",
+      state: "credential_custody_recorded",
+      authorityEffect: "evidence_only",
+      terminalOutcome: "evidence_only",
+    },
+    "gateway custody proof packet records redacted custody posture evidence without minting authority",
+  ),
+  "recordGatewayCustodyProofPacket:refusal": entry(
+    {
+      phase: "observation",
+      state: "credential_custody_recorded",
+      authorityEffect: "none",
+      terminalOutcome: "refusal",
+    },
+    "gateway custody proof packet failures refuse weak custody evidence before policy or gateway authority",
+  ),
+  "recordGatewayCustodyProofPacket:proof_gap": entry(
+    {
+      phase: "observation",
+      state: "credential_custody_recorded",
+      authorityEffect: "evidence_only",
+      terminalOutcome: "proof_gap",
+    },
+    "gateway custody proof packet uncertainty remains evidence instead of permission",
+  ),
   "recordCredentialResolutionEvidence:recorded": entry(
     {
       phase: "gateway",

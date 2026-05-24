@@ -19,6 +19,7 @@ const idFields = {
   gateway_registry_entry: "gatewayRegistryEntryId",
   operating_envelope: "envelopeId",
   gateway_credential_ref: "gatewayCredentialRefId",
+  gateway_custody_proof_packet: "gatewayCustodyProofPacketId",
   credential_resolution_evidence: "credentialResolutionEvidenceId",
   transition_request_context: "transitionRequestContextId",
   runtime_execution: "runtimeExecutionId",
