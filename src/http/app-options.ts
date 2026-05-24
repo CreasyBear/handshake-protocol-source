@@ -1,4 +1,5 @@
 import type { ProtocolStore } from "../protocol/store/port";
+import type { AuthorityCertificateTrustMaterialInput } from "../protocol/areas/authority-certificate";
 import type { CallerAuthTokens, CallerAuthWorkerBindings } from "./admission/caller-auth";
 import type { HostedCallerVerifier } from "./admission/hosted-caller-identity";
 
@@ -13,4 +14,5 @@ export type AppOptions = {
   callerAuthTokens?: CallerAuthTokens;
   authMode?: "local" | "hosted";
   hostedCallerVerifier?: HostedCallerVerifier;
+  authorityCertificateTrustMaterial?: AuthorityCertificateTrustMaterialInput;
 };

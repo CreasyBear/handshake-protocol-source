@@ -82,6 +82,101 @@ describe("Hono protocol surface", () => {
     expect(openapiDocument.paths["/v0.2/records/{objectType}/{objectId}"]).toBeUndefined();
   });
 
+  it("serves hosted verifier projections and verification without mutating protocol state", async () => {
+    const store = new InMemoryProtocolStore();
+    const app = createApp({
+      store,
+      authorityCertificateTrustMaterial: {
+        keys: [
+          {
+            keyIdentityRef: "fixture:ed25519:verifier",
+            issuerRef: "issuer:fixture",
+            signerRole: "gateway",
+            algorithm: "ed25519",
+            publicKeyEd25519: "public-ed25519-material",
+            hmacSecret: null,
+            status: "active",
+          },
+          {
+            keyIdentityRef: "fixture:hmac:dev",
+            signerRole: null,
+            algorithm: "hmac-sha256",
+            publicKeyEd25519: null,
+            hmacSecret: "must-not-project",
+            status: "active",
+          },
+        ],
+        issuers: [
+          {
+            issuerRef: "issuer:fixture",
+            issuerDigest: DIGEST_B,
+            status: "active",
+            metadataRefs: ["evidence:issuer-fixture"],
+          },
+        ],
+        statusRecords: [
+          {
+            statusRecordId: "acsr_fixture_key",
+            subjectKind: "key",
+            subjectRef: "fixture:ed25519:verifier",
+            status: "active",
+            reasonCode: "fixture_key_active",
+            observedAt: "2026-05-24T00:00:00.000Z",
+            evidenceRefs: ["evidence:key-status"],
+          },
+        ],
+      },
+    });
+
+    const metadata = await app.request("/v0.2/verifier/metadata");
+    expect(metadata.status).toBe(200);
+    expect(await metadata.json()).toMatchObject({
+      authorityCreated: false,
+      hostedMutationAuthority: false,
+      remoteTrustFetchAllowed: false,
+      verificationPlane: "local_pinned_trust_material",
+    });
+
+    const keySet = await app.request("/v0.2/verifier/key-set");
+    expect(keySet.status).toBe(200);
+    const keySetBody = await keySet.text();
+    expect(keySetBody).toContain("fixture:ed25519:verifier");
+    expect(keySetBody).not.toContain("must-not-project");
+    expect(JSON.parse(keySetBody)).toMatchObject({
+      trustDecision: "caller_pinned_trust_material_only",
+      authorityCreated: false,
+      omittedPrivateKeyCount: 1,
+    });
+
+    const jwks = await app.request("/v0.2/verifier/jwks.json");
+    expect(jwks.status).toBe(200);
+    const jwksBody = await jwks.text();
+    expect(jwksBody).toContain('"kty":"OKP"');
+    expect(jwksBody).not.toContain("hmacSecret");
+    expect(jwksBody).not.toContain("must-not-project");
+
+    const status = await app.request("/v0.2/verifier/status/key/fixture:ed25519:verifier");
+    expect(status.status).toBe(200);
+    expect(await status.json()).toMatchObject({
+      authorityCreated: false,
+      statusRecord: { subjectRef: "fixture:ed25519:verifier", status: "active" },
+    });
+
+    const verify = await app.request("/v0.2/verifier/authority-certificates/verify", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ certificate: { not: "an authority certificate" } }),
+    });
+    expect(verify.status).toBe(200);
+    expect(await verify.json()).toMatchObject({
+      outcome: "refused",
+      authorityCreated: false,
+      failures: [{ code: "schema_invalid" }],
+    });
+    expect(await store.listRecordsByType("authority_certificate")).toHaveLength(0);
+    expect(await store.listRecordsByType("contract_stream_event")).toHaveLength(0);
+  });
+
   it("keeps transition route registry, OpenAPI security, and debug route posture in parity", async () => {
     const app = createApp();
     const response = await app.request("/openapi.json");

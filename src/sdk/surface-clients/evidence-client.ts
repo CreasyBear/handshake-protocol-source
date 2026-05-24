@@ -1,6 +1,6 @@
 import type {
   AgentTransactionEnvelopeProjection,
-  AuthorityCertificateTrustMaterial,
+  AuthorityCertificateTrustMaterialInput,
   ContractEvidenceProjection,
   GeneratedGraphEvidenceProjection,
   IdempotencyRecoveryProjection,
@@ -58,10 +58,7 @@ export class EvidenceClient {
     return this.transport.get(`/v0.2/evidence/protected-path-install-health/${encodeURIComponent(actionContractId)}`);
   }
 
-  verifyAuthorityCertificate(
-    certificate: unknown,
-    trustMaterial: AuthorityCertificateTrustMaterial,
-  ): Promise<VerifyAuthorityCertificateResult> {
-    return verifyAuthorityCertificate(certificate, trustMaterial);
+  verifyAuthorityCertificate(certificate: unknown, trustMaterial: unknown): Promise<VerifyAuthorityCertificateResult> {
+    return verifyAuthorityCertificate(certificate, trustMaterial as AuthorityCertificateTrustMaterialInput);
   }
 }

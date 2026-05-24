@@ -163,7 +163,13 @@ export const AuthorityCertificateTrustMaterialSchema = z.strictObject({
   verificationTime: IsoDateSchema.nullable().default(null),
   allowDevHmac: z.boolean().default(false),
 });
-export type AuthorityCertificateTrustMaterialInput = z.input<typeof AuthorityCertificateTrustMaterialSchema>;
+export type AuthorityCertificateTrustMaterialInput = {
+  keys?: z.input<typeof AuthorityCertificateTrustKeySchema>[];
+  issuers?: z.input<typeof AuthorityCertificateIssuerSchema>[];
+  statusRecords?: z.input<typeof AuthorityCertificateStatusRecordSchema>[];
+  verificationTime?: string | null;
+  allowDevHmac?: boolean;
+};
 export type AuthorityCertificateTrustMaterial = z.infer<typeof AuthorityCertificateTrustMaterialSchema>;
 
 export const AuthorityCertificateVerificationOutcomeSchema = z.enum(["verified", "refused", "proof_gap"]);

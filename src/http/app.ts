@@ -8,6 +8,13 @@ import { authorizeTransitionAdmission } from "./admission";
 import type { AppOptions, WorkerBindings } from "./app-options";
 import { evidenceReadRouteDefinitions } from "./routes/evidence-read-route-registry";
 import { handleEvidenceRead } from "./handlers/evidence-read";
+import {
+  handleHostedAuthorityCertificateVerify,
+  handleVerifierJwks,
+  handleVerifierKeySet,
+  handleVerifierMetadata,
+  handleVerifierStatus,
+} from "./handlers/verifier";
 import { assertHostedCallerScope } from "./admission/hosted-caller-identity";
 import { handleInternalRecordRead } from "./handlers/internal-record-read";
 import { openApiDocument } from "./openapi";
@@ -45,6 +52,12 @@ export function createApp(options: AppOptions = {}) {
   for (const route of evidenceReadRouteDefinitions) {
     app.get(route.honoPath, (c) => handleEvidenceRead(c, options, fallbackStore, route));
   }
+
+  app.get("/v0.2/verifier/metadata", (c) => handleVerifierMetadata(c));
+  app.get("/v0.2/verifier/key-set", (c) => handleVerifierKeySet(c, options));
+  app.get("/v0.2/verifier/jwks.json", (c) => handleVerifierJwks(c, options));
+  app.get("/v0.2/verifier/status/:subjectKind/:subjectRef", (c) => handleVerifierStatus(c, options));
+  app.post("/v0.2/verifier/authority-certificates/verify", (c) => handleHostedAuthorityCertificateVerify(c, options));
 
   app.get("/v0.2/records/:objectType/:objectId", async (c) => {
     return handleInternalRecordRead(c, options, fallbackStore);
