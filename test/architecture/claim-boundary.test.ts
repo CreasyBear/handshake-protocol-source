@@ -70,7 +70,11 @@ describe("claim boundary", () => {
     expect(canonicalDocs).not.toMatch(/use case: convert generated engineering-agent execution/i);
     expect(readme).toContain("narrow official x402 exact buyer-side proof path");
     expect(readme).toContain("one official buyer-side `exact` per-call path");
-    expect(readme).toContain("package install remains a regression fixture");
+    expect(readme).toContain("package-install material adapter pack evidence/report projection");
+    expect(readme).toContain("first promoted non-payment adapter pack after x402 exact per-call");
+    expect(readme).toContain("package safety proof");
+    expect(readme).toContain("npm audit replacement");
+    expect(readme).toContain("Bun provenance verification");
     expect(readme).toContain("external package-material attestation");
     expect(readme).toContain("not broad x402 compatibility");
     expect(readme).toContain("No adapter family defines the protocol");
@@ -101,6 +105,11 @@ describe("claim boundary", () => {
     expect(runtimeLane).toContain("It must not issue policy decisions, greenlights, gateway checks, receipts");
     expect(conformanceLane).toContain("does not prove provider-side enforcement");
     expect(adaptersLane).toContain("must not imply generic adapters, hosted operation");
+    expect(adaptersLane).toContain("package-install/adapter-pack.ts");
+    expect(adaptersLane).toContain(
+      "Package-install material evidence proves exact evidence/report/proof-gap binding only",
+    );
+    expect(adaptersLane).toContain("supply-chain safety, npm audit replacement, Bun provenance verification");
     expect(x402Walkthrough).toContain("one official buyer-side `x402_payment.exact` protected spend attempt");
     expect(x402Walkthrough).toContain("Do not write raw protocol records");
     expect(x402Walkthrough).toContain("The local/reference wallet gateway is the mutation credential holder");

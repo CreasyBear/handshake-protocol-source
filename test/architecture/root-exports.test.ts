@@ -274,6 +274,9 @@ describe("root package exports", () => {
 
     expect(Object.keys(root)).not.toContain("checkProtectedMutationAdapterConformance");
     expect(exportNames).toEqual([
+      "PackageInstallAdapterEvidenceReportSchema",
+      "PackageInstallMaterialEvidenceSchema",
+      "PackageInstallMaterialEvidenceStatusSchema",
       "X402AuthorityCertificateEvidenceProfileSchema",
       "X402FirstWedgeEvidenceLabelSchema",
       "X402FirstWedgeSurfaceSchema",
@@ -285,6 +288,9 @@ describe("root package exports", () => {
       "checkX402PaymentInstallConformance",
       "classifyX402FirstWedgeEvidenceLabel",
       "classifyX402FirstWedgeSurface",
+      "packageInstallMaterialAdapterPack",
+      "projectPackageInstallAdapterEvidenceReport",
+      "projectPackageInstallMaterialEvidence",
       "projectX402AuthorityCertificateEvidenceProfile",
     ]);
     expect(conformance.checkProtectedMutationAdapterConformance).toBeFunction();

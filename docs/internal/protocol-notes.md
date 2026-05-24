@@ -120,13 +120,17 @@ Protocol areas may depend on foundation/events/context/store and other area publ
 
 ## Current Proof Lanes
 
-- x402 payment is a local proof profile. Package install, repo write, and
-  preview deploy remain reference gateway fixtures. No adapter family defines
-  the protocol shape.
+- x402 exact per-call payment is the first local proof profile. Package install
+  is the first promoted non-payment adapter pack after that wedge; repo write
+  and preview deploy remain reference gateway fixtures. No adapter family
+  defines the protocol shape.
 - Package install binds gateway-observed package manager, registry,
   manifest/lockfile, install flags, lifecycle-script policy, and resolved
-  material evidence fields before mutation. This is local parameter binding, not
-  external package-material attestation.
+  material evidence fields before mutation. Its material adapter pack projects a
+  buyer-readable action, authority, exact-contract, evidence, outcome,
+  proof-gap, reconstruction, and bypass-posture report. This is local evidence
+  and proof-gap projection, not package safety, npm-audit replacement, Bun
+  provenance verification, or external package-material attestation.
 - Payment-specific protected-action packs live under adapter/plugin lanes, not protocol areas.
 - The payment adapter has a local D1/HTTP establishment path, runtime ingress,
   local/reference paid-HTTP 402 challenge and post-gate signed retry evidence,

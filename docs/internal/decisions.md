@@ -71,8 +71,10 @@ The local foundation includes:
 - provider-neutral `GatewayCredentialRef` and `CredentialResolutionEvidence`
   records bound into candidate/contract digest, policy/gateway evaluation,
   credential-ref isolation, and redacted projections;
-- package-install observed supply-chain parameters bound at the gateway before
-  mutation;
+- package-install material adapter pack evidence/report projection over
+  observed package manager, registry, manifest/lockfile, install flags,
+  lifecycle-script posture, resolved material refs, exact gateway binding,
+  bypass probe requirements, and proof gaps;
 - local x402 payment D1/HTTP establishment path through install, runtime
   proposal, policy, gateway check, local/reference 402 challenge evidence,
   gateway-created payment signature evidence, local/reference signed retry
@@ -127,6 +129,8 @@ The local foundation does not prove:
 - live vault-provider custody or provider-side secret lifecycle operation;
 - hosted org auth, policy operation, RBAC, retention, search, or mutation authority;
 - external package-manager material attestation;
+- package safety, npm-audit replacement, or Bun provenance verification from
+  the package-install adapter pack;
 - broad MCP, CLI, browser, shell, network, package-manager, or generated-tool-stream
   interception beyond the local x402 payment and package-install dispatch boundaries;
 - portable cross-org trust, remote JWKS trust fetch, live revocation authority,

@@ -177,6 +177,11 @@ export const protocolReasonCodes = [
   code("protected_surface_operation_in_progress", "gateway_decision", "gateway"),
   code("gate_passed", "gateway_decision", "gateway"),
   code("downstream_status_unknown", "proof_gap", "gateway"),
+  code("lockfile_reconstruction_evidence_missing", "proof_gap", "gateway"),
+  code("npm_provenance_not_verified", "proof_gap", "gateway"),
+  code("npm_signature_not_verified", "proof_gap", "gateway"),
+  code("package_lifecycle_scripts_require_separate_contract", "proof_gap", "gateway"),
+  code("registry_integrity_not_verified", "proof_gap", "gateway"),
 
   code("invalid_transition_unknown_reconciliation_cannot_resolve_proof_gap", "transition_error", "operation_lifecycle"),
   code("orphan_mitigation_required", "proof_gap", "operation_lifecycle"),

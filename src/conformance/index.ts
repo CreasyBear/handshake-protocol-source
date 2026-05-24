@@ -39,6 +39,18 @@ export async function assertProtectedMutationAdapterConformance(
 }
 
 export {
+  PackageInstallAdapterEvidenceReportSchema,
+  PackageInstallMaterialEvidenceSchema,
+  PackageInstallMaterialEvidenceStatusSchema,
+  packageInstallMaterialAdapterPack,
+  projectPackageInstallAdapterEvidenceReport,
+  projectPackageInstallMaterialEvidence,
+  type PackageInstallAdapterEvidenceReport,
+  type PackageInstallMaterialEvidence,
+  type PackageInstallMaterialEvidenceStatus,
+} from "../adapters/package-install/adapter-pack";
+
+export {
   X402FirstWedgeSurfaceSchema,
   X402AuthorityCertificateEvidenceProfileSchema,
   X402FirstWedgeEvidenceLabelSchema,
