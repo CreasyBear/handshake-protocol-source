@@ -1,0 +1,75 @@
+# RISK Perspective: Concerns Elimination
+
+## Invariant At Stake
+
+No consequential autonomous action executes outside declared bounds, and divergent behavior must be haltable, isolatable, and reconstructable.
+
+The current danger is false closure: runtime/MCP proposal surfaces can look aligned with the x402 adapter while dropping refusal-critical posture, sandbox evidence can be mistaken for seller/facilitator authority, and package/docs gates can make publish or hosted claims before source mechanisms exist.
+
+## P0 Risk Register
+
+| ID | Risk | Failure mode | Mitigation or cut line | Required validation gate |
+| --- | --- | --- | --- | --- |
+| P0-R1 | Runtime x402 posture defaulting creates weaker contracts than the direct adapter. | `RuntimeIngressObservedDispatchSchema` accepts `intendedRequestBodyPosture`, `providerEnvironmentPosture`, and `providerEnvironmentRef`, but `x402PaymentAttemptForDispatch()` currently omits them. Unsupported body posture or live/unknown provider posture can default to `no_body` and `local_reference_sandbox` before proposal. | Propagate the three fields into `X402PaymentAttempt`; add a shared x402 posture fixture/helper so runtime tests and adapter tests assert the same refusal codes. Cut line: runtime ingress cannot be described as an official x402 proposal path until unsupported/live/unknown dispatches refuse before contract proposal. | `npm run test -- test/runtime/runtime-ingress.test.ts test/adapters/x402-payment-action-proposal.test.ts`; assertions: no `intent_compilation`, `action_contract`, `greenlight`, or `gateway_check_attempt` on unsupported/live posture. |
+| P0-R2 | MCP x402 proposal schema cannot express the same request/provider refusal boundary. | `McpX402PaymentProposalInputSchema`, `x402Parameters()`, and `deriveMcpX402IdempotencyKey()` omit request-body posture and provider-environment posture. A model-facing MCP proposal can produce a weaker candidate than the adapter would accept. | Add `intendedRequestBodyPosture`, `providerEnvironmentPosture`, and `providerEnvironmentRef` to the strict MCP schema; forward them into candidate parameters, tool-call drafts, non-secret summaries, and idempotency digest material; preflight refuse omitted/unsupported/live/unknown before runtime calls. Cut line: MCP stays proposal/evidence only and cannot be called "parity" until these fields are contract-bound. | `npm run test -- test/mcp/mcp-schema-contract.test.ts test/mcp/mcp-x402-proposal.test.ts test/architecture/mcp-surface-posture.test.ts`; pack smoke must update its reference proposal input. |
+| P0-R3 | Local sandbox signed retry evidence is confused with seller middleware, facilitator settlement, or authority. | `createLocalX402PaidHttpSandbox()` emits official-shaped 402 challenge evidence and signed retry observation. Even with `authorityCreated: false`, product/demo text can launder it into payment finality or facilitator operation. | Keep sandbox evidence under explicit local/reference types and refs; keep `authorityCreated: false` on challenge and retry; classify signed retry as downstream fixture observation after `VerifiedGatewayCheck`, not policy, greenlight, gateway check, settlement, or signing authority. Cut line: no seller middleware, facilitator operation, settlement finality, or live paid HTTP claim without separate adapter and tests. | `npm run test -- test/adapters/x402-wallet-gateway.test.ts test/integration/x402-d1-http.test.ts test/product/x402-protected-spend-demo-report.test.ts test/architecture/claim-boundary.test.ts`. |
+| P0-R4 | Signer custody leaks into runtime/MCP/CLI or becomes a live provider custody claim. | `createOfficialExactX402SigningSurface()` uses an injected `ClientEvmSigner`; this proves gateway-side fixture/local signing after a passed gate, not provider vault lifecycle, customer custody, rotation, or revocation. | Keep signer factory out of adapter barrels and public root/runtime/MCP/CLI exports; enforce gateway-held or fixture-gateway-held signer posture in install/conformance; redact `PaymentPayload`, `PAYMENT-SIGNATURE`, raw private keys, and signer refs in projections and demos. Cut line: no live/provider/customer custody claim without provider-specific custody resolver, rotation/revocation tests, and gateway failure tests. | `npm run test -- test/architecture/import-posture.test.ts test/adapters/x402-wallet-gateway.test.ts test/adapters/x402-bypass-probes.test.ts test/protocol/evidence-projections.test.ts`. |
+| P0-R5 | Runtime/MCP bypass evidence is overclaimed as host-wide interception. | Runtime ingress records observed/synthetic bypass-shaped evidence, and MCP rejects authority-shaped inputs. Neither proves browser, shell, package manager, cloud, network, repo, or sibling MCP interception in a real host. | Keep bypass posture as observed evidence only. Require host-specific bypass probes and installed gateway-owned credentials before claiming protection for any host. Cut line: broad MCP/runtime/browser/shell/network/package protection remains future work. | `npm run quality:claims`; `npm run test -- test/runtime/runtime-ingress.test.ts test/mcp/mcp-x402-proposal.test.ts test/architecture/mcp-surface-posture.test.ts`. |
+
+## P1 Risk Register
+
+| ID | Risk | Failure mode | Mitigation or cut line | Required validation gate |
+| --- | --- | --- | --- | --- |
+| P1-R1 | Runtime ingress family hardcoding causes cross-family refusal drift. | `src/runtime/ingress/index.ts` owns multiple family schemas, conversion functions, graph nodes, and dispatch classifiers. New families can miss refusal fields or inherit x402 defaults. | Introduce a source-owned family adapter/registry interface for dispatch schema, attempt conversion, graph node metadata, refusal preflight, and signing-secret lookup. Migrate one family at a time with no public claim expansion. Cut line: no new protected-action family through the monolithic switch after the registry exists. | `npm run test -- test/runtime/runtime-ingress.test.ts test/runtime/auth-md-candidate-compilation.test.ts test/runtime/package-install-runtime.test.ts`; `npm run quality:architecture`. |
+| P1-R2 | Spend windows are metadata but get read as aggregate enforcement. | `X402SpendBoundsSchema` carries session/day/review fields with `spendWindowEnforcementStatus: "not_enforced_local_metadata"`; changed-amount retries can create separate per-call contracts. | Either implement a reservation ledger keyed by tenant/org/principal/agent/action/resource/window with conflict semantics and recovery evidence, or keep all aggregate spend copy/tests as non-claims. Cut line: no session/day/review enforcement claim until the ledger is source-owned and D1-backed. | Current cut-line gate: `npm run test -- test/runtime/runtime-ingress.test.ts test/architecture/claim-boundary.test.ts test/product/x402-protected-spend-demo-report.test.ts`. Future ledger gate must add D1 atomicity and conflict tests. |
+| P1-R3 | Evidence redaction is denylist-shaped and can miss provider credential formats. | `redactedProjectionRefs()` filters raw-looking refs by regex. Unknown vault/provider formats can pass into contract/envelope projections. | Move live-provider projections toward allowlisted typed refs and digests; add provider-format fuzz fixtures for secret refs, payment signatures, bearer tokens, vault paths, and x402 payload terms. Cut line: no hosted audit/search or provider-custody evidence claim while redaction depends only on generic patterns. | `npm run test -- test/protocol/evidence-projections.test.ts test/http/http.test.ts test/integration/auth-md-receipt-reconstruction.test.ts`; add fuzz tests before any live-provider phase closes. |
+| P1-R4 | D1/projection assembly does tenant/org scans and per-offset receipt reads. | `assembleAgentTransactionEnvelope()` calls broad `listRecordsByType()` for many object types, and receipt timeline reads load stream events one offset at a time. Hosted evidence reads will degrade or time out under real volume. | Add contract/action/run-scoped store methods, D1 indexes, and batched stream-event range reads. Keep current projections as local diagnostic reads until this lands. Cut line: no hosted audit/search, high-volume evidence, or customer dashboard claim. | `npm run quality:storage`; add scale fixtures around `assembleAgentTransactionEnvelope()` and receipt timeline reads before hosted claims. |
+| P1-R5 | Publish/package drift ships stale bundles or stale MCP schema. | Dirty source can change runtime/MCP/x402 behavior while `dist/**`, bin smoke inputs, or package metadata lag behind. | Treat `npm run pack:check` as mandatory for publish readiness; update package entrypoint smoke inputs when MCP schema changes; fail if `.planning/`, tests, or scratch docs enter packed files. Cut line: no npm/MCP Registry/public install claim from source-only changes. | `npm run pack:check`; `node scripts/check-package-surface.mjs`; `node scripts/check-published-entrypoints.mjs`; `npm run check:repo`. |
+| P1-R6 | x402 future surfaces sneak into `x402_payment.exact`. | `upto`, batch settlement, signed offers/receipts, lifecycle hooks, seller middleware, facilitator operation, and MCP auto-pay can be mistaken as extensions of the first wedge. | Keep `classifyX402FirstWedgeSurface()` as the source-owned cut line; add hostile/future upstream fixtures for unknown extensions, multiple accepts, non-exact schemes, malformed assets, and facilitator-shaped labels. Cut line: create new action classes only after policy/gateway/receipt support exists. | `npm run test -- test/conformance/x402-payment-conformance.test.ts test/conformance/x402-upstream-exact-fixtures.test.ts test/architecture/claim-boundary.test.ts`. |
+
+## P2 Risk Register
+
+| ID | Risk | Failure mode | Mitigation or cut line | Required validation gate |
+| --- | --- | --- | --- | --- |
+| P2-R1 | `.planning` scratch drift becomes repo canon. | Derived maps and macro outputs can be treated as source truth by future agents, reviving stale Tier 2 labels or overbroad claims. | Add/keep source-owned docs stating `.planning/` is scratch; ensure package surface excludes `.planning/`; do not create scripts, exports, CI names, or README sections from planning labels. Cut line: promote only source-backed decisions into `AGENTS.md`, `README.md`, `QUALITY.md`, `STRUCTURE.md`, or `docs/internal/*`. | `npm run quality:claims`; `npm run pack:check`; add an architecture guard if README/package/scripts begin referencing `.planning` as canon. |
+| P2-R2 | False completion through doc-only concern closure. | A plan can mark concerns closed after copy edits while source still defaults, overclaims, or leaks evidence. | Closure rule: every concern needs one source mechanism, one focused regression test, and one architecture/claim/package gate. Documentation can only follow source behavior. Cut line: if a concern has no source diff or test diff, it remains open. | Closeout must include focused tests plus `npm run quality:claims`, `npm run quality:architecture`, `npm run pack:check`, and `npm run check:repo`. |
+| P2-R3 | Demo output normalizes non-authority proof-object language. | Buyer-readable `x402_paid_http_call.exact` can be mistaken as an action catalog entry, and report output can imply hosted/live provider behavior. | Keep buyer-readable names explicitly non-authority and backed by actual `x402_payment.exact` action-contract fields; product tests must assert local/reference labels, gateway holder, non-claims, and absent raw signer terms. Cut line: no new proof-object label until action catalog, compiler, policy, and gateway expose a matching action class. | `npm run demo:aps`; `npm run test -- test/product/x402-protected-spend-demo-report.test.ts test/architecture/claim-boundary.test.ts`. |
+| P2-R4 | Gateway failure evidence remains too coarse for operations. | `runX402WalletGateway()` collapses signing failures to digest-only diagnostics, hiding selected-requirement drift versus SDK/signer/provider failure. | Add redacted failure reason codes without exposing signer material, `PaymentPayload`, or `PAYMENT-SIGNATURE`. Cut line: coarse failure classification is acceptable for local foundation, but not for hosted operations/support claims. | `npm run test -- test/adapters/x402-wallet-gateway.test.ts test/protocol/evidence-projections.test.ts`. |
+
+## Validation Gates
+
+Minimum implementation gate for this concerns-elimination plan:
+
+1. Focused P0 regression gate:
+   `npm run test -- test/runtime/runtime-ingress.test.ts test/mcp/mcp-schema-contract.test.ts test/mcp/mcp-x402-proposal.test.ts test/adapters/x402-payment-action-proposal.test.ts test/adapters/x402-wallet-gateway.test.ts`
+2. x402 future-surface and bypass gate:
+   `npm run test -- test/conformance/x402-payment-conformance.test.ts test/conformance/x402-upstream-exact-fixtures.test.ts test/adapters/x402-bypass-probes.test.ts`
+3. Evidence/redaction/storage gate:
+   `npm run quality:storage`
+4. Claim and architecture gate:
+   `npm run quality:claims && npm run quality:architecture`
+5. Publish drift gate:
+   `npm run pack:check`
+6. Final closeout gate:
+   `npm run check:repo`
+
+No concern is closed unless the focused gate and the final closeout gate both pass on the dirty worktree state being shipped.
+
+## Rollback And Stop Conditions
+
+- Stop if runtime or MCP unsupported/live/unknown posture still reaches `action_contract_proposed`.
+- Stop if any runtime or MCP test creates `policy_decision`, `greenlight`, `gateway_check_attempt`, `mutation_attempt`, `receipt`, or `authority_certificate`.
+- Stop if sandbox evidence introduces `authorityCreated: true`, settlement finality, seller middleware, facilitator operation, or live provider language.
+- Stop if signer, `PaymentPayload`, raw private key, `PAYMENT-SIGNATURE`, bearer token, vault path, or provider secret material appears in MCP/CLI/demo/projection serialized output.
+- Stop if aggregate spend/session/day/review language appears without a D1-backed reservation ledger.
+- Stop if D1/projection changes rely on broader tenant/org scans for a hosted claim.
+- Stop if package entrypoint smoke does not exercise the final MCP schema after posture fields are added.
+- Stop if `.planning/` becomes a package file, public docs authority source, script name, CI name, exported symbol, or README claim source.
+- Roll back claim text, not source guardrails, when source mechanisms pass but product copy overstates the installed boundary.
+- Roll back implementation if it weakens Tier 1 protocol/kernel invariants or moves authority into runtime, MCP, CLI, demos, or review output.
+
+## Blocked Checks
+
+- No validation commands were run in this raw risk pass; this file is a planning artifact only.
+- Sibling raw outputs, normalized outputs, and `.planning/macro/PLAN.md` were intentionally not read, so cross-perspective conflicts are unchecked here.
+- Live provider custody, hosted verifier, npm publication, MCP Registry publication, facilitator/seller middleware, aggregate spend ledger, and host-wide interception cannot be validated from current source because those mechanisms are not implemented.
