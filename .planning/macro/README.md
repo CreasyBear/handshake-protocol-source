@@ -6,6 +6,7 @@ Invariant: this folder is scratch coordination for macro work. It must not becom
 
 - `DEFERRED-INTEGRATE-ELIMINATE.md`: current integrate/eliminate register and critical path.
 - `active/x402-product-evaluation-20260524/`: not fully implemented. The activation/productization plan still names blocked work around a local verification command and first-use packet shape.
+- `active/auth-md-x402-interlock-20260524/`: active macro refresh. Plans a fail-first `auth_md_x402_interlock_packet.v0` before any composite auth.md/x402 execution surface.
 
 ## Implemented
 
