@@ -4,11 +4,23 @@
 
 ## Current State Inputs
 
-**Worktree state:**
-- Treat the current dirty x402 sandbox/evidence work as the test target. Source paths include `src/adapters/x402-payment/action-proposal.ts`, `src/adapters/x402-payment/upstream-evidence.ts`, `src/adapters/x402-payment/wallet-gateway.ts`, untracked `src/adapters/x402-payment/sandbox-http.ts`, and `src/runtime/ingress/index.ts`.
-- Treat the current dirty x402 tests as active coverage: `test/adapters/x402-payment-action-proposal.test.ts`, `test/adapters/x402-wallet-gateway.test.ts`, and `test/product/x402-protected-spend-demo-report.test.ts`.
-- Treat package and claim-surface docs currently dirty as claim-test inputs: `README.md`, `docs/internal/decisions.md`, `docs/internal/protocol-notes.md`, `examples/x402-protected-spend/README.md`, and `examples/x402-protected-spend/run.ts`.
-- CLI and MCP are proposal/evidence/package surfaces only. Tests must keep `src/cli/**`, `src/mcp/**`, `bin/handshake`, `bin/handshake-mcp`, `server.json`, and the `package.json` `./cli`/`./mcp` subpaths away from policy decisions, greenlights, gateway checks, mutations, raw records, signer material, and credential custody.
+**Closeout remap state:**
+- Treat commit `b3635c5` as the current test baseline. The final closeout gate
+  passed with 495 Bun tests, package surface check, release proof readiness
+  check, and `git diff --check`.
+- Focused coverage added or hardened by the seven-plan stack lives in
+  `test/protocol/credential-custody.test.ts`,
+  `test/protocol/authority-certificate.test.ts`, `test/http/http.test.ts`,
+  `test/adapters/package-install-adapter-pack.test.ts`,
+  `test/adapters/package-install-host-harness.test.ts`,
+  `test/architecture/package-release-proof.test.ts`,
+  `test/architecture/claim-boundary.test.ts`, and
+  `test/architecture/package-surface.test.ts`.
+- CLI, MCP, runtime ingress, hosted verifier/readiness, release proof, and
+  package-install reports are still proposal/evidence/read/metadata surfaces.
+  Tests should fail any future movement of policy decisions, greenlights,
+  gateway checks, mutations, signer material, raw records, custody, trust, or
+  settlement into those surfaces.
 
 ## Test Framework
 

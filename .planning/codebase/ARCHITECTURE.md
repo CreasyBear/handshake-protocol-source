@@ -2,6 +2,38 @@
 
 **Analysis Date:** 2026-05-24
 
+## Closeout Remap: 2026-05-24 Tier 2 Macro Architecture
+
+Remapped at commit `b3635c5` after the seven active macro plans were
+implemented. The architecture still has one authority spine:
+
+```text
+runtime/generated execution proposal
+-> exact action contract
+-> policy decision
+-> one-use greenlight
+-> gateway check before consequence
+-> receipt, refusal, proof gap, or terminal certificate
+-> redacted reconstruction / verification / readiness surfaces
+```
+
+New source-owned expansion points:
+
+- `src/protocol/areas/credential-custody/` records redacted custody proof
+  packets and post-gate credential resolution evidence. It records evidence; it
+  does not retrieve secrets or mint authority.
+- `src/protocol/areas/authority-certificate/` now projects structured
+  verifier responses, issuer/key/status posture, native verifier key sets, and
+  JWKS as public-key material only.
+- `src/http/admission/` and `src/http/handlers/hosted-readiness.ts` add hosted
+  admission/readiness/read posture. Hosted routes remain admission/read/evidence
+  surfaces, not mutation authority.
+- `src/adapters/package-install/adapter-pack.ts` and
+  `src/adapters/package-install/host-harness.ts` provide the first promoted
+  non-payment adapter pack after x402 exact per-call.
+- `src/surfaces/release-proof.ts` records publication readiness states and
+  authority non-claims. Publication does not create gateway enforcement.
+
 ## System Overview
 
 ```text

@@ -2,6 +2,33 @@
 
 **Analysis Date:** 2026-05-24
 
+## Closeout Remap: 2026-05-24 Tier 2 Macro Stack
+
+Remapped at commit `b3635c5` after the seven macro-plan implementation stack.
+The source now includes additional repo-owned primitives and guards that were
+not present in the prior map:
+
+- Credential custody protocol records: `GatewayCustodyProofPacket` and
+  `CredentialResolutionEvidence` under
+  `src/protocol/areas/credential-custody/`.
+- Structured terminal verifier evidence: issuer/key/status models, native
+  verifier key-set projection, JWKS projection, and
+  `AuthorityCertificateVerificationResponse` under
+  `src/protocol/areas/authority-certificate/`.
+- Hosted admission and read posture: deployment-mode config, hosted caller
+  identity verification, redacted evidence reads, raw-read posture, and
+  readiness reporting under `src/http/admission/` and `src/http/handlers/`.
+- Package-install adapter-pack evidence: material evidence, lifecycle-script
+  posture, gateway observed-parameter report, and package-manager host harness
+  under `src/adapters/package-install/` and
+  `src/adapters/protected-path-probes/`.
+- Public distribution release-state proof: `PackageReleaseProof` and
+  `scripts/check-release-proof.mjs`.
+
+Current local closeout gate: `npm run check:repo` passed after this stack with
+495 tests, package surface check, release proof readiness check, and
+`git diff --check`.
+
 ## Languages
 
 **Primary:**

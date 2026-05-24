@@ -2,6 +2,26 @@
 
 **Analysis Date:** 2026-05-24
 
+## Closeout Remap: 2026-05-24 External Boundary State
+
+Remapped at commit `b3635c5`.
+
+Current external-posture facts:
+
+- x402 remains one buyer-side `exact` per-call proof wedge. Local/reference
+  challenge and signed-retry evidence is post-gate fixture evidence only.
+- npm and MCP Registry are publication/discoverability surfaces. Source now
+  separates `ready_to_publish`, `actually_published`, and
+  `registry_discoverable` through `PackageReleaseProof`; actual npm publish and
+  MCP Registry discoverability are not claimed by local source gates.
+- Hosted verifier/admission code is local foundation and configured-readiness
+  posture. It does not prove production hosted readiness, remote JWKS trust
+  fetching, cross-org trust, live revocation authority, or hosted mutation
+  authority.
+- D1 remains the structured durable store path; KV remains non-authoritative
+  cache/posture unless a future source change promotes it with explicit
+  consistency and audit limits.
+
 ## APIs & External Services
 
 **Cloudflare Worker Runtime:**

@@ -16,6 +16,7 @@ Invariant: this folder is scratch coordination for macro work. It must not becom
 - `implemented/2026-05-24-cli-mcp-publish-readiness/`: CLI/MCP package-readiness source gates closed; actual external publication remains owner-held.
 - `implemented/2026-05-24-tier2-x402-sandbox/`: local x402 sandbox proof closed under local/reference non-claims.
 - `implemented/2026-05-24-concerns-elimination/`: codebase concern elimination plan and validation closed.
+- `implemented/2026-05-24-tier2-macro-closeout/`: seven active macro plans source-closed with audit, review, GSD remap, and explicit external proof gaps.
 
 ## Archive
 

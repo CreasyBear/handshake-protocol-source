@@ -4,11 +4,20 @@
 
 ## Current State Inputs
 
-**Worktree state:**
-- Treat current uncommitted source and test changes as current codebase state. Visible x402 sandbox/evidence work is in `src/adapters/x402-payment/action-proposal.ts`, `src/adapters/x402-payment/index.ts`, `src/adapters/x402-payment/upstream-evidence.ts`, `src/adapters/x402-payment/wallet-gateway.ts`, untracked `src/adapters/x402-payment/sandbox-http.ts`, and `src/runtime/ingress/index.ts`.
-- Treat the matching x402 evidence tests as current state: `test/adapters/x402-payment-action-proposal.test.ts`, `test/adapters/x402-wallet-gateway.test.ts`, and `test/product/x402-protected-spend-demo-report.test.ts`.
-- Treat package/claim docs that changed in the worktree as current claim context: `README.md`, `docs/internal/decisions.md`, `docs/internal/protocol-notes.md`, `examples/x402-protected-spend/README.md`, and `examples/x402-protected-spend/run.ts`.
-- `.planning/codebase/*.md` files are scratch mapper outputs. They are not source truth, exported API, package surface, or canonical docs.
+**Closeout remap state:**
+- Treat commit `b3635c5` as the current source baseline for this map. The seven
+  macro-plan implementation commits are source truth; `.planning/codebase/*.md`
+  remains scratch.
+- Do not treat older "dirty worktree" notes in prior maps as current defects.
+  Runtime and MCP x402 request/provider posture fields now exist in
+  `src/runtime/ingress/index.ts` and `src/mcp/x402-proposal.ts`.
+- New post-closeout convention: any release, hosted, verifier, adapter-pack, or
+  bypass-harness surface must carry explicit non-authority fields when it could
+  be mistaken for permission, trust, custody, settlement, payment management,
+  certification, host-wide enforcement, or package safety proof.
+- `.planning/` artifacts can guide review and closeout, but source-facing names,
+  scripts, exports, package metadata, and canonical docs must come from tracked
+  source and passing gates.
 
 ## Naming Patterns
 

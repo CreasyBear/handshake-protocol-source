@@ -2,6 +2,11 @@
 
 Date: 2026-05-24
 
+Closeout update: the seven-plan critical path below is source-closed under
+`.planning/macro/implemented/2026-05-24-tier2-macro-closeout/`. Keep this file
+as historical integrate/eliminate context. Do not treat it as active work unless
+a future plan reopens a named proof gap.
+
 ## Vision
 
 Handshake should become the default authority boundary for protected actions in automated decision making:

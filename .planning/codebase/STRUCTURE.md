@@ -2,6 +2,30 @@
 
 **Analysis Date:** 2026-05-24
 
+## Closeout Remap: 2026-05-24 Structure Additions
+
+Remapped at commit `b3635c5`. New or materially expanded paths after the seven
+macro plans:
+
+- `src/protocol/areas/credential-custody/` owns gateway custody proof packets
+  and credential resolution evidence.
+- `src/protocol/areas/authority-certificate/` owns structured verifier
+  response, issuer/key/status models, key-set projection, and JWKS projection.
+- `src/http/admission/` owns hosted admission config and caller identity
+  posture.
+- `src/http/handlers/verifier.ts` and
+  `src/http/handlers/hosted-readiness.ts` own hosted verifier/readiness
+  projections.
+- `src/adapters/package-install/adapter-pack.ts` owns the package-install
+  material adapter-pack evidence/report projection.
+- `src/adapters/package-install/host-harness.ts` and
+  `src/adapters/protected-path-probes/host-fixture.ts` own the named local host
+  bypass harness posture.
+- `src/surfaces/release-proof.ts` owns public distribution release-state proof
+  and non-authority fields.
+- `scripts/check-release-proof.mjs` extends package checks with publication
+  boundary assertions.
+
 ## Directory Layout
 
 ```text
