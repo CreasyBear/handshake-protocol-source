@@ -2,6 +2,14 @@
 
 **Analysis Date:** 2026-05-24
 
+## Current State Inputs
+
+**Worktree state:**
+- Treat current uncommitted source and test changes as current codebase state. Visible x402 sandbox/evidence work is in `src/adapters/x402-payment/action-proposal.ts`, `src/adapters/x402-payment/index.ts`, `src/adapters/x402-payment/upstream-evidence.ts`, `src/adapters/x402-payment/wallet-gateway.ts`, untracked `src/adapters/x402-payment/sandbox-http.ts`, and `src/runtime/ingress/index.ts`.
+- Treat the matching x402 evidence tests as current state: `test/adapters/x402-payment-action-proposal.test.ts`, `test/adapters/x402-wallet-gateway.test.ts`, and `test/product/x402-protected-spend-demo-report.test.ts`.
+- Treat package/claim docs that changed in the worktree as current claim context: `README.md`, `docs/internal/decisions.md`, `docs/internal/protocol-notes.md`, `examples/x402-protected-spend/README.md`, and `examples/x402-protected-spend/run.ts`.
+- `.planning/codebase/*.md` files are scratch mapper outputs. They are not source truth, exported API, package surface, or canonical docs.
+
 ## Naming Patterns
 
 **Files:**
@@ -27,6 +35,7 @@
 - Use exact protocol object names from `QUALITY.md`: `ActionContract`, `PolicyDecision`, `Greenlight`, `GatewayCheck`, `Receipt`, `Refusal`, `ProofGap`, and `IsolationState`.
 - Use `type` imports for types; `eslint.config.js` enforces `@typescript-eslint/consistent-type-imports`.
 - Runtime/client protocol seams should be narrow structural interfaces, such as `PackageInstallRuntimeProtocol` in `src/runtime/package-install/action-proposal.ts`, `PackageInstallProtocol` in `src/adapters/package-install/gateway.ts`, and `McpRuntimeProposalClient` in `src/mcp/x402-proposal.ts`.
+- x402 local/reference sandbox and gateway evidence types stay explicit about authority posture. Examples include `LocalX402PaidHttpSandboxChallenge`, `LocalX402PaidHttpSandboxRetryResult`, and `X402PaymentSignatureEvidence` in `src/adapters/x402-payment/sandbox-http.ts` and `src/adapters/x402-payment/wallet-gateway.ts`; each carries `authorityCreated: false` or gateway-held credential posture instead of implying payment authority.
 
 ## Code Style
 
@@ -50,8 +59,9 @@
 
 **Claim Boundaries:**
 - Treat `README.md`, `docs/internal/decisions.md`, and `docs/internal/protocol-notes.md` as the source of claim language. They currently define the checkout as local foundation/reference proof, not hosted operation or provider enforcement.
+- Treat the publishable package surface as explicit but non-enforcing. `package.json` exposes root, `./runtime`, `./conformance`, `./sdk/role-clients`, `./cli`, `./mcp`, `./experimental`, and `./package.json`; `bin/handshake` is the local CLI evidence/readiness command and `bin/handshake-mcp` plus the `handshake-protocol-kernel` bin start the local stdio MCP proposal/evidence server. These surfaces are not authority or enforcement gates.
 - Do not broaden local/reference adapter proof into hosted/provider claims. `test/architecture/claim-boundary.test.ts` enforces x402 and MCP wording, including "not broad x402 compatibility", "not live provider custody", and MCP proposal/evidence-only posture.
-- Keep x402 first-wedge language narrow: official buyer-side `exact` per-call proof only. `test/conformance/x402-upstream-exact-fixtures.test.ts`, `test/conformance/x402-payment-conformance.test.ts`, and `test/adapters/x402-wallet-gateway.test.ts` pin unsupported surfaces and gateway-held signer evidence.
+- Keep x402 first-wedge language narrow: official buyer-side `exact` per-call proof only. `test/conformance/x402-upstream-exact-fixtures.test.ts`, `test/conformance/x402-payment-conformance.test.ts`, `test/adapters/x402-wallet-gateway.test.ts`, `test/integration/x402-d1-http.test.ts`, and `test/product/x402-protected-spend-demo-report.test.ts` pin unsupported surfaces, gateway-held signer evidence, local/reference 402 challenge evidence, post-gate signed retry observation, and the absence of aggregate spend-window enforcement.
 - Keep MCP language proposal/evidence-only. `test/architecture/mcp-surface-posture.test.ts`, `test/mcp/mcp-schema-contract.test.ts`, `test/mcp/mcp-resource-redaction.test.ts`, and `test/mcp/mcp-stdio-process.test.ts` forbid policy, greenlight, gateway check, mutation, credential material, raw records, and hosted/provider claims.
 
 ## Import Organization
@@ -71,7 +81,8 @@
 - HTTP and SDK code must not reach into protocol area internals; import public area indexes or curated root exports. The exception is the certificate verifier import in `src/sdk/surface-clients/evidence-client.ts`, enforced by `test/architecture/import-posture.test.ts`.
 - Storage adapters in `src/storage/**` must not import primitive behavior modules. D1 SQL statement assembly stays in `src/storage/d1/statements.ts`; store behavior stays in `src/storage/d1/index.ts`.
 - Runtime, representation helpers, and evidence projections must stay off policy/gateway/receipt/certificate authority behavior imports. `test/architecture/import-posture.test.ts` enforces this for `src/runtime`, `src/protocol/areas/protected-action-representation`, and `src/protocol/evidence-projections`.
-- Official x402 signing imports stay inside `src/adapters/x402-payment/wallet-gateway.ts`; `test/architecture/import-posture.test.ts` forbids `@x402/evm`, `@x402/fetch`, and paid-client imports elsewhere in `src/**`.
+- Official x402 signer and paid-client imports stay inside `src/adapters/x402-payment/wallet-gateway.ts`; `test/architecture/import-posture.test.ts` forbids `@x402/core/client`, `@x402/fetch`, `@x402/axios`, and `@x402/evm*` elsewhere in `src/**`. Official schema parsing may live in `src/adapters/x402-payment/upstream-evidence.ts`; local/reference sandbox orchestration lives in `src/adapters/x402-payment/sandbox-http.ts` without becoming a public signing surface.
+- Keep the official signing factory off adapter barrels and package public surfaces. `src/adapters/x402-payment/index.ts` may export `action-proposal`, `bypass-probes`, `conformance`, `install-proposal`, `sandbox-http`, and `upstream-evidence`, but `test/architecture/import-posture.test.ts` forbids exporting `createOfficialExactX402SigningSurface` through adapter barrels, root exports, runtime, conformance, or experimental public surfaces.
 - MCP source under `src/mcp/**` must not import `protocol/kernel`, policy/greenlight internals, gateway-gate internals, receipt-export authority, authority-certificate authority, adapters, storage, `experimental`, or all-role SDK clients. `test/architecture/mcp-surface-posture.test.ts` enforces this.
 
 ## Error Handling
@@ -82,6 +93,7 @@
 - Downstream mutation failures are reconciled with redacted diagnostic evidence, not raw errors. `src/adapters/downstream-failure-evidence.ts` feeds reconciliation in `src/adapters/package-install/gateway.ts`, `src/adapters/repo-write/gateway.ts`, and `src/adapters/preview-deploy/gateway.ts`.
 - Missing or ambiguous downstream evidence becomes `ProofGap`, not success. `docs/internal/protocol-notes.md`, `test/protocol/evidence-projections.test.ts`, and `test/adapters/x402-wallet-gateway.test.ts` exercise proof-gap outcomes.
 - Runtime and MCP proposal surfaces should refuse before authority when inputs are dynamic, stale, raw-sibling-shaped, too large, ambiguous, or outside bounds. Examples: `src/runtime/ingress/index.ts`, `test/runtime/runtime-ingress.test.ts`, and `src/mcp/x402-proposal.ts`.
+- x402 sandbox retry evidence is downstream fixture evidence only. `src/adapters/x402-payment/sandbox-http.ts` records a local/reference `402` challenge before authority, then records one signed retry only after gateway-created signature evidence; it refuses missing signature evidence, wrong header names, non-reference environments, and ambiguous request body posture.
 
 ## Logging
 
@@ -113,6 +125,7 @@
 **Authority Separation:**
 - Runtime helpers may create runtime evidence, generated graphs, tool-call drafts, intent compilations, action contracts, and refusals. They must not issue policy decisions, greenlights, gateway checks, receipts, or mutations. `test/runtime/runtime-ingress.test.ts` and `test/runtime/codemode-multi-action-runtime.test.ts` assert record counts for this boundary.
 - Gateway adapters may mutate only after `verifiedGatewayCheckFromResult()` returns a `VerifiedGatewayCheck`. `src/adapters/package-install/gateway.ts`, `src/adapters/repo-write/gateway.ts`, `src/adapters/preview-deploy/gateway.ts`, and `src/adapters/x402-payment/wallet-gateway.ts` follow this pattern.
+- x402 official `PaymentPayload` / `PAYMENT-SIGNATURE` creation belongs behind `runX402WalletGateway()` after a passed gateway check. `src/adapters/x402-payment/action-proposal.ts`, `src/runtime/ingress/index.ts`, `src/mcp/x402-proposal.ts`, `src/sdk/surface-clients/runtime-client.ts`, and evidence projections must expose proposal/evidence refs and digests, never signer material or raw payment payloads.
 - Evidence projections are read-only diagnostic surfaces. `src/protocol/evidence-projections/` and `test/protocol/evidence-projections.test.ts` distinguish gateway admission, downstream outcome, refusal, replay, and proof-gap evidence.
 
 ## Module Design

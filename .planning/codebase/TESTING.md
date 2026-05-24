@@ -2,6 +2,14 @@
 
 **Analysis Date:** 2026-05-24
 
+## Current State Inputs
+
+**Worktree state:**
+- Treat the current dirty x402 sandbox/evidence work as the test target. Source paths include `src/adapters/x402-payment/action-proposal.ts`, `src/adapters/x402-payment/upstream-evidence.ts`, `src/adapters/x402-payment/wallet-gateway.ts`, untracked `src/adapters/x402-payment/sandbox-http.ts`, and `src/runtime/ingress/index.ts`.
+- Treat the current dirty x402 tests as active coverage: `test/adapters/x402-payment-action-proposal.test.ts`, `test/adapters/x402-wallet-gateway.test.ts`, and `test/product/x402-protected-spend-demo-report.test.ts`.
+- Treat package and claim-surface docs currently dirty as claim-test inputs: `README.md`, `docs/internal/decisions.md`, `docs/internal/protocol-notes.md`, `examples/x402-protected-spend/README.md`, and `examples/x402-protected-spend/run.ts`.
+- CLI and MCP are proposal/evidence/package surfaces only. Tests must keep `src/cli/**`, `src/mcp/**`, `bin/handshake`, `bin/handshake-mcp`, `server.json`, and the `package.json` `./cli`/`./mcp` subpaths away from policy decisions, greenlights, gateway checks, mutations, raw records, signer material, and credential custody.
+
 ## Test Framework
 
 **Runner:**
@@ -23,6 +31,7 @@ npm run check:repo           # Full local and CI gate
 npm run quality:architecture # Architecture/import/surface/conformance slice
 npm run quality:claims       # Claim-boundary and active-vocabulary slice
 npm run quality:storage      # D1/storage/protocol invariant slice
+npm run demo:aps             # Local/reference x402 protected-spend report artifacts
 ```
 
 `package.json` defines `check:repo` as:
@@ -32,6 +41,15 @@ npm run check:types && npm run lint && npm run format:check && npm run test && n
 ```
 
 CI runs the same gate in `.github/workflows/check.yml`.
+
+Focused x402 sandbox/runtime/MCP/product regression slices are ordinary Bun test invocations rather than separate package scripts:
+
+```bash
+npm run test -- test/adapters/x402-wallet-gateway.test.ts test/integration/x402-d1-http.test.ts test/product/x402-protected-spend-demo-report.test.ts
+npm run test -- test/runtime/runtime-ingress.test.ts test/mcp/mcp-x402-proposal.test.ts test/mcp/mcp-reference-transcript.test.ts test/mcp/mcp-stdio-process.test.ts
+npm run test -- test/conformance/x402-upstream-exact-fixtures.test.ts test/conformance/x402-payment-conformance.test.ts test/conformance/protected-mutation-adapter-conformance.test.ts
+npm run test -- test/architecture/claim-boundary.test.ts test/architecture/import-posture.test.ts test/architecture/mcp-surface-posture.test.ts
+```
 
 ## Test File Organization
 
@@ -136,6 +154,7 @@ function fakeSigningSurface(downstreamPaymentStatus: "succeeded" | "unknown") {
 
 **What to Mock:**
 - Mock external surfaces at the mutation boundary: package manifest surfaces in `test/support/package-install-flow.ts`, repo-write surfaces in `test/support/repo-write-flow.ts`, preview deploy surfaces in `test/conformance/protected-mutation-adapter-conformance.test.ts`, auth.md downstream API surfaces in `test/adapters/auth-md-serialization-redaction.test.ts`, and x402 signing surfaces in `test/adapters/x402-wallet-gateway.test.ts`.
+- Mock local/reference paid HTTP behavior with `createLocalX402PaidHttpSandbox()` and `createLocalX402SandboxSigningSurface()` from `src/adapters/x402-payment/sandbox-http.ts` when proving the x402 402 challenge and post-gate signed retry path. The sandbox is a fixture: tests must still prove `signPayment()` receives a `VerifiedGatewayCheck` through `runX402WalletGateway()`.
 - Mock SDK/transport clients for role-surface behavior, such as fake runtime clients in `test/mcp/mcp-x402-proposal.test.ts` and fake evidence clients in `test/mcp/mcp-resource-redaction.test.ts`.
 - Use `InMemoryProtocolStore` from `src/storage/memory/index.ts` for protocol transition tests unless D1 semantics are the subject.
 
@@ -220,21 +239,36 @@ Quality is enforced by explicit invariant tests, focused gates, TypeScript stric
 - `test/architecture/mcp-surface-posture.test.ts`: MCP active posture, off-root exports, forbidden imports, and no credential/authority text.
 - `test/architecture/claim-boundary.test.ts` and `test/architecture/self-hosted-activation-claim-boundary.test.ts`: local/reference vs hosted/provider claim language.
 
+**Package and Surface Tests:**
+- `test/architecture/package-surface.test.ts` pins `package.json` publishable exports, `bin/handshake`, `bin/handshake-mcp`, the package-name MCP bin, packable files, MCP Registry metadata in `server.json`, and `pack:check` binding into `check:repo`.
+- `test/architecture/root-exports.test.ts` keeps root exports curated, keeps `src/runtime/index.ts`, `src/conformance/index.ts`, `src/experimental.ts`, `src/cli/index.ts`, `src/mcp/index.ts`, and `src/sdk/surface-clients/index.ts` on explicit subpaths, and forbids CLI/MCP/runtime/conformance helpers from becoming root authority surface.
+- `test/architecture/surface-boundary-posture.test.ts` pins the product-surface manifest in `src/surfaces/boundary-manifest.ts`, including required non-authority flags and forbidden route families for SDK, CLI, and MCP surfaces.
+- `test/architecture/cli-command-posture.test.ts` keeps CLI commands limited to schema/init/doctor/evidence/certificate/support/install-health/conformance flows and forbids mutation-shaped command names, authority route families, all-role clients, raw records, gateway runners, and process spawning inside CLI source.
+- `test/architecture/mcp-surface-posture.test.ts` keeps MCP active as `proposal_only`, off root exports, and away from authority imports, credential material, payment payloads, signer/wallet terms, and hosted/provider claims.
+- `scripts/check-package-surface.mjs` performs an npm dry-run and requires `dist` bundles/types, CLI/MCP bins, `server.json`, compact canon docs, and source files while excluding `test/`, `.planning/`, `.agents/`, workspace junk, and removed docs trees.
+- `scripts/check-published-entrypoints.mjs` smoke-tests bundled Node entrypoints: `node bin/handshake schema` must emit non-authority flags, and `bin/handshake-mcp` must serve the stdio MCP proposal/evidence tool through the official MCP client without `PaymentPayload` or `PAYMENT-SIGNATURE` leakage.
+
 **Claim-Boundary Tests:**
 - `test/architecture/claim-boundary.test.ts` is the main guard for local runtime ingress, x402, adapters, and MCP claims in `README.md`, `examples/x402-protected-spend/README.md`, and lane manifests.
 - `test/architecture/active-vocabulary.test.ts` scans active roots for stale vocabulary.
 - `test/architecture/self-hosted-activation-claim-boundary.test.ts` ensures the self-hosted activation packet does not claim broad MCP/browser/shell/network/package-manager protection, hosted operation, provider custody proof, cross-org trust, spend-window ledger enforcement, WorkOS/auth.md attestation, or clearing-house readiness.
 
 **x402 Focused Tests:**
-- `test/conformance/x402-upstream-exact-fixtures.test.ts` pins official upstream source/package basis, smokes official SDK parsing, decodes `PAYMENT-REQUIRED` into proposal evidence only, refuses missing selected index, refuses unsupported surfaces, and forbids leaking `PaymentPayload`/`PAYMENT-SIGNATURE`.
+- `test/conformance/x402-upstream-exact-fixtures.test.ts` pins official upstream source/package basis, smokes official SDK parsing, decodes `PAYMENT-REQUIRED` into proposal evidence only, selects the requested exact requirement, refuses missing selected index, refuses unsupported surfaces, and forbids leaking `PaymentPayload`/`PAYMENT-SIGNATURE`.
 - `test/conformance/x402-payment-conformance.test.ts` verifies signer custody and bypass probe posture, unsupported first-wedge classification, and evidence taxonomy that does not create authority or settlement finality.
 - `test/adapters/x402-install-proposal.test.ts` compiles local/reference x402 install records and refuses exposed signer authority, wildcard bounds, and per-call overrun.
 - `test/adapters/x402-payment-action-proposal.test.ts` turns observed or upstream official x402 terms into exact contracts without issuing authority, binds selected requirements/request material, and keeps session/day/review windows as metadata.
-- `test/adapters/x402-wallet-gateway.test.ts` creates fixture or official `PaymentPayload`/signature evidence only after a verified gateway check, refuses parameter drift/replay before signing, redacts credential material, and records proof gaps for missing downstream response.
+- `test/adapters/x402-wallet-gateway.test.ts` creates fixture or official `PaymentPayload`/signature evidence only after a verified gateway check, records a local/reference sandbox 402 challenge and one signed retry only after gateway admission, binds `Payment-Identifier` evidence, refuses parameter drift/replay before signing, redacts credential material, and records proof gaps for missing downstream response.
 - `test/adapters/x402-bypass-probes.test.ts` records signer side channels, direct MCP payment, token passthrough, wrapper drift, and failure-open posture as bypass evidence; conformance fixtures cannot manufacture gateway-checked posture.
 - `test/runtime/runtime-ingress.test.ts` covers wrapped, dynamic, ambiguous, raw sibling, direct MCP, retry, changed-parameter retry, and truncated x402 dispatch paths without issuing authority.
-- `test/integration/x402-d1-http.test.ts` exercises the D1/HTTP protected x402 path.
-- `test/product/x402-protected-spend-demo-report.test.ts` keeps the demo report inside local/reference evidence claims.
+- `test/integration/x402-d1-http.test.ts` exercises the D1/HTTP protected x402 path, official exact `PaymentPayload` evidence, redacted agent transaction envelopes, parameter drift refusal, replay refusal, and downstream proof-gap persistence.
+- `test/product/x402-protected-spend-demo-report.test.ts` runs `examples/x402-protected-spend/run.ts`, checks the buyer-readable APS report, verifies role-scoped `RuntimeClient`/`EvidenceClient` usage, asserts local/reference non-claims, and ensures raw credential material is absent.
+
+**x402 APS Demo Phases:**
+- `examples/x402-protected-spend/run.ts` writes `examples/x402-protected-spend/output/latest.md` and `examples/x402-protected-spend/output/latest.json`.
+- `npm run demo:aps` produces named phases: `0_sandbox_payment_required_challenge`, `1_runtime_proposal`, `2_policy_greenlight`, `3_gateway_admission_and_signature`, `4_sandbox_paid_retry`, `5_redacted_evidence_envelope`, `6_terminal_certificate`, and `7_replay_refusal`.
+- The demo must keep `authorityRecordsBeforePolicy` at zero for policy decisions, greenlights, gateway checks, mutation attempts, receipts, and authority certificates; `test/product/x402-protected-spend-demo-report.test.ts` pins this.
+- The APS report must list missing proof objects such as the external custody proof packet, spend reservation ledger, and hosted verifier/trust-material distribution before any provider custody, aggregate spend enforcement, or cross-org trust claim.
 
 **MCP Redaction and Proposal Tests:**
 - `test/mcp/mcp-resource-redaction.test.ts` routes resource URIs through read-only evidence projections, keeps metadata/challenge/certificate resources reference-only, and rejects non-source-owned resource URI families.
