@@ -114,7 +114,7 @@ describe("participant identity bindings", () => {
 
     expect(certificate.envelope.participantIdentityBindings).toEqual(contract.participantIdentityBindings);
     expect(certificate.signingInputDigest).toBe(await authorityCertificateSigningInputDigest(certificate));
-    expect(verification.valid).toBe(true);
+    expect(verification.outcome).toBe("verified");
   });
 
   it("rejects participant identity bindings that do not match envelope actors", async () => {

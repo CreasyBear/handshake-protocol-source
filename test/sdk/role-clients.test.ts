@@ -108,7 +108,7 @@ describe("role-scoped SDK clients", () => {
     await expect(
       evidenceClient.verifyAuthorityCertificate({}, { keys: [], allowDevHmac: false }),
     ).resolves.toMatchObject({
-      valid: false,
+      outcome: "refused",
       envelope: null,
       signingInputDigest: null,
     });

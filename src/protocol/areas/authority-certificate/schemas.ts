@@ -221,7 +221,6 @@ export const AuthorityCertificateVerificationResponseSchema = z.strictObject({
   verificationPlane: z.literal("local_pinned_trust_material"),
   authorityCreated: z.literal(false),
   redactionProfileRef: z.literal("authority-certificate-verification:v1-redacted"),
-  valid: z.boolean(),
   checks: z.strictObject({
     schema: AuthorityCertificateVerificationCheckStatusSchema,
     cryptographicSignature: AuthorityCertificateVerificationCheckStatusSchema,

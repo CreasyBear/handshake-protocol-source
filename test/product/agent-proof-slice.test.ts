@@ -14,6 +14,7 @@ import { runPackageInstallGateway } from "../../src/adapters/package-install/gat
 import { digestCanonical } from "../../src/protocol/foundation/canonical";
 import { nowIso } from "../../src/protocol/foundation/ids";
 import { verifyAuthorityCertificate, type AuthorityCertificateSignerInput } from "../../src";
+import { projectX402AuthorityCertificateEvidenceProfile } from "../../src/conformance";
 import { proposeRuntimeIngressActionContracts } from "../../src/runtime";
 import type { ProtocolStore } from "../../src/protocol/store/port";
 import {
@@ -176,7 +177,22 @@ describe("adapter-backed APS proof spine", () => {
     const verification = await verifyAuthorityCertificate(certificate, trustMaterial(signers));
     expect(certificate.terminal.terminalKind).toBe("receipt");
     expect(certificate.envelope.actionClass).toBe("x402_payment.exact");
-    expect(verification.valid).toBe(true);
+    expect(verification.outcome).toBe("verified");
+    expect(projectX402AuthorityCertificateEvidenceProfile(verification)).toMatchObject({
+      evidenceProfile: "x402_exact_per_call",
+      actionClass: "x402_payment.exact",
+      actionContractRef: contract.actionContractId,
+      gatewayAdmissionStatus: "admitted",
+      downstreamOutcomeStatus: "pending",
+      exactPerCallProtectedAction: true,
+      gatewayCheckEvidenceRef: `gateway_check_attempt:${gatewayResult.gatewayCheck.gateAttempt.gateAttemptId}`,
+      receiptRef: gatewayResult.gatewayCheck.receipt.receiptId,
+      provesPaymentSuccess: false,
+      provesSettlementFinality: false,
+      provesFacilitatorOperation: false,
+      provesProviderCustody: false,
+      managesPayment: false,
+    });
     const certifiedEnvelope = await client.getAgentTransactionEnvelopeProjection(
       contract.actionContractId,
       "runtime_evidence",

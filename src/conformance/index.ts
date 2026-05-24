@@ -40,6 +40,7 @@ export async function assertProtectedMutationAdapterConformance(
 
 export {
   X402FirstWedgeSurfaceSchema,
+  X402AuthorityCertificateEvidenceProfileSchema,
   X402FirstWedgeEvidenceLabelSchema,
   X402FirstWedgeUnsupportedSurfaceSchema,
   X402PaymentConformancePostureSchema,
@@ -47,6 +48,8 @@ export {
   checkX402PaymentInstallConformance,
   classifyX402FirstWedgeEvidenceLabel,
   classifyX402FirstWedgeSurface,
+  projectX402AuthorityCertificateEvidenceProfile,
+  type X402AuthorityCertificateEvidenceProfile,
   type X402FirstWedgeEvidenceLabel,
   type X402FirstWedgeEvidenceLabelClassification,
   type X402FirstWedgeSurface,

@@ -20,6 +20,10 @@ import {
 import { HandshakeClient } from "../../src/sdk/client";
 import type { HandshakeClientError } from "../../src/sdk/client";
 import { InMemoryProtocolStore } from "../../src/storage/memory";
+import type {
+  AuthorityCertificateSignerInput,
+  AuthorityCertificateTrustMaterialInput,
+} from "../../src/protocol/areas/authority-certificate";
 import {
   createGreenlitContract,
   futureIso,
@@ -39,6 +43,8 @@ import {
   runtimeExecutionBody,
   staticHostedVerifier,
 } from "../support/http-protocol-fixtures";
+
+const ED25519_ALGORITHM = { name: "Ed25519" } as Algorithm;
 
 const TEST_CALLER_AUTH_TOKENS = {
   control_plane: "test_control_plane_token",
@@ -173,6 +179,108 @@ describe("Hono protocol surface", () => {
       authorityCreated: false,
       failures: [{ code: "schema_invalid" }],
     });
+    expect(await store.listRecordsByType("authority_certificate")).toHaveLength(0);
+    expect(await store.listRecordsByType("contract_stream_event")).toHaveLength(0);
+  });
+
+  it("hardens hosted verifier failure cases without accepting caller trust or mutating state", async () => {
+    const { certificate, signers } = await hostedAuthorityCertificateFixture();
+    const store = new InMemoryProtocolStore();
+    const app = createApp({ store, authorityCertificateTrustMaterial: hostedTrustMaterial(signers) });
+
+    const verified = await app.request("/v0.2/verifier/authority-certificates/verify", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ certificate }),
+    });
+    expect(verified.status).toBe(200);
+    const verifiedBody = await verified.json();
+    expect(verifiedBody).toMatchObject({
+      outcome: "verified",
+      authorityCreated: false,
+      envelope: { actionClass: "package.install" },
+    });
+    expect(verifiedBody).not.toHaveProperty("valid");
+
+    const callerTrust = await app.request("/v0.2/verifier/authority-certificates/verify", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ certificate, trustMaterial: { keys: [] } }),
+    });
+    expect(callerTrust.status).toBe(400);
+    expect(await callerTrust.json()).toMatchObject({
+      error: { code: "invalid_request", commitState: "not_started" },
+    });
+
+    const malformed = await app.request("/v0.2/verifier/authority-certificates/verify", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: "{",
+    });
+    expect(malformed.status).toBe(400);
+    expect(await malformed.json()).toMatchObject({
+      error: { code: "invalid_request", commitState: "not_started" },
+    });
+
+    const oversized = await app.request("/v0.2/verifier/authority-certificates/verify", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ certificate: "x".repeat(257 * 1024) }),
+    });
+    expect(oversized.status).toBe(413);
+    expect(await oversized.json()).toMatchObject({
+      error: { code: "transition_request_body_too_large", commitState: "not_started" },
+    });
+
+    const missingStatus = await app.request("/v0.2/verifier/status/key/fixture:ed25519:missing");
+    expect(missingStatus.status).toBe(200);
+    expect(await missingStatus.json()).toMatchObject({
+      authorityCreated: false,
+      statusRecord: null,
+      statusOutcome: "status_unavailable",
+      proofGapReasonCode: "trust_status_unavailable",
+    });
+
+    const unknownIssuer = await createApp({
+      authorityCertificateTrustMaterial: hostedTrustMaterial(signers, { issuerRef: "issuer:missing" }, false),
+    }).request("/v0.2/verifier/authority-certificates/verify", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ certificate }),
+    });
+    const unknownIssuerBody = (await unknownIssuer.json()) as HostedVerifierResponseBody;
+    expect(unknownIssuerBody.outcome).toBe("refused");
+    expect(unknownIssuerBody.failures.map((failure: { code: string }) => failure.code)).toContain(
+      "trust_issuer_unknown",
+    );
+
+    const revoked = await createApp({
+      authorityCertificateTrustMaterial: hostedTrustMaterial(signers, { status: "revoked" }),
+    }).request("/v0.2/verifier/authority-certificates/verify", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ certificate }),
+    });
+    const revokedBody = (await revoked.json()) as HostedVerifierResponseBody;
+    expect(revokedBody.outcome).toBe("refused");
+    expect(revokedBody.failures.map((failure: { code: string }) => failure.code)).toContain("trust_key_revoked");
+
+    const statusOutage = await createApp({
+      authorityCertificateTrustMaterial: hostedTrustMaterial(signers, { status: "status_unavailable" }),
+    }).request("/v0.2/verifier/authority-certificates/verify", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ certificate }),
+    });
+    const statusOutageBody = (await statusOutage.json()) as HostedVerifierResponseBody;
+    expect(statusOutageBody).toMatchObject({
+      outcome: "proof_gap",
+      checks: { status: "proof_gap" },
+    });
+    expect(statusOutageBody.failures.map((failure: { code: string }) => failure.code)).toContain(
+      "trust_status_unavailable",
+    );
+
     expect(await store.listRecordsByType("authority_certificate")).toHaveLength(0);
     expect(await store.listRecordsByType("contract_stream_event")).toHaveLength(0);
   });
@@ -1307,6 +1415,100 @@ function jsonHeaders(role: TransitionCallerRole): Record<string, string> {
     "x-handshake-request-identity": `test-request-${role}`,
     authorization: `Bearer ${TEST_CALLER_AUTH_TOKENS[role]}`,
   };
+}
+
+type HttpFixtureEd25519Signer = {
+  signerRole: "operator_policy" | "gateway";
+  keyIdentityRef: string;
+  privateKeyPkcs8: string;
+  publicKeyEd25519: string;
+};
+
+type HostedVerifierResponseBody = {
+  outcome: string;
+  checks?: Record<string, string>;
+  failures: Array<{ code: string }>;
+};
+
+type HostedTrustKeyInput = NonNullable<AuthorityCertificateTrustMaterialInput["keys"]>[number];
+
+async function hostedAuthorityCertificateFixture() {
+  const fixture = await createGreenlitContract();
+  const gate = await fixture.kernel.gatewayCheck({
+    actionContractId: fixture.contract.actionContractId,
+    greenlightId: fixture.greenlight.greenlightId,
+    observedParameters: { package: "hono", versionRange: "^4.12.19" },
+  });
+  const signers = await httpFixtureEd25519Signers();
+  const certificate = await fixture.kernel.createAuthorityCertificate({
+    terminalObjectRef: `receipt:${gate.receipt.receiptId}`,
+    signers: signerInputs(signers),
+  });
+  return { certificate, signers };
+}
+
+async function httpFixtureEd25519Signers(): Promise<HttpFixtureEd25519Signer[]> {
+  return Promise.all([
+    httpFixtureEd25519Signer("operator_policy", "fixture:ed25519:operator-policy"),
+    httpFixtureEd25519Signer("gateway", "fixture:ed25519:gateway"),
+  ]);
+}
+
+async function httpFixtureEd25519Signer(
+  signerRole: HttpFixtureEd25519Signer["signerRole"],
+  keyIdentityRef: string,
+): Promise<HttpFixtureEd25519Signer> {
+  const keyPair = (await crypto.subtle.generateKey(ED25519_ALGORITHM, true, ["sign", "verify"])) as CryptoKeyPair;
+  const privateKeyPkcs8 = bytesToBase64Url(new Uint8Array(await crypto.subtle.exportKey("pkcs8", keyPair.privateKey)));
+  const publicKeyEd25519 = bytesToBase64Url(new Uint8Array(await crypto.subtle.exportKey("raw", keyPair.publicKey)));
+  return { signerRole, keyIdentityRef, privateKeyPkcs8, publicKeyEd25519 };
+}
+
+function signerInputs(signers: HttpFixtureEd25519Signer[]): AuthorityCertificateSignerInput[] {
+  return signers.map((signer) => ({
+    signerRole: signer.signerRole,
+    keyIdentityRef: signer.keyIdentityRef,
+    algorithm: "ed25519" as const,
+    privateKeyPkcs8: signer.privateKeyPkcs8,
+  }));
+}
+
+function hostedTrustMaterial(
+  signers: HttpFixtureEd25519Signer[],
+  keyOverrides: Partial<HostedTrustKeyInput> = {},
+  includeIssuer = true,
+): AuthorityCertificateTrustMaterialInput {
+  const issuerRef = keyOverrides.issuerRef ?? "issuer:fixture";
+  return {
+    keys: signers.map((signer) => ({
+      keyIdentityRef: signer.keyIdentityRef,
+      issuerRef,
+      signerRole: signer.signerRole,
+      algorithm: "ed25519" as const,
+      publicKeyEd25519: signer.publicKeyEd25519,
+      hmacSecret: null,
+      status: "active" as const,
+      ...keyOverrides,
+    })),
+    issuers: includeIssuer
+      ? [
+          {
+            issuerRef,
+            issuerDigest: DIGEST_B,
+            status: "active" as const,
+            metadataRefs: ["evidence:issuer-fixture"],
+          },
+        ]
+      : [],
+    statusRecords: [],
+    allowDevHmac: false,
+  };
+}
+
+function bytesToBase64Url(bytes: Uint8Array): string {
+  let binary = "";
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/u, "");
 }
 
 async function createRecoveryTerminalConflictAttempt() {

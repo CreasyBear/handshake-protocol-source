@@ -5,14 +5,15 @@ import { cliOutput } from "./output";
 export async function verifyCertificateCommand(input: { certificate: unknown; trustMaterial: unknown }) {
   const trustMaterial = AuthorityCertificateTrustMaterialSchema.parse(input.trustMaterial);
   const verification = await verifyAuthorityCertificate(input.certificate, trustMaterial);
+  const verified = verification.outcome === "verified";
   return cliOutput({
     command: "cert verify",
     plane: "evidence",
     custodyRole: "review_custody",
-    ok: verification.valid,
+    ok: verified,
     reasonCodes: verification.failures.map((failure) => failure.code),
-    nextAction: verification.valid ? "read_evidence" : "fix_arguments",
-    retryability: verification.valid ? "not_retryable" : "retryable_after_fix",
+    nextAction: verified ? "read_evidence" : "fix_arguments",
+    retryability: verified ? "not_retryable" : "retryable_after_fix",
     redactionProfileRef: "authority-certificate-verification:v1-redacted",
     evidenceRefs: [
       verification.envelope?.actionContractRef ? `action_contract:${verification.envelope.actionContractRef}` : null,
@@ -21,7 +22,6 @@ export async function verifyCertificateCommand(input: { certificate: unknown; tr
     proofGapRefs: verification.envelope?.proofGapRefs ?? [],
     refusalRefs: verification.envelope?.refusalRefs ?? [],
     result: {
-      verificationValid: verification.valid,
       verificationOutcome: verification.outcome,
       signingInputDigest: verification.signingInputDigest,
       actionClass: verification.envelope?.actionClass ?? null,

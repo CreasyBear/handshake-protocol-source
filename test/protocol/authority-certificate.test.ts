@@ -11,6 +11,7 @@ import {
   verifyAuthorityCertificate,
   type AuthorityCertificate,
 } from "../../src";
+import { projectX402AuthorityCertificateEvidenceProfile } from "../../src/conformance";
 import type { AuthorityCertificateSignerInput } from "../../src/protocol/areas/authority-certificate";
 import { recordUnknownDownstreamProofGap } from "../support/fixtures";
 import {
@@ -56,13 +57,24 @@ describe("AuthorityCertificate foundation", () => {
     expect(certificate.signingInputDigest).toBe(await authorityCertificateSigningInputDigest(certificate));
     expect(buildAuthorityCertificateSigningInput(certificate)).not.toHaveProperty("signatures");
     expect(buildAuthorityCertificateSigningInput(certificate)).not.toHaveProperty("signingInputDigest");
-    expect(result.valid).toBe(true);
     expect(result.outcome).toBe("verified");
     expect(result.authorityCreated).toBe(false);
     expect(result.checks.trustMaterial).toBe("passed");
     expect(result.checks.status).toBe("passed");
     expect(result.failures).toEqual([]);
     expect(result.envelope?.clearingEvidenceRefs.obligationRef).toBe("obligation:test-hono-install");
+
+    const x402Profile = projectX402AuthorityCertificateEvidenceProfile(result);
+    expect(x402Profile).toMatchObject({
+      evidenceProfile: "unsupported_action_class",
+      actionClass: "package.install",
+      exactPerCallProtectedAction: false,
+      provesPaymentSuccess: false,
+      provesSettlementFinality: false,
+      provesFacilitatorOperation: false,
+      provesProviderCustody: false,
+      managesPayment: false,
+    });
   });
 
   it("exports certificate JSON that verifies in a subprocess without protocol store access", async () => {
@@ -79,8 +91,8 @@ describe("AuthorityCertificate foundation", () => {
       const cert = JSON.parse(await Bun.file(${JSON.stringify(certificatePath)}).text());
       const trust = JSON.parse(await Bun.file(${JSON.stringify(trustPath)}).text());
       const result = await verifyAuthorityCertificate(cert, trust);
-      console.log(JSON.stringify({ valid: result.valid, failures: result.failures }));
-      process.exit(result.valid ? 0 : 1);
+      console.log(JSON.stringify({ outcome: result.outcome, failures: result.failures }));
+      process.exit(result.outcome === "verified" ? 0 : 1);
     `;
     const subprocess = Bun.spawnSync({
       cmd: [process.execPath, "-e", script],
@@ -90,7 +102,7 @@ describe("AuthorityCertificate foundation", () => {
     const stdout = new TextDecoder().decode(subprocess.stdout).trim();
 
     expect(subprocess.exitCode).toBe(0);
-    expect(JSON.parse(stdout)).toEqual({ valid: true, failures: [] });
+    expect(JSON.parse(stdout)).toEqual({ outcome: "verified", failures: [] });
   });
 
   it("fails verification when the signed envelope is tampered without a digest update", async () => {
@@ -100,7 +112,7 @@ describe("AuthorityCertificate foundation", () => {
 
     const result = await verifyAuthorityCertificate(tampered, trustMaterial(signers));
 
-    expect(result.valid).toBe(false);
+    expect(result.outcome).toBe("refused");
     expect(result.failures.map((failure) => failure.code)).toContain("envelope_digest_mismatch");
   });
 
@@ -136,7 +148,7 @@ describe("AuthorityCertificate foundation", () => {
 
     expect(buildAuthorityCertificateSigningInput(certificate)).toHaveProperty("consumerBindings");
     expect(buildAuthorityCertificateSigningInput(certificate)).toHaveProperty("extensions");
-    expect(result.valid).toBe(false);
+    expect(result.outcome).toBe("refused");
     expect(result.failures.map((failure) => failure.code)).toContain("signing_input_digest_mismatch");
     expect(result.failures.map((failure) => failure.code)).toContain("signature_signed_over_mismatch");
   });
@@ -150,7 +162,7 @@ describe("AuthorityCertificate foundation", () => {
 
     const result = await verifyAuthorityCertificate(stripped, trustMaterial(signers));
 
-    expect(result.valid).toBe(false);
+    expect(result.outcome).toBe("refused");
     expect(result.failures.map((failure) => failure.code)).toContain("required_signer_missing");
   });
 
@@ -160,7 +172,7 @@ describe("AuthorityCertificate foundation", () => {
 
     const result = await verifyAuthorityCertificate(certificate, trustMaterial(wrongSigners));
 
-    expect(result.valid).toBe(false);
+    expect(result.outcome).toBe("refused");
     expect(result.failures.map((failure) => failure.code)).toContain("signature_invalid");
   });
 
@@ -185,7 +197,7 @@ describe("AuthorityCertificate foundation", () => {
     expect(certificate.terminal.terminalKind).toBe("durable_refusal");
     expect(certificate.verificationPolicy.requiredSignerRoles).toEqual(["operator_policy"]);
     expect(certificate.envelope.gatewayAdmissionStatus).toBe("not_requested");
-    expect(result.valid).toBe(true);
+    expect(result.outcome).toBe("verified");
   });
 
   it("mints and verifies a proof-gap certificate after downstream finality remains unknown", async () => {
@@ -206,7 +218,7 @@ describe("AuthorityCertificate foundation", () => {
 
     expect(certificate.terminal.terminalKind).toBe("proof_gap");
     expect(certificate.envelope.proofGapRefs).toContain(proofGap.proofGapId);
-    expect(result.valid).toBe(true);
+    expect(result.outcome).toBe("verified");
   });
 
   it("embeds assembled custody, recovery, isolation, and idempotency evidence in terminal certificates", async () => {
@@ -301,7 +313,7 @@ describe("AuthorityCertificate foundation", () => {
         "surface_operation_reconciliation",
       ]),
     );
-    expect(result.valid).toBe(true);
+    expect(result.outcome).toBe("verified");
   });
 
   it("mints and verifies a replay-refusal certificate without mutation authority", async () => {
@@ -327,7 +339,7 @@ describe("AuthorityCertificate foundation", () => {
     expect(certificate.terminal.terminalKind).toBe("replay_refusal");
     expect(certificate.envelope.greenlightConsumptionStatus).toBe("replayed");
     expect(certificate.envelope.gatewayAdmissionStatus).toBe("replayed");
-    expect(result.valid).toBe(true);
+    expect(result.outcome).toBe("verified");
   });
 
   it("rejects non-terminal certificate minting", async () => {
@@ -377,7 +389,7 @@ describe("AuthorityCertificate foundation", () => {
     });
     const productionResult = await verifyAuthorityCertificate(forged, trustMaterial(signers));
 
-    expect(result.valid).toBe(false);
+    expect(result.outcome).toBe("refused");
     expect(result.failures.map((failure) => failure.code)).toContain("signature_invalid");
     expect(productionResult.failures.map((failure) => failure.code)).toContain("hmac_not_allowed");
   });

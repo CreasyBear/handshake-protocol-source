@@ -92,7 +92,8 @@ The local foundation includes:
 foundation kernel/protocol primitives. The certificate is a terminal signed evidence object
 for receipt, durable refusal, proof gap, or replay refusal outcomes. It is Layer
 8 authority evidence only: it does not create greenlights, gateway checks,
-mutation proof, identity, settlement, marketplace status, or hosted trust.
+mutation proof, identity, settlement, marketplace status, hosted trust, or
+hosted mutation authority.
 
 Source anchors:
 
@@ -115,16 +116,20 @@ JSON without the protocol store. The local trust read model now separates
 `verified`, `refused`, and `proof_gap` outcomes, issuer/key/status failures,
 and public verifier key-set/JWKS projections. Those projections expose only
 public verification material and create no authority or cross-org trust.
+Non-mutating hosted verifier routes can project metadata, key-set/JWKS, status,
+and structured verification against configured local trust material; those
+routes do not fetch remote trust, mutate certificate/status records, host
+operation, or turn verification into permission.
 
 The local foundation does not prove:
 
 - live/provider payment custody;
 - live vault-provider custody or provider-side secret lifecycle operation;
-- hosted org auth, policy operation, RBAC, retention, or search;
+- hosted org auth, policy operation, RBAC, retention, search, or mutation authority;
 - external package-manager material attestation;
 - broad MCP, CLI, browser, shell, network, package-manager, or generated-tool-stream
   interception beyond the local x402 payment and package-install dispatch boundaries;
-- portable cross-org verification, live JWKS fetch, hosted revocation lookup,
+- portable cross-org trust, remote JWKS trust fetch, live revocation authority,
   marketplace certification, or provider custody from local fixture keys.
 
 ## Current Bought Product

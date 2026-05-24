@@ -46,12 +46,13 @@ ingress surfaces for local x402 payment and package-install dispatch boundaries.
 It is not an external establishment claim. Live provider custody, hosted
 operation, broad MCP/CLI/browser/shell/network runtime ingestion, independent
 package-material attestation, aggregate payment-budget management, cross-org
-AuthorityCertificate trust, live JWKS/revocation, and hosted verifier operation
-remain outside this kernel. Local AuthorityCertificate minting and offline
-pinned-key verification are part of the source foundation. Current x402
-spend enforcement is per-call only; aggregate payment-budget management is
-intentionally outside the current remit, and local spend-window fields are
-non-enforced metadata.
+AuthorityCertificate trust, remote JWKS trust fetching, live revocation
+authority, and hosted mutation authority remain outside this kernel. Local
+AuthorityCertificate minting, offline pinned-key verification, and non-mutating
+hosted verifier projections over configured local trust material are part of the
+source foundation. Current x402 spend enforcement is per-call only; aggregate
+payment-budget management is intentionally outside the current remit, and local
+spend-window fields are non-enforced metadata.
 
 ## Source Ownership
 

@@ -399,7 +399,6 @@ function verificationResponse(input: {
     verificationPlane: "local_pinned_trust_material",
     authorityCreated: false,
     redactionProfileRef: "authority-certificate-verification:v1-redacted",
-    valid: outcome === "verified",
     checks: verificationChecks(input.failures),
     failures: input.failures,
     envelope: input.envelope,

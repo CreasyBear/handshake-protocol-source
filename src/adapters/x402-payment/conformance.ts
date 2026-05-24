@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { requiredGatewayCheckedBypassProbeKinds } from "../../protocol/areas/bypass-probe";
+import type { AuthorityCertificateVerificationResponse } from "../../protocol/areas/authority-certificate";
 
 export const x402FirstWedgeUnsupportedSurfaces = [
   "upto",
@@ -82,6 +83,30 @@ export type X402FirstWedgeEvidenceLabelClassification = {
   settlementFinality: "not_settlement_finality" | "settlement_succeeded" | "settlement_failed" | "settlement_unknown";
 };
 
+export const X402AuthorityCertificateEvidenceProfileSchema = z.strictObject({
+  profileKind: z.literal("authority_certificate_x402_exact_evidence_profile"),
+  authorityCreated: z.literal(false),
+  verificationOutcome: z.enum(["verified", "refused", "proof_gap"]),
+  evidenceProfile: z.enum(["x402_exact_per_call", "unsupported_action_class", "unverified_certificate", "proof_gap"]),
+  actionClass: z.string().min(1).nullable(),
+  actionContractRef: z.string().min(1).nullable(),
+  gatewayAdmissionStatus: z.enum(["not_requested", "admitted", "refused", "proof_gap", "replayed"]).nullable(),
+  downstreamOutcomeStatus: z.enum(["not_started", "pending", "succeeded", "refused", "failed", "unknown"]).nullable(),
+  exactPerCallProtectedAction: z.boolean(),
+  gatewayCheckEvidenceRef: z.string().min(1).nullable(),
+  receiptRef: z.string().min(1).nullable(),
+  proofGapRefs: z.array(z.string().min(1)),
+  refusalRefs: z.array(z.string().min(1)),
+  evidenceRefs: z.array(z.string().min(1)),
+  provesPaymentSuccess: z.literal(false),
+  provesSettlementFinality: z.literal(false),
+  provesFacilitatorOperation: z.literal(false),
+  provesProviderCustody: z.literal(false),
+  managesPayment: z.literal(false),
+  nonClaims: z.array(z.string().min(1)),
+});
+export type X402AuthorityCertificateEvidenceProfile = z.infer<typeof X402AuthorityCertificateEvidenceProfileSchema>;
+
 const x402FirstWedgeEvidenceLabelClassifications = {
   facilitator_settle_attempted: evidenceLabel("facilitator_settle_attempted", "facilitator_settlement", {
     firstWedgeOperation: "unsupported_facilitator_operation",
@@ -151,6 +176,51 @@ export function classifyX402FirstWedgeSurface(surfaceValue: unknown): X402FirstW
 export function classifyX402FirstWedgeEvidenceLabel(labelValue: unknown): X402FirstWedgeEvidenceLabelClassification {
   const label = X402FirstWedgeEvidenceLabelSchema.parse(labelValue);
   return { ...x402FirstWedgeEvidenceLabelClassifications[label] };
+}
+
+export function projectX402AuthorityCertificateEvidenceProfile(
+  verification: AuthorityCertificateVerificationResponse,
+): X402AuthorityCertificateEvidenceProfile {
+  const envelope = verification.envelope;
+  const isX402Exact = envelope?.actionClass === "x402_payment.exact";
+  const evidenceProfile = x402CertificateEvidenceProfileFor(verification.outcome, isX402Exact);
+  return X402AuthorityCertificateEvidenceProfileSchema.parse({
+    profileKind: "authority_certificate_x402_exact_evidence_profile",
+    authorityCreated: false,
+    verificationOutcome: verification.outcome,
+    evidenceProfile,
+    actionClass: envelope?.actionClass ?? null,
+    actionContractRef: envelope?.actionContractRef ?? null,
+    gatewayAdmissionStatus: envelope?.gatewayAdmissionStatus ?? null,
+    downstreamOutcomeStatus: envelope?.downstreamOutcomeStatus ?? null,
+    exactPerCallProtectedAction: isX402Exact && verification.outcome === "verified",
+    gatewayCheckEvidenceRef: envelope?.gateAttemptRef ? `gateway_check_attempt:${envelope.gateAttemptRef}` : null,
+    receiptRef: envelope?.receiptRef ?? null,
+    proofGapRefs: envelope?.proofGapRefs ?? [],
+    refusalRefs: envelope?.refusalRefs ?? [],
+    evidenceRefs: envelope
+      ? uniqueStrings([
+          ...envelope.evidenceRefs,
+          ...envelope.surfaceOperationEvidenceRefs,
+          ...envelope.downstreamEvidenceRefs,
+          ...envelope.gatewayCredentialEvidenceRefs,
+          ...envelope.credentialResolutionEvidenceRefs,
+        ])
+      : [],
+    provesPaymentSuccess: false,
+    provesSettlementFinality: false,
+    provesFacilitatorOperation: false,
+    provesProviderCustody: false,
+    managesPayment: false,
+    nonClaims: [
+      "not payment success",
+      "not settlement finality",
+      "not facilitator operation",
+      "not provider custody",
+      "not payment management",
+      "not broad x402 compatibility",
+    ],
+  });
 }
 
 export const X402PaymentConformancePostureSchema = z.strictObject({
@@ -244,4 +314,17 @@ function evidenceLabel(
     label,
     settlementFinality: options.settlementFinality ?? "not_settlement_finality",
   };
+}
+
+function x402CertificateEvidenceProfileFor(
+  outcome: AuthorityCertificateVerificationResponse["outcome"],
+  isX402Exact: boolean,
+): X402AuthorityCertificateEvidenceProfile["evidenceProfile"] {
+  if (outcome === "proof_gap") return "proof_gap";
+  if (outcome !== "verified") return "unverified_certificate";
+  return isX402Exact ? "x402_exact_per_call" : "unsupported_action_class";
+}
+
+function uniqueStrings(values: string[]): string[] {
+  return [...new Set(values)];
 }

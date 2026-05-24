@@ -54,7 +54,7 @@ type ApsDemoOutput = {
     };
     readonly evidencePosture: unknown;
     readonly terminalPosture: {
-      readonly verificationValid: boolean;
+      readonly verificationOutcome: "verified" | "refused" | "proof_gap";
     };
   };
 };
@@ -114,7 +114,7 @@ const output = {
         policyDecision: apsOutput.report.authorityPath.policyDecision,
         gateDecision: apsOutput.report.authorityPath.gateDecision,
         replayDecision: apsOutput.report.authorityPath.replayDecision,
-        certificateVerificationValid: apsOutput.report.terminalPosture.verificationValid,
+        certificateVerificationOutcome: apsOutput.report.terminalPosture.verificationOutcome,
       },
     },
     {

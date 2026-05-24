@@ -208,11 +208,13 @@ HMAC/propose-time signatures as portable trust, and works without the protocol
 store. The local verifier response is structured as `verified`, `refused`, or
 `proof_gap`; it separates cryptographic, artifact, terminal, gateway-admission,
 trust-material, and status checks. Native verifier key-set and JWKS projections
-are public-material projections only, not trust decisions.
+are public-material projections only, not trust decisions. Non-mutating hosted
+verifier routes expose metadata, key-set/JWKS, status lookup, and structured
+verification against configured local trust material only.
 
-This is still local foundation trust. Cross-org JWKS fetch, hosted revocation
-lookup, hosted verify APIs, marketplace certification, and provider custody
-remain outside this local foundation.
+This is still local foundation trust. Cross-org trust, remote JWKS trust fetch,
+live revocation authority, hosted mutation authority, marketplace
+certification, and provider custody remain outside this local foundation.
 
 ## Pressure Review Notes
 

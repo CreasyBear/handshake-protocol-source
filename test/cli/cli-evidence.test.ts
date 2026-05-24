@@ -64,7 +64,7 @@ describe("CLI evidence surface", () => {
       retryability: "retryable_after_fix",
       redactionProfileRef: "authority-certificate-verification:v1-redacted",
       result: {
-        verificationValid: false,
+        verificationOutcome: "refused",
         signingInputDigest: null,
         actionClass: null,
         failureCodes: ["schema_invalid"],
@@ -272,7 +272,7 @@ function apsReport() {
       },
       terminalPosture: {
         terminalKind: "receipt",
-        verificationValid: true,
+        verificationOutcome: "verified",
       },
       nonClaims: ["hosted operation", "clearing-house readiness", "aggregate payment-budget management"],
       missingProofObjects: [],

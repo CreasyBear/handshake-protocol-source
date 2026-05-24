@@ -230,9 +230,10 @@ ref/resolution evidence records. It enforces x402 per-call spend only. It does
 not prove live provider custody, live vault-provider operation, broad
 MCP/CLI/browser/shell/network runtime interception, hosted operation, external
 package-material verification, aggregate payment-budget management, cross-org
-AuthorityCertificate trust, live JWKS/revocation, or hosted verifier operation.
-The local source foundation does include AuthorityCertificate minting and
-offline pinned-key verification.
+AuthorityCertificate trust, remote JWKS trust fetching, live revocation
+authority, or hosted mutation authority. The local source foundation does
+include AuthorityCertificate minting, offline pinned-key verification, and
+non-mutating hosted verifier projections over configured local trust material.
 
 ## Extension Boundary
 

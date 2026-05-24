@@ -73,11 +73,13 @@ describe("claim boundary", () => {
     expect(readme).toContain("not broad x402 compatibility");
     expect(readme).toContain("No adapter family defines the protocol");
     expect(readme).toContain("public runtime ingress for local x402 payment and package-install dispatch boundaries");
-    expect(readme).toContain("not live provider custody, hosted operation, generic MCP/runtime control");
+    expect(readme).toContain("not live provider custody, hosted mutation authority, generic MCP/runtime control");
+    expect(readme).toContain("non-mutating hosted verifier metadata/key-set/JWKS/status/verify routes");
+    expect(readme).toContain("remote JWKS trust fetching, live revocation authority");
     expect(readme).toContain("npm run demo:self-hosted");
     expect(readme).toContain("source-owned local MCP stdio proposal/evidence process proof");
     expect(readme).toContain("facilitator operation, seller middleware, unsupported x402 schemes");
-    expect(readme).toContain("cross-org AuthorityCertificate trust, live JWKS/revocation, hosted verifier operation");
+    expect(readme).toContain("cross-org AuthorityCertificate trust");
     expect(readme).toContain("aggregate payment-budget management is intentionally outside the current remit");
     expect(readme).not.toMatch(/session\/day\/review spend windows are metadata until a ledger exists/i);
     expect(readme).not.toMatch(/\bx402 compatible\b/i);

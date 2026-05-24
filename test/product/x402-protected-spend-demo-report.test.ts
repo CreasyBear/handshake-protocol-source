@@ -108,7 +108,7 @@ describe("x402 protected spend demo report", () => {
       },
       terminalPosture: {
         terminalKind: "receipt",
-        verificationValid: true,
+        verificationOutcome: "verified",
         trustBoundary: "local_pinned_trust_material_only",
         replayRefusal: {
           gateDecision: "refused",

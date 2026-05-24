@@ -289,7 +289,7 @@ const phases = [
     evidence: {
       authorityCertificateId: certificate.authorityCertificateId,
       terminalKind: certificate.terminal.terminalKind,
-      verificationValid: certificateVerification.valid,
+      verificationOutcome: certificateVerification.outcome,
       signerRoles: certificate.signatures.map((signature) => signature.signerRole),
     },
   },
@@ -432,7 +432,7 @@ function buyerReadableApsReport() {
     terminalPosture: {
       terminalKind: certificate.terminal.terminalKind,
       authorityCertificateId: certificate.authorityCertificateId,
-      verificationValid: certificateVerification.valid,
+      verificationOutcome: certificateVerification.outcome,
       signerRoles: certificate.signatures.map((signature) => signature.signerRole),
       trustBoundary: "local_pinned_trust_material_only",
       replayRefusal: {
@@ -471,7 +471,7 @@ function buyerReadableApsReport() {
         requiredBeforeClaim: "provider/customer gateway custody",
       },
       {
-        proofObject: "hosted verifier and trust material distribution",
+        proofObject: "cross-org trust material distribution and remote status authority",
         requiredBeforeClaim: "cross-org certificate trust",
       },
       {
