@@ -1,40 +1,77 @@
 {
   "name": "handshake-protocol-kernel",
   "version": "0.2.4",
-  "private": true,
+  "description": "Contracted execution infrastructure for engineering agents: protocol kernel, CLI evidence views, and local MCP proposal/evidence server.",
+  "license": "UNLICENSED",
+  "mcpName": "io.github.joelchan/handshake-protocol-kernel",
+  "keywords": [
+    "agents",
+    "execution-control",
+    "handshake",
+    "mcp",
+    "x402"
+  ],
+  "engines": {
+    "node": ">=20",
+    "bun": ">=1.3.9"
+  },
   "type": "module",
   "types": "./dist/index.d.ts",
+  "bin": {
+    "handshake": "bin/handshake",
+    "handshake-protocol-kernel": "bin/handshake-mcp",
+    "handshake-mcp": "bin/handshake-mcp"
+  },
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "import": "./src/index.ts",
-      "default": "./src/index.ts"
+      "bun": "./src/index.ts",
+      "import": "./dist/index.mjs",
+      "default": "./dist/index.mjs"
     },
     "./conformance": {
       "types": "./dist/conformance/index.d.ts",
-      "import": "./src/conformance/index.ts",
-      "default": "./src/conformance/index.ts"
+      "bun": "./src/conformance/index.ts",
+      "import": "./dist/conformance/index.mjs",
+      "default": "./dist/conformance/index.mjs"
     },
     "./runtime": {
       "types": "./dist/runtime/index.d.ts",
-      "import": "./src/runtime/index.ts",
-      "default": "./src/runtime/index.ts"
+      "bun": "./src/runtime/index.ts",
+      "import": "./dist/runtime/index.mjs",
+      "default": "./dist/runtime/index.mjs"
     },
     "./sdk/role-clients": {
       "types": "./dist/sdk/surface-clients/index.d.ts",
-      "import": "./src/sdk/surface-clients/index.ts",
-      "default": "./src/sdk/surface-clients/index.ts"
+      "bun": "./src/sdk/surface-clients/index.ts",
+      "import": "./dist/sdk/surface-clients/index.mjs",
+      "default": "./dist/sdk/surface-clients/index.mjs"
+    },
+    "./cli": {
+      "types": "./dist/cli/index.d.ts",
+      "bun": "./src/cli/index.ts",
+      "import": "./dist/cli/index.mjs",
+      "default": "./dist/cli/index.mjs"
+    },
+    "./mcp": {
+      "types": "./dist/mcp/index.d.ts",
+      "bun": "./src/mcp/index.ts",
+      "import": "./dist/mcp/index.mjs",
+      "default": "./dist/mcp/index.mjs"
     },
     "./experimental": {
       "types": "./dist/experimental.d.ts",
-      "import": "./src/experimental.ts",
-      "default": "./src/experimental.ts"
+      "bun": "./src/experimental.ts",
+      "import": "./dist/experimental.mjs",
+      "default": "./dist/experimental.mjs"
     },
     "./package.json": "./package.json"
   },
   "files": [
+    "bin",
     "src",
     "dist",
+    "server.json",
     "README.md",
     "QUALITY.md",
     "STRUCTURE.md",
@@ -52,12 +89,14 @@
     "demo:self-hosted": "bun run ./examples/self-hosted-activation/run.ts",
     "demo:aps": "bun run ./examples/x402-protected-spend/run.ts",
     "demo:mcp-transcript": "bun run ./examples/mcp-reference-transcript/run.ts",
-    "build": "tsc -p tsconfig.build.json",
+    "build": "npm run build:types && npm run build:bundles",
+    "build:types": "tsc -p tsconfig.build.json",
+    "build:bundles": "node scripts/build-package-bundles.mjs",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "lint": "eslint src test --max-warnings=0",
     "check:types": "tsc --noEmit --pretty false",
-    "pack:check": "npm run build && node scripts/check-package-surface.mjs",
+    "pack:check": "npm run build && node scripts/check-package-surface.mjs && node scripts/check-published-entrypoints.mjs",
     "check:repo": "npm run check:types && npm run lint && npm run format:check && npm run test && npm run pack:check && git diff --check",
     "quality:architecture": "npm run test -- test/architecture/import-posture.test.ts test/architecture/naming-posture.test.ts test/architecture/package-surface.test.ts test/architecture/root-exports.test.ts test/architecture/surface-boundary-posture.test.ts test/architecture/cli-command-posture.test.ts test/architecture/mcp-surface-posture.test.ts test/conformance/protected-mutation-adapter-conformance.test.ts",
     "quality:claims": "npm run test -- test/architecture/active-vocabulary.test.ts test/architecture/claim-boundary.test.ts",

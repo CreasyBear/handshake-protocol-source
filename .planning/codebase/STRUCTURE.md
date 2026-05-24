@@ -5,498 +5,491 @@
 ## Directory Layout
 
 ```text
-Handshake v0.0.2/
-|-- AGENTS.md                          # Doctrine, invariants, authority boundary language
-|-- README.md                          # Repo orientation, command contract, proof boundary, source map
-|-- QUALITY.md                         # TypeScript quality, naming, import, and claims rules
-|-- STRUCTURE.md                       # Canonical source/test/docs ownership map
-|-- package.json                       # Private package contract, scripts, exports, files
-|-- bun.lock                           # Bun lockfile
-|-- tsconfig.json                      # TypeScript check config
-|-- tsconfig.build.json                # Declaration build config
-|-- eslint.config.js                   # ESLint config
-|-- wrangler.toml                      # Worker, D1, and KV binding config
-|-- .github/workflows/check.yml        # CI gate running `npm run check:repo`
-|-- docs/internal/                     # Compact canonical internal docs
-|-- examples/x402-protected-spend/     # Local x402 APS proof artifact generator
-|-- examples/mcp-reference-transcript/ # Source-owned MCP transcript artifact generator
-|-- examples/self-hosted-activation/   # Source-owned local self-hosted activation packet
-|-- migrations/                        # D1 protocol storage schema
-|-- scripts/                           # Package surface check script
-|-- src/                               # TypeScript source package
-|-- test/                              # Bun tests by ownership lane
-|-- dist/                              # Generated declaration build output
-|-- node_modules/                      # Installed dependencies
-|-- .planning/                         # Scratch planning and mapper outputs
-|-- .gstack/                           # Local tool scratch
-`-- .cursor/                           # Editor-local config
+[project-root]/
+├── AGENTS.md                    # Doctrine, invariants, planning rules, response posture.
+├── README.md                    # Current repo orientation, source map, commands, local/reference claim boundary.
+├── QUALITY.md                   # TypeScript quality, naming, and Tier 1 gate rules.
+├── STRUCTURE.md                 # Tracked source/test/docs ownership map.
+├── package.json                 # Publishable package exports, command contract, bins, and MCP name.
+├── server.json                  # MCP Registry metadata for the local stdio proposal/evidence server.
+├── bin/                         # Thin Node wrappers for bundled CLI and MCP entrypoints.
+├── bun.lock                     # Bun dependency lockfile.
+├── tsconfig.json                # TypeScript source typecheck config.
+├── tsconfig.build.json          # Declaration build config.
+├── eslint.config.js             # ESLint config.
+├── wrangler.toml                # Cloudflare Worker/D1/KV binding configuration.
+├── migrations/
+│   └── 0001_protocol_kernel.sql # D1 protocol record, stream, greenlight, ledger, isolation, receipt indexes.
+├── docs/
+│   └── internal/                # Compact tracked protocol canon and durable implementation decisions.
+├── examples/
+│   ├── self-hosted-activation/  # Local activation packet proof.
+│   ├── x402-protected-spend/    # Local x402 protected-spend report.
+│   └── mcp-reference-transcript/# Local MCP proposal/evidence transcript.
+├── scripts/
+│   ├── build-package-bundles.mjs# Node ESM bundle build for public imports and bins.
+│   ├── check-package-surface.mjs# Pack-surface guard.
+│   └── check-published-entrypoints.mjs # Node CLI/MCP bin smoke gate.
+├── src/
+│   ├── protocol/                # Protocol meaning and transition authority.
+│   ├── http/                    # Hono/Worker transport, admission, routes, evidence reads.
+│   ├── runtime/                 # Generated-execution proposal helpers; not authority.
+│   ├── mcp/                     # Model-facing proposal/evidence surface; not authority.
+│   ├── adapters/                # Reference gateway fixtures and adapter profiles.
+│   ├── install/                 # Protected-action install proposal compiler contracts.
+│   ├── storage/                 # D1, memory, KV, and store mechanics.
+│   ├── sdk/                     # Typed HTTP clients and role-scoped runtime/evidence clients.
+│   ├── cli/                     # Local evidence and command-manifest wrappers.
+│   ├── conformance/             # Reference posture checks.
+│   ├── surfaces/                # Non-authority surface boundary manifest.
+│   ├── index.ts                 # Curated package root export.
+│   ├── experimental.ts          # Explicit reference adapter surface.
+│   └── worker.ts                # Cloudflare Worker entrypoint.
+├── test/
+│   ├── architecture/            # Repo shape, import, claim, package, CLI/MCP/surface guards.
+│   ├── protocol/                # Primitive and state-machine invariants.
+│   ├── runtime/                 # Runtime ingress and codemode proposal behavior.
+│   ├── mcp/                     # MCP proposal/resource/process contracts.
+│   ├── adapters/                # Reference gateway fixtures.
+│   ├── integration/             # End-to-end protected action paths.
+│   ├── conformance/             # Adapter/conformance checks.
+│   ├── http/                    # Hono/D1 transport behavior.
+│   ├── sdk/                     # SDK role clients.
+│   ├── cli/                     # CLI local evidence/readback behavior.
+│   ├── product/                 # Self-hosted activation/product proof slices.
+│   └── support/                 # Test fixtures and harnesses.
+├── dist/                        # Generated declaration/build output; not source authority.
+├── .github/workflows/check.yml  # CI gate bound to `npm run check:repo`.
+└── .planning/                   # Scratch planning/mapper output; not repo truth.
 ```
-
-```text
-src/
-|-- index.ts                           # Curated root package exports
-|-- experimental.ts                    # Explicit experimental adapter fixture exports
-|-- worker.ts                          # Cloudflare Worker fetch entrypoint
-|-- protocol/                          # Protocol meaning, response objects, events, store port
-|-- http/                              # Hono/Worker transport, envelopes, routes, evidence reads
-|-- runtime/                           # Generated-execution proposal helpers and ingress subpath
-|-- adapters/                          # Reference gateway fixtures, x402 proof profile, auth.md protected-call profile
-|-- install/                           # Generic protected-action install proposal contracts
-|-- storage/                           # D1, memory, KV, and store implementation plumbing
-|-- sdk/                               # Low-level HTTP client and role-scoped Tier 2 clients
-|-- cli/                               # Local operator/evidence command surfaces
-|-- mcp/                               # Model-facing proposal/resource source modules and local stdio proof harness
-|-- surfaces/                          # Shared non-authority surface manifests and outcomes
-`-- conformance/                       # Reference conformance checks
-```
-
-```text
-test/
-|-- architecture/                      # Import, export, package, surface, CLI, MCP, claims, naming gates
-|-- protocol/                          # Primitive schemas, transitions, records, reason codes, invariants
-|-- http/                              # Hono, route, D1, evidence read behavior
-|-- runtime/                           # Runtime ingress and codemode proposal behavior
-|-- sdk/                               # Role-scoped client behavior
-|-- cli/                               # CLI evidence, local project, support bundle, x402 posture
-|-- mcp/                               # MCP schema, resource, proposal, transcript behavior
-|-- adapters/                          # Reference gateway fixtures and x402 adapter behavior
-|-- conformance/                       # Adapter conformance and x402 first-wedge posture
-|-- integration/                       # End-to-end D1/HTTP protected action paths
-|-- product/                           # Local proof report and transcript-facing product checks
-`-- support/                           # Fixtures and harnesses
-```
-
-## Current Git-State Boundary
-
-**Committed architecture:**
-- Tier 1 kernel authority lives in `src/protocol/*`, HTTP transition transport in `src/http/*`, durable store mechanics in `src/storage/*`, and gateway-side reference mutation fixtures in committed adapter families such as `src/adapters/package-install/*`, `src/adapters/repo-write/*`, `src/adapters/preview-deploy/*`, and `src/adapters/x402-payment/*`.
-- Tier 2 surfaces live in `src/runtime/*`, `src/sdk/surface-clients/*`, `src/cli/*`, `src/mcp/*`, and `src/surfaces/*`. They propose, render, read redacted evidence, or report readiness; they do not authorize, gateway-check, mutate, settle, clear, certify, or prove provider custody.
-- Committed transition-budget telemetry hardening lives in `test/support/transition-budget-recorder.ts` and `test/protocol/transition-budget-recorder.test.ts`.
-
-**Committed auth.md protected-call profile:**
-- Commit `7bba365` added `src/adapters/auth-md/index.ts`, `src/adapters/auth-md/profiles.ts`, `src/adapters/auth-md/action-proposal.ts`, `src/adapters/auth-md/gateway.ts`, tests, docs, runtime-ingress binding, and explicit experimental exports.
-- Treat auth.md as an experimental/reference adapter profile: discovery and registration are provenance; `GatewayCredentialRef` is custody evidence; `auth_md_protected_api_call.exact` is an action contract; `runAuthMdProtectedApiCallGateway()` mutates only after `VerifiedGatewayCheck`.
-- It is not Tier 1 kernel, not an auth provider, not an OAuth server, not WorkOS replacement, not provider custody, not hosted operation, and not a generic API gateway.
-
-**Current Tier 2 activation closeout:**
-- Closeout files add a source-owned local self-hosted activation packet, local MCP stdio process proof, CLI self-hosted readback tests, and claim-boundary tests for the packet.
-- Key files: `examples/self-hosted-activation/*`, `src/mcp/stdio/*`, `test/product/self-hosted-activation.test.ts`, `test/mcp/mcp-stdio-process.test.ts`, `test/cli/cli-self-hosted-readback.test.ts`, and `test/architecture/self-hosted-activation-claim-boundary.test.ts`.
-- Treat these as local/pre-hosted activation evidence only. They are not public MCP host packaging, hosted operation, process supervision, gateway authority, or broad runtime containment.
 
 ## Directory Purposes
 
-**Root Canon:**
-- Purpose: Keep repo truth compact and source-backed.
-- Contains: `AGENTS.md`, `README.md`, `QUALITY.md`, `STRUCTURE.md`, `docs/internal/decisions.md`, `docs/internal/protocol-definition.md`, `docs/internal/protocol-kernel-architecture.md`, `docs/internal/protocol-layman.md`, `docs/internal/protocol-notes.md`.
-- Key files: `AGENTS.md`, `README.md`, `QUALITY.md`, `STRUCTURE.md`.
+**Root Canon Files:**
+- Purpose: Define active repo truth and operating rules.
+- Contains: `AGENTS.md`, `README.md`, `QUALITY.md`, `STRUCTURE.md`, `docs/internal/*`.
+- Key files: `docs/internal/decisions.md`, `docs/internal/protocol-definition.md`, `docs/internal/protocol-kernel-architecture.md`, `docs/internal/protocol-notes.md`.
+- Guidance: Use tracked canon for claims. Use `.planning/` only as derived scratch.
 
-**`docs/internal`:**
-- Purpose: Durable product/protocol/architecture decisions.
-- Contains: `decisions.md`, `protocol-definition.md`, `protocol-kernel-architecture.md`, `protocol-layman.md`, `protocol-notes.md`.
-- Key files: `docs/internal/protocol-definition.md`, `docs/internal/protocol-kernel-architecture.md`.
+**`src/protocol/`:**
+- Purpose: Own protocol meaning: action contracts, policy decisions, one-use greenlights, gateway checks, receipts, refusals, proof gaps, isolation, recovery, review binding, generated-execution evidence boundaries, canonicalization, events, and store port.
+- Contains: `kernel.ts`, `areas/*`, `foundation/*`, `events/*`, `context/*`, `navigation/*`, `public/*`, `evidence-projections/*`, `store/*`.
+- Key files: `src/protocol/kernel.ts`, `src/protocol/areas/action-contract/transitions.ts`, `src/protocol/areas/policy-greenlight/transitions.ts`, `src/protocol/areas/gateway-gate/transitions.ts`, `src/protocol/store/port.ts`.
+- Guidance: Add protocol primitives under `src/protocol/areas/<primitive>/` with `schemas.ts`, `inputs.ts`, `types.ts`, `transitions.ts`, and `index.ts`. Do not import HTTP, SDK, runtime wrappers, storage implementations, or adapter fixtures.
 
-**`src/protocol`:**
-- Purpose: Protocol meaning, response object ownership, canonicalization, reason codes, transition facade, events, context, navigation, store port, evidence projections, and primitive areas.
-- Contains: `kernel.ts`, `public/`, `foundation/`, `events/`, `context/`, `navigation/`, `evidence-projections/`, `store/`, `areas/`.
-- Key files: `src/protocol/kernel.ts`, `src/protocol/public/schemas.ts`, `src/protocol/public/inputs.ts`, `src/protocol/foundation/reason-codes.ts`, `src/protocol/store/port.ts`.
+**`src/protocol/areas/`:**
+- Purpose: Own individual protocol primitives and state transitions.
+- Contains: `action-contract`, `authority-certificate`, `bypass-probe`, `catalog-envelope`, `credential-custody`, `gateway-gate`, `generated-execution-graph`, `idempotency-ledger`, `intent-compilation`, `isolation-breaker`, `operation-lifecycle`, `policy-greenlight`, `proof-gap`, `protected-path-posture`, `receipt-export`, `recovery`, `refusal`, `review-binding`, `runtime-evidence`, `tool-call-draft`, and object/representation/lifecycle support areas.
+- Key files: `src/protocol/areas/object-registry/index.ts`, `src/protocol/areas/credential-custody/transitions.ts`, `src/protocol/areas/gateway-gate/artifacts.ts`.
+- Guidance: Area internals may import other areas through public indexes only. Schema/type faces stay local unless deliberately aggregated through `src/protocol/public/*`.
 
-**`src/protocol/areas`:**
-- Purpose: Owned protocol primitives and state transitions.
-- Contains: `catalog-envelope`, `credential-custody`, `runtime-evidence`, `generated-execution-graph`, `tool-call-draft`, `intent-compilation`, `action-contract`, `policy-greenlight`, `gateway-gate`, `receipt-export`, `refusal`, `proof-gap`, `recovery`, `review-binding`, `isolation-breaker`, `operation-lifecycle`, `protected-path-posture`, `object-registry`, `authority-certificate`, and related areas.
-- Key files: `src/protocol/areas/action-contract/transitions.ts`, `src/protocol/areas/policy-greenlight/transitions.ts`, `src/protocol/areas/gateway-gate/transitions.ts`, `src/protocol/areas/object-registry/index.ts`.
+**`src/protocol/foundation/`:**
+- Purpose: Own base protocol mechanics.
+- Contains: canonicalization, content digests, IDs, errors, reason codes, base schemas, transition guards.
+- Key files: `src/protocol/foundation/canonical.ts`, `src/protocol/foundation/content-digests.ts`, `src/protocol/foundation/errors.ts`, `src/protocol/foundation/reason-codes.ts`.
+- Guidance: Put deterministic, protocol-wide helpers here only when they are not an area-owned behavior.
 
-**`src/protocol/public`:**
-- Purpose: Public schema/input aggregation for HTTP, SDK, examples, and root exports.
-- Contains: `schemas.ts`, `inputs.ts`, `transitions.ts`, `index.ts`.
+**`src/protocol/events/`:**
+- Purpose: Own ordered stream event schemas, digest chains, and record commits.
+- Contains: `chains.ts`, `records.ts`, `schemas.ts`.
+- Key files: `src/protocol/events/chains.ts`, `src/protocol/events/records.ts`.
+- Guidance: Use events for reconstruction evidence, not logging as authority.
+
+**`src/protocol/evidence-projections/`:**
+- Purpose: Own redacted diagnostic projections.
+- Contains: projection assembly, schemas, projection builders.
+- Key files: `src/protocol/evidence-projections/assembly.ts`, `src/protocol/evidence-projections/projections.ts`.
+- Guidance: Add audit/search/user-facing evidence as purpose-built redacted projections, not generic raw record reads.
+
+**`src/protocol/public/`:**
+- Purpose: Public schema/input aggregation only.
+- Contains: `schemas.ts`, `inputs.ts`, `transitions.ts`.
 - Key files: `src/protocol/public/schemas.ts`, `src/protocol/public/inputs.ts`.
+- Guidance: Keep as `export * from ...` aggregators. Do not add behavior.
 
-**`src/protocol/foundation`:**
-- Purpose: Shared protocol foundation with no transport or storage implementation dependency.
-- Contains: canonicalization, content digests, IDs, errors, schema core, reason codes, transition guards.
-- Key files: `src/protocol/foundation/canonical.ts`, `src/protocol/foundation/content-digests.ts`, `src/protocol/foundation/errors.ts`, `src/protocol/foundation/reason-codes.ts`, `src/protocol/foundation/schema-core.ts`.
+**`src/http/`:**
+- Purpose: Own Hono/Worker transport, route metadata, admission, request context, errors, OpenAPI, evidence read handlers, and store/kernel resolution.
+- Contains: `app.ts`, `app-options.ts`, `admission/*`, `routes/*`, `handlers/*`, `errors/*`, `openapi/*`, `navigation/*`, `store/*`.
+- Key files: `src/http/app.ts`, `src/http/routes/transition-route-registry.ts`, `src/http/routes/transition-invokers.ts`, `src/http/admission/index.ts`, `src/http/store/resolution.ts`.
+- Guidance: Add transition routes by updating `src/http/routes/transition-route-registry.ts`, `src/http/routes/transition-invokers.ts`, response schemas when needed, and route tests under `test/http/`. Do not put protocol meaning in HTTP.
 
-**`src/protocol/evidence-projections`:**
-- Purpose: Redacted telemetry response schemas and projection builders.
-- Contains: projection schemas and builders for contract view, agent transaction envelope, idempotency recovery, receipt timeline, and protected-path install health.
-- Key files: `src/protocol/evidence-projections/schemas.ts`, `src/protocol/evidence-projections/projections.ts`.
+**`src/runtime/`:**
+- Purpose: Own generated-execution proposal helpers and runtime ingress. Runtime is observer/compiler evidence, not authority.
+- Contains: `ingress/index.ts`, `package-install/action-proposal.ts`, `repo-write/action-proposal.ts`, `preview-deploy/action-proposal.ts`, `codemode-multi-action/*`.
+- Key files: `src/runtime/ingress/index.ts`, `src/runtime/codemode-multi-action/generated-program-runner.ts`, `src/runtime/index.ts`.
+- Guidance: Add runtime families only when they emit the same protocol evidence shape and return explicit non-authority posture. Do not issue policy decisions, greenlights, gateway checks, receipts, or mutation attempts.
 
-**`src/protocol/events`:**
-- Purpose: Canonical record building, request context attachment, and digest-linked stream events.
-- Contains: `records.ts`, `chains.ts`, `schemas.ts`, `index.ts`.
-- Key files: `src/protocol/events/records.ts`, `src/protocol/events/chains.ts`.
+**`src/mcp/`:**
+- Purpose: Own model-facing proposal/evidence catalog, schemas, resource mapping, and local stdio process proof.
+- Contains: `catalog.ts`, `output.ts`, `resources.ts`, `x402-proposal.ts`, `digest.ts`, `stdio/*`, `reference-transcript.ts`, `reference-transcript-fixtures.ts`.
+- Key files: `src/mcp/catalog.ts`, `src/mcp/x402-proposal.ts`, `src/mcp/resources.ts`, `src/mcp/stdio/server.ts`.
+- Guidance: MCP can propose and read redacted evidence. It must not import protocol kernel internals, gateway transitions, adapters, storage, signer material, or all-role SDK clients.
 
-**`src/http`:**
-- Purpose: Hono/Worker transport, route admission, response schemas, error envelopes, OpenAPI, evidence reads, raw record guard, and store/kernel resolution.
-- Contains: `app.ts`, `app-options.ts`, `admission/`, `routes/`, `handlers/`, `errors/`, `openapi/`, `navigation/`, `store/`.
-- Key files: `src/http/app.ts`, `src/http/routes/transition-route-registry.ts`, `src/http/routes/transition-response-schemas.ts`, `src/http/errors/transition-error-envelope.ts`, `src/http/handlers/evidence-read.ts`, `src/http/handlers/internal-record-read.ts`.
+**`src/adapters/`:**
+- Purpose: Own reference adapter profiles, bypass probes, and gateway fixtures that mutate only after `VerifiedGatewayCheck`.
+- Contains: `auth-md/*`, `x402-payment/*`, `package-install/gateway.ts`, `repo-write/gateway.ts`, `preview-deploy/gateway.ts`, `protected-path-probes/*`, `downstream-failure-evidence.ts`.
+- Key files: `src/adapters/x402-payment/wallet-gateway.ts`, `src/adapters/x402-payment/install-proposal.ts`, `src/adapters/auth-md/gateway.ts`, `src/adapters/auth-md/action-proposal.ts`.
+- Guidance: Put signer/payment/credential-use code only in gateway-owned adapter files. Keep official x402 signer imports inside `src/adapters/x402-payment/wallet-gateway.ts`. Adapter barrels must not expose raw signer factories unless explicitly guarded.
 
-**`src/runtime`:**
-- Purpose: Generated-execution proposal evidence and action-contract proposal helpers.
-- Contains: `index.ts`, `ingress/`, `codemode-multi-action/`, `package-install/`, `preview-deploy/`, `repo-write/`.
-- Key files: `src/runtime/index.ts`, `src/runtime/ingress/index.ts`, `src/runtime/codemode-multi-action/generated-program-runner.ts`, `src/runtime/package-install/action-proposal.ts`.
-
-**`src/adapters`:**
-- Purpose: Reference gateway fixtures and adapter proof profiles.
-- Contains: committed package-install, repo-write, preview-deploy, protected-path probes, x402 payment proof profile, downstream failure evidence, and auth.md protected-call/lifecycle/bypass adapter profile.
-- Key files: `src/adapters/package-install/gateway.ts`, `src/adapters/repo-write/gateway.ts`, `src/adapters/preview-deploy/gateway.ts`, `src/adapters/x402-payment/wallet-gateway.ts`, `src/adapters/x402-payment/install-proposal.ts`, `src/adapters/x402-payment/action-proposal.ts`, `src/adapters/x402-payment/upstream-evidence.ts`, `src/adapters/x402-payment/conformance.ts`, `src/adapters/x402-payment/bypass-probes.ts`.
-
-**`src/install`:**
-- Purpose: Generic protected-action install proposal and adapter-pack contracts.
-- Contains: `install-proposal/`, `protected-action-adapter-pack/`, `index.ts`.
+**`src/install/`:**
+- Purpose: Own generic install proposal and protected-action adapter-pack contracts.
+- Contains: `install-proposal/index.ts`, `protected-action-adapter-pack/index.ts`.
 - Key files: `src/install/install-proposal/index.ts`, `src/install/protected-action-adapter-pack/index.ts`.
+- Guidance: Install proposals compile protected paths into kernel records. They do not create policy decisions, greenlights, gateway checks, receipts, signatures, or downstream success claims.
 
-**`src/storage`:**
-- Purpose: Protocol store implementations and non-authority cache helpers.
-- Contains: `d1/`, `memory/`, `kv/`, `store.ts`.
-- Key files: `src/storage/d1/index.ts`, `src/storage/d1/statements.ts`, `src/storage/memory/index.ts`, `src/storage/kv/index.ts`, `src/storage/store.ts`.
+**`src/storage/`:**
+- Purpose: Own atomic record/store mechanics and cache plumbing.
+- Contains: `d1/*`, `memory/*`, `kv/*`, `store.ts`.
+- Key files: `src/storage/d1/index.ts`, `src/storage/d1/statements.ts`, `src/storage/memory/index.ts`, `src/storage/kv/index.ts`.
+- Guidance: Storage sees protocol objects as durable evidence. It must not decide protocol meaning, policy, lifecycle, recovery, proof-gap, or gateway state semantics.
 
-**`src/sdk`:**
-- Purpose: Typed HTTP client ergonomics and role-scoped Tier 2 activation clients.
-- Contains: `client.ts`, `surface-clients/`.
-- Key files: `src/sdk/client.ts`, `src/sdk/surface-clients/runtime-client.ts`, `src/sdk/surface-clients/evidence-client.ts`, `src/sdk/surface-clients/transport.ts`, `src/sdk/surface-clients/index.ts`.
+**`src/sdk/`:**
+- Purpose: Own typed HTTP client ergonomics and role-scoped runtime/evidence clients.
+- Contains: `client.ts`, `surface-clients/*`.
+- Key files: `src/sdk/client.ts`, `src/sdk/surface-clients/runtime-client.ts`, `src/sdk/surface-clients/evidence-client.ts`, `src/sdk/surface-clients/transport.ts`.
+- Guidance: Add role-scoped clients under `src/sdk/surface-clients/` and update `src/surfaces/boundary-manifest.ts`. Do not add all-role token maps to activation paths.
 
-**`src/cli`:**
-- Purpose: Local operator/evidence command contract, output envelope, local project readiness, x402 local posture, support bundle, and certificate verification.
-- Contains: `command-manifest.ts`, `main.ts`, `output.ts`, `aps-report.ts`, `certificate.ts`, `projection-evidence.ts`, `support-bundle.ts`, `local-project/`, `x402/`.
-- Key files: `src/cli/command-manifest.ts`, `src/cli/output.ts`, `src/cli/support-bundle.ts`, `src/cli/local-project/index.ts`, `src/cli/x402/index.ts`.
+**`src/cli/`:**
+- Purpose: Own local command manifest, redacted evidence rendering, local project config, support bundle, x402 local install/probe helpers, and certificate verification wrapper.
+- Contains: `command-manifest.ts`, `main.ts`, `output.ts`, `aps-report.ts`, `certificate.ts`, `projection-evidence.ts`, `support-bundle.ts`, `local-project/*`, `x402/*`.
+- Key files: `src/cli/command-manifest.ts`, `src/cli/certificate.ts`, `src/cli/x402/index.ts`.
+- Guidance: CLI commands are evidence/setup/readiness commands. Do not add mutation-shaped command names, gateway runners, process startup, raw record export, policy evaluation, gateway checks, or signer factories.
 
-**`src/mcp`:**
-- Purpose: Model-facing x402 proposal and evidence source modules.
-- Contains: `catalog.ts`, `resources.ts`, `x402-proposal.ts`, `output.ts`, `digest.ts`, `reference-transcript.ts`, `reference-transcript-fixtures.ts`, `index.ts`, and the local `stdio/` proof harness.
-- Key files: `src/mcp/catalog.ts`, `src/mcp/resources.ts`, `src/mcp/x402-proposal.ts`, `src/mcp/output.ts`, `src/mcp/reference-transcript.ts`.
-
-**`src/surfaces`:**
-- Purpose: Shared boundary manifests and non-authority outcome shapes for SDK, CLI, MCP, and deferred surfaces.
-- Contains: `boundary-manifest.ts`, `outcome.ts`, `LANE.md`.
-- Key files: `src/surfaces/boundary-manifest.ts`, `src/surfaces/outcome.ts`.
-
-**`src/conformance`:**
-- Purpose: Reference conformance checks without standards certification or authority.
-- Contains: `index.ts`, `LANE.md`.
+**`src/conformance/`:**
+- Purpose: Own source-package conformance checks without standards certification claims.
+- Contains: `index.ts`.
 - Key files: `src/conformance/index.ts`.
+- Guidance: Add narrow invariant probes one at a time. Do not imply provider-side gateway certification.
 
-**`examples/x402-protected-spend`:**
-- Purpose: Local APS proof report for one official buyer-side `x402_payment.exact` path.
-- Contains: `run.ts`, `README.md`, `output/latest.json`, `output/latest.md`.
-- Key files: `examples/x402-protected-spend/run.ts`, `examples/x402-protected-spend/README.md`.
+**`src/surfaces/`:**
+- Purpose: Own internal boundary manifests for non-kernel product surfaces.
+- Contains: `boundary-manifest.ts`, `outcome.ts`.
+- Key files: `src/surfaces/boundary-manifest.ts`.
+- Guidance: Surface ids must declare custody role, authority posture, source roots, route families, forbidden imports, forbidden credential/output shapes, non-authority flags, and claim-boundary labels before implementation expands.
 
-**`examples/mcp-reference-transcript`:**
-- Purpose: Source-owned MCP transcript artifact generator.
-- Contains: `run.ts`, `README.md`, `output/latest.json`, `output/latest.md`.
-- Key files: `examples/mcp-reference-transcript/run.ts`, `src/mcp/reference-transcript.ts`.
+**`test/`:**
+- Purpose: Mirror ownership and enforce protocol/state/architecture claims.
+- Contains: architecture, protocol, runtime, MCP, adapters, integration, conformance, HTTP, SDK, CLI, product, support tests.
+- Key files: `test/architecture/import-posture.test.ts`, `test/architecture/root-exports.test.ts`, `test/architecture/surface-boundary-posture.test.ts`, `test/protocol/model-based-invariants.test.ts`, `test/integration/x402-d1-http.test.ts`.
+- Guidance: Place tests beside ownership lanes, not in root `test/*.test.ts`.
 
-**`examples/self-hosted-activation`:**
-- Purpose: Source-owned local activation packet that composes APS, CLI readbacks, MCP reference transcript, and local MCP stdio process proof.
-- Contains: `run.ts`, `README.md`, `DEFERRED_GATES.md`, `output/.gitignore`, and ignored generated output files.
-- Key files: `examples/self-hosted-activation/run.ts`, `src/mcp/stdio/process-proof.ts`, `test/product/self-hosted-activation.test.ts`.
+**`examples/`:**
+- Purpose: Produce local/reference evidence packets for self-hosted activation, x402 protected-spend, and MCP reference transcript.
+- Contains: `examples/self-hosted-activation/*`, `examples/x402-protected-spend/*`, `examples/mcp-reference-transcript/*`.
+- Key files: `examples/self-hosted-activation/run.ts`, `examples/x402-protected-spend/run.ts`, `examples/mcp-reference-transcript/run.ts`.
+- Guidance: Examples must preserve local/reference labels and not claim hosted/provider operation.
+
+**`migrations/`:**
+- Purpose: Own canonical D1 schema for protocol storage.
+- Contains: `migrations/0001_protocol_kernel.sql`.
+- Key files: `migrations/0001_protocol_kernel.sql`.
+- Guidance: Add schema changes that preserve durable reconstruction, greenlight consumption, idempotency, isolation, operation-claim, receipt, and stream-event invariants.
+
+**`dist/`:**
+- Purpose: Generated declaration and Node ESM bundle output used by package surface checks.
+- Contains: generated declaration files mirroring `src/` plus bundled public import and bin artifacts.
+- Key files: `bin/handshake`, `bin/handshake-mcp`, `dist/index.d.ts`, `dist/index.mjs`, `dist/bin/handshake.mjs`, `dist/bin/handshake-mcp.mjs`.
+- Guidance: Do not edit by hand. Regenerate through `npm run build`.
+
+**`.planning/`:**
+- Purpose: Scratch planning, mapper outputs, macro plans, phase plans, strategy notes.
+- Contains: `.planning/codebase/*` plus planning subtrees.
+- Key files: `.planning/codebase/ARCHITECTURE.md`, `.planning/codebase/STRUCTURE.md`.
+- Guidance: Do not promote `.planning/` paths, labels, stage names, or scratch claims into source, README, scripts, CI, exported symbols, or canonical docs unless explicitly validated and promoted.
 
 ## Key File Locations
 
 **Entry Points:**
-- `src/index.ts`: Curated package root exports.
-- `src/runtime/index.ts`: `./runtime` package subpath for runtime ingress.
-- `src/sdk/surface-clients/index.ts`: `./sdk/role-clients` package subpath for `RuntimeClient` and `EvidenceClient`.
-- `src/conformance/index.ts`: `./conformance` package subpath.
-- `src/experimental.ts`: `./experimental` reference adapter fixture subpath.
-- `src/http/app.ts`: Hono app creation and route registration.
-- `src/worker.ts`: Worker fetch entrypoint.
-- `src/cli/main.ts`: Source CLI dispatcher.
-- `src/mcp/index.ts`: MCP source-module exports, not a package subpath.
-- `src/mcp/stdio/entry.ts`: Local MCP stdio process entrypoint for the source-owned self-hosted proof packet, not a package export.
-- `examples/x402-protected-spend/run.ts`: APS proof artifact generator.
-- `examples/mcp-reference-transcript/run.ts`: MCP transcript artifact generator.
-- `examples/self-hosted-activation/run.ts`: Local self-hosted activation packet generator.
+- `src/index.ts`: Curated stable root package export.
+- `src/experimental.ts`: Explicit experimental/reference adapter export surface.
+- `src/runtime/index.ts`: Runtime proposal subpath export.
+- `src/sdk/surface-clients/index.ts`: Role-scoped SDK activation clients.
+- `src/conformance/index.ts`: Conformance subpath export.
+- `src/worker.ts`: Cloudflare Worker entrypoint.
+- `src/http/app.ts`: Hono app factory.
+- `src/cli/main.ts`: CLI entrypoint.
+- `src/mcp/stdio/entry.ts`: Local MCP stdio process entrypoint.
 
 **Configuration:**
-- `package.json`: Package exports, scripts, files, dependencies.
-- `wrangler.toml`: Worker, D1, KV binding configuration.
-- `migrations/0001_protocol_kernel.sql`: D1 schema for protocol records and authority indexes.
+- `package.json`: Package exports, command contract, CLI/MCP bins, and MCP registry name.
+- `server.json`: MCP Registry metadata for npm/stdio package publication.
+- `bin/`: Thin Node wrappers that import bundled `dist/bin/*` artifacts.
+- `tsconfig.json`: TypeScript source typecheck.
+- `tsconfig.build.json`: Declaration build.
+- `eslint.config.js`: ESLint.
+- `.prettierrc.json`: Prettier.
+- `.prettierignore`: Excludes `dist`, `.planning`, generated output, and tool folders from Prettier.
+- `wrangler.toml`: Worker bindings.
 - `.github/workflows/check.yml`: CI gate.
-- `tsconfig.json`, `tsconfig.build.json`, `eslint.config.js`: TypeScript/lint/build configuration.
 
-**Response Contracts:**
-- `src/protocol/public/schemas.ts`: Public protocol object schemas.
-- `src/protocol/public/inputs.ts`: Public transition input schemas.
-- `src/protocol/foundation/reason-codes.ts`: Protocol reason-code registry.
-- `src/http/routes/transition-response-schemas.ts`: HTTP success response schemas for composite transitions.
-- `src/http/errors/transition-error-envelope.ts`: HTTP/SDK failure envelope.
-- `src/protocol/evidence-projections/schemas.ts`: Redacted telemetry projection schemas.
-- `src/surfaces/outcome.ts`: Shared non-authority surface outcome schema.
-- `src/cli/output.ts`: CLI output envelope.
-- `src/mcp/output.ts`: MCP tool result envelope.
+**Canonical Docs:**
+- `AGENTS.md`: Doctrine and invariant language.
+- `README.md`: Source map, commands, local/reference claims.
+- `QUALITY.md`: Quality, naming, and gates.
+- `STRUCTURE.md`: Source/test/docs ownership.
+- `docs/internal/decisions.md`: Durable decisions.
+- `docs/internal/protocol-definition.md`: Canonical protocol definition.
+- `docs/internal/protocol-kernel-architecture.md`: Kernel architecture and schema map.
+- `docs/internal/protocol-layman.md`: Plain-English protocol translation.
+- `docs/internal/protocol-notes.md`: Compact implementation notes.
 
-**Runtime And Evidence Flow:**
-- `src/runtime/ingress/index.ts`: Observed dispatch block parsing and proposal/refusal evidence.
-- `src/mcp/x402-proposal.ts`: MCP proposal-to-runtime bridge.
-- `src/mcp/resources.ts`: MCP evidence resource reads.
-- `src/sdk/surface-clients/runtime-client.ts`: Runtime proposal route client.
-- `src/sdk/surface-clients/evidence-client.ts`: Evidence projection route client.
-- `src/http/handlers/evidence-read.ts`: HTTP projection handler.
-- `src/protocol/evidence-projections/projections.ts`: Projection builders.
+**Core Protocol Logic:**
+- `src/protocol/kernel.ts`: Transition facade.
+- `src/protocol/areas/catalog-envelope/*`: Tool/action/gateway/envelope declarations.
+- `src/protocol/areas/runtime-evidence/*`: Runtime execution evidence.
+- `src/protocol/areas/generated-execution-graph/*`: Generated-code/spec graph evidence.
+- `src/protocol/areas/tool-call-draft/*`: Generated tool-call state.
+- `src/protocol/areas/intent-compilation/*`: Candidate/refusal boundary.
+- `src/protocol/areas/action-contract/*`: Exact contract canonicalization.
+- `src/protocol/areas/policy-greenlight/*`: Policy decisions, one-use greenlights, idempotency, review integration.
+- `src/protocol/areas/gateway-gate/*`: Gateway checks, replay refusal, receipt/proof-gap artifacts.
+- `src/protocol/areas/credential-custody/*`: Gateway credential refs and post-gate credential resolution evidence.
+- `src/protocol/areas/operation-lifecycle/*`: Downstream reconciliation.
+- `src/protocol/areas/receipt-export/*`: Receipt and receipt export.
+- `src/protocol/areas/refusal/*`: Refusal evidence.
+- `src/protocol/areas/proof-gap/*`: Proof-gap records.
+- `src/protocol/areas/isolation-breaker/*`: Isolation and breaker state.
+- `src/protocol/areas/recovery/*`: Recovery recommendations and terminal conflict handling.
+- `src/protocol/areas/authority-certificate/*`: Terminal signed evidence and offline verification.
 
-**Gateway And Adapter Flow:**
-- `src/protocol/areas/gateway-gate/transitions.ts`: Gateway check transition behavior.
-- `src/protocol/areas/gateway-gate/guards.ts`: Verified gateway check helpers.
-- `src/adapters/x402-payment/wallet-gateway.ts`: Official x402 signing after verified gate.
-- `src/adapters/x402-payment/install-proposal.ts`: x402 install compiler.
-- `src/adapters/x402-payment/action-proposal.ts`: x402 exact action proposal builder.
-- `src/adapters/x402-payment/upstream-evidence.ts`: Official PAYMENT-REQUIRED evidence decoding.
-- `src/adapters/x402-payment/conformance.ts`: x402 cut-line and conformance classifications.
-- `src/adapters/x402-payment/bypass-probes.ts`: Hostile x402 bypass probe executors.
+**Transport And Evidence Reads:**
+- `src/http/routes/transition-route-registry.ts`: Route metadata, roles, scope resolvers, schemas.
+- `src/http/routes/transition-invokers.ts`: Route-to-kernel dispatch.
+- `src/http/handlers/evidence-read.ts`: Redacted evidence projections.
+- `src/http/handlers/internal-record-read.ts`: Generic raw read guarded by object-registry posture.
+- `src/http/admission/*`: Role-scoped token and hosted caller admission seams.
+- `src/http/store/resolution.ts`: D1/fallback store resolution and `HandshakeKernel` construction.
 
-**Storage Evidence:**
-- `src/protocol/store/port.ts`: Store port and atomic commit contracts.
-- `src/protocol/events/records.ts`: Stored protocol record building and transition request context attachment.
-- `src/storage/d1/index.ts`: D1 store implementation.
-- `src/storage/d1/statements.ts`: SQL statement construction.
-- `src/storage/memory/index.ts`: In-memory store fixture.
-- `migrations/0001_protocol_kernel.sql`: Durable reconstruction schema.
+**Runtime/MCP Non-Authority Surfaces:**
+- `src/runtime/ingress/index.ts`: Runtime dispatch block schema and proposal orchestration.
+- `src/runtime/codemode-multi-action/generated-program-runner.ts`: Codemode multi-action proposal runner.
+- `src/mcp/catalog.ts`: MCP tools/resources catalog.
+- `src/mcp/x402-proposal.ts`: Strict MCP x402 proposal bridge.
+- `src/mcp/resources.ts`: Read-only evidence resource mapping.
+- `src/surfaces/boundary-manifest.ts`: Non-authority surface contracts.
+
+**x402 Adapter Boundary:**
+- `src/adapters/x402-payment/install-proposal.ts`: x402 adapter pack and install records.
+- `src/adapters/x402-payment/action-proposal.ts`: x402 runtime/action-contract proposal builder.
+- `src/adapters/x402-payment/wallet-gateway.ts`: Verified-gate wallet gateway and official signer/payment payload boundary.
+- `src/adapters/x402-payment/bypass-probes.ts`: Hostile bypass/custody probes.
+- `src/adapters/x402-payment/conformance.ts`: x402 conformance checks.
+- `src/adapters/x402-payment/index.ts`: Adapter barrel that intentionally omits the official signer factory.
+
+**Auth.md Adapter Boundary:**
+- `src/adapters/auth-md/profiles.ts`: Redacted discovery/registration/identity/claim/revocation evidence shapes.
+- `src/adapters/auth-md/action-proposal.ts`: Exact protected API-call proposal builder.
+- `src/adapters/auth-md/gateway.ts`: Gateway-check, credential-resolution, protected-call, reconciliation path.
+- `src/adapters/auth-md/revocation.ts`: Credential lifecycle isolation mapping.
+- `src/adapters/auth-md/bypass-probes.ts`: Hostile bypass probes.
+
+**Storage And Reconstruction:**
+- `src/protocol/store/port.ts`: Store interface and atomic commit contracts.
+- `src/storage/d1/index.ts`: D1 `ProtocolStore` implementation.
+- `src/storage/d1/statements.ts`: D1 SQL statement assembly.
+- `src/storage/memory/index.ts`: In-memory test/reference store.
+- `src/storage/kv/index.ts`: KV cache helpers.
+- `migrations/0001_protocol_kernel.sql`: D1 durable schema.
 
 **Testing:**
-- `test/architecture/root-exports.test.ts`: Root, runtime, role-client, conformance, experimental export guards.
-- `test/architecture/package-surface.test.ts`: Package exports/files/scripts guard.
-- `test/architecture/import-posture.test.ts`: Lane import posture and route metadata separation.
-- `test/architecture/surface-boundary-posture.test.ts`: SDK/CLI/MCP/deferred surface boundary manifest guard.
-- `test/architecture/cli-command-posture.test.ts`: CLI command/output non-authority guard.
-- `test/architecture/mcp-surface-posture.test.ts`: MCP source/non-export/non-authority guard.
-- `test/architecture/claim-boundary.test.ts`: Local proof and non-claim language guard.
-- `test/protocol/reason-code-registry.test.ts`: Reason-code registry guard.
-- `test/runtime/runtime-ingress.test.ts`: Runtime ingress contract/refusal/no-authority guard.
-- `test/sdk/role-clients.test.ts`: Role-scoped client guard.
-- `test/support/transition-budget-recorder.ts`: Committed telemetry harness that counts transition reads, writes, committed records, events, stream partitions, and store calls.
-- `test/protocol/transition-budget-recorder.test.ts`: Committed budget guard for policy, gateway, receipt export, reconciliation, and recovery status transitions.
-- `test/cli/cli-support-bundle.test.ts`: Support bundle redaction/non-authority guard.
-- `test/mcp/mcp-reference-transcript.test.ts`: MCP transcript harness guard.
-- `test/adapters/x402-wallet-gateway.test.ts`: x402 gateway signer custody and replay guard.
-- `test/integration/x402-d1-http.test.ts`: x402 D1/HTTP establishment path guard.
-- `test/product/x402-protected-spend-demo-report.test.ts`: APS proof report and role-client usage guard.
+- `test/architecture/import-posture.test.ts`: Layer and import rules.
+- `test/architecture/root-exports.test.ts`: Curated exports.
+- `test/architecture/package-surface.test.ts`: Package publish posture, files, exports, bins, and MCP registry metadata.
+- `test/architecture/surface-boundary-posture.test.ts`: SDK/CLI/MCP non-authority boundaries.
+- `test/architecture/mcp-surface-posture.test.ts`: MCP authority/import/credential posture.
+- `test/architecture/cli-command-posture.test.ts`: CLI command posture.
+- `test/architecture/claim-boundary.test.ts`: Claim boundary.
+- `test/protocol/*`: Protocol invariants and state machines.
+- `test/runtime/*`: Runtime ingress/codemode proposal behavior.
+- `test/mcp/*`: MCP catalog/resource/proposal/process behavior.
+- `test/adapters/*`: Gateway fixtures.
+- `test/integration/*`: End-to-end protected action paths.
+- `test/conformance/*`: Adapter/conformance checks.
 
 ## Naming Conventions
 
 **Files:**
-- Use boring owned protocol nouns: `transition-response-schemas.ts`, `transition-error-envelope.ts`, `reason-codes.ts`, `support-bundle.ts`, `reference-transcript.ts`.
-- Use lane-local `index.ts` public faces for multi-file directories.
-- Avoid generic buckets such as `utils`, `helpers`, `common`, `misc`, `manager`, or `service`.
+- Use owned protocol nouns and lane nouns: `action-contract`, `gateway-gate`, `credential-custody`, `generated-execution-graph`, `protected-path-posture`.
+- Use `schemas.ts`, `inputs.ts`, `types.ts`, `transitions.ts`, `guards.ts`, `index.ts` inside protocol areas.
+- Use `action-proposal.ts` for runtime/adapter proposal helpers, for example `src/adapters/x402-payment/action-proposal.ts`.
+- Use `gateway.ts` or `wallet-gateway.ts` for reference gateway fixtures, for example `src/adapters/auth-md/gateway.ts` and `src/adapters/x402-payment/wallet-gateway.ts`.
+- Use `LANE.md` at first-level `src/*` directories to declare ownership and extraction posture.
 
 **Directories:**
-- Use authority-boundary lanes under `src/`: `protocol`, `http`, `runtime`, `adapters`, `storage`, `sdk`, `cli`, `mcp`, `surfaces`, `install`, `conformance`.
-- Use primitive-owned areas under `src/protocol/areas/*`.
-- Use owned surface subdirectories such as `src/cli/local-project`, `src/cli/x402`, and `src/sdk/surface-clients`.
+- Split by authority boundary, not generic buckets.
+- Put primitive behavior under `src/protocol/areas/<primitive>/`.
+- Put transport under `src/http/`, client under `src/sdk/`, runtime proposal under `src/runtime/`, model-facing proposal/evidence under `src/mcp/`, and reference fixtures under `src/adapters/`.
+- Avoid banned bucket names such as `utils`, `helpers`, `common`, `misc`, `stuff`, `manager`, and `service` unless `STRUCTURE.md` explicitly creates an exception.
 
-**Protocol Objects:**
-- Keep object names exact: `ActionContract`, `PolicyDecision`, `Greenlight`, `GatewayCheck`, `Receipt`, `Refusal`, `ProofGap`, `IsolationState`.
-- Keep response/telemetry names explicit: `TransitionErrorEnvelope`, `SurfaceOutcome`, `CliOutputEnvelope`, `ContractEvidenceProjection`, `AgentTransactionEnvelopeProjection`, `ReceiptTimelineProjection`.
+**Exports:**
+- Root exports stay curated in `src/index.ts`.
+- Reference gateway fixtures stay behind `src/experimental.ts`.
+- Runtime ingress stays behind `src/runtime/index.ts` and the `./runtime` package subpath.
+- Role-scoped activation clients stay behind `src/sdk/surface-clients/index.ts` and `./sdk/role-clients`.
+- Conformance stays behind `src/conformance/index.ts` and `./conformance`.
+- Do not export `HandshakeKernel`, stores, MCP internals, surface manifests, signer factories, or gateway runners from the package root unless root export tests are deliberately changed.
 
-## Where To Add New Code
+**Protocol Object Names:**
+- Preserve exact object nouns: `ActionContract`, `PolicyDecision`, `Greenlight`, `GatewayCheck`, `Receipt`, `Refusal`, `ProofGap`, `IsolationState`.
+- Durable write functions should use explicit verbs such as `record*`, `persist*`, `commit*`, `consume*`, `mark*`, `activate*`.
+- Read/derivation functions should use `get*`, `list*`, `derive*`, `build*`, `format*`, `resolve*`.
+- Avoid overclaiming names such as `ensureSafe*`, `guarantee*`, `proveExecution*`, `trustedAgent*`, and `secureApproval*`.
 
-**New Protocol Object Or Response Schema:**
-- Primary code: `src/protocol/areas/<primitive>/schemas.ts`, `src/protocol/areas/<primitive>/inputs.ts`, `src/protocol/areas/<primitive>/transitions.ts`.
-- Public aggregation: `src/protocol/public/schemas.ts`, `src/protocol/public/inputs.ts`.
-- Tests: `test/protocol/<primitive>.test.ts`, `test/architecture/root-exports.test.ts` if exported.
-- Evidence note: Add object-registry metadata in `src/protocol/areas/object-registry/*` when durable record/read/export posture changes.
+## Where to Add New Code
 
-**New Reason Code:**
-- Primary code: `src/protocol/foundation/reason-codes.ts`.
-- Schema use: `src/protocol/foundation/schema-core.ts` if the code affects public reason-code schema posture.
-- Tests: `test/protocol/reason-code-registry.test.ts` and any transition test that emits the code.
+**New Protocol Primitive:**
+- Primary code: `src/protocol/areas/<primitive>/`
+- Required files: `schemas.ts`, `inputs.ts`, `types.ts`, `transitions.ts`, `index.ts`
+- Registry updates: `src/protocol/areas/object-registry/index.ts`, `src/protocol/areas/object-registry/schemas.ts`
+- Public aggregation: `src/protocol/public/schemas.ts`, `src/protocol/public/inputs.ts` only when it is intentionally public.
+- Navigation: `src/protocol/navigation/index.ts` when the transition becomes a protocol transition.
+- Tests: `test/protocol/<primitive>.test.ts` plus architecture guard updates if import/export posture changes.
 
-**New HTTP Transition Or Success Response:**
-- Route metadata: `src/http/routes/transition-route-registry.ts`.
-- Response schema: `src/http/routes/transition-response-schemas.ts` for composite bodies.
-- Invoker: `src/http/routes/transition-invokers.ts`.
-- Scope: `src/http/routes/transition-scope-resolvers.ts`.
-- Tests: `test/http/http.test.ts`, `test/http/d1-http.test.ts`, `test/architecture/import-posture.test.ts`.
-- Guardrail: Keep metadata, invokers, and response schemas separated.
-
-**New HTTP Error Envelope Field:**
-- Primary code: `src/http/errors/transition-error-envelope.ts`.
-- SDK parsing: `src/sdk/client.ts`, `src/sdk/surface-clients/transport.ts`.
-- Tests: `test/http/http.test.ts`, `test/sdk/role-clients.test.ts` if role clients surface it.
+**New HTTP Transition:**
+- Primary code: `src/http/routes/transition-route-registry.ts`, `src/http/routes/transition-invokers.ts`
+- Response schema: `src/http/routes/transition-response-schemas.ts`
+- Scope resolver: `src/http/routes/transition-scope-resolvers.ts` if direct body or record scope is insufficient.
+- Handler changes: Prefer route invoker to kernel transition. Add handler only for special read/projection behavior.
+- Tests: `test/http/http.test.ts`, `test/http/d1-http.test.ts`, and architecture import posture tests.
 
 **New Redacted Evidence Projection:**
-- Projection schema: `src/protocol/evidence-projections/schemas.ts`.
-- Projection builder: `src/protocol/evidence-projections/projections.ts`.
-- HTTP route: `src/http/routes/evidence-read-route-registry.ts`.
-- HTTP handler: `src/http/handlers/evidence-read.ts`.
-- SDK read: `src/sdk/client.ts` and, if Tier 2 evidence-safe, `src/sdk/surface-clients/evidence-client.ts`.
-- MCP resource: `src/mcp/catalog.ts` and `src/mcp/resources.ts` only if model-facing readback is required.
-- CLI wrapper: `src/cli/projection-evidence.ts` or `src/cli/support-bundle.ts` only if operator evidence readback is required.
-- Tests: `test/protocol/evidence-projections.test.ts`, `test/http/http.test.ts`, `test/sdk/role-clients.test.ts`, `test/mcp/mcp-resource-redaction.test.ts`, `test/cli/cli-evidence.test.ts`.
+- Primary code: `src/protocol/evidence-projections/projections.ts`, `src/protocol/evidence-projections/schemas.ts`, `src/protocol/evidence-projections/assembly.ts`
+- HTTP route: `src/http/routes/evidence-read-route-registry.ts`, `src/http/handlers/evidence-read.ts`
+- SDK readback: `src/sdk/client.ts` or `src/sdk/surface-clients/evidence-client.ts`
+- MCP resource: `src/mcp/resources.ts` only if model-facing readback is explicitly safe.
+- Tests: `test/protocol/evidence-projections.test.ts`, `test/http/http.test.ts`, `test/mcp/mcp-resource-redaction.test.ts` when MCP-exposed.
 
-**New SDK Role-Scoped Method:**
-- Runtime proposal method: `src/sdk/surface-clients/runtime-client.ts`.
-- Evidence read method: `src/sdk/surface-clients/evidence-client.ts`.
-- Transport changes: `src/sdk/surface-clients/transport.ts`.
-- Export changes: `src/sdk/surface-clients/index.ts`, `package.json`, `test/architecture/package-surface.test.ts`.
-- Tests: `test/sdk/role-clients.test.ts`, `test/architecture/root-exports.test.ts`, `test/architecture/surface-boundary-posture.test.ts`.
-- Guardrail: Do not add policy, gateway, receipt export, install, certificate mint, signer, raw record, or all-role token behavior to role clients.
-
-**New CLI Command:**
-- Manifest: `src/cli/command-manifest.ts`.
-- Output envelope: `src/cli/output.ts`.
-- Dispatcher: `src/cli/main.ts`.
-- Command implementation: `src/cli/<owned-area>.ts` or an existing owned subdirectory such as `src/cli/local-project/*` or `src/cli/x402/*`.
-- Surface manifest: `src/surfaces/boundary-manifest.ts`.
-- Tests: `test/architecture/cli-command-posture.test.ts`, `test/architecture/surface-boundary-posture.test.ts`, plus `test/cli/<feature>.test.ts`.
-- Guardrail: Do not create mutation-shaped command names, child process launchers, gateway checks, policy evaluation, receipt exports, raw records, or credential material.
+**New Runtime Dispatch Family:**
+- Primary code: `src/runtime/ingress/index.ts` for dispatch schema/orchestration.
+- Family proposal helper: `src/runtime/<family>/action-proposal.ts` or adapter-owned `src/adapters/<family>/action-proposal.ts`.
+- Guardrail: Return non-authority posture and refuse raw sibling, dynamic, late-bound, ambiguous, oversized, and unsupported shapes.
+- Tests: `test/runtime/runtime-ingress.test.ts` or a family-specific file under `test/runtime/`.
 
 **New MCP Tool Or Resource:**
-- Catalog: `src/mcp/catalog.ts`.
-- Tool proposal bridge: `src/mcp/<action>-proposal.ts`.
-- Resource read: `src/mcp/resources.ts`.
-- Output: `src/mcp/output.ts`, `src/surfaces/outcome.ts`.
-- Transcript harness: `src/mcp/reference-transcript.ts`, `src/mcp/reference-transcript-fixtures.ts`, `examples/mcp-reference-transcript/run.ts`.
-- Surface manifest: `src/surfaces/boundary-manifest.ts`.
+- Primary code: `src/mcp/catalog.ts`, `src/mcp/output.ts`, `src/mcp/resources.ts`, and a tool-specific module under `src/mcp/`.
+- Boundary update: `src/surfaces/boundary-manifest.ts` if route families, import roots, credential bans, or output fields change.
 - Tests: `test/mcp/*`, `test/architecture/mcp-surface-posture.test.ts`, `test/architecture/surface-boundary-posture.test.ts`.
-- Guardrail: Do not add an MCP process, package export, gateway check, payment signing, receipt export, certificate mint, raw record read, or all-role client import without a deliberate boundary change.
+- Constraint: MCP may propose and display redacted evidence only. It must not gateway-check, mutate, sign, mint, export receipts, or hold credentials.
 
-**New Runtime Ingress Family:**
-- Ingress schema and orchestration: `src/runtime/ingress/index.ts`.
-- Family proposal helper: `src/runtime/<family>/action-proposal.ts` or adapter-owned helper when the action family is adapter-specific.
-- Runtime subpath export: `src/runtime/index.ts` only for observer/compiler helpers.
-- Tests: `test/runtime/runtime-ingress.test.ts`, family-specific `test/runtime/<family>.test.ts`, `test/architecture/claim-boundary.test.ts`.
-- Guardrail: Runtime may create runtime evidence, graph evidence, tool-call drafts, intent compilations, action contracts, and refusals only.
+**New Reference Gateway Adapter:**
+- Primary code: `src/adapters/<adapter>/gateway.ts`.
+- Proposal code: `src/adapters/<adapter>/action-proposal.ts` or `src/runtime/<family>/action-proposal.ts`, depending on ownership.
+- Bypass/custody probes: `src/adapters/<adapter>/bypass-probes.ts`.
+- Experimental export: `src/experimental.ts`, not `src/index.ts`.
+- Tests: `test/adapters/<adapter>.test.ts`, `test/integration/<adapter>.test.ts`, `test/conformance/*`, architecture import posture tests.
+- Constraint: Mutate only after `verifiedGatewayCheckFromResult()` returns a `VerifiedGatewayCheck`.
 
-**New Adapter Fixture Or x402 Extension:**
-- Reference gateway: `src/adapters/<family>/gateway.ts`.
-- x402 exact proof profile: `src/adapters/x402-payment/*`.
-- Conformance: `src/conformance/index.ts` or adapter-local `src/adapters/<family>/conformance.ts`.
-- Experimental export: `src/experimental.ts` only for explicitly experimental fixtures.
-- Tests: `test/adapters/<family>.test.ts`, `test/conformance/<family>.test.ts`, `test/architecture/import-posture.test.ts`, `test/architecture/root-exports.test.ts`.
-- Guardrail: Mutation must happen only after `VerifiedGatewayCheck`; adapters must not import storage internals or use SDK/runtime as authority.
+**New x402 Capability:**
+- Primary code: `src/adapters/x402-payment/`.
+- Signer/payment-payload code: `src/adapters/x402-payment/wallet-gateway.ts` only.
+- Install/config records: `src/adapters/x402-payment/install-proposal.ts`.
+- Proposal records: `src/adapters/x402-payment/action-proposal.ts`.
+- Tests: `test/adapters/x402-wallet-gateway.test.ts`, `test/integration/x402-d1-http.test.ts`, `test/conformance/x402-payment-conformance.test.ts`.
+- Constraint: Keep claims to local/reference buyer-side `exact` unless a real provider/customer gateway owns the mutation credential and a ledger/enforcement surface is implemented.
 
-**auth.md Adapter Work:**
-- Committed files: `src/adapters/auth-md/profiles.ts`, `src/adapters/auth-md/action-proposal.ts`, `src/adapters/auth-md/gateway.ts`, `src/adapters/auth-md/index.ts`, `test/adapters/auth-md-adapter.test.ts`, `test/adapters/auth-md-gateway.test.ts`, and `test/runtime/auth-md-candidate-compilation.test.ts`.
-- Lifecycle/bypass/reconstruction files: `src/adapters/auth-md/revocation.ts`, `src/adapters/auth-md/bypass-probes.ts`, `test/support/auth-md-flow.ts`, `test/adapters/auth-md-bypass-probes.test.ts`, `test/adapters/auth-md-revocation.test.ts`, `test/adapters/auth-md-gateway-pressure.test.ts`, `test/adapters/auth-md-serialization-redaction.test.ts`, `test/protocol/policy-auth-md.test.ts`, `test/integration/auth-md-protected-call.test.ts`, and `test/integration/auth-md-receipt-reconstruction.test.ts`.
-- Placement: keep auth.md under `src/adapters/auth-md/` and explicit `src/experimental.ts` exports. Do not move it to root, runtime, SDK, CLI, MCP, or conformance package surfaces unless a future source-owned boundary explicitly proves that move.
-- Guardrail: It may normalize Protected Resource Metadata, prepare opaque `GatewayCredentialRef` intake, propose exact service-call contracts, and run a reference gateway only after `VerifiedGatewayCheck`. It must not issue policy by itself, create ambient greenlights, leak credential material, claim hosted identity, become an auth provider or OAuth server, certify providers, or act as a generic API gateway.
+**New Auth.md Credential-Custody Capability:**
+- Primary code: `src/adapters/auth-md/`.
+- Credential/evidence profiles: `src/adapters/auth-md/profiles.ts`.
+- Proposal builder: `src/adapters/auth-md/action-proposal.ts`.
+- Gateway path: `src/adapters/auth-md/gateway.ts`.
+- Lifecycle/isolation: `src/adapters/auth-md/revocation.ts`.
+- Tests: `test/adapters/auth-md-*.test.ts`, `test/integration/auth-md-*.test.ts`, `test/runtime/auth-md-candidate-compilation.test.ts`.
+- Constraint: Auth.md discovery/registration/identity evidence is provenance only. Credential resolution evidence is post-gate only.
 
-**New Storage Evidence Or Index:**
-- Store contract: `src/protocol/store/port.ts`.
-- D1 implementation: `src/storage/d1/index.ts`.
-- SQL statements: `src/storage/d1/statements.ts`.
-- D1 schema: `migrations/0001_protocol_kernel.sql`.
-- Memory fixture: `src/storage/memory/index.ts`.
-- Tests: `test/protocol/protocol-store-atomicity-contract.test.ts`, `test/http/d1-http.test.ts`, `test/protocol/fault-injecting-protocol-store.test.ts`.
-- Guardrail: Storage stores evidence and atomic indexes; it must not interpret protocol meaning.
+**New Store Implementation:**
+- Primary code: `src/storage/<store>/`.
+- Interface: Implement `ProtocolStore` from `src/protocol/store/port.ts`.
+- Tests: `test/protocol/protocol-store-atomicity-contract.test.ts`, `test/protocol/fault-injecting-protocol-store.test.ts`, store-specific tests.
+- Constraint: Storage may preserve atomic state and records. It must not interpret policy/gateway/recovery meaning.
 
-**New Demo Or Report Artifact:**
-- APS-style x402 report: `examples/x402-protected-spend/run.ts`, `examples/x402-protected-spend/README.md`.
-- MCP transcript report: `examples/mcp-reference-transcript/run.ts`, `examples/mcp-reference-transcript/README.md`.
-- Tests: `test/product/x402-protected-spend-demo-report.test.ts`, `test/mcp/mcp-reference-transcript.test.ts`.
-- Guardrail: Demo outputs must state local/reference posture and non-claims, and generated output under `examples/*/output/` is artifact evidence, not source authority.
+**New SDK Client Surface:**
+- Primary code: `src/sdk/surface-clients/` for role-scoped activation clients; `src/sdk/client.ts` only for full route parity.
+- Boundary update: `src/surfaces/boundary-manifest.ts`.
+- Package export: `package.json` only if a deliberate subpath is needed.
+- Tests: `test/sdk/role-clients.test.ts`, `test/architecture/surface-boundary-posture.test.ts`, `test/architecture/root-exports.test.ts`.
+- Constraint: Do not introduce fallback all-role token flows into agent-facing activation clients.
 
-**New Architecture Guard:**
-- Import/export/package posture: `test/architecture/import-posture.test.ts`, `test/architecture/root-exports.test.ts`, `test/architecture/package-surface.test.ts`.
-- Surface posture: `test/architecture/surface-boundary-posture.test.ts`, `test/architecture/cli-command-posture.test.ts`, `test/architecture/mcp-surface-posture.test.ts`.
-- Claims/naming/vocabulary: `test/architecture/claim-boundary.test.ts`, `test/architecture/active-vocabulary.test.ts`, `test/architecture/naming-posture.test.ts`.
-- Guardrail: Add guard tests before expanding source-facing authority surfaces.
+**New CLI Command:**
+- Primary code: `src/cli/command-manifest.ts`, then a command module under `src/cli/`.
+- Tests: `test/architecture/cli-command-posture.test.ts`, `test/cli/*`.
+- Constraint: Commands must be evidence/setup/readiness/local-verify only unless the CLI authority model is redesigned.
 
-**New Transition-Budget Telemetry Guard:**
-- Harness: `test/support/transition-budget-recorder.ts`.
-- Tests: `test/protocol/transition-budget-recorder.test.ts`.
-- Use for: guarding read/write/record/event/partition fan-out of authority-bearing transitions.
-- Guardrail: This is local test telemetry for architecture drift, not hosted observability, provider operation, clearing-house monitoring, or execution authority.
-
-## Active Tier 2 Surface Ownership
-
-**Shared surface boundary:**
-- Source: `src/surfaces/boundary-manifest.ts`.
-- Active ids: `sdk.runtime`, `sdk.evidence`, `cli.operator`, `cli.evidence`, `mcp.runtime`.
-- Deferred ids: `sdk.install`, `sdk.gateway`, `cli.process`.
-- Tests: `test/architecture/surface-boundary-posture.test.ts`.
-
-**Protocol and telemetry surfaces:**
-- Protocol objects: `src/protocol/public/schemas.ts`, `src/protocol/areas/*/schemas.ts`.
-- Reason codes: `src/protocol/foundation/reason-codes.ts`.
-- Evidence projections: `src/protocol/evidence-projections/*`.
-- Tests: `test/protocol/*`, `test/architecture/root-exports.test.ts`.
-
-**HTTP response surfaces:**
-- Transition routes: `src/http/routes/transition-route-registry.ts`.
-- Success responses: `src/http/routes/transition-response-schemas.ts`.
-- Error envelope: `src/http/errors/transition-error-envelope.ts`.
-- Evidence reads: `src/http/routes/evidence-read-route-registry.ts`, `src/http/handlers/evidence-read.ts`.
-- Raw record guard: `src/http/handlers/internal-record-read.ts`.
-- Tests: `test/http/*`, `test/architecture/import-posture.test.ts`.
-
-**SDK surfaces:**
-- Low-level compatibility client: `src/sdk/client.ts`.
-- Role-scoped activation clients: `src/sdk/surface-clients/*`.
-- Package subpath: `package.json` entry `./sdk/role-clients`.
-- Tests: `test/sdk/role-clients.test.ts`, `test/architecture/root-exports.test.ts`, `test/architecture/package-surface.test.ts`.
-
-**CLI surfaces:**
-- Command manifest: `src/cli/command-manifest.ts`.
-- Output envelope: `src/cli/output.ts`.
-- Support bundle: `src/cli/support-bundle.ts`.
-- Local project posture: `src/cli/local-project/*`.
-- Local x402 posture: `src/cli/x402/*`.
-- Tests: `test/cli/*`, `test/architecture/cli-command-posture.test.ts`.
-
-**MCP surfaces:**
-- Catalog: `src/mcp/catalog.ts`.
-- Resource reads: `src/mcp/resources.ts`.
-- x402 proposal: `src/mcp/x402-proposal.ts`.
-- Transcript: `src/mcp/reference-transcript.ts`, `src/mcp/reference-transcript-fixtures.ts`.
-- Tests: `test/mcp/*`, `test/architecture/mcp-surface-posture.test.ts`.
-
-**Runtime ingress surfaces:**
-- Public subpath: `src/runtime/index.ts`.
-- Ingress implementation: `src/runtime/ingress/index.ts`.
-- Tests: `test/runtime/runtime-ingress.test.ts`, `test/architecture/claim-boundary.test.ts`.
-
-**Adapter and x402 surfaces:**
-- Reference gateways: `src/adapters/package-install/gateway.ts`, `src/adapters/repo-write/gateway.ts`, `src/adapters/preview-deploy/gateway.ts`.
-- x402 proof profile: `src/adapters/x402-payment/*`.
-- Committed auth.md profile: `src/adapters/auth-md/*` proposal/gateway/runtime-ingress/lifecycle/bypass/reconstruction slice is experimental/reference architecture.
-- Conformance subpath: `src/conformance/index.ts`.
-- Experimental subpath: `src/experimental.ts`.
-- Tests: `test/adapters/*`, `test/conformance/*`, `test/integration/x402-d1-http.test.ts`.
-
-**Committed telemetry guards:**
-- Store wrapper: `test/support/transition-budget-recorder.ts`.
-- Budget tests: `test/protocol/transition-budget-recorder.test.ts`.
-- Purpose: local transition-cost and evidence fan-out drift detection.
-- Boundary: test-only architecture telemetry, not runtime monitoring or authority.
+**Utilities:**
+- Protocol-wide deterministic helpers: `src/protocol/foundation/`.
+- Lane-local helpers: keep inside the owning lane, for example `src/adapters/downstream-failure-evidence.ts`.
+- Shared non-authority product surface helpers: `src/surfaces/`.
+- Do not create generic `utils`, `helpers`, or `common` directories.
 
 ## Special Directories
 
 **`.planning/`:**
-- Purpose: Scratch planning and mapper outputs.
+- Purpose: Scratch planning and derived mapper output.
 - Generated: Yes.
-- Committed: Context-dependent scratch; not repo truth.
-- Boundary: Do not use `.planning/*` as source path, package export, script name, CI label, or canonical docs source.
-
-**`examples/*/output/`:**
-- Purpose: Generated demo artifacts.
-- Generated: Yes.
-- Committed: Output placeholders and latest artifacts may exist, but source behavior lives in `examples/*/run.ts` and `src/*`.
-- Boundary: Output artifacts are evidence snapshots, not protocol authority.
+- Committed: Project-dependent, but not canonical repo truth.
+- Rule: Do not read sibling mapper outputs while generating a scoped mapper file. Do not promote scratch labels into source, scripts, CI, README, package exports, or tracked canon without explicit validation.
 
 **`dist/`:**
-- Purpose: Generated TypeScript declaration build output.
+- Purpose: Generated declarations and Node ESM bundles used by package checks.
 - Generated: Yes.
-- Committed: Package check artifact depending on local workflow.
-- Boundary: Do not edit by hand.
+- Committed: Present in this checkout.
+- Rule: Do not hand edit; regenerate with `npm run build`.
+
+**`examples/*/output/`:**
+- Purpose: Local generated evidence packets.
+- Generated: Yes.
+- Committed: Output ignored except `.gitignore` placeholders.
+- Rule: Generated reports are local/reference evidence. Keep non-claims visible.
 
 **`node_modules/`:**
 - Purpose: Installed dependencies.
 - Generated: Yes.
 - Committed: No.
-- Boundary: Do not inspect as source truth unless debugging dependency behavior.
+- Rule: Do not inspect or edit unless debugging dependency resolution.
 
-**`migrations/`:**
-- Purpose: Canonical D1 schema for protocol storage.
-- Generated: No.
-- Committed: Yes.
-- Boundary: Storage schema only; no product claims or runtime behavior.
+**`.gstack/`:**
+- Purpose: Local tool/security reports.
+- Generated: Yes.
+- Committed: Not active repo canon.
+- Rule: Do not promote local tool state into protocol docs or source.
 
 **`.github/`:**
-- Purpose: CI workflow.
+- Purpose: CI workflow ownership.
 - Generated: No.
 - Committed: Yes.
-- Boundary: Must run `npm run check:repo`.
+- Rule: CI must remain bound to `npm run check:repo`.
+
+**Empty Deferred Source Folders:**
+- Purpose: `src/runtime/consequence-ingress/`, `src/sdk/activation/`, `test/install/`, and `docs/internal/tier-3-strategy/` exist as empty/deferred directories in the current tree.
+- Generated: No.
+- Committed: Depends on git tracking of non-empty contents; empty directories are not tracked by git.
+- Rule: Do not treat empty directories as implemented surfaces.
+
+## Tier 1 Foundation Guardrails
+
+**Architecture Gate:**
+- Command: `npm run quality:architecture`
+- Covers: `test/architecture/import-posture.test.ts`, `test/architecture/naming-posture.test.ts`, `test/architecture/package-surface.test.ts`, `test/architecture/root-exports.test.ts`, `test/architecture/surface-boundary-posture.test.ts`, `test/architecture/cli-command-posture.test.ts`, `test/architecture/mcp-surface-posture.test.ts`, `test/conformance/protected-mutation-adapter-conformance.test.ts`.
+
+**Claim Gate:**
+- Command: `npm run quality:claims`
+- Covers: `test/architecture/active-vocabulary.test.ts`, `test/architecture/claim-boundary.test.ts`.
+
+**Storage/Protocol Gate:**
+- Command: `npm run quality:storage`
+- Covers: `test/http/d1-http.test.ts`, `test/protocol/kernel-*.test.ts`, `test/protocol/transition-matrix.test.ts`, `test/protocol/model-based-invariants.test.ts`, `test/protocol/action-attempt-lifecycle.test.ts`, `test/protocol/evidence-projections.test.ts`, `test/protocol/protocol-store-atomicity-contract.test.ts`, `test/protocol/authority-certificate.test.ts`.
+
+**Full Gate:**
+- Command: `npm run check:repo`
+- Covers: TypeScript, lint, Prettier, Bun tests, package surface build/check, and whitespace diff.
+
+## Local/Reference vs Hosted/Provider Claims
+
+- Use `local`, `reference`, `fixture`, `source-owned`, `self-hosted local packet`, or `D1/HTTP reference path` for current proof surfaces in `examples/*`, `src/adapters/*`, `src/mcp/*`, `src/runtime/*`, and `src/storage/*`.
+- Do not claim hosted operation from `src/http`, `src/worker.ts`, `wrangler.toml`, or `D1ProtocolStore`.
+- Do not claim provider custody from `GatewayCredentialRef`, x402 wallet fixture, auth.md profile evidence, or MCP/SDK/CLI surfaces.
+- Do not claim broad MCP/browser/shell/network interception from `src/mcp` or `src/runtime`.
+- Do not claim cross-org trust from `AuthorityCertificate`; local offline pinned-key verification lives under `src/protocol/areas/authority-certificate/*`.
+- Do not claim x402 spend-window enforcement from metadata fields in `src/adapters/x402-payment/install-proposal.ts`; session/day/review windows require a ledger.
 
 ---
 

@@ -42,7 +42,7 @@ Storage internals, protocol kernel internals, runtime wrappers, mutation adapter
 
 ## Public surface
 
-No package root export in this slice. Commands are local source entrypoints until package/bin posture is designed.
+Package subpath `handshake-protocol-kernel/cli` exposes command metadata and local evidence helpers only. Package bin `handshake` runs the same JSON-output command contract from the bundled Node artifact. The bin is not a mutation runner, gateway process, policy evaluator, signer, receipt exporter, or hosted client.
 
 ## Extraction trigger
 

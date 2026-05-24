@@ -41,7 +41,7 @@ Unknown fields, authority-shaped fields, stale metadata, not-ready install postu
 
 ## Future package target
 
-Potential future package subpath: `handshake-protocol-kernel/mcp`. This is deferred until a public MCP client target, process model, and install posture are deliberately selected.
+The first public package target is the existing `handshake-protocol-kernel` npm package with explicit `./mcp` subpath and `handshake-mcp` stdio bin. Extraction to a dedicated package remains deferred until a real external host transcript and hosted/process supervision boundary exist.
 
 ## Allowed imports
 
@@ -72,7 +72,7 @@ Potential future package subpath: `handshake-protocol-kernel/mcp`. This is defer
 
 ## Public surface
 
-No package-root export in this slice. Source modules are internal until package posture is explicitly decided.
+Package subpath `handshake-protocol-kernel/mcp` exposes the catalog, schemas, read-only resource mapping, reference transcript builder, and proposal bridge. Package bin `handshake-mcp` starts the local stdio MCP server. Neither surface is package-root authority, gateway custody, signer custody, hosted operation, receipt export, certificate minting, mutation execution, or broad MCP protection.
 
 ## Extraction trigger
 

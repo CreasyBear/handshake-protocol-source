@@ -225,9 +225,13 @@ npm run check:repo
 
 ## Package Boundary Decision
 
-Accepted: this checkout declares a private source-package boundary with explicit root, conformance, and experimental subpath exports.
+Accepted: this checkout declares a publishable npm package boundary with explicit root, runtime, conformance, role-scoped SDK, CLI, MCP, and experimental subpath exports.
 
-The package remains `"private": true`; removing that guard, adding a license, and publishing are release decisions outside structural cleanup. The current package check builds declarations and runs an npm dry-run to verify the package surface includes source, generated types, and compact canon while excluding tests, planning scratch, and deleted documentation trees.
+The package is no longer marked private. Public Node imports resolve to bundled ESM in `dist/`; Bun-local development can still resolve the source TypeScript through the `bun` export condition. The `handshake` bin is the local JSON-output evidence/readiness CLI. The `handshake-mcp` bin, and the package-name bin `handshake-protocol-kernel`, start the local stdio MCP proposal/evidence server.
+
+MCP Registry metadata is source-owned through `server.json` and `package.json#mcpName`. This follows the official MCP Registry npm package rule: `server.json` uses `registryType: "npm"` and the package `mcpName` must match the server name. Registry publishing still requires external npm and MCP Registry authentication; the source gate proves the package shape, not account ownership or actual publication.
+
+The package check builds declarations and Node bundles, runs an npm dry-run, verifies the package surface includes source, generated types, bundled JS, bins, MCP registry metadata, and compact canon, excludes tests/planning scratch/deleted doc trees, and smoke-tests the packaged CLI plus MCP stdio server through the official MCP client SDK.
 
 CI must run the same command through `.github/workflows/check.yml`.
 

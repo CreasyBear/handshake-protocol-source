@@ -22,7 +22,7 @@ vague principal intent
 
 The kernel does not claim hosted operation, provider-side enforcement, broad agent governance, or downstream business success. A path is protected only when the gateway owns the mutation credential and verifies the exact greenlight before mutation.
 
-Current local foundation status: source and tests cover the protected-action kernel chain, derived lifecycle evidence, idempotency ledger, redacted evidence projections including agent transaction envelopes, terminal AuthorityCertificate minting and offline pinned-key verification, package-install supply-chain gate binding, the narrow official x402 exact buyer-side proof path through D1/HTTP durable evidence, official x402 SDK signer-custody/bypass probes, public runtime ingress for local x402 payment and package-install dispatch boundaries, and a source-owned local MCP stdio proposal/evidence process proof. x402 coverage is one official buyer-side `exact` per-call path with gateway-held `PaymentPayload` / `PAYMENT-SIGNATURE` creation after `VerifiedGatewayCheck`; package install remains a regression fixture. No adapter family defines the protocol. This is local kernel foundation, not broad x402 compatibility, not live provider custody, hosted operation, generic MCP/runtime control, external package-material attestation, cross-org AuthorityCertificate trust, live JWKS/revocation, hosted verifier operation, facilitator operation, seller middleware, unsupported x402 schemes, marketplace/certification, or spend-window ledger enforcement. Runtime ingress and MCP are observer/compiler/proposal evidence surfaces and current x402 spend enforcement is per-call only; session/day/review spend windows are metadata until a ledger exists.
+Current local foundation status: source and tests cover the protected-action kernel chain, derived lifecycle evidence, idempotency ledger, redacted evidence projections including agent transaction envelopes, terminal AuthorityCertificate minting and offline pinned-key verification, package-install supply-chain gate binding, the narrow official x402 exact buyer-side proof path through D1/HTTP durable evidence, official x402 SDK signer-custody/bypass probes, public runtime ingress for local x402 payment and package-install dispatch boundaries, a source-owned local MCP stdio proposal/evidence process proof, and publishable Node-bundled CLI/MCP entrypoints with MCP Registry metadata. x402 coverage is one official buyer-side `exact` per-call path with gateway-held `PaymentPayload` / `PAYMENT-SIGNATURE` creation after `VerifiedGatewayCheck`; package install remains a regression fixture. No adapter family defines the protocol. This is local kernel foundation, not broad x402 compatibility, not live provider custody, hosted operation, generic MCP/runtime control, external package-material attestation, cross-org AuthorityCertificate trust, live JWKS/revocation, hosted verifier operation, facilitator operation, seller middleware, unsupported x402 schemes, marketplace/certification, or spend-window ledger enforcement. Runtime ingress and MCP are observer/compiler/proposal evidence surfaces and current x402 spend enforcement is per-call only; session/day/review spend windows are metadata until a ledger exists.
 
 ## Repo Truth
 
@@ -118,7 +118,7 @@ test/
 
 ## Commands
 
-Prerequisite: Bun `1.3.9`.
+Prerequisites: Bun `1.3.9` for local development/tests and Node.js for the packaged CLI/MCP entrypoints.
 
 First run:
 
@@ -180,6 +180,36 @@ exporter, or certificate minter. The package root still exposes the lower-level
 `HandshakeClient` for route parity and tests, but first-slice activation should
 not teach all-role or fallback-token usage.
 
+Packaged CLI and MCP entrypoints:
+
+```bash
+npm run build
+node bin/handshake schema
+node bin/handshake-mcp
+```
+
+After package installation, the human/operator CLI command is `handshake`.
+The local stdio MCP server command is `handshake-mcp`; the package-name bin
+`handshake-protocol-kernel` also points to the MCP server so MCP registry
+package installs have a server-shaped default executable. Both entrypoints run
+from bundled Node artifacts under `dist/`; they are not source-only Bun
+shortcuts.
+
+MCP Registry publication metadata:
+
+```text
+server.json
+package.json#mcpName
+```
+
+`server.json` describes one npm/stdio MCP package named
+`io.github.joelchan/handshake-protocol-kernel` and must stay synchronized with
+`package.json#mcpName`, `name`, and `version`. Registry publication still
+requires npm authentication and MCP Registry namespace authentication. The MCP
+server remains proposal/evidence only: not policy, not greenlight, not gateway
+check, not mutation, not receipt export, not authority-certificate minting, not
+hosted operation, and not provider custody.
+
 Model-facing MCP reference transcript:
 
 ```bash
@@ -212,8 +242,8 @@ operation, and not provider custody.
 | `npm run lint`                | ESLint over `src` and `test` with zero warnings                                     |
 | `npm run format:check`        | Prettier check                                                                      |
 | `npm run test`                | All Bun tests                                                                       |
-| `npm run build`               | Declaration build for the private source package boundary                           |
-| `npm run pack:check`          | Dry-run package surface check; excludes scratch and test-only material              |
+| `npm run build`               | Declaration build plus Node bundles for public imports and CLI/MCP bins             |
+| `npm run pack:check`          | Dry-run package, package surface, and published entrypoint smoke check              |
 | `npm run dev`                 | Wrangler Worker dev after local D1/KV bindings are configured                       |
 
 Focused gates:

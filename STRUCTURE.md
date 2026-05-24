@@ -21,6 +21,8 @@ Last structural audit: 2026-05-19.
 | `src/index.ts`        | Curated package export surface.                                                                                      | Internal kernel/store objects or compatibility shims.                                                             |
 | `src/experimental.ts` | Explicit reference adapter profile and gateway fixture exports.                                                      | Stable public API claims, provider enforcement claims, or standards certification claims.                         |
 | `src/worker.ts`       | Cloudflare Worker entrypoint wiring.                                                                                 | Protocol meaning, route behavior, or deployment policy.                                                           |
+| `bin/`                | Thin Node executable wrappers for bundled CLI and MCP package entrypoints.                                           | Source logic, authority behavior, gateway custody, or mutation execution.                                         |
+| `server.json`         | MCP Registry metadata for the local stdio proposal/evidence server.                                                  | Product claims, hosted operation, package publication proof, or protocol semantics.                               |
 | `migrations/`         | Canonical D1 schema for protocol storage.                                                                            | Runtime behavior or product documentation.                                                                        |
 | `wrangler.toml`       | Worker binding and deployment configuration.                                                                         | Product claims or protocol semantics.                                                                             |
 
@@ -76,6 +78,7 @@ src/
     index.ts
     output.ts
     resources.ts
+    stdio/
     x402-proposal.ts
   surfaces/
     boundary-manifest.ts
@@ -83,6 +86,10 @@ src/
   index.ts
   experimental.ts
   worker.ts
+bin/
+  handshake
+  handshake-mcp
+server.json
 wrangler.toml
 migrations/
 ```

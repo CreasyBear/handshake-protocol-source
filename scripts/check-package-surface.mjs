@@ -1,7 +1,11 @@
 import { spawnSync } from "node:child_process";
+import { readFileSync } from "node:fs";
 
 const requiredFiles = [
   "package.json",
+  "server.json",
+  "bin/handshake",
+  "bin/handshake-mcp",
   "README.md",
   "QUALITY.md",
   "STRUCTURE.md",
@@ -14,11 +18,24 @@ const requiredFiles = [
   "src/conformance/index.ts",
   "src/runtime/index.ts",
   "src/sdk/surface-clients/index.ts",
+  "src/cli/index.ts",
+  "src/mcp/index.ts",
   "src/experimental.ts",
+  "dist/index.mjs",
+  "dist/conformance/index.mjs",
+  "dist/runtime/index.mjs",
+  "dist/sdk/surface-clients/index.mjs",
+  "dist/cli/index.mjs",
+  "dist/mcp/index.mjs",
+  "dist/experimental.mjs",
+  "dist/bin/handshake.mjs",
+  "dist/bin/handshake-mcp.mjs",
   "dist/index.d.ts",
   "dist/conformance/index.d.ts",
   "dist/runtime/index.d.ts",
   "dist/sdk/surface-clients/index.d.ts",
+  "dist/cli/index.d.ts",
+  "dist/mcp/index.d.ts",
   "dist/experimental.d.ts",
 ];
 
@@ -51,10 +68,16 @@ if (pack.status !== 0) {
 
 const [artifact] = JSON.parse(pack.stdout);
 const packageFiles = new Set(artifact.files.map((file) => file.path.replace(/^package\//, "")));
+const packageJson = JSON.parse(readFileSync("package.json", "utf8"));
 const missingFiles = requiredFiles.filter((file) => !packageFiles.has(file));
 const forbiddenFiles = [...packageFiles].filter((file) =>
   forbiddenPathFragments.some((fragment) => file.includes(fragment)),
 );
+
+if (packageJson.private === true) {
+  process.stderr.write("Package dry-run cannot be publish-ready while package.json private is true.\n");
+  process.exit(1);
+}
 
 if (missingFiles.length > 0 || forbiddenFiles.length > 0) {
   if (missingFiles.length > 0) {

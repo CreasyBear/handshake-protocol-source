@@ -296,4 +296,22 @@ describe("root package exports", () => {
     expect(exportNames).not.toContain("HandshakeClient");
     expect(exportNames.join(" ")).not.toMatch(/Policy|Greenlight|Gateway|ReceiptExport|AuthorityCertificateMint/);
   });
+
+  it("keeps CLI and MCP on explicit non-root package surfaces", async () => {
+    const root = await import("../../src");
+    const cli = await import("handshake-protocol-kernel/cli");
+    const mcp = await import("handshake-protocol-kernel/mcp");
+    const cliExportNames = Object.keys(cli).sort();
+    const mcpExportNames = Object.keys(mcp).sort();
+
+    expect(Object.keys(root)).not.toContain("runCliCommand");
+    expect(Object.keys(root)).not.toContain("proposeMcpX402Payment");
+    expect(cliExportNames).toContain("runCliCommand");
+    expect(cliExportNames).toContain("cliCommandManifest");
+    expect(mcpExportNames).toContain("mcpCatalogSnapshot");
+    expect(mcpExportNames).toContain("proposeMcpX402Payment");
+    expect([...cliExportNames, ...mcpExportNames].join(" ")).not.toMatch(
+      /PolicyDecision|Greenlight|GatewayCheck|ReceiptExport|AuthorityCertificateMint|PaymentPayload/,
+    );
+  });
 });

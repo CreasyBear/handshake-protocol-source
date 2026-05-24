@@ -5,65 +5,67 @@
 ## Test Framework
 
 **Runner:**
-- Bun test runner from `bun@1.3.9`.
-- Config: no `vitest.config.*` or `jest.config.*` detected; test behavior is driven by `package.json`, `tsconfig.json`, and Bun defaults.
-- Test imports use `import { describe, expect, it } from "bun:test";` across files such as `test/protocol/kernel-policy-gateway.test.ts`, `test/mcp/mcp-schema-contract.test.ts`, and `test/cli/cli-evidence.test.ts`.
+- Bun test runner from `bun:test`.
+- Version basis: `package.json` declares `packageManager: "bun@1.3.9"` and `.github/workflows/check.yml` installs Bun `1.3.9`.
+- Config: Not detected. There is no `bunfig.toml`, `jest.config.*`, or `vitest.config.*`; scripts in `package.json` are the test contract.
 
 **Assertion Library:**
-- Bun's built-in `expect` API from `bun:test`.
-- Tests use `toEqual`, `toMatchObject`, `toBe`, `toBeNull`, `toHaveLength`, `toContain`, `toStartWith`, `toMatch`, `rejects.toThrow`, `rejects.toMatchObject`, and `resolves.toMatchObject`.
+- Bun `expect` from `bun:test`, with matchers such as `toEqual`, `toMatchObject`, `toContain`, `toBeNull`, `toHaveLength`, `toThrow`, and async `.rejects.toThrow`.
 
 **Run Commands:**
 ```bash
-npm run test                  # Run all Bun tests
-npm run check:types           # TypeScript check with no pretty output
-npm run lint                  # ESLint over src and test with zero warnings
-npm run format:check          # Prettier check
-npm run quality:architecture  # Import, naming, export, surface, and conformance guard slice
-npm run quality:storage       # D1/store/kernel/storage invariant slice
-npm run quality:claims        # Vocabulary and claim-boundary slice
-npm run check:repo            # Full local and CI gate
-npm run demo:aps              # Generate local x402 protected-spend report
-npm run demo:mcp-transcript   # Generate source-owned MCP x402 reference transcript
-npm run demo:self-hosted      # Generate local self-hosted activation packet
+npm run test                 # Run all Bun tests
+npm run check:types          # TypeScript strict no-emit check
+npm run lint                 # ESLint over src and test with zero warnings
+npm run format:check         # Prettier check
+npm run pack:check           # Declaration/bundle build, package dry-run, and published entrypoint smoke check
+npm run check:repo           # Full local and CI gate
+npm run quality:architecture # Architecture/import/surface/conformance slice
+npm run quality:claims       # Claim-boundary and active-vocabulary slice
+npm run quality:storage      # D1/storage/protocol invariant slice
 ```
 
-**Current gate posture from scripts:**
-- `package.json` defines `npm run check:repo` as `npm run check:types && npm run lint && npm run format:check && npm run test && npm run pack:check && git diff --check`.
-- `package.json` defines `npm run quality:architecture` as the architecture/import/export/surface/conformance slice: `test/architecture/import-posture.test.ts`, `test/architecture/naming-posture.test.ts`, `test/architecture/package-surface.test.ts`, `test/architecture/root-exports.test.ts`, `test/architecture/surface-boundary-posture.test.ts`, `test/architecture/cli-command-posture.test.ts`, `test/architecture/mcp-surface-posture.test.ts`, and `test/conformance/protected-mutation-adapter-conformance.test.ts`.
-- `package.json` defines `npm run quality:claims` as `test/architecture/active-vocabulary.test.ts` plus `test/architecture/claim-boundary.test.ts`.
-- `package.json` defines `npm run quality:storage` as `test/http/d1-http.test.ts`, `test/protocol/kernel-*.test.ts`, `test/protocol/transition-matrix.test.ts`, `test/protocol/model-based-invariants.test.ts`, `test/protocol/action-attempt-lifecycle.test.ts`, `test/protocol/evidence-projections.test.ts`, `test/protocol/protocol-store-atomicity-contract.test.ts`, and `test/protocol/authority-certificate.test.ts`.
-- `.github/workflows/check.yml` runs `npm run check:repo`.
-- This mapper refresh executed focused pre-hosted Tier 2 closeout slices for policy refusal responses, MCP committed error readback, evidence projections, x402 D1/conformance, CLI response posture, runtime ingress, local MCP stdio proof, and the local self-hosted activation packet.
-- Treat `npm run check:repo` as still required before committing the self-hosted/MCP stdio closeout expansion.
+`package.json` defines `check:repo` as:
+
+```bash
+npm run check:types && npm run lint && npm run format:check && npm run test && npm run pack:check && git diff --check
+```
+
+CI runs the same gate in `.github/workflows/check.yml`.
 
 ## Test File Organization
 
 **Location:**
-- Tests are separate from source under `test/`, not colocated beside `src/`.
-- Current test files are grouped by authority and surface lane: `test/protocol/`, `test/architecture/`, `test/http/`, `test/runtime/`, `test/adapters/`, `test/mcp/`, `test/cli/`, `test/sdk/`, `test/conformance/`, `test/product/`, and `test/integration/`.
-- Shared test-only support lives in `test/support/`, including `test/support/fixtures.ts`, `test/support/d1-http-harness.ts`, `test/support/fault-injecting-protocol-store.ts`, `test/support/package-install-flow.ts`, `test/support/repo-write-flow.ts`, and `test/support/preview-deploy-flow.ts`.
+- Tests live under `test/<lane>/`, mirroring source ownership described in `STRUCTURE.md`.
+- `test/architecture/` owns repo shape, imports, naming, exports, package surface, claim boundaries, CLI posture, MCP posture, and surface boundary posture.
+- `test/protocol/` owns protocol primitives, transition state, policy/gateway invariants, evidence projections, storage contracts, refusal/proof-gap/certificate behavior, and model-based invariants.
+- `test/runtime/` owns generated-execution and runtime proposal helpers, including package install, codemode multi-action, x402 runtime ingress, and auth.md candidate compilation.
+- `test/adapters/` owns reference gateway fixtures, x402 wallet/probe/install/proposal behavior, repo-write/package-install/preview-deploy gateways, and auth.md redaction/gateway/revocation/bypass behavior.
+- `test/conformance/` owns reference conformance checks: `test/conformance/protected-mutation-adapter-conformance.test.ts`, `test/conformance/x402-payment-conformance.test.ts`, and `test/conformance/x402-upstream-exact-fixtures.test.ts`.
+- `test/mcp/` owns MCP schema, resource redaction, x402 proposal bridge, reference transcript, and local stdio process proof.
+- `test/http/` and `test/integration/` own Hono/D1 protocol paths and end-to-end protected-action paths.
+- `test/product/` owns buyer-readable demo report boundaries for local activation and protected-spend outputs.
+- `test/support/` holds fixtures and harnesses. It is not a loose test root.
 
 **Naming:**
-- Use `*.test.ts` suffix for executable tests.
-- Name test files by the invariant or surface guarded: `test/architecture/import-posture.test.ts`, `test/architecture/mcp-surface-posture.test.ts`, `test/protocol/credential-custody.test.ts`, `test/runtime/runtime-ingress.test.ts`, and `test/integration/x402-d1-http.test.ts`.
-- Do not add root-level `test/*.test.ts`; `test/architecture/naming-posture.test.ts` enforces this.
+- Test files use `*.test.ts`, such as `test/architecture/claim-boundary.test.ts`, `test/runtime/runtime-ingress.test.ts`, and `test/mcp/mcp-resource-redaction.test.ts`.
+- Root `test/*.test.ts` files are forbidden by `test/architecture/naming-posture.test.ts`.
 
 **Structure:**
 ```text
 test/
-  architecture/      repo shape, naming, exports, vocabulary, surfaces
-  protocol/          protocol primitives and state-machine invariants
-  conformance/       reference conformance and x402 first-wedge parity checks
-  http/              Hono/Worker transport and D1-over-HTTP behavior
-  runtime/           generated-execution proposal helpers
-  mcp/               model-facing proposal/evidence surface contracts
-  cli/               local evidence/manifest command contracts
-  sdk/               role-scoped client boundaries
-  adapters/          reference gateway fixtures
-  integration/       end-to-end protected action paths
-  product/           proof-slice and demo-report behavior
-  support/           fixtures, harnesses, and local mutation surfaces
+  architecture/
+  protocol/
+  runtime/
+  adapters/
+  conformance/
+  mcp/
+  http/
+  integration/
+  product/
+  cli/
+  sdk/
+  support/
 ```
 
 ## Test Structure
@@ -71,294 +73,240 @@ test/
 **Suite Organization:**
 ```typescript
 import { describe, expect, it } from "bun:test";
-import { createGreenlitContract } from "../support/fixtures";
 
-describe("Handshake kernel invariants: policy and gateway", () => {
-  it("records refusal instead of issuing a second greenlight for the same action contract", async () => {
-    const fixture = await createGreenlitContract();
+describe("runtime ingress adapter", () => {
+  it("observes supported dispatch and proposes a contract without policy or gateway authority", async () => {
+    const fixture = makeKernelFixture();
+    await registerFixtureObjects(fixture);
 
-    const duplicate = await fixture.kernel.evaluatePolicy({
-      actionContractId: fixture.contract.actionContractId,
-      envelopeId: fixture.envelope.envelopeId,
-    });
+    const result = await proposeRuntimeIngressActionContracts(fixture.kernel, config, input);
 
-    expect(duplicate.decision.decision).toBe("refuse");
-    expect(duplicate.decision.decisionReasonCode).toBe("idempotency_duplicate_authority");
-    expect(duplicate.greenlight).toBeNull();
+    expect(result.outcome).toBe("action_contracts_proposed");
+    expect(await recordCount(fixture.store, "greenlight")).toBe(0);
+    expect(await recordCount(fixture.store, "gateway_check_attempt")).toBe(0);
+    expect(await recordCount(fixture.store, "mutation_attempt")).toBe(0);
   });
 });
 ```
 
+This pattern appears in `test/runtime/runtime-ingress.test.ts`, `test/runtime/codemode-multi-action-runtime.test.ts`, and adapter tests such as `test/adapters/x402-wallet-gateway.test.ts`.
+
 **Patterns:**
-- Keep setup local to each `it()` instead of global hooks. The tree uses explicit per-test fixture construction in `test/support/fixtures.ts`, `test/support/d1-http-harness.ts`, and test-local helper functions.
-- Assert exact protocol states and reason codes, not only success booleans. Examples: `idempotency_duplicate_authority` in `test/protocol/kernel-policy-gateway.test.ts`, `params_mismatch` in `test/adapters/x402-wallet-gateway.test.ts`, and `mcp_input_schema_invalid` in `src/mcp/x402-proposal.ts` tests.
-- Assert absence of authority and credential material on proposal/evidence surfaces. Examples: non-authority flags in `test/mcp/mcp-schema-contract.test.ts`, CLI flags in `test/cli/cli-evidence.test.ts`, and surface manifest checks in `test/architecture/surface-boundary-posture.test.ts`.
-- For D1/HTTP tests, create a harness per test and dispose it in `finally`; see `test/integration/x402-d1-http.test.ts` and `test/http/d1-http.test.ts`.
-- Use table loops for matrix behavior where the test's purpose is coverage over variants, as in `test/mcp/mcp-x402-proposal.test.ts`, `test/protocol/kernel-cross-scope-matrix.test.ts`, and `test/conformance/x402-payment-conformance.test.ts`.
-- Use source-owned reference transcript tests when a user/model-facing workflow needs many hostile or not-ready rows without claiming a live host. `test/mcp/mcp-reference-transcript.test.ts` validates the generated transcript rows, source bindings, CLI readbacks, hostile matrix, and non-authority posture.
+- Tests assert both positive state and forbidden authority. Example: `test/runtime/runtime-ingress.test.ts` expects action contracts for supported wrapped dispatch and zero `policy_decision`, `greenlight`, `gateway_check_attempt`, `mutation_attempt`, `receipt`, and `authority_certificate` records.
+- Tests prefer exact reason codes and discriminated outcomes. Examples: `params_mismatch`, `already_consumed`, `protected_path_probe_failed`, `generated_execution_graph_not_contractable`, and `x402_amount_exceeds_call_bound` in `test/adapters/x402-wallet-gateway.test.ts`, `test/adapters/x402-bypass-probes.test.ts`, and `test/runtime/runtime-ingress.test.ts`.
+- Tests use explicit record counts through store helpers to prove authority boundaries. Examples: `recordCount()` in `test/runtime/runtime-ingress.test.ts`, `test/runtime/codemode-multi-action-runtime.test.ts`, and `test/http/d1-http.test.ts`.
+- Tests check serialized output for absence of secret or authority fields using `JSON.stringify(...).not.toContain(...)`. Examples: `test/mcp/mcp-resource-redaction.test.ts`, `test/mcp/mcp-x402-proposal.test.ts`, `test/adapters/auth-md-serialization-redaction.test.ts`, and `test/protocol/evidence-projections.test.ts`.
+- Tests use helper fixtures to build installed kernel state before exercising transitions. Examples: `createGreenlitContract()` and `makeKernelFixture()` in `test/support/fixtures.ts`, auth.md fixtures in `test/support/auth-md-flow.ts`, and x402 install fixtures inside `test/adapters/x402-wallet-gateway.test.ts`.
 
 ## Mocking
 
-**Framework:** Hand-written fakes and harnesses; no Jest/Vitest mocking framework.
+**Framework:** Hand-written fakes and in-memory fixtures.
 
 **Patterns:**
 ```typescript
-function fakeRuntimeClient(calls: Array<{ name: string; input: unknown }>): McpRuntimeProposalClient {
+function fakeEvidenceClient(calls: string[]): McpEvidenceResourceClient {
   return {
-    async createRuntimeExecution(input) {
-      calls.push({ name: "createRuntimeExecution", input });
-      return { runtimeExecutionId: "rex_mcp_x402" } as never;
+    async getContractEvidenceProjection(actionContractId: string) {
+      calls.push(`contract:${actionContractId}`);
+      return { projection: "contract", actionContractId };
     },
-    async proposeActionContract(input) {
-      calls.push({ name: "proposeActionContract", input });
-      return { actionContractId: "act_mcp_x402" } as never;
-    },
-  } as McpRuntimeProposalClient;
+  };
 }
 ```
 
+`test/mcp/mcp-resource-redaction.test.ts` uses the above style to verify routing into read-only projections.
+
+```typescript
+function fakeSigningSurface(downstreamPaymentStatus: "succeeded" | "unknown") {
+  let signatures = 0;
+  const commands: X402PaymentSignatureCommand[] = [];
+  return {
+    signatureCount: () => signatures,
+    signedCommands: () => commands,
+    async signPayment(command: X402PaymentSignatureCommand) {
+      signatures += 1;
+      commands.push(command);
+      return { evidenceRef: `evidence:x402-payment-signature:${command.verifiedGate.gateAttemptId}` };
+    },
+  };
+}
+```
+
+`test/adapters/x402-wallet-gateway.test.ts` uses this style to prove signing happens only after `VerifiedGatewayCheck`.
+
 **What to Mock:**
-- Mock SDK fetch boundaries with captured calls, as `captureFetch()` does in `test/sdk/role-clients.test.ts`.
-- Mock runtime proposal clients when testing MCP orchestration order and non-authority posture, as `fakeRuntimeClient()` does in `test/mcp/mcp-x402-proposal.test.ts`.
-- Mock protected mutation surfaces with counters and captured commands, as x402 fake signing surfaces do in `test/adapters/x402-wallet-gateway.test.ts`.
-- Use `FaultInjectingProtocolStore` from `test/support/fault-injecting-protocol-store.ts` for stale reads, ambiguous commits, and conflict behavior.
-- Use `LocalD1Database` in `test/support/d1-http-harness.ts` to exercise the Worker/D1 path without a remote Cloudflare dependency.
+- Mock external surfaces at the mutation boundary: package manifest surfaces in `test/support/package-install-flow.ts`, repo-write surfaces in `test/support/repo-write-flow.ts`, preview deploy surfaces in `test/conformance/protected-mutation-adapter-conformance.test.ts`, auth.md downstream API surfaces in `test/adapters/auth-md-serialization-redaction.test.ts`, and x402 signing surfaces in `test/adapters/x402-wallet-gateway.test.ts`.
+- Mock SDK/transport clients for role-surface behavior, such as fake runtime clients in `test/mcp/mcp-x402-proposal.test.ts` and fake evidence clients in `test/mcp/mcp-resource-redaction.test.ts`.
+- Use `InMemoryProtocolStore` from `src/storage/memory/index.ts` for protocol transition tests unless D1 semantics are the subject.
 
 **What NOT to Mock:**
-- Do not mock protocol kernel transitions when the invariant under test is authority sequencing; use `HandshakeKernel` with `InMemoryProtocolStore` from `src/storage/memory` or `D1ProtocolStore` from `src/storage/d1`.
-- Do not mock Zod schemas when testing public contracts; parse real schemas such as `McpX402PaymentProposalInputSchema` in `test/mcp/mcp-schema-contract.test.ts`.
-- Do not mock the official x402 parsing surface when checking upstream parity; `test/conformance/x402-upstream-exact-fixtures.test.ts` imports `@x402/core/schemas`, `@x402/evm/exact/client`, and `@x402/fetch`.
-- Do not mock architecture guard behavior; architecture tests read the real tree with `node:fs` and dynamic imports from `src/**`.
+- Do not mock the protocol kernel when testing state-machine invariants. Tests such as `test/protocol/kernel-policy-gateway.test.ts`, `test/protocol/model-based-invariants.test.ts`, and `test/protocol/evidence-projections.test.ts` use real `HandshakeKernel`.
+- Do not mock gateway checks in adapter mutation tests. Use real `gatewayCheck()` and then require `verifiedGatewayCheckFromResult()` in adapter code.
+- Do not mock source import/export posture. Architecture tests read actual files and package exports in `test/architecture/import-posture.test.ts`, `test/architecture/root-exports.test.ts`, and `test/architecture/package-surface.test.ts`.
+- Do not mock local MCP stdio proof when the process boundary is under test. `test/mcp/mcp-stdio-process.test.ts` runs the local MCP server through official client/server SDK transport.
 
 ## Fixtures and Factories
 
 **Test Data:**
 ```typescript
-export function makeKernelFixture() {
-  const store = new InMemoryProtocolStore();
-  const kernel = new HandshakeKernel(store);
-  const createdAt = nowIso();
+const digest = `sha256:${"a".repeat(64)}` as const;
 
-  return { store, kernel, tool, actionType, gateway, envelope };
+function validInstallInput(): X402InstallProposalInput {
+  const createdAt = nowIso();
+  return {
+    tenantId: "tenant_demo",
+    organizationId: "org_demo",
+    createdAt,
+    endpointEvidence: {
+      endpointUrl: "https://api.example.com/mcp/premium-context",
+      payee: "0xpayee",
+      network: "base-sepolia",
+      token: "USDC",
+      maxAtomicAmount: "2500",
+      paymentRequirementsDigest: digest,
+      evidenceRefs: ["evidence:x402-payment-required"],
+    },
+    spendBounds: {
+      maxAtomicAmountPerCall: "2500",
+      expiresAt: futureIso(),
+    },
+  };
 }
 ```
 
+This literal-fixture style appears in `test/adapters/x402-install-proposal.test.ts`, `test/adapters/x402-wallet-gateway.test.ts`, `test/adapters/x402-bypass-probes.test.ts`, and `test/conformance/x402-upstream-exact-fixtures.test.ts`.
+
 **Location:**
-- Kernel catalog fixtures and greenlit-contract helpers live in `test/support/fixtures.ts`.
-- D1/HTTP app harness lives in `test/support/d1-http-harness.ts`.
-- Package, repo-write, preview-deploy, and codemode runtime flow helpers live in `test/support/package-install-flow.ts`, `test/support/repo-write-flow.ts`, `test/support/preview-deploy-flow.ts`, and `test/support/codemode-multi-action-flow.ts`.
-- Local file-system mutation surfaces live in `test/support/repo-write-surface.ts` and test-local helpers such as `writeJson()` in `test/cli/cli-evidence.test.ts`.
-- Official x402 fixture shapes are declared inside x402-specific tests such as `test/adapters/x402-wallet-gateway.test.ts`, `test/integration/x402-d1-http.test.ts`, and `test/conformance/x402-upstream-exact-fixtures.test.ts`.
-- Source-owned demo transcript fixtures live in `src/mcp/reference-transcript.ts` and are rendered by `examples/mcp-reference-transcript/run.ts`; tests should import the source builder rather than asserting on stale generated output files.
+- Shared kernel fixtures: `test/support/fixtures.ts`.
+- Flow-specific fixtures: `test/support/package-install-flow.ts`, `test/support/repo-write-flow.ts`, `test/support/preview-deploy-flow.ts`, `test/support/codemode-multi-action-flow.ts`, and `test/support/auth-md-flow.ts`.
+- HTTP/D1 harness: `test/support/d1-http-harness.ts` and `test/support/http-protocol-fixtures.ts`.
+- Invariant helpers: `test/support/kernel-invariant-helpers.ts`.
+- Local surface fixtures: `test/support/package-manifest-surface.ts` and `test/support/repo-write-surface.ts`.
 
 ## Coverage
 
-**Requirements:** Not enforced by a coverage threshold.
+**Requirements:** None enforced by tooling. `package.json` has no coverage script and there is no coverage threshold config.
 
 **View Coverage:**
 ```bash
-# Not detected in package.json
+Not detected
 ```
 
-**Current enforcement substitute:**
-- `npm run check:repo` in `package.json` runs typecheck, lint, Prettier check, all Bun tests, package-surface check, and `git diff --check`.
-- `.github/workflows/check.yml` runs `bun install --frozen-lockfile` and `npm run check:repo`.
-- Architecture tests act as structural coverage for imports, naming, root exports, package surface, CLI/MCP posture, active vocabulary, and claim boundaries.
-
-## Response And Telemetry Contract Coverage
-
-**Committed telemetry/response posture coverage:**
-- Policy refusal response posture is tested in `test/protocol/kernel-policy-gateway.test.ts` and `test/http/d1-http.test.ts`. Duplicate authority and missing protected-path posture refusals must return `authorityCreated: false`, `gatewayCheckPerformed: false`, `mutationAttempted: false`, `greenlightRef: null`, `refusalReasonCode`, `nextAction: "read_evidence"`, `retryability: "not_retryable"`, and a persisted `refusalRef`.
-- HTTP transition response schemas are source-owned in `src/http/routes/transition-response-schemas.ts`; `test/http/d1-http.test.ts` exercises the D1/Hono route path so policy responses preserve structured refusal posture over HTTP.
-- Runtime ingress response posture is tested in `test/runtime/runtime-ingress.test.ts`. The tests assert `schemaVersion: "handshake.runtime-ingress.outcome.v1"`, false non-authority flags, reason-code mapping, read/recraft/stop next actions, runtime/graph/draft/compilation/contract refs, x402 retry refs, raw sibling bypass evidence, and zero policy/greenlight/gateway/mutation/receipt/certificate records from runtime ingress.
-- CLI response posture is tested in `test/cli/cli-evidence.test.ts`, `test/cli/cli-local-project.test.ts`, `test/cli/cli-support-bundle.test.ts`, and `test/cli/cli-x402-install-probes.test.ts`. These tests require `handshake.cli.v1` envelopes, non-claims, redaction profile refs, reason codes, next actions, retryability, commit state, and explicit non-authority flags across success and failure paths.
-- MCP transition evidence posture is tested in `test/mcp/mcp-x402-proposal.test.ts`. Committed refusals and proof gaps must surface as structured `SurfaceOutcome` values with `commitState: "protocol_recorded"`, `refusalRef` or `proofRef`, read-evidence next actions, and evidence URIs; unknown commit state maps to `commitState: "ambiguous"` and `nextAction: "stop"`.
-
-**Stable response schemas:**
-- `test/mcp/mcp-schema-contract.test.ts` parses real MCP tool/resource schemas from `src/mcp/catalog.ts`, `src/mcp/output.ts`, and `src/surfaces/outcome.ts`; it rejects authority-shaped fields such as policy, greenlight, gateway, mutation, receipt, raw, signing, and certificate-minting inputs.
-- `test/cli/cli-evidence.test.ts`, `test/cli/cli-support-bundle.test.ts`, and `test/architecture/cli-command-posture.test.ts` require CLI outputs from `src/cli/output.ts` to carry schema version, warnings, non-claims, and explicit non-authority fields.
-- `test/http/http.test.ts` exercises `src/http/errors/transition-error-envelope.ts` and route response schemas, including typed error envelopes, request custody errors, body-size refusal before commit, redacted evidence projection reads, and blocked generic raw internal reads.
-
-**Reason codes and refusal language:**
-- `test/protocol/reason-code-registry.test.ts` keeps `src/protocol/foundation/reason-codes.ts` and HTTP code registries unique and checks that source-emitted reason-code literals are registered while `ReasonCodeSchema` stays open for operator-supplied future reasons.
-- `test/mcp/mcp-x402-proposal.test.ts` covers structured MCP refusal outcomes for invalid schema, tools-list changes, stale metadata, install not ready, gateway offline or unknown, amount overrun, replay/idempotency refusal, and bypass-shaped input.
-- Runtime and adapter tests assert exact reason codes for generated-code refusal, raw sibling bypass, params mismatch, replay, per-call x402 amount bounds, and incomplete official x402 evidence in `test/runtime/runtime-ingress.test.ts`, `test/adapters/x402-payment-action-proposal.test.ts`, and `test/adapters/x402-wallet-gateway.test.ts`.
-
-**Redaction and proof gaps:**
-- `test/protocol/evidence-projections.test.ts` proves contract, idempotency recovery, receipt timeline, agent transaction envelope, and install-health projections expose redacted refs/digests while omitting raw x402 payment credentials.
-- `test/mcp/mcp-resource-redaction.test.ts` proves MCP evidence resources route through `EvidenceClient` projection methods and that metadata, challenge, and certificate resources remain reference-only.
-- `test/cli/cli-support-bundle.test.ts` proves local support bundles omit `PaymentPayload`, `PAYMENT-SIGNATURE`, private keys, tokens, raw internal records, gateway credentials, mutation commands, and receipt exports.
-- `test/adapters/x402-wallet-gateway.test.ts` and `test/integration/x402-d1-http.test.ts` prove proof-gap behavior for missing downstream responses after gateway admission and signing evidence.
-
-**Local/pre-hosted and export posture:**
-- `test/architecture/claim-boundary.test.ts`, `test/architecture/surface-boundary-posture.test.ts`, `test/architecture/package-surface.test.ts`, `test/architecture/root-exports.test.ts`, `test/architecture/mcp-surface-posture.test.ts`, and `test/architecture/cli-command-posture.test.ts` prevent hosted/provider/cross-org/broad-control claims and keep root exports, role-client subpaths, MCP internals, CLI commands, and package files narrow.
-- `test/product/x402-protected-spend-demo-report.test.ts` proves the APS demo uses `RuntimeClient` and `EvidenceClient`, not the all-role `HandshakeClient`, and asserts local/reference non-claims.
-- `test/mcp/mcp-reference-transcript.test.ts` proves source-owned MCP transcript rows cover success, not-ready, freshness, bypass, replay, params mismatch, and proof-gap cases while carrying non-authority posture.
-
-## Active Tier 2 SDK/CLI/MCP Coverage
-
-**Current posture tests:**
-- Shared surface posture is guarded by `test/architecture/surface-boundary-posture.test.ts`, which reads `src/surfaces/boundary-manifest.ts`, checks active/deferred surface ids, forbids authority route families on model/operator surfaces, requires non-authority output flags, and scans existing source roots for forbidden imports, credentials, and output fields.
-- SDK role boundaries are guarded by `test/sdk/role-clients.test.ts`. It uses `// @ts-expect-error` checks to reject role maps and fallback tokens on `RuntimeClientOptions` and `EvidenceClientOptions`, captures fetch calls to prove single-role authorization headers, and asserts that role clients do not expose `evaluatePolicy`, `gatewayCheck`, `createReceiptExport`, or certificate minting methods.
-- CLI posture is guarded by `test/cli/cli-evidence.test.ts`, `test/cli/cli-local-project.test.ts`, `test/cli/cli-x402-install-probes.test.ts`, `test/cli/cli-support-bundle.test.ts`, and `test/architecture/cli-command-posture.test.ts`. These tests keep the active command set to schema/init/doctor, APS and redacted evidence wrappers, local certificate verification, redacted support bundle assembly, local x402 install/probe/install-health posture, and x402 conformance; require all CLI JSON to carry non-authority fields; and scan `src/cli/*` for all-role clients, process startup, gateway runners, raw records, and mutation-shaped command names.
-- MCP schema/resource/proposal/transcript posture is guarded by `test/mcp/mcp-schema-contract.test.ts`, `test/mcp/mcp-resource-redaction.test.ts`, `test/mcp/mcp-x402-proposal.test.ts`, `test/mcp/mcp-reference-transcript.test.ts`, and `test/architecture/mcp-surface-posture.test.ts`. These tests enforce one proposal tool, read-only resources, strict unknown-field rejection, shared `SurfaceOutcome` output, read-only projection routing, non-authority flags, no root export, no direct policy/gateway/signer/storage imports, and source-bound transcript rows.
-- `npm run quality:architecture` includes the Tier 2 structural slice: `test/architecture/import-posture.test.ts`, `test/architecture/naming-posture.test.ts`, `test/architecture/package-surface.test.ts`, `test/architecture/root-exports.test.ts`, `test/architecture/surface-boundary-posture.test.ts`, `test/architecture/cli-command-posture.test.ts`, `test/architecture/mcp-surface-posture.test.ts`, and `test/conformance/protected-mutation-adapter-conformance.test.ts`.
-
-**Current coverage gaps:**
-- SDK role-client tests use a captured fetch fake in `test/sdk/role-clients.test.ts`; they also smoke the `handshake-protocol-kernel/sdk/role-clients` package subpath. There is no HTTP/D1 integration test proving `RuntimeClient` and `EvidenceClient` against the real app routes.
-- CLI tests cover APS report rendering, invalid certificate verification, schema output, structured usage errors, conformance classification, local credential placeholder/profile storage, doctor readiness, local x402 install/probe commands, pre-contract install health, redacted contract views, receipt timelines, and file-backed support bundles. They do not yet cover valid/tampered certificate fixtures, package bin/pack checks, live control-plane install registration, live provider/gateway probes, or process-start contracts.
-- MCP proposal tests use a fake `McpRuntimeProposalClient` in `test/mcp/mcp-x402-proposal.test.ts`; `test/mcp/mcp-reference-transcript.test.ts` adds a source-owned transcript harness, but there is still no external MCP server/host transcript, no end-to-end HTTP-backed proposal bridge, and no real protocol replay/idempotency recovery path through MCP.
-- MCP proposal tests cover `toolsListChanged` freshness, strict oversized-field rejection, bypass-shaped input rejection, stable derived idempotency keys, sequenced retry keys, and replay/idempotency mapping through structured non-authority outcomes.
-- MCP resource tests prove URI parsing and evidence-client routing, but metadata, challenge, and certificate resources in `src/mcp/resources.ts` are still reference-only payloads rather than source-owned projection reads. The stdio proof exercises a real local MCP process through the official SDK, but still does not prove browser/shell/package-manager/cloud containment or hosted process supervision.
-- Architecture tests prevent authority drift by static scanning, but they do not prove runtime containment of sibling browser, shell, package-manager, cloud, or repo-write tools. Any claim that MCP or CLI controls those channels remains outside current evidence.
-- CLI readiness can hide operator frustration because `doctor` remains `not_ready` even after a local x402 probe passes; this is correct while `trustedReadiness` is false, but tests should preserve the exact reason-code path so future UI/help text can explain the next mechanism instead of reporting generic failure.
-- Model/developer frustration can hide behind fake clients: SDK and MCP unit tests prove surface method shape and headers, not a real network-backed activation path. Any quickstart or support workflow needs an HTTP/D1 route test before treating the surface as adoptable.
-
-## Auth.md Adapter Coverage
-
-**Committed auth.md protected-call tests:**
-- `test/adapters/auth-md-adapter.test.ts` covers PRM and authorization-server `agent_auth` normalization, auth.md document digest as supporting evidence, credential intake redaction, ID-JAG audience checks, exact `auth_md_protected_api_call.exact` proposal, no greenlight/gateway/mutation from proposal helpers, and pre-compilation refusal for raw authorization headers, dynamic endpoints, read-only methods, cross-origin endpoints, and unsafe custody.
-- `test/adapters/auth-md-gateway.test.ts` covers credential use only after `VerifiedGatewayCheck`, parameter drift refusal before credential resolution, replay refusal before credential resolution, downstream proof-gap recording, non-authoritative gateway posture, and fail-closed behavior when downstream evidence tries to leak auth material.
-- `test/runtime/auth-md-candidate-compilation.test.ts` covers runtime-ingress auth.md compilation into `CandidateAction` without authority, unsafe generated shapes, raw sibling bypass evidence, and graph coverage refusal.
-- `test/architecture/root-exports.test.ts` keeps auth.md off the package root and exposes only explicit experimental fixture exports.
-
-**Committed auth.md lifecycle/bypass/reconstruction tests:**
-- `test/adapters/auth-md-bypass-probes.test.ts` covers prevented, detected, and proof-gap hostile posture for raw bearer passthrough, direct HTTP, sibling MCP, browser tool, raw network, token replay, stale metadata, unsafe retry loop, gateway wrapper drift, and failure-closed behavior.
-- `test/adapters/auth-md-revocation.test.ts` covers lifecycle evidence mapping to credential-ref isolation and verifies future policy and stale unconsumed greenlights are blocked after isolation.
-- `test/adapters/auth-md-gateway-pressure.test.ts` covers scope, metadata, credential-ref drift, incompatible gateway policy drift, stale greenlights after credential isolation, and gateway-observed unsafe parameters before credential resolution.
-- `test/adapters/auth-md-serialization-redaction.test.ts` verifies raw credentials, claim tokens, JWTs, and PII stay out of adapter, policy, gateway, probe, and projection output.
-- `test/protocol/policy-auth-md.test.ts` covers exact greenlight binding, duplicate idempotency refusal, and non-authority posture for registration, ID-JAG, claim, scopes, and revocation evidence.
-- `test/integration/auth-md-protected-call.test.ts` covers the local twelve-workflow transcript for discovery, registration, proposal, policy, gateway, replay, refusal, proof gap, bypass, lifecycle, redaction, and reconstruction posture.
-- `test/integration/auth-md-receipt-reconstruction.test.ts` separates auth.md provenance from Handshake enforcement and downstream proof gaps, and projects policy refusal without implying gateway admission or credential use.
-
-**How to validate auth.md-sensitive changes before landing:**
-- Run the focused auth.md slice when adapter, lifecycle, bypass, policy, gateway, or reconstruction files change.
-- Run `npm run quality:architecture` because auth.md touches exports, adapter posture, architecture guards, and runtime ingress.
-- Run `npm run quality:claims` because auth.md language can easily drift into auth-provider, OAuth-server, provider-custody, or hosted-operation claims.
-- Run `npm run check:repo` before closeout because auth.md touches source, tests, architecture docs, and generated evidence projection shapes.
-
-## Demo Script Tests
-
-**x402 protected-spend demo:**
-- `test/product/x402-protected-spend-demo-report.test.ts` runs `examples/x402-protected-spend/run.ts`, checks the generated JSON/markdown output, verifies `RuntimeClient` and `EvidenceClient` usage, and rejects `HandshakeClient` / direct runtime-ingress shortcuts in the demo source.
-- The test asserts local/reference non-claims including no hosted operation, no broad x402 compatibility, no aggregate spend ledger, and local pinned trust only.
-
-**MCP reference transcript demo:**
-- `test/mcp/mcp-reference-transcript.test.ts` validates `buildMcpX402ReferenceTranscript()` and `buildMcpX402ReferenceTranscriptMarkdown()` from `src/mcp/reference-transcript.ts`.
-- The transcript covers metadata read, valid proposal, evidence readback, stale metadata, tools-list change, install not ready, gateway offline, amount mismatch, parameter drift, replay refusal, raw sibling-shaped input, and downstream proof gap.
-- The demo command `npm run demo:mcp-transcript` writes `examples/mcp-reference-transcript/output/latest.json` and `examples/mcp-reference-transcript/output/latest.md`; generated files are ignored and should not become canonical source.
-
-**Self-hosted activation demo:**
-- `test/product/self-hosted-activation.test.ts` runs `examples/self-hosted-activation/run.ts`, checks generated JSON/markdown output, and requires APS, CLI readback, MCP transcript, and MCP stdio proof rows to pass.
-- `test/mcp/mcp-stdio-process.test.ts` exercises the local MCP stdio server through `@modelcontextprotocol/client` and `@modelcontextprotocol/server` while asserting explicit non-authority posture.
-- `test/cli/cli-self-hosted-readback.test.ts` verifies CLI-style readback of the self-hosted output artifact without turning it into an authority surface.
-- `test/architecture/self-hosted-activation-claim-boundary.test.ts` keeps the packet local/source-owned and rejects hosted/process/custody overclaims.
-
-## Closeout Commands For This Goal
-
-```bash
-npm run quality:architecture  # Surface posture, package exports, import lanes, claim boundaries
-npm run quality:claims        # Current local/pre-hosted product language and active vocabulary
-npm run quality:storage       # Durable storage, D1, and protocol persistence gates
-npm run test                  # Full Bun test suite across protocol, runtime, MCP, CLI, SDK, x402, HTTP, demos
-npm run demo:aps              # Regenerate local x402 protected-spend report artifacts
-npm run demo:mcp-transcript   # Regenerate local MCP reference transcript artifacts
-npm run demo:self-hosted      # Regenerate local self-hosted activation packet artifacts
-npm run check:repo            # Full closeout gate used by CI
-```
+Quality is enforced by explicit invariant tests, focused gates, TypeScript strictness, ESLint, Prettier, package dry-run checks, and `git diff --check`.
 
 ## Test Types
 
 **Unit Tests:**
-- Protocol primitive and state tests live under `test/protocol/`, including `test/protocol/kernel-policy-gateway.test.ts`, `test/protocol/kernel-idempotency-ledger.test.ts`, `test/protocol/credential-custody.test.ts`, `test/protocol/operation-lifecycle.test.ts`, and `test/protocol/authority-certificate.test.ts`.
-- Adapter unit tests live under `test/adapters/`, including `test/adapters/x402-wallet-gateway.test.ts`, `test/adapters/package-install-gateway.test.ts`, `test/adapters/repo-write-gateway.test.ts`, and `test/adapters/preview-deploy-gateway.test.ts`.
-- Surface unit tests live under `test/mcp/`, `test/cli/`, and `test/sdk/`.
+- Protocol primitive/unit tests live in `test/protocol/`, such as `test/protocol/canonical.test.ts`, `test/protocol/refusal-format.test.ts`, `test/protocol/object-registry.test.ts`, `test/protocol/reason-code-registry.test.ts`, and `test/protocol/representation-contract.test.ts`.
+- Runtime unit tests live in `test/runtime/`, such as `test/runtime/package-install-runtime.test.ts`, `test/runtime/runtime-ingress.test.ts`, `test/runtime/codemode-multi-action-runtime.test.ts`, and `test/runtime/auth-md-candidate-compilation.test.ts`.
+- Adapter unit tests live in `test/adapters/`, such as `test/adapters/package-install-gateway.test.ts`, `test/adapters/repo-write-gateway.test.ts`, `test/adapters/preview-deploy-gateway.test.ts`, and `test/adapters/auth-md-gateway.test.ts`.
 
 **Integration Tests:**
-- HTTP and D1 behavior is covered by `test/http/http.test.ts`, `test/http/d1-http.test.ts`, `test/integration/package-install-end-to-end.test.ts`, `test/integration/repo-write-d1-http.test.ts`, and `test/integration/x402-d1-http.test.ts`.
-- Integration tests should assert event order, stream digests, durable record counts, redaction posture, replay refusal, proof gaps, and finality boundaries.
-
-**Architecture/Quality Tests:**
-- Repo shape, lane manifests, import posture, naming, root exports, package exports, CLI posture, MCP posture, and surface boundaries live under `test/architecture/`.
-- These tests are part of the product quality bar because they prevent authority drift, surface overclaiming, and scratch-doc canon leakage.
-
-**Conformance Tests:**
-- Protected mutation adapter conformance lives in `test/conformance/protected-mutation-adapter-conformance.test.ts`.
-- x402 install and upstream exact parity live in `test/conformance/x402-payment-conformance.test.ts` and `test/conformance/x402-upstream-exact-fixtures.test.ts`.
+- D1 and HTTP integration lives in `test/http/d1-http.test.ts`, `test/http/http.test.ts`, and `test/integration/x402-d1-http.test.ts`.
+- Protected action end-to-end paths live in `test/integration/package-install-end-to-end.test.ts`, `test/integration/repo-write-d1-http.test.ts`, `test/integration/auth-md-protected-call.test.ts`, and `test/integration/auth-md-receipt-reconstruction.test.ts`.
+- Product/demo report tests live in `test/product/self-hosted-activation.test.ts`, `test/product/agent-proof-slice.test.ts`, and `test/product/x402-protected-spend-demo-report.test.ts`.
 
 **E2E Tests:**
-- No browser E2E framework is used.
-- The closest end-to-end paths are local protocol/HTTP/D1 flows in `test/integration/x402-d1-http.test.ts`, `test/integration/repo-write-d1-http.test.ts`, and `test/integration/package-install-end-to-end.test.ts`.
-- Tier 2 SDK/CLI/MCP surfaces do not have a true host/process E2E test. The current transcript and CLI demos are source-owned harnesses, not process custody, external MCP host, package bin, browser, shell, cloud, or provider-gateway tests.
+- Browser E2E is not used.
+- Local process proof exists for MCP stdio in `test/mcp/mcp-stdio-process.test.ts`; it exercises `src/mcp/stdio/entry.ts` through `@modelcontextprotocol/client` and `@modelcontextprotocol/server` without creating authority.
+
+**Architecture Tests:**
+- `test/architecture/import-posture.test.ts`: lane imports, protocol area boundaries, public schema/input aggregators, x402 signer import custody, vault/secret API exclusion, object-registry shape, removed shims.
+- `test/architecture/naming-posture.test.ts`: workspace junk, root test placement, banned bucket names, loose-file thresholds, `index.ts` public faces, planning-stage labels, stale docs paths, overclaiming names, vague protocol mutation verbs, adapter rail leakage, CI binding.
+- `test/architecture/root-exports.test.ts`: curated root exports, explicit `./runtime`, `./conformance`, `./experimental`, and `./sdk/role-clients` surfaces.
+- `test/architecture/package-surface.test.ts`: publishable package boundary, exported subpaths, CLI/MCP bins, MCP registry metadata, packable files, and `pack:check` binding.
+- `test/architecture/surface-boundary-posture.test.ts`: role/client/CLI/MCP surface boundary manifest, non-authority flags, forbidden route families, credential/output exclusions, import roots.
+- `test/architecture/cli-command-posture.test.ts`: CLI command IDs, no mutation-shaped command names, no authority route families, no raw records, and required non-authority JSON fields.
+- `test/architecture/mcp-surface-posture.test.ts`: MCP active posture, off-root exports, forbidden imports, and no credential/authority text.
+- `test/architecture/claim-boundary.test.ts` and `test/architecture/self-hosted-activation-claim-boundary.test.ts`: local/reference vs hosted/provider claim language.
+
+**Claim-Boundary Tests:**
+- `test/architecture/claim-boundary.test.ts` is the main guard for local runtime ingress, x402, adapters, and MCP claims in `README.md`, `examples/x402-protected-spend/README.md`, and lane manifests.
+- `test/architecture/active-vocabulary.test.ts` scans active roots for stale vocabulary.
+- `test/architecture/self-hosted-activation-claim-boundary.test.ts` ensures the self-hosted activation packet does not claim broad MCP/browser/shell/network/package-manager protection, hosted operation, provider custody proof, cross-org trust, spend-window ledger enforcement, WorkOS/auth.md attestation, or clearing-house readiness.
+
+**x402 Focused Tests:**
+- `test/conformance/x402-upstream-exact-fixtures.test.ts` pins official upstream source/package basis, smokes official SDK parsing, decodes `PAYMENT-REQUIRED` into proposal evidence only, refuses missing selected index, refuses unsupported surfaces, and forbids leaking `PaymentPayload`/`PAYMENT-SIGNATURE`.
+- `test/conformance/x402-payment-conformance.test.ts` verifies signer custody and bypass probe posture, unsupported first-wedge classification, and evidence taxonomy that does not create authority or settlement finality.
+- `test/adapters/x402-install-proposal.test.ts` compiles local/reference x402 install records and refuses exposed signer authority, wildcard bounds, and per-call overrun.
+- `test/adapters/x402-payment-action-proposal.test.ts` turns observed or upstream official x402 terms into exact contracts without issuing authority, binds selected requirements/request material, and keeps session/day/review windows as metadata.
+- `test/adapters/x402-wallet-gateway.test.ts` creates fixture or official `PaymentPayload`/signature evidence only after a verified gateway check, refuses parameter drift/replay before signing, redacts credential material, and records proof gaps for missing downstream response.
+- `test/adapters/x402-bypass-probes.test.ts` records signer side channels, direct MCP payment, token passthrough, wrapper drift, and failure-open posture as bypass evidence; conformance fixtures cannot manufacture gateway-checked posture.
+- `test/runtime/runtime-ingress.test.ts` covers wrapped, dynamic, ambiguous, raw sibling, direct MCP, retry, changed-parameter retry, and truncated x402 dispatch paths without issuing authority.
+- `test/integration/x402-d1-http.test.ts` exercises the D1/HTTP protected x402 path.
+- `test/product/x402-protected-spend-demo-report.test.ts` keeps the demo report inside local/reference evidence claims.
+
+**MCP Redaction and Proposal Tests:**
+- `test/mcp/mcp-resource-redaction.test.ts` routes resource URIs through read-only evidence projections, keeps metadata/challenge/certificate resources reference-only, and rejects non-source-owned resource URI families.
+- `test/mcp/mcp-schema-contract.test.ts` exposes read resources plus exactly one x402 proposal tool, rejects authority-shaped fields, and requires structured non-authority outcomes.
+- `test/mcp/mcp-x402-proposal.test.ts` bridges MCP proposal input to runtime evidence/draft/compilation/contract calls only; it refuses stale metadata, not-ready install, offline gateway, overrun amounts, oversized fields, bypass-shaped inputs, replay/idempotency failures, and ambiguous commit states as structured non-authority outcomes.
+- `test/mcp/mcp-reference-transcript.test.ts` pins transcript cases for metadata, valid proposal, evidence readback, stale metadata, tools-list change, install-not-ready, gateway-offline, amount/params mismatch, replay refusal, raw sibling input, and proof-gap uncertainty.
+- `test/mcp/mcp-stdio-process.test.ts` exercises the local MCP stdio server through the official SDK and verifies no `PAYMENT-SIGNATURE`, `PaymentPayload`, private key, or authority mutation evidence leaks.
+
+**Adapter Conformance Tests:**
+- `test/conformance/protected-mutation-adapter-conformance.test.ts` proves an unsafe adapter fails when it mutates without `VerifiedGatewayCheck`, and applies the same no-mutation conformance to package-install, repo-write, and preview-deploy adapters.
+- `src/conformance/index.ts` defines `ProtectedMutationAdapterProbe` and `checkProtectedMutationAdapterConformance()` by comparing mutation counts before and after `attemptWithoutVerifiedGatewayCheck()`.
+- `test/architecture/import-posture.test.ts` keeps `checkProtectedMutationAdapterConformance()` on `./conformance`, not the root export.
 
 ## Common Patterns
 
 **Async Testing:**
 ```typescript
-const harness = await createD1HttpHarness();
-try {
-  const { actionContract, client, greenlight } = await createX402Contract(harness);
-  const gatewayResult = await runX402WalletGateway({
-    protocol: client,
-    surface,
-    actionContractId: actionContract.actionContractId,
-    greenlightId: greenlight.greenlightId,
-    observedParameters: actionContract.parameters as X402PaymentParameters,
-  });
-
-  expect(gatewayResult.outcome).toBe("payment_signature_reconciled");
-} finally {
-  await harness.dispose();
-}
+await expect(
+  proposeRuntimeIngressActionContracts(kernel, config, oversizedInput),
+).rejects.toThrow();
 ```
+
+Use async rejection assertions when schema or transition guards must fail before records are written. Examples: `test/runtime/runtime-ingress.test.ts`, `test/conformance/x402-upstream-exact-fixtures.test.ts`, and `test/mcp/mcp-stdio-process.test.ts`.
 
 **Error Testing:**
 ```typescript
-await expect(
-  fixture.kernel.evaluatePolicy({
-    actionContractId: fixture.contract.actionContractId,
-    envelopeId: "env_other",
-  }),
-).rejects.toThrow("Policy may evaluate only the envelope pinned by the action contract");
+const result = await runPackageInstallGateway({
+  protocol: fixture.kernel,
+  surface,
+  actionContractId,
+  greenlightId,
+  observedParameters: changedParameters,
+});
+
+expect(result.outcome).toBe("gateway_check_refused");
+expect(result.gatewayCheck.gateAttempt.gateDecisionReasonCode).toBe("params_mismatch");
+expect(surface.mutationCount).toBe(0);
 ```
+
+Use this pattern for gateway refusal and no-mutation assertions in `test/adapters/package-install-gateway.test.ts`, `test/adapters/repo-write-gateway.test.ts`, `test/adapters/preview-deploy-gateway.test.ts`, `test/adapters/x402-wallet-gateway.test.ts`, and `test/conformance/protected-mutation-adapter-conformance.test.ts`.
+
+**Record Count Testing:**
+```typescript
+expect(await recordCount(store, "action_contract")).toBe(1);
+expect(await recordCount(store, "policy_decision")).toBe(0);
+expect(await recordCount(store, "greenlight")).toBe(0);
+expect(await recordCount(store, "gateway_check_attempt")).toBe(0);
+expect(await recordCount(store, "mutation_attempt")).toBe(0);
+```
+
+Use record counts to prove exact authority boundaries, especially in `test/runtime/runtime-ingress.test.ts`, `test/runtime/codemode-multi-action-runtime.test.ts`, and `test/http/d1-http.test.ts`.
 
 **Redaction Testing:**
 ```typescript
-expect(JSON.stringify(result.signatureEvidence)).not.toContain("PAYMENT-SIGNATURE");
-expect(JSON.stringify(result.signatureEvidence)).not.toContain("privateKey");
-expect(JSON.stringify(result.signatureEvidence)).not.toContain(`0x${"a".repeat(130)}`);
+const serialized = JSON.stringify(result);
+expect(serialized).not.toContain("PAYMENT-SIGNATURE");
+expect(serialized).not.toContain("PaymentPayload");
+expect(serialized).not.toContain("privateKey");
+expect(serialized).not.toContain("rawCredentialMaterial");
 ```
 
-**Type Boundary Testing:**
+Use serialized absence checks for MCP, x402, auth.md, and evidence projection surfaces. See `test/mcp/mcp-resource-redaction.test.ts`, `test/mcp/mcp-x402-proposal.test.ts`, `test/adapters/auth-md-serialization-redaction.test.ts`, `test/adapters/x402-wallet-gateway.test.ts`, and `test/protocol/evidence-projections.test.ts`.
+
+**Local/Reference Claim Testing:**
 ```typescript
-// @ts-expect-error runtime client must not accept role maps.
-const invalidRuntimeRoleMap: RuntimeClientOptions = { roleCredential: "runtime-token", transitionTokens: {} };
+const readme = readFileSync("README.md", "utf8");
+expect(readme).toContain("not broad x402 compatibility");
+expect(readme).toContain("not live provider custody");
+expect(readme).not.toMatch(/provider custody claim|hosted dashboard/i);
 ```
 
-**Architecture Guard Testing:**
-```typescript
-const violations: string[] = [];
-for (const file of walkTs("src/mcp")) {
-  const text = readFileSync(file, "utf8");
-  if (text.includes("gatewayCheck(")) violations.push(file);
-}
-expect(violations.sort()).toEqual([]);
-```
-
-**Reference Transcript Testing:**
-```typescript
-const pack = await buildMcpX402ReferenceTranscript();
-
-for (const row of pack.rows) {
-  expect(row.sourceBindings.length).toBeGreaterThan(0);
-  expect(row.nonAuthorityPosture).toMatchObject({
-    authorityCreated: false,
-    greenlightCreated: false,
-    gatewayCheckPerformed: false,
-    mutationAttempted: false,
-  });
-}
-```
+Use claim tests when docs, examples, lane manifests, CLI output, MCP output, or package surfaces could imply hosted/provider enforcement. Primary files: `test/architecture/claim-boundary.test.ts`, `test/architecture/self-hosted-activation-claim-boundary.test.ts`, `test/architecture/cli-command-posture.test.ts`, and `test/architecture/mcp-surface-posture.test.ts`.
 
 ---
 

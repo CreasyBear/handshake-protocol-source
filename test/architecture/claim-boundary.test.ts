@@ -4,6 +4,7 @@ import packageJson from "../../package.json";
 
 type PackageExport = {
   types: string;
+  bun: string;
   import: string;
   default: string;
 };
@@ -24,8 +25,9 @@ describe("claim boundary", () => {
 
     expect(pkg.exports["./runtime"]).toEqual({
       types: "./dist/runtime/index.d.ts",
-      import: "./src/runtime/index.ts",
-      default: "./src/runtime/index.ts",
+      bun: "./src/runtime/index.ts",
+      import: "./dist/runtime/index.mjs",
+      default: "./dist/runtime/index.mjs",
     });
     expect(Object.keys(root)).not.toContain("proposeRuntimeIngressActionContracts");
     expect(Object.keys(root)).toContain("ProtectedActionRequestSchema");
@@ -102,12 +104,15 @@ describe("claim boundary", () => {
     expect(mcpLane).toContain("Gateway custody, control-plane install, signer material");
     expect(mcpLane).toContain("certificate resources as local terminal evidence references only");
     expect(mcpLane).toContain("MCP can propose and display evidence. It cannot authorize");
+    expect(mcpLane).toContain("Package bin `handshake-mcp` starts the local stdio MCP server");
+    expect(mcpLane).toContain("hosted operation");
+    expect(mcpLane).toContain("broad MCP protection");
     expect(mcpLane).toContain(
       "does not claim sibling MCP, terminal, browser, cloud, package-manager, repo, or network paths are protected",
     );
     expect(mcpLane).not.toMatch(/MCP (?:controls|secures|protects) (?:all|every|broad)/i);
     expect(mcpLane).not.toMatch(
-      /hosted operation|provider custody|settlement|aggregate spend|spend-window enforcement/i,
+      /MCP (?:provides|performs|operates|proves|claims) (?:hosted operation|provider custody|settlement|aggregate spend|spend-window enforcement)/i,
     );
     expect(mcpLane).not.toMatch(/marketplace|certification|clearing house|clearing-house|broad x402 compatibility/i);
     expect(mcpLane).not.toMatch(
