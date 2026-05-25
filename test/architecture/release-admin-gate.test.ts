@@ -1,7 +1,7 @@
 import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
-import { join } from "node:path";
 import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, it } from "bun:test";
 
 const repoRoot = process.cwd();
@@ -63,5 +63,31 @@ describe("release admin gate", () => {
     expect(script).not.toContain("workflow_dispatch");
     expect(script).not.toContain("/releases");
     expect(script).not.toContain("PATCH");
+  });
+
+  it("documents the release admin state machine in internal canon", () => {
+    const runbook = readFileSync("docs/internal/release-admin-runbook.md", "utf8");
+    const decisions = readFileSync("docs/internal/decisions.md", "utf8");
+    const structure = readFileSync("STRUCTURE.md", "utf8");
+
+    expect(structure).toContain("docs/internal/release-admin-runbook.md");
+    expect(decisions).toContain("docs/internal/release-admin-runbook.md");
+    expect(runbook).toContain("Release administration must prove the source-to-artifact boundary");
+    expect(runbook).toContain("npm run release:admin:check");
+    expect(runbook).toContain("npm run release:admin:check:remote");
+    expect(runbook).toContain("First-Time npm Maintainer Practices");
+    expect(runbook).toContain("Treat npm download counts as distribution noise");
+    expect(runbook).toContain("Promote to `latest` only after registry readback");
+    expect(runbook).toContain("two-factor authentication, token restrictions, minimal");
+    expect(runbook).toContain("prefer a deprecation warning plus a fixed patch release");
+    expect(runbook).toContain("Three-Month High-Activity Readiness");
+    expect(runbook).toContain("Only levels 3 through 6 count as adoption evidence");
+    expect(runbook).toContain("no install-time telemetry, phone-home behavior");
+    expect(runbook).toContain("Support intake should classify every public report");
+    expect(runbook).toContain("Do not answer support pressure");
+    expect(runbook).toContain("Forbidden Shortcuts");
+    expect(runbook).toContain("Do not treat a local green gate as release proof");
+    expect(runbook).toContain("do not patch only the observed CI symptom");
+    expect(runbook).not.toContain("npm publish --provenance");
   });
 });

@@ -648,4 +648,5 @@ does not publish to npm, create GitHub releases, change repository metadata,
 create authority, create policy decisions, issue greenlights, perform gateway
 checks, mutate protected surfaces, or register MCP discoverability. Use
 `npm run release:admin:check:remote` after source and artifact pushes when
-remote ref readback is required before launch-admin metadata work.
+remote ref readback is required before launch-admin metadata work. The operating
+runbook lives in `docs/internal/release-admin-runbook.md`.
