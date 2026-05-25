@@ -117,6 +117,7 @@ describe("package surface", () => {
     expect(pkg.scripts["pack:check"]).toBe(
       "npm run build && node scripts/check-package-surface.mjs && node scripts/check-published-entrypoints.mjs && node scripts/check-clean-installed-activation.mjs && node scripts/check-release-proof.mjs",
     );
+    expect(pkg.scripts["check:repo"]).toContain("npm run build:types && npm run check:types");
     expect(pkg.scripts["check:repo"]).toContain("npm run pack:check");
   });
 
