@@ -186,6 +186,7 @@ docs/internal/protocol-kernel-architecture.md
 docs/internal/protocol-layman.md
 docs/internal/protocol-notes.md
 docs/internal/release-admin-runbook.md
+docs/internal/service-workflow-story.md
 ```
 
 Long planning reports, source studies, and historical prompts belong outside the active repo tree or under `docs/internal/archive` only when there is a reason to retain provenance.

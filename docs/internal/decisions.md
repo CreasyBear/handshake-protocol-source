@@ -16,6 +16,7 @@ docs/internal/protocol-definition.md
 docs/internal/protocol-kernel-architecture.md
 docs/internal/protocol-layman.md
 docs/internal/protocol-notes.md
+docs/internal/service-workflow-story.md
 ```
 
 `.planning/` is scratch. Long plans, source studies, public-facing product docs, and historical prompts are not active repo truth.
@@ -369,7 +370,7 @@ This checkout is an internal TypeScript protocol kernel. It should not carry lon
 
 Accepted: the active repo canon is compact and internal.
 
-Former ADR, plan, product, protocol, business, reference, audit, and spec subtrees are no longer active repo truth. Durable decisions move into this file only when they protect implementation boundaries. Protocol definition lives in `docs/internal/protocol-definition.md`. Kernel architecture and schema mapping live in `docs/internal/protocol-kernel-architecture.md`. Plain-English translation lives in `docs/internal/protocol-layman.md`. Compact implementation notes live in `docs/internal/protocol-notes.md`. Planning, marketing, source studies, and historical prompts belong outside the active repo tree.
+Former ADR, plan, product, protocol, business, reference, audit, and spec subtrees are no longer active repo truth. Durable decisions move into this file only when they protect implementation boundaries. Protocol definition lives in `docs/internal/protocol-definition.md`. Kernel architecture and schema mapping live in `docs/internal/protocol-kernel-architecture.md`. Plain-English translation lives in `docs/internal/protocol-layman.md`. Compact implementation notes live in `docs/internal/protocol-notes.md`. The service workflow story lives in `docs/internal/service-workflow-story.md` as a product-surface translation only; it does not create authority. Planning, marketing, source studies, and historical prompts belong outside the active repo tree.
 
 ## Structural Decision
 
