@@ -1,109 +1,91 @@
 # Decisions
 
-## DEC-001
+## NPLAN-D001 - One Authority Spine
 
-- ID: DEC-001
-- Status: Accepted
-- Decision: Proceed from the decision-gated macro map into a full Tier 1/Tier 2 macro plan.
-- Rationale: The user explicitly authorized the full plan and implementation sequence after reviewing the goal.
-- Source: User instruction and `.planning/macro-plan/runs/20260525T095940Z-tier1-tier2-product-simplification/input.md`.
-- Revisit Trigger: If sidecar review finds an authority violation that cannot be converted into a concrete gate.
+- Status: accepted
+- Decision: Handshake architecture is one protocol authority spine with
+  projection/readback vocabulary over it.
+- Rationale: Product/protocol peer lanes create ambiguity about where authority
+  lives.
+- Source: user correction; `.planning/macro-plan/runs/20260525T110908Z-architectural-north-star/input.md`
+- Revisit trigger: only if a future source-owned transition changes the
+  authority spine.
 
-## DEC-002
+## NPLAN-D002 - Surfaces Are Implementation Boundaries
 
-- ID: DEC-002
-- Status: Accepted
-- Decision: Keep Passport as a docs/story input noun only.
-- Rationale: Passport helps users understand presented standing evidence but is too authority-shaped for protocol or API authority.
-- Source: `.planning/macro-map/MACRO-MAP.md`, `views/DESIGN.md`, `views/AUTHORITY.md`.
-- Revisit Trigger: If user comprehension evidence shows Passport consistently implies identity or permission even with cut lines.
+- Status: accepted
+- Decision: Keep `src/surfaces` and "surface" as implementation vocabulary, but
+  canonical docs must say surfaces expose projection/readback only and are not a
+  product truth lane.
+- Rationale: Removing the folder would cause churn; correcting its meaning
+  addresses the real architectural risk.
+- Source: `STRUCTURE.md`, `src/surfaces/LANE.md`, `test/architecture/surface-boundary-posture.test.ts`
+- Revisit trigger: if package extraction needs a public projection subpath.
 
-## DEC-003
+## NPLAN-D002A - Projection Surfaces Versus Transition Clients
 
-- ID: DEC-003
-- Status: Accepted
-- Decision: Use `ServiceWorkflowAdmission` as the source/API surface output.
-- Rationale: It is narrower than standalone Admission and makes the service-side mapping explicit.
-- Source: `.planning/macro-map/MECHANISM-MAP.md`, `views/ENG.md`, `.planning/codebase/CONCERNS.md`.
-- Revisit Trigger: If implementation reveals a clearer non-authority noun with stronger tests.
+- Status: accepted
+- Decision: Canonical vocabulary must distinguish product projection/readback
+  surfaces from role-scoped protocol transition clients.
+- Rationale: Some SDK/HTTP clients transport authority-bearing protocol
+  transitions, while product projection surfaces must remain non-authority. One
+  umbrella term hides that difference.
+- Source: `runs/20260525T110908Z-architectural-north-star/audits/product-vocabulary-projection-audit.md`
+- Revisit trigger: if the SDK/client taxonomy changes.
 
-## DEC-004
+## NPLAN-D003 - ProtectedActionEvent As Lifecycle Projection Concept
 
-- ID: DEC-004
-- Status: Accepted
-- Decision: Use `ServiceWorkflowHandle` as the carried workflow context object.
-- Rationale: It is less authority-loaded than Badge and can carry context/digest refs with explicit false authority flags.
-- Source: `views/DESIGN.md`, `views/DEVEX.md`, `views/AGENT.md`, `views/RUNTIME.md`.
-- Revisit Trigger: If developers still treat handle as reusable permission in tests or review.
+- Status: accepted
+- Decision: Use `ProtectedActionEvent` as a documentation/testing lifecycle
+  concept in this run, source-owned through a `src/surfaces` projection map, not
+  as a stored protocol object.
+- Rationale: The current protocol already has navigation/lifecycle matrices; a
+  new primitive would risk duplicating authority state.
+- Source: `src/protocol/navigation`, `src/protocol/areas/action-attempt-lifecycle`, `docs/internal/protocol-notes.md`
+- Revisit trigger: if source proves the existing lifecycle cannot express a
+  required terminal event projection.
 
-## DEC-005
+## NPLAN-D003A - Runtime Composition Gaps Are Blocking
 
-- ID: DEC-005
-- Status: Accepted
-- Decision: Keep Badge as optional narrative shorthand only.
-- Rationale: Badge is memorable but reads like bearer auth. It must not become schema, route, export, or protocol object.
-- Source: `.planning/macro-map/FACET-MAP.md`, `views/CEO.md`, `views/DESIGN.md`.
-- Revisit Trigger: If product copy requires removing Badge entirely to preserve the boundary.
+- Status: accepted
+- Decision: Mixed-family same-envelope and x402/auth.md non-composition gates
+  are P0 for closeout.
+- Rationale: Projection-over-spine fails if one generated block can blur
+  multiple authority contexts into a single runtime spine or composite
+  credential/payment artifact.
+- Source: `runs/20260525T110908Z-architectural-north-star/audits/runtime-protected-action-gates-audit.md`
+- Revisit trigger: after focused runtime tests prove the gate.
 
-## DEC-006
+## NPLAN-D003B - Authority Surface Naming Must Be Replaced
 
-- ID: DEC-006
-- Status: Accepted
-- Decision: Split passport/admission/workflow IDs into five non-authority refs.
-- Rationale: Correlation and reconstruction need stable refs, but no ref may create authority.
-- Source: User-provided invariant and current macro-plan input.
-- Revisit Trigger: If source implementation requires additional digests for canonicalization or redaction.
+- Status: accepted
+- Decision: `sdk.policy` and similar clients should be described as
+  role-scoped protocol transition clients, not authority surfaces.
+- Rationale: The kernel/policy transition owns authority. SDK clients transport
+  a role-scoped call into that transition.
+- Source: `runs/20260525T110908Z-architectural-north-star/audits/architecture-case-study-audit.md`
+- Revisit trigger: if a future client truly owns an enforceable authority
+  transition outside the kernel, which should be treated as a new protocol
+  design.
 
-## DEC-007
+## NPLAN-D004 - Case Studies Become Mechanism Rules
 
-- ID: DEC-007
-- Status: Accepted
-- Decision: First implementation home is docs plus `src/surfaces`, not `src/protocol/areas`.
-- Rationale: No new enforceable transition exists; current protocol primitives already represent evidence, attempt bounds, exact contracts, policy, gateway, and readback.
-- Source: `.planning/codebase/ARCHITECTURE.md`, `.planning/codebase/STRUCTURE.md`, `STRUCTURE.md`.
-- Revisit Trigger: Only if a future source design identifies a distinct terminal or state-transition event.
+- Status: accepted
+- Decision: Stripe, Kubernetes/OPA, Vault, GitHub, AWS IAM, SLSA/Sigstore,
+  Vercel, and Cloudflare are used as mechanism references only.
+- Rationale: Borrowed analogy can overclaim enforcement. Mechanism rules can be
+  tested.
+- Source: `.planning/macro-plan/runs/20260525T110908Z-architectural-north-star/research.md`
+- Revisit trigger: if a later implementation imports a concrete standard or
+  certification.
 
-## DEC-008
+## NPLAN-D005 - Badge Remains Unsafe Shorthand
 
-- ID: DEC-008
-- Status: Accepted
-- Decision: Tier 2 examples and runtime convergence wait for Tier 1 schema and boundary tests.
-- Rationale: Demo-first would overclaim the product story before authority boundaries are source-enforced.
-- Source: `.planning/macro-map/EXECUTION-MAP.md`, `.planning/macro-map/PROTECTED-ACTION-MAP.md`.
-- Revisit Trigger: If a non-source prototype is requested separately and clearly marked throwaway.
-
-## DEC-009
-
-- ID: DEC-009
-- Status: Accepted
-- Decision: Tier 3 remains blocked until Tier 1/Tier 2 proof gates pass or proof gaps are explicit.
-- Rationale: Hosted operation must consume proven local/source-owned surfaces, not expand the kernel or package surface prematurely.
-- Source: `docs/internal/decisions.md`, macro-plan objective, prior Tier 3 boundary guidance.
-- Revisit Trigger: If the user starts a separate hosted workspace with explicit Tier 3 scope.
-
-## DEC-010
-
-- ID: DEC-010
-- Status: Rejected
-- Decision: Do not make Passport a protocol primitive.
-- Rationale: It would duplicate evidence and authority-adjacent records without adding a gateway-enforced transition.
-- Source: `.planning/codebase/CONCERNS.md`, `.planning/macro-map/MECHANISM-MAP.md`.
-- Revisit Trigger: A future protocol decision proves a distinct enforceable state.
-
-## DEC-011
-
-- ID: DEC-011
-- Status: Rejected
-- Decision: Do not sell passport validation as the bought authority unit.
-- Rationale: The economic unit remains protected-event terminalization and reconstructable evidence.
-- Source: `views/CEO.md`, `docs/internal/decisions.md`.
-- Revisit Trigger: Paid pilot evidence proves a separate validation product without weakening authority claims.
-
-## DEC-012
-
-- ID: DEC-012
-- Status: Deferred
-- Decision: Defer live x402/auth.md composite service gateway demo.
-- Rationale: The surface and non-authority tests must land before composite external rails.
-- Source: `.planning/macro-map/PROTECTED-ACTION-MAP.md`, `.planning/codebase/INTEGRATIONS.md`.
-- Revisit Trigger: T2-04 starts after Tier 1 and early Tier 2 gates pass.
+- Status: accepted
+- Decision: Badge remains forbidden as schema/protocol/export/route authority
+  vocabulary. If used in UI later, it must mean a read-only state label derived
+  from evidence.
+- Rationale: Badge reads as bearer authority under generated-agent behavior.
+- Source: `.planning/macro-map/DECISIONS.md`, `docs/internal/service-workflow-story.md`, `src/mcp/LANE.md`
+- Revisit trigger: if a UI-only state-label component is designed with explicit
+  non-authority copy and tests.

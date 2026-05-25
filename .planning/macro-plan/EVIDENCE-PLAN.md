@@ -1,180 +1,138 @@
 # Evidence Plan
 
+## Invariant At Stake
+
+The closeout must prove the architectural correction, not just successful text
+edits. Evidence must distinguish research, plan, implementation, test, review,
+and residual proof gaps.
+
+## Evidence Artifacts
+
+| Artifact | Purpose |
+| --- | --- |
+| `runs/20260525T110908Z-architectural-north-star/input.md` | Immutable goal and source boundary |
+| `runs/20260525T110908Z-architectural-north-star/research.md` | Primary-source case-study mechanisms |
+| `runs/20260525T110908Z-architectural-north-star/source-snapshot.md` | Starting repo/source posture |
+| `runs/20260525T110908Z-architectural-north-star/blocked-checks.md` | Preserved proof gaps and stop conditions |
+| `runs/20260525T110908Z-architectural-north-star/audits/*.md` | Sidecar pressure reports |
+| `runs/20260525T110908Z-architectural-north-star/validation.md` | Command and review closeout |
+
 ## Current Evidence
 
-The plan is grounded in canonical docs, the current macro map, and current
-codebase maps. Canon proves the authority chain and product-surface boundary.
-The macro map proves lens convergence around non-authority product
-simplification. The codebase maps identify source placement, tests, and proof
-gaps. Tier 1 source implementation now owns the service workflow story,
-non-authority admission/handle schemas, and boundary tests. Tier 2 source
-implementation now owns active CLI/MCP/SDK posture alignment, the runnable local
-service workflow admission example, and generated-agent/runtime misuse gates.
+- Current run input, research, research-evidence, source snapshot, blocked
+  checks, and five sidecar audits exist.
+- Macro-plan validator must be rerun after final plan edits.
+- Source/docs/tests implementation evidence is not complete until focused gates
+  and `npm run check:repo` run after final changes.
 
-Current structural validation result:
+## Command Evidence
 
-```text
-Macro plan output is valid.
-```
-
-Sidecar review result: all five assigned audit reports exist under `.planning/macro-plan/runs/20260525T095940Z-tier1-tier2-product-simplification/audits/`. The reports recommend preserving protected-action, runtime, product, and evidence gates. The chair reconciliation narrows implementation readiness to the first Tier 1 story/schema/test slice and keeps protected-action fixtures, host containment claims, external rails, public-surface convergence, and Tier 3 blocked until source proof exists.
-
-## Verification Commands
-
-Macro-plan validation:
+Plan validation:
 
 ```bash
 /Users/joelchan/.codex/skills/gsd-macro-plan/scripts/validate_macro_plan_output.py .planning/macro-plan
 ```
 
-Observed output:
-
-```text
-Macro plan output is valid.
-```
-
-Tier 1 documentation and surface verification:
+Focused implementation gates:
 
 ```bash
 npm run quality:claims
 npm run quality:architecture
-npm run check:types
-git diff --check
+npm run test -- test/architecture/claim-boundary.test.ts test/architecture/workflow-admission-boundary.test.ts
+npm run test -- test/runtime/runtime-ingress.test.ts test/product/service-workflow-admission.test.ts
 ```
 
-Protocol simplification focused verification:
-
-```bash
-npm run test -- test/protocol/kernel-compilation-contract.test.ts test/protocol/kernel-policy-gateway.test.ts test/protocol/evidence-projections.test.ts test/runtime/runtime-ingress.test.ts
-```
-
-Tier 2 example and integration verification will use a new focused product test plus existing x402/auth.md gateway tests when those surfaces are touched.
-
-T2-03 generated-agent/runtime misuse verification:
-
-```bash
-npm run test -- test/product/service-workflow-admission.test.ts
-npm run test -- test/runtime/runtime-ingress.test.ts
-```
-
-T2-04 protected-action fixture gate verification:
-
-```bash
-npm run test -- test/product/service-workflow-admission.test.ts
-npm run test -- test/adapters/x402-wallet-gateway.test.ts test/integration/x402-d1-http.test.ts
-```
-
-T2-05 Tier 3 lock verification:
-
-```bash
-npm run test -- test/architecture/claim-boundary.test.ts
-npm run check:repo
-```
-
-Full closeout:
+Closeout:
 
 ```bash
 npm run format:check
 npm run check:repo
+git status --short --branch
 ```
-
-Current full closeout status: `npm run check:repo` passes after MPLAN-010.
-
-## Replay And Refusal Cases
-
-Required cases:
-
-- handle reused after refusal;
-- handle reused after proof gap;
-- handle reused after consumed greenlight replay;
-- changed payment amount or endpoint after admission;
-- dynamic tool construction from handle;
-- raw x402 payload supplied through admission;
-- raw bearer/API token supplied through handle;
-- gateway policy drift between admission and action request;
-- credential-ref or authority-ref isolation before protected action;
-- stale passport evidence or expired admission.
-
-Each case must stop before signer use, mutation, receipt export, or certificate minting unless a fresh exact contract clears through policy and gateway.
-
-## Review Prompts
-
-Use these review prompts before promoting implementation:
-
-- Does any simplified noun imply permission?
-- Can the user approve admission while the later action contract differs?
-- Can an agent pass the handle directly into a protected tool?
-- Can generated code mutate through a sibling route after admission?
-- Does the readback distinguish admission, policy, gateway, downstream, receipt, refusal, replay, and proof gap?
-- Does every public claim match the current source proof ledger?
-- Does Tier 3 remain blocked?
 
 ## Fixtures Or Examples
 
-Planned fixture sequence:
-
-1. Local service workflow admission fixture emits JSON and Markdown.
-2. Negative fixture attempts to use handle as authority and is refused.
-3. Later x402 fixture uses handle as context to create one fresh `x402_payment.exact` action request.
-4. Output separates admission readback from protected-action terminal evidence.
-
-Existing examples to mirror:
-
-- `examples/self-hosted-activation/`
-- `examples/x402-protected-spend/`
-- `examples/external-adapter-sdk/`
-- `examples/x402-protected-tool-profiles/`
-- `examples/mcp-reference-transcript/`
+- `examples/service-workflow-admission/latest.json` and `latest.md` must remain
+  service workflow readbacks, not authority artifacts.
+- Product/architecture fixtures must assert Passport, Admission, Handle,
+  Clearance, Outcome, and Certificate as projections over existing lifecycle
+  entries or explicit pre-contract evidence context.
+- Runtime fixtures must cover mixed-family envelope refusal and x402/auth.md
+  non-composition, not one composite authority object.
 
 ## Readback And Redaction Checks
 
-Readback must omit:
-
-- raw credentials;
-- provider secret paths;
-- private keys;
-- bearer/API tokens;
-- raw x402 `PaymentPayload`;
-- `PAYMENT-SIGNATURE`;
-- raw internal protocol records unless route admission explicitly allows a safe internal read;
-- mutation commands hidden inside handle fields.
-
-Readback must include:
-
-- explicit non-authority flags;
-- accepted/refused/stale/proof-gap claim rows;
-- digest/ref fields for reconstruction;
-- fresh action contract requirement;
-- proof gaps and next safe recovery moves.
-
-## Browser Or Visual Evidence
-
-No browser or visual evidence is required for the first Tier 1 implementation because this is source/docs/schema/test work. If a review renderer or UI is introduced later, visual QA must verify that admission, handle, clearance, receipt, refusal, and proof-gap states are visibly separate and not summarized as one approval badge.
+- Readbacks may include correlation and reconstruction references, including
+  digest and presentation/admission/handle IDs, only when those IDs are marked
+  non-authority.
+- Readbacks must not expose payment material, signer payloads, gateway-held
+  credentials, authority tokens, or live provider secrets.
+- Redaction must preserve enough structure to reconstruct proposal, policy,
+  gateway check, receipt/refusal/proof gap, and terminal certificate posture
+  without turning evidence into reusable auth.
 
 ## Runtime Proof Artifacts
 
-Runtime artifacts to collect during Tier 2:
-
-- runtime ingress negative cases for dynamic/stale handle-context refusal;
-- runtime ingress loop/retry cases proving handle evidence does not become
-  aggregate spend authority;
-- service workflow fixture gate proving handle context feeds one fresh
-  `x402_payment.exact` path without carrying payment material;
-- auth.md provenance/proof-gap posture showing no composite credential plus
-  spend authority artifact;
-- Tier 3 admission lock in canonical docs and claim-boundary tests;
-- MCP proposal/readback output;
-- host profile posture rows;
-- raw sibling bypass inventory;
-- generated-execution graph evidence for loop/retry/dynamic-tool cases;
-- proof-gap readback for unverified hosts.
+- Runtime proof must include generated execution shape, runtime posture,
+  protected action path, gateway authority holder, raw or sibling bypass
+  posture, and surviving receipt/refusal/proof-gap evidence.
+- Mixed-family runtime proof must show a same-envelope pass or an explicit
+  refusal before one projected workflow readback is assembled.
+- x402/auth.md runtime proof must show separate exact contracts or refusal,
+  never one composite credential-plus-payment authority artifact.
 
 ## Evidence Not Yet Available
 
-- user comprehension evidence for Passport/Admission/Badge naming;
-- live external x402 provider/facilitator behavior;
-- provider-grade auth.md credential custody;
-- browser/A2A/OpenAPI gateway-owned protected path evidence;
-- native containment for non-Codex hosts;
-- hosted operation, provider custody, retention, org auth, or Tier 3 cloud evidence;
-- market willingness to pay for passport validation as a standalone product.
+- Post-implementation focused test outputs are not available until source/docs
+  edits land.
+- Full `npm run check:repo` evidence is not available until after focused gates
+  pass.
+- Hosted/Tier 3 proof remains unavailable by design in this run.
+- Live provider custody, native host containment, registry acceptance, and
+  marketplace trust remain proof gaps.
+
+## Verification Commands
+
+Use the command matrix above. Record exact outputs in
+`runs/20260525T110908Z-architectural-north-star/validation.md`.
+
+## Evidence Success Criteria
+
+- Sidecar findings are resolved or carried as explicit proof gaps.
+- Tests require projection-over-spine language and non-authority service
+  workflow semantics.
+- Full repo gate passes before final implementation closeout.
+- Git commits separate macro-plan reset from implementation when possible.
+
+## Replay And Refusal Cases
+
+Evidence must include or preserve tests for replay refusal, policy/runtime
+refusal, gateway refusal, stale handle/review refusal, mixed-family envelope
+refusal, x402/auth.md non-composition refusal, and proof-gap readback.
+
+## Review Prompts
+
+- Does the diff preserve one authority spine?
+- Does any product noun create authority or imply a second lane?
+- Are sidecar P0 findings resolved in source/tests or recorded as proof gaps?
+- Were focused gates and full repo gate run after final changes?
+
+## Browser Or Visual Evidence
+
+This correction is architecture/source owned, not a finished product UI slice.
+Browser evidence is optional unless docs/demo pages or rendered service workflow
+readbacks are changed. If visual/browser surfaces are touched, capture:
+
+- rendered service workflow readback showing projection language;
+- absence of authority, trusted identity, reusable credential, or badge-style
+  permission wording;
+- console and route errors for the changed route;
+- a note that visual readback is evidence only and not an enforcement boundary.
+
+## Residual Proof Gaps To Preserve
+
+- No live provider custody or settlement finality.
+- No hosted operation or hosted org auth.
+- No marketplace/certification or cross-org trust.
+- No native host containment.
+- No finished product UI beyond source-owned docs/schema/demo/readback.

@@ -1,88 +1,105 @@
 # Runtime Gates
 
+## Invariant At Stake
+
+Generated agents will treat simple vocabulary as operational affordance unless
+runtime gates prove otherwise. A projection/readback surface may help prepare a
+proposal, but it cannot authorize a runtime dispatch.
+
 ## Source Boundary
 
-| Source | Runtime Role | Status |
-| --- | --- | --- |
-| `.planning/macro-map/AGENT-RUNTIME-MAP.md` | Runtime posture for Passport / Admission / Handle move | Derived gate input |
-| `.planning/macro-map/views/AGENT.md` | Generated-agent handoff and misuse risks | Lens evidence |
-| `.planning/macro-map/views/RUNTIME.md` | Multi-host and x402/auth.md posture | Lens evidence |
-| `.planning/codebase/INTEGRATIONS.md` | Current external rail and host profile map | Derived codebase evidence |
-| `src/runtime/ingress/index.ts`, `src/runtime/ingress/schemas.ts` | Proposal-only runtime ingress | Source proof for current runtime posture |
-| `src/mcp/x402-proposal.ts`, `src/x402-protected-tool/LANE.md` | MCP proposal and x402 host-profile posture | Source proof for proposal/readback non-authority |
-| `README.md`, `docs/internal/protocol-notes.md` | Canonical non-claims for MCP, host profiles, x402, and runtime evidence | Canon |
+Runtime gate truth lives in `src/runtime/ingress`, `test/runtime/*`,
+`test/product/service-workflow-admission.test.ts`, `src/mcp/LANE.md`,
+`src/cli/command-manifest.ts`, and protocol/gateway tests. Planning gates are
+not runtime enforcement.
 
 ## Runtime Targets
 
-| Target | Current Evidence | Suitability Posture |
+| Target | Current posture | Required north-star gate |
 | --- | --- | --- |
-| Codex | Local profile and MCP proposal/readback evidence | Usable for first implementation and local verification; no host-wide containment claim |
-| Claude Code | Managed profile artifact in x402 protected-tool lane | Surface parity target; verify before runtime-specific claims |
-| Hermes | Tool-packet/profile artifact | Surface parity target; verify before runtime-specific claims |
-| OpenClaw | Tool-packet/profile artifact | Surface parity target; verify before runtime-specific claims |
-| MCP | Local stdio proposal/evidence server | Proposal/readback only; no policy/gateway/mutation |
-| x402 | One buyer-side exact per-call local proof path | Protected-action rail; gateway/signer boundary still required |
-| auth.md | Credential provenance and protected API profile | Evidence rail; not action approval |
-| Browser | Potential side channel | Treat as bypass/proof-gap unless gateway-owned path exists |
-| A2A | Task/metadata context | Evidence only |
-| OpenAPI | Route/catalog context | Operation description only |
+| Codex | Local profile and MCP/stdout evidence only | No host-wide containment claim; workflow handle is proposal context only |
+| Claude Code | Managed/profile artifact evidence | No native containment claim |
+| Hermes | Tool-packet/profile artifact evidence | No reusable handle authority |
+| OpenClaw | Tool-packet/profile artifact evidence | No raw sibling mutation bypass claim |
+| MCP | Proposal/evidence resources and stdio process proof | MCP cannot authorize, pay, execute, retry, recover, or certify |
+| x402 | Buyer-side exact per-call local proof lane | Fresh exact action request for each payment; signer material stays behind gateway |
+| auth.md | Provenance and credential-custody evidence | auth.md does not become composite authority with x402 |
+| Browser / A2A / OpenAPI | Proof-gap contexts | No protected-action readiness without gateway-owned path |
 
 ## Suitability Postures
 
-The weakest host posture controls the claim. The plan may say "multi-host evidence posture" but not "multi-host containment." Codex is the active implementation runtime. Other hosts remain product-surface parity and future verification targets until their activation artifacts are source-checked and executed.
+- Suitable for local source-owned proposal/evidence/readback tests.
+- Suitable for Codex-local implementation with shell and repo gates.
+- Not suitable for host-wide containment claims.
+- Not suitable for hosted operation or live provider custody claims.
 
 ## Instruction Sources
 
-Runtime agents must receive:
-
-- `AGENTS.md` invariant and cut lines;
-- `AGENT-HANDOFF.md` context bundle;
-- `PROTECTED-ACTION-GATES.md` authority boundary;
-- source lane `LANE.md` files before edits;
-- focused tests for runtime ingress, MCP posture, and surface boundary.
+- `AGENTS.md`
+- `src/runtime/ingress/*`
+- `src/mcp/LANE.md`
+- `src/cli/command-manifest.ts`
+- `docs/internal/decisions.md`
+- `test/runtime/runtime-ingress.test.ts`
+- `test/runtime/auth-md-candidate-compilation.test.ts`
+- `test/product/service-workflow-admission.test.ts`
 
 ## Tool Contract
 
-Allowed runtime actions:
-
-- inspect admission and handle evidence;
-- propose fresh action requests;
-- use runtime ingress as proposal evidence;
-- read redacted evidence and proof gaps;
-- recraft exact contracts after drift or refusal.
-
-Forbidden runtime actions:
-
-- treat handle as permission;
-- invoke signer or payment payload generation from admission;
-- mutate from Passport/Badge/Handle;
-- retry proof gaps as permission;
-- dynamically construct protected tools without classifier/refusal checks;
-- route around gateway via browser, shell, network, package manager, raw MCP, raw x402, or direct HTTP sibling paths.
+Runtime ingress may observe generated dispatches, record evidence, refuse unsafe
+shapes, and propose candidates. It must not evaluate policy, issue greenlights,
+perform gateway checks, use signers, mutate protected surfaces, export receipts,
+mint certificates, or claim host containment.
 
 ## Approval Or Permission Behavior
 
-Human approval of a story, rendered review, or admission report is not permission. Runtime approval must bind to the exact protected-action contract and later gateway check. If the generated code can call an unwrapped consequential tool, the generated code escaped the contract boundary.
+Runtime evidence, service workflow handles, rendered reviews, and MCP/CLI/SDK
+outputs are not approval or permission. Permission exists only when the protocol
+spine records a policy greenlight and the gateway verifies it for one exact
+mutation attempt.
 
 ## Subagent Behavior
 
-Subagents can review runtime posture, write isolated tests, or implement disjoint slices. They must not claim final runtime suitability. Promoting a host from profile evidence to native operation requires source-specific verification and a separate proof packet.
+Subagents may audit runtime gates or implement disjoint tests, but they may not
+declare runtime protection, host containment, protected-action authority, or
+final closeout. The chair reconciles findings.
 
 ## Continuation State
 
-Continuation must survive compaction and restart through:
-
-- `.planning/macro-plan/AGENT-HANDOFF.md`;
-- `TASKS.jsonl`;
-- source comments avoided unless necessary;
-- git checkpoints after validated slices;
-- test output captured in closeout notes or run validation files.
+Runtime gates remain open until focused tests pass for mixed-family same-envelope
+behavior, x402/auth.md non-composition, stale handle/review posture, and current
+service workflow misuse cases.
 
 ## Blocked Runtime Checks
 
-These checks block broad claims, not the first Tier 1 implementation:
+- Host-wide containment for Codex, Claude Code, Hermes, OpenClaw, MCP, browser,
+  A2A, OpenAPI.
+- Live provider custody, settlement, facilitator operation, seller middleware.
+- Broad raw sibling inventory for all browser, network, cloud, deploy, database,
+  and shell channels.
 
-- no browser/A2A/OpenAPI gateway-owned path exists for this workflow handle;
-- no Claude Code, Hermes, OpenClaw, or generic MCP runtime smoke has been executed for service workflow admission;
-- no native host containment proof exists;
-- no raw sibling inventory specific to this new handle surface exists until runtime misuse tests are written.
+## Required Runtime Misuse Coverage
+
+- mixed-family dispatch blocks must share one generated execution envelope
+  before they can be recorded as one runtime spine;
+- loops and retries with the same handle;
+- changed observed parameters across retries;
+- dynamic tool construction;
+- stale rendered review or stale admission context;
+- raw sibling x402/auth.md/MCP/browser/network bypass;
+- direct protected mutation attempt without fresh contract;
+- replay after one-use greenlight consumption;
+- proof-gap and isolation propagation.
+- x402/auth.md generated composition as separate exact contracts or refusal,
+  never one composite authority artifact.
+
+## Pass Condition
+
+Runtime may carry projection context into proposal preparation only if the
+resulting protected action still becomes one fresh exact action contract and
+passes policy/gateway gates before mutation.
+
+## Stop Condition
+
+Stop if any runtime path treats Passport, Admission, Handle, Badge, Outcome,
+Certificate, CLI output, MCP resource, or SDK helper as executable grant.

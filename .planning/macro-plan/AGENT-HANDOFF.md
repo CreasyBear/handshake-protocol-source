@@ -2,11 +2,61 @@
 
 ## Objective
 
-Implement the Tier 1/Tier 2 Handshake product simplification program in order, starting with the non-authority service workflow story and surface contract. The user wants the macro plan completed first, then implementation. The first executable slice is deliberately small in code footprint but strict in proof: create the simplified product surface without creating authority.
+Implement the architectural north-star correction: Handshake has one protocol
+authority spine, and product vocabulary is projection/readback over that spine.
+The goal is not another thin plan. It includes research, macro planning,
+implementation, evaluation, sidecar review, full repo gates, and commits.
 
 ## Source Boundary
 
-Read these first, in this order:
+Canon lives in tracked repo docs/source/tests, not `.planning/`. The active
+planning package for this run is
+`.planning/macro-plan/runs/20260525T110908Z-architectural-north-star/` and is
+evidence for this execution only. Prior macro-plan runs are historical context,
+not current closeout proof.
+
+## Runtime Profile
+
+Primary runtime is Codex in a workspace-write checkout with restricted network.
+Use `rg` for discovery and `apply_patch` for edits. Multi-host posture remains
+evidence-only; do not claim native containment for Codex, Claude Code, Hermes,
+OpenClaw, MCP, browser, A2A, OpenAPI, auth.md, or x402.
+
+## Instruction Sources
+
+- `AGENTS.md` for doctrine and invariants.
+- `QUALITY.md` and `STRUCTURE.md` for repo boundaries.
+- `src/*/LANE.md` for lane-local ownership.
+- `.planning/macro-plan/*` for execution plan and gates.
+
+## Context Bundle
+
+The live problem is not whether `src/surfaces` can exist. It can. The problem is
+whether product vocabulary is described as a peer truth lane. Correct model:
+projection/readback surfaces and role-scoped transition clients both sit under
+one protocol authority spine.
+
+## Ignored Context
+
+Do not use older macro-plan validation or prior green tests as current-run
+closeout evidence. Do not use `.planning/` labels in repo-facing source or
+package exports.
+
+## Tool Contract
+
+Allowed: read/patch docs, source, tests, planning artifacts; run focused and
+full repo gates; use sidecars for bounded audit only. Forbidden: protected
+mutations outside user-authorized commands, broad network claims without
+primary sources, and any authority claim not backed by source.
+
+## Protected-Action Boundary
+
+Projection context stops before authority. Every protected action still requires
+`CandidateAction / ActionContract -> PolicyDecision -> one-use Greenlight or
+Refusal -> GatewayCheck -> Receipt / Refusal / ReplayRefusal / ProofGap /
+AuthorityCertificate`.
+
+## Read First
 
 1. `AGENTS.md`
 2. `README.md`
@@ -14,159 +64,113 @@ Read these first, in this order:
 4. `STRUCTURE.md`
 5. `docs/internal/decisions.md`
 6. `docs/internal/protocol-notes.md`
-7. `docs/internal/protocol-layman.md`
+7. `docs/internal/service-workflow-story.md`
 8. `.planning/macro-plan/MACRO-PLAN.md`
 9. `.planning/macro-plan/EXECUTION-SLICES.md`
-10. `.planning/macro-plan/PROTECTED-ACTION-GATES.md`
-11. `.planning/macro-plan/RUNTIME-GATES.md`
+10. `.planning/macro-plan/RUNTIME-GATES.md`
+11. `.planning/macro-plan/PROTECTED-ACTION-GATES.md`
 12. `.planning/macro-plan/TASKS.jsonl`
 
-`.planning/` is scratch except for this active execution handoff. Use it as planning evidence, not repo-facing product truth.
+`.planning/` remains scratch. Do not turn planning labels into repo-facing
+source or package surfaces.
 
-## Runtime Profile
-
-Primary runtime is Codex in a workspace-write checkout with restricted network. Use `apply_patch` for edits. Use `rg` for discovery. Use focused tests before broad gates. Preserve dirty worktree state as user-owned.
-
-Multi-host posture is evidence-only: Codex, Claude Code, Hermes, OpenClaw, MCP, browser, A2A, OpenAPI, auth.md, and x402 do not share one runtime model. Do not claim native containment for any host from this plan.
-
-## Instruction Sources
-
-- `AGENTS.md`: invariant and doctrine.
-- `QUALITY.md`: naming, quality, and boundary gates.
-- `STRUCTURE.md`: source ownership.
-- `docs/internal/*`: current product/protocol canon.
-- `src/*/LANE.md`: lane ownership before source edits.
-- `.planning/macro-plan/*`: execution program and stop conditions.
-
-## Context Bundle
-
-Core product move:
+## North-Star Model
 
 ```text
-Passport -> evidence package the agent presents
-ServiceWorkflowAdmission -> service-side accepted/refused/stale/proof-gap mapping
-ServiceWorkflowHandle -> carried non-authority workflow context
-Action Request -> fresh CandidateAction / ActionContract
-Clearance -> PolicyDecision + one-use Greenlight/Refusal + GatewayCheck
-Outcome -> Receipt / Refusal / ReplayRefusal / ProofGap / AuthorityCertificate
+Projection/readback vocabulary
+  Passport / Admission / Handle / Clearance / Outcome / Certificate
+    over
+One protected-action event spine
+  CandidateAction / ActionContract
+  -> PolicyDecision
+  -> one-use Greenlight or Refusal
+  -> GatewayCheck
+  -> Receipt / Refusal / ReplayRefusal / ProofGap / AuthorityCertificate
 ```
 
-Non-authority IDs:
-
-```text
-passportPackageDigest
-passportPresentationId
-admissionId
-serviceWorkflowHandleId
-serviceWorkflowHandleDigest
-```
-
-All are correlation/reconstruction refs only.
-
-## Ignored Context
-
-Ignore older `.planning/macro/runs/20260525T141206-service-gateway-principal-agent-link/final/*` as a governing source. Treat historical Tier 3 plans as boundary reminders only. Do not use `.planning/` labels in repo-facing source, package scripts, public exports, or canonical docs.
-
-## Tool Contract
+## Active Implementation Scope
 
 Allowed:
 
-- read source, docs, tests, and planning artifacts;
-- edit tracked docs, `src/surfaces`, architecture/product tests, examples, and narrowly related exports when required by the active slice;
-- execute focused quality gates;
-- use up to five subagents only when the user explicitly asks for delegation or sidecar work.
+- patch canonical docs to replace dual-lane mental model with projection over
+  one authority spine;
+- add or update architecture tests for projection-only language;
+- update `src/surfaces/LANE.md` to clarify that surfaces are implementation
+  boundaries for projection/readback, not behavior owners;
+- run focused gates and full repo gates;
+- commit coherent checkpoints.
 
 Forbidden:
 
-- direct protected mutations outside user-authorized shell commands;
-- broad network research unless requested or required for current unstable facts;
-- rewriting protocol kernel state unless a slice proves a distinct enforceable transition;
-- treating CLI, MCP, SDK, runtime ingress, docs, review screens, examples, certificates, passport IDs, or workflow handles as authority.
+- add protocol primitives for Passport, Admission, Handle, Outcome, Badge, or
+  `ProtectedActionEvent`;
+- widen root exports, CLI/MCP authority, SDK role powers, gateway adapters, or
+  hosted claims;
+- treat receipts, certificates, support bundles, review screens, passports, or
+  workflow handles as future permission;
+- claim hosted operation, provider custody, settlement/finality, marketplace
+  certification, cross-org trust, aggregate spend enforcement, host containment,
+  hosted org auth, or retention/search.
 
 ## Subagent Topology
 
-Use sidecars only for non-overlapping review or implementation scopes:
+At most five sidecars:
 
-- product/docs;
-- surface/schema;
-- architecture tests;
-- runtime/agent negative tests;
-- evidence/release gate.
+- architecture/case-study mechanisms;
+- vocabulary/projection language;
+- protected-action lifecycle mapping;
+- runtime/protected-action gates;
+- evidence/review/closeout.
 
-No sidecar owns final authority claims, final plan status, or Tier 3 promotion.
-
-## Protected-Action Boundary
-
-Admission and handle stop before policy. Every protected action still requires:
-
-```text
-CandidateAction
-ActionContract
-PolicyDecision
-one-use Greenlight or Refusal
-GatewayCheckAttempt
-Receipt / Refusal / ProofGap
-```
-
-If a gateway cannot enforce before consequence, this is advisory, not Handshake.
-
-## Checkpoints
-
-- Macro-plan validation: committed.
-- Tier 1 story/schema/tests and docs convergence: committed.
-- Tier 2 active surface alignment, local example, runtime misuse gates, and
-  protected-action fixture gate: committed.
-- Tier 3 admission lock and final release gate: committed after `npm run
-  check:repo`.
-- Before any Tier 3 work: stop and confirm separate hosted workspace or fresh
-  Tier 1/Tier 2 kernel task.
-
-## Stop Conditions
-
-Stop immediately if:
-
-- a Passport, Admission, Badge, or Handle object creates authority;
-- `ServiceWorkflowHandle` is accepted as policy/gateway/signer/mutation evidence;
-- raw credential, token, private key, `PaymentPayload`, or `PAYMENT-SIGNATURE` appears in passport/admission/handle records;
-- a rendered review or docs summary is treated as permission;
-- x402/auth.md fixture work precedes non-authority surface tests;
-- Tier 3 work starts before Tier 1/Tier 2 proof gates close.
+Sidecars may write audit reports only. The chair owns final sequencing, status,
+authority claims, and commits.
 
 ## Evaluation Path
 
-Start narrow:
-
 ```bash
+/Users/joelchan/.codex/skills/gsd-macro-plan/scripts/validate_macro_plan_output.py .planning/macro-plan
 npm run quality:claims
 npm run quality:architecture
+npm run test -- test/architecture/claim-boundary.test.ts test/architecture/workflow-admission-boundary.test.ts
+npm run test -- test/runtime/runtime-ingress.test.ts test/product/service-workflow-admission.test.ts
+npm run check:repo
+git status --short --branch
 ```
 
-Then run focused slices:
+## Stop Conditions
 
-```bash
-npm run test -- test/protocol/kernel-compilation-contract.test.ts test/protocol/kernel-policy-gateway.test.ts test/protocol/evidence-projections.test.ts test/runtime/runtime-ingress.test.ts
-```
+Stop if:
 
-Use `npm run check:repo` before claiming implementation closeout.
+- product vocabulary becomes a peer authority lane;
+- `ServiceWorkflowHandle` can satisfy policy, gateway, signer, mutation,
+  receipt, or certificate requirements;
+- a case-study analogy is used as proof of Handshake capability;
+- Tier 3/hosted pressure expands the kernel/package surface;
+- full repo gate fails and no explicitly justified narrowed closeout exists.
 
 ## Proof Gaps
 
-- No live provider custody, settlement, hosted operation, or native host
-  containment is proven.
-- No marketplace/certification, cross-org trust, aggregate spend enforcement,
-  hosted org auth, retention/search, or hosted mutation authority is proven.
-- auth.md plus x402 remains non-composite provenance/proof-gap posture unless a
-  future fresh action family clears its own gates.
-- Tier 3 remains locked behind a separate hosted workspace or a new Tier 1/Tier
-  2 kernel task with fresh proof gates.
+- No live provider custody, x402 settlement/finality, facilitator operation, or
+  seller middleware is proven.
+- No hosted operation, hosted org auth, retention/search, marketplace trust, or
+  cross-org trust is proven.
+- No native host containment is proven.
+- No finished UI product experience is proven by this architecture correction.
 
 ## Non-Claims
 
-This handoff does not authorize Tier 3, hosted operation, provider custody, settlement finality, marketplace trust, cross-org trust, broad x402 compatibility, aggregate spend enforcement, broad runtime interception, or native host containment.
+This handoff does not authorize Tier 3, hosted operation, provider custody,
+settlement, marketplace trust, cross-org trust, aggregate spend enforcement,
+host containment, or product UX completion.
+
+## Current Next Step
+
+Patch canonical docs and `test/architecture/claim-boundary.test.ts` so the repo
+requires projection-over-spine language and forbids product/protocol peer-lane
+truth claims.
 
 ## Next Agent Step
 
-No Tier 1/Tier 2 simplification slice remains open. If the user opens Tier 3,
-start from the Tier 3 admission lock in `docs/internal/decisions.md` and route
-hosted operation to a separate hosted workspace or a fresh Tier 1/Tier 2 kernel
-task before changing protocol exports.
+Implement NPLAN-002 and NPLAN-003 first: canonical projection vocabulary plus
+`src/surfaces/service-workflow-lifecycle-projections.ts` and its architecture
+test. Do not begin hosted/Tier 3 work.

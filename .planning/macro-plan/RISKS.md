@@ -1,101 +1,62 @@
 # Risks
 
-## RISK-001
+## P0 - Dual-Lane Authority Drift
 
-- ID: RISK-001
-- Severity: Critical
-- Risk: `ServiceWorkflowHandle` becomes reusable auth.
-- Trigger: SDK, CLI, MCP, runtime, or example code accepts a handle as sufficient evidence for protected mutation.
-- Mitigation: Literal false non-authority flags, surface-boundary tests, runtime misuse tests, and fresh action contract requirement.
-- Owner: Surface/schema implementer and architecture-test implementer.
-- Status: Active gate.
+Risk: `product surface` and `protocol kernel` become peer lanes of truth.
 
-## RISK-002
+Mitigation: canonical docs must say projection/readback over one authority
+spine; claim-boundary tests must forbid product/protocol peer-lane claims.
 
-- ID: RISK-002
-- Severity: Critical
-- Risk: Admission is mistaken for policy decision or gateway acceptance.
-- Trigger: Docs or schema use Admission without showing accepted/refused/stale/proof-gap rows and separate clearance state.
-- Mitigation: Use `ServiceWorkflowAdmission`, not standalone `Admission`; require action request and clearance sections in docs and readback.
-- Owner: Product/docs implementer.
-- Status: Active gate.
+Stop condition: any product noun creates, grants, reinterprets, or bypasses
+authority.
 
-## RISK-003
+## P0 - Handle Or Badge As Reusable Auth
 
-- ID: RISK-003
-- Severity: High
-- Risk: Passport digest or presentation ID becomes identity, trust, or spend approval.
-- Trigger: Passport fields are used in policy/gateway checks as sufficient proof rather than evidence refs.
-- Mitigation: Define all passport/admission/handle IDs as correlation and reconstruction only; test they cannot create authority.
-- Owner: Protected-action reviewer.
-- Status: Active gate.
+Risk: generated agents treat `ServiceWorkflowHandle` or badge-like UX as a
+bearer token.
 
-## RISK-004
+Mitigation: schema false flags, workflow-admission tests, runtime misuse tests,
+and forbidden vocabulary rules.
 
-- ID: RISK-004
-- Severity: High
-- Risk: Product simplification becomes metaphor-only documentation.
-- Trigger: Story docs land without source schema, fields, tests, examples, and proof gates.
-- Mitigation: Pair story with surface contract and architecture tests in Tier 1.
-- Owner: Chair.
-- Status: Active gate.
+Stop condition: a handle can satisfy policy, gateway, signer, mutation, receipt,
+certificate, payment, or credential requirements.
 
-## RISK-005
+## P0 - Case-Study Overclaiming
 
-- ID: RISK-005
-- Severity: High
-- Risk: Tier 2 fixture overclaims x402/auth.md external rails.
-- Trigger: Example claims live provider custody, settlement, broad x402 compatibility, auth.md approval, or hosted operation.
-- Mitigation: Local/source-owned fixture first; explicit non-claims; x402/auth.md adapter tests when touched.
-- Owner: Protected-action fixture implementer.
-- Status: Deferred until Tier 2.
+Risk: Stripe/Kubernetes/Vault/GitHub/AWS/SLSA/Vercel/Cloudflare analogies create
+unearned authority claims.
 
-## RISK-006
+Mitigation: research is stored as mechanism rules only; source proof still wins.
 
-- ID: RISK-006
-- Severity: High
-- Risk: Multi-host runtime language becomes containment claim.
-- Trigger: Codex-local evidence is generalized to Claude Code, Hermes, OpenClaw, generic MCP, browser, A2A, or OpenAPI.
-- Mitigation: Runtime posture table and host-specific proof gaps; no native containment claim.
-- Owner: Runtime test implementer.
-- Status: Active gate.
+Stop condition: docs imply Handshake has hosted operation, provider custody,
+settlement, host containment, or marketplace trust because another product has a
+similar concept.
 
-## RISK-007
+## P1 - Surface Folder Name Confusion
 
-- ID: RISK-007
-- Severity: Medium
-- Risk: Architecture tests rely on string scans and miss semantic authority drift.
-- Trigger: Dynamic imports, re-export indirection, or schema aliasing bypasses surface-boundary checks.
-- Mitigation: Combine import-boundary tests, schema assertions, explicit non-authority fields, and product output tests.
-- Owner: Architecture-test implementer.
-- Status: Active gate.
+Risk: `src/surfaces` sounds like a product lane.
 
-## RISK-008
+Mitigation: keep the folder but clarify that it owns projection/readback
+implementation boundaries only.
 
-- ID: RISK-008
-- Severity: Medium
-- Risk: Canonical docs and README diverge into two first-use stories.
-- Trigger: service workflow story lands but README still teaches only x402 install mechanics.
-- Mitigation: Canonical docs convergence slice after source surface and tests.
-- Owner: Docs implementer.
-- Status: Planned.
+Stop condition: surface code evaluates policy, issues greenlights, performs
+gateway checks, mutates, exports receipts, mints certificates, or reads raw
+protocol records.
 
-## RISK-009
+## P1 - ProtectedActionEvent Object Creep
 
-- ID: RISK-009
-- Severity: High
-- Risk: Tier 3 starts before Tier 1/Tier 2 proof gates close.
-- Trigger: Hosted-workspace pressure turns local simplification into hosted operation or package-surface expansion.
-- Mitigation: Tier 3 lock slice and final repo gate; feed any kernel need back into Tier 1/Tier 2.
-- Owner: Release gate owner.
-- Status: Active gate.
+Risk: a useful lifecycle concept becomes a duplicated protocol primitive.
 
-## RISK-010
+Mitigation: keep it documentation/testing-only in this run and map to existing
+protocol navigation/action-attempt lifecycle evidence.
 
-- ID: RISK-010
-- Severity: Medium
-- Risk: The first implementation grows into broad SDK/CLI/MCP redesign.
-- Trigger: Developer ergonomics work expands before surface contract proves the model.
-- Mitigation: Implementation starts with story, surface schema, and boundary test only; Tier 2 convergence follows after gates.
-- Owner: Chair.
-- Status: Active gate.
+Stop condition: new stored event object, package export, gateway input, or
+policy input is introduced without a separate transition proposal.
+
+## P1 - Tier 3 Kernel Creep
+
+Risk: hosted-product needs use the simplified vocabulary to widen kernel exports
+or package surfaces.
+
+Mitigation: preserve hosted admission lock and route hosted operation to a
+separate workspace or fresh pre-hosted kernel task.

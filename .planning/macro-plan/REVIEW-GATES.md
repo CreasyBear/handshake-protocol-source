@@ -1,76 +1,129 @@
 # Review Gates
 
+## Invariant At Stake
+
+The chair owns final authority claims. Sidecars can pressure-test, but they
+cannot promote a plan to ready or declare implementation complete.
+
 ## Gate Summary
 
-| Gate | Evidence | Status |
-| --- | --- | --- |
-| CEO | Buyer story and economic unit reviewed in macro-map lens | Keep language, contain it |
-| Engineering | Source placement and tests reviewed in macro-map lens | Surface first, no protocol primitive |
-| Design | User mental model reviewed in macro-map lens | State separation required |
-| DevEx | First-use path and docs/SDK/CLI/MCP reviewed in macro-map lens | Converge surfaces after schema |
-| Agent | Generated-agent misuse reviewed in macro-map lens | Handle misuse tests required |
-| Runtime | Multi-host posture reviewed in macro-map lens | Host-specific proof gaps required |
-| Protected Action | Authority and gateway boundary reviewed in macro-map lens | Non-authority matrix required |
-| Evidence | Macro-plan validation and proof gaps | Validator and sidecar reconciliation required |
+The review system must reject three failure classes:
+
+- architectural drift back into dual product/protocol authority lanes;
+- product vocabulary that becomes identity, permission, reusable auth, receipt
+  substitute, or gateway shortcut;
+- evidence that proves planning effort but not source-owned mechanism.
+
+The plan can be promoted only when every gate below either passes with current
+evidence or records a named proof gap that does not undermine the next slice.
 
 ## Sidecar Review
 
-Sidecar audits are expected under `.planning/macro-plan/runs/20260525T095940Z-tier1-tier2-product-simplification/audits/`:
+At most five sidecars:
 
-- `slices.md`
-- `protected-action.md`
-- `runtime-agent.md`
-- `evidence.md`
-- `product-devex-design.md`
-
-All five sidecar reports are present. The chair reconciled them by narrowing implementation readiness to the first Tier 1 story/schema/test slice. Protected-action fixture work, multi-host runtime claims, public-surface convergence, and Tier 3 remain gated until their source proof exists. Sidecar findings can add gates, risks, and task details; they cannot authorize weaker authority claims.
-
-| Report | Chair Reconciliation |
+| Report | Scope |
 | --- | --- |
-| `audits/slices.md` | Full-program slices are captured in `EXECUTION-SLICES.md`; implementation starts only after macro validation. |
-| `audits/protected-action.md` | Field-level matrix and negative-test requirements are captured in `PROTECTED-ACTION-GATES.md`; protected-action fixtures stay gated. |
-| `audits/runtime-agent.md` | Host-specific posture and generated-execution stress gates are captured in `RUNTIME-GATES.md`; no generic multi-host execution claim. |
-| `audits/evidence.md` | Validator result and status reconciliation are recorded in `EVIDENCE-PLAN.md` and run-local `validation.md`. |
-| `audits/product-devex-design.md` | 10-star product criteria and convergence plan are captured in execution slices and tasks; public ergonomics wait for source schema/tests. |
+| `architecture-case-study-audit.md` | Mechanism quality and case-study misuse |
+| `product-vocabulary-projection-audit.md` | Product vocabulary and dual-lane language |
+| `protected-action-lifecycle-audit.md` | Lifecycle/projection mapping |
+| `runtime-protected-action-gates-audit.md` | Runtime misuse and protected-action gates |
+| `evidence-review-gates-audit.md` | Evidence, validation, review, and commit closeout |
+
+The chair has accepted the sidecar reports as pressure inputs, not authority.
+Resolved findings must appear in docs/source/tests. Unresolved findings remain
+explicit proof gaps in `RISKS.md`, `blocked-checks.md`, or validation closeout.
 
 ## CEO Gate
 
-Pass condition: the buyer story centers on protected-event clearing and reconstruction, not passport validation as authority. Passport validation may be free/open adoption plumbing. Paid value remains protected-event terminalization, retention/readback/export, and gateway readiness.
+Question: does this make the product smaller, harder, sharper, and easier to
+adopt without broadening the wedge?
 
-Fail condition: the product sells trusted agents, reusable badges, passport permissions, marketplace certification, settlement, cross-org trust, or hosted clearing before proof.
+Pass condition: the correction makes Handshake legible as protected-action
+infrastructure for one cleared event lifecycle. It must not sell dashboards,
+identity, agent trust, hosted clearing, marketplace certification, generic
+observability, or approval theatre as the product.
 
 ## Engineering Gate
 
-Pass condition: first implementation lives in `docs/internal`, `src/surfaces`, and architecture/product tests. It does not add `src/protocol/areas/passport`, protocol object registry entries, gateway adapter authority, root authority exports, or store migrations.
+Question: can the mechanism be enforced and tested from source?
 
-Fail condition: source placement makes a surface noun look like protocol state without a distinct enforceable transition.
+Pass condition: there is one protocol authority spine, source-owned projection
+mapping, focused tests for non-authority product nouns, and no widened package
+exports, protocol primitives, gateway adapters, CLI/MCP authority, or hosted
+claims. Any `sdk.policy`-like role client must be named as transition transport
+under custody, not as a product authority surface.
 
 ## Design Gate
 
-Pass condition: the user-facing model separates Passport evidence, Service Admission, Workflow Handle, Action Request, Clearance, Gateway Check, and Outcome. The review surface does not show one approval badge over mixed states.
+Question: does simplification hide protocol complexity without lying about
+authority?
 
-Fail condition: admission review is substituted for exact action-contract review. This is review theatre.
+Pass condition: Passport, Admission, Handle, Clearance, Outcome, and
+Certificate can make the workflow understandable while their copy and schemas
+explicitly say they do not create authority. Badge-like language is cut unless
+it is a read-only state label derived from evidence.
 
 ## DevEx Gate
 
-Pass condition: README, protocol-layman docs, role-client guidance, CLI/MCP descriptions, and examples teach the simplified flow while preserving non-authority flags and proof gaps.
+Question: can a builder integrate the narrow wedge without learning the entire
+protocol internals?
 
-Fail condition: developers receive a badge/handle API before learning that every protected action requires fresh clearance.
+Pass condition: docs and demos teach proposal, evidence, readback, refusal, and
+proof gap as product-facing concepts, while directing protected mutation through
+the existing kernel/gateway state machine. No setup path asks a developer to
+invent authority semantics.
 
 ## Agent Gate
 
-Pass condition: agent handoff and tests cover loops, retries, branches, dynamic tool construction, stale review, changed params, raw siblings, replay, proof gaps, and isolation.
+Question: can a fresh agent resume without chat memory and without turning
+planning into canon?
 
-Fail condition: generated code can pass a handle into an unwrapped consequential tool. The generated code escaped the contract boundary.
+Pass condition: `AGENT-HANDOFF.md`, `TASKS.jsonl`, and run-local evidence are
+sufficient to start the next mechanism. `.planning/` remains derived evidence;
+repo-facing truth lands only in canon docs, source, tests, and examples.
 
 ## Runtime Gate
 
-Pass condition: runtime posture is host-specific. Codex, Claude Code, Hermes, OpenClaw, MCP, browser, A2A, OpenAPI, auth.md, and x402 are not collapsed into one runtime claim.
+Question: does generated execution remain bounded under loops, retries,
+branches, sibling calls, stale handles, and dynamic tool pressure?
 
-Fail condition: host profiles, MCP visibility, OpenAPI routes, or A2A metadata are treated as enforcement.
+Pass condition: runtime/protected-action tests prove same-envelope composition
+or refusal, x402/auth.md non-composition, replay refusal, stale context
+refusal, and proof-gap readback. Runtime handles may carry proposal context but
+cannot authorize mutation.
 
 ## Protected-Action Gate
 
-Pass condition: the field-level matrix proves admission and handle cannot create authority, policy decisions, greenlights, gateway checks, signer use, payment material, mutation, receipts, certificates, or resource widening. x402/auth.md remain exact per-event rails.
+Question: is there still exactly one enforceable authority boundary?
 
-Fail condition: one admission or handle can authorize multiple mutations. This is ambient authority wearing a badge.
+Pass condition: every consequential action reaches a fresh exact contract,
+policy decision, one-use greenlight/refusal, gateway check, and terminal
+receipt/refusal/proof gap/certificate posture. No product noun can skip,
+cache, reuse, or summarize that boundary into authority.
+
+## Chair Review Checklist
+
+- Does the plan preserve one authority spine?
+- Are product nouns projections/readbacks only?
+- Do docs avoid product/protocol peer-lane claims?
+- Do tests fail if peer-lane language returns?
+- Does any source change widen package exports, protocol primitives, CLI/MCP
+  authority, SDK role powers, gateway adapters, or hosted claims?
+- Are official case studies translated into mechanisms with URLs?
+- Are residual proof gaps explicit?
+
+## Code Review Gate
+
+Before final closeout, inspect the diff for:
+
+- overbroad docs rewrites;
+- repo-facing planning labels;
+- new authority-shaped nouns;
+- accidental package export churn;
+- claim-boundary tests that merely bless prose without guarding source risk.
+
+## Promotion Rule
+
+`READY_FOR_AGENT_EXECUTION` means a bounded agent can execute the next slice. It
+does not mean hosted/Tier 3 can start and does not mean the architecture is
+complete until implementation and full gates pass.

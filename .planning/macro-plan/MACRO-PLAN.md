@@ -2,200 +2,293 @@
 
 ## Invariant At Stake
 
-Tier 1 and Tier 2 product simplification may hide protocol complexity from users, but it must not hide authority. A user can see a clean flow, an agent can carry a workflow handle, and a service can accept standing evidence, but no Passport, Admission, Badge, Handle, Certificate, review screen, or ID can become identity, permission, reusable auth, policy approval, gateway acceptance, signer permission, receipt export, terminal certification, or mutation authority.
+Handshake must not split into product truth and protocol truth. Product
+vocabulary may make service intake legible, but it must be a non-authority
+projection/readback over one protected-action event spine.
 
-The protected-action invariant remains exact:
+The single authority spine remains:
 
 ```text
-standing evidence
--> service-side admission/readback
--> bounded workflow context
--> fresh protected-action request
--> exact ActionContract
+CandidateAction / ActionContract
 -> PolicyDecision
 -> one-use Greenlight or Refusal
 -> GatewayCheck before mutation
 -> Receipt / Refusal / ReplayRefusal / ProofGap / AuthorityCertificate
 ```
 
+Passport, Admission, Handle, Clearance, Outcome, Certificate, Badge-like labels,
+review screens, CLI output, MCP resources, SDK helpers, demos, and support
+bundles can only project, request, or read this spine. They cannot create a peer
+lane that authorizes, reinterprets, or bypasses it.
+
 ## Source Boundary
 
 | Source | Role | Status |
 | --- | --- | --- |
-| `.planning/macro-map/MACRO-HANDOFF.md` | Handoff from Passport / Admission / Badge macro map | Decision-gated, now user-authorized for full planning |
-| `.planning/macro-map/MACRO-MAP.md` | Selected macro move and non-proofs | Derived planning evidence |
-| `.planning/macro-map/FACET-MAP.md`, `views/*.md` | CEO, ENG, DESIGN, DEVEX, AGENT, RUNTIME, AUTHORITY pressure | Independent lens evidence |
-| `.planning/macro-map/MECHANISM-MAP.md`, `EXECUTION-MAP.md`, `EXPERIENCE-MAP.md`, `AGENT-RUNTIME-MAP.md`, `PROTECTED-ACTION-MAP.md` | Mechanism, sequencing, experience, runtime, and authority maps | Required plan inputs |
-| `.planning/codebase/ARCHITECTURE.md`, `STRUCTURE.md`, `CONVENTIONS.md`, `TESTING.md`, `CONCERNS.md`, `INTEGRATIONS.md`, `STACK.md` | Placement, testing, conventions, proof gaps, integrations, and package posture | Derived evidence; source-check during implementation |
-| `README.md`, `QUALITY.md`, `STRUCTURE.md` | Package posture, quality language, source ownership | Canon |
-| `docs/internal/decisions.md`, `docs/internal/protocol-notes.md` | Product kernel, proof ledger, expansion admission, current protocol notes | Canon |
-| `docs/internal/protocol-definition.md`, `docs/internal/protocol-kernel-architecture.md`, `docs/internal/protocol-layman.md` | Definition, architecture, and plain-language translation | Canon |
-| `.planning/macro-plan/runs/20260525T095940Z-tier1-tier2-product-simplification/*` | Input packet, source snapshot, blocked checks, sidecar audits, validation | Current run evidence |
+| `.planning/macro-map/MACRO-HANDOFF.md` | Passport / Admission / Badge macro map | Derived planning input, decision-gated but user-authorized for correction |
+| `.planning/macro-map/*` | Lens maps, concerns, decisions, tasks | Derived planning evidence |
+| `.planning/codebase/*` | Repo architecture, testing, integrations, concerns | Derived evidence; source-check before canon |
+| `.planning/macro-plan/runs/20260525T110908Z-architectural-north-star/*` | Current input, research, snapshot, sidecar audits, validation | Current run evidence |
+| `AGENTS.md`, `README.md`, `QUALITY.md`, `STRUCTURE.md` | Doctrine, orientation, quality, structure | Canon |
+| `docs/internal/decisions.md`, `protocol-notes.md`, `protocol-layman.md`, `service-workflow-story.md` | Product/protocol canon and plain translation | Canon |
+| `src/protocol`, `src/surfaces`, `src/runtime`, `src/cli`, `src/mcp`, `examples/service-workflow-admission`, `test/*` | Source-owned behavior and proof gates | Mechanism truth |
+
+## Research Mechanisms
+
+Primary-source research is recorded in
+`.planning/macro-plan/runs/20260525T110908Z-architectural-north-star/research.md`.
+The imported mechanisms are:
+
+- Stripe PaymentIntents: one lifecycle object with explicit statuses and
+  idempotency, not multiple truth lanes.
+- Kubernetes Admission / OPA: request-time chokepoints and rejection before
+  persistence or mutation.
+- Vault: custody, leases, renewal, revocation, and audit; handles do not become
+  raw secret material.
+- GitHub deployment environments: protection rules before execution proceeds.
+- AWS IAM: default deny and explicit deny overriding convenience.
+- SLSA / artifact attestations: provenance and certificates are terminal
+  evidence, not future permission.
+- Vercel / Cloudflare: product copy names scope and method; verification is
+  repeated instead of assuming stale context remains valid.
+
+These are mechanisms only. They do not prove Handshake hosted operation,
+provider custody, marketplace trust, or host containment.
 
 ## Current Evidence
 
-The current kernel already has the protected-action authority spine: exact contracts, policy decisions, one-use greenlights/refusals, gateway checks, receipts, refusals, proof gaps, isolation, and terminal certificates. Canonical docs make product surfaces non-authority by definition. Runtime ingress is proposal-only. MCP is proposal/evidence-only. CLI and SDK surfaces are role-scoped but do not infer authority from evidence reads. Gateway adapters mutate only after verified gateway evidence.
-
-The macro map converges on the same architectural conclusion: do not add a Passport protocol primitive; do not make Admission a policy decision; do not make Badge reusable auth. The right product simplification is a surface/readback layer that translates standing evidence into service workflow admission, then forces every protected action into fresh clearance.
-
-The codebase map points to `src/surfaces` as the first implementation home. It also names the verification lanes: claim-boundary tests, naming-posture tests, surface-boundary posture tests, protocol compilation/policy/gateway tests, runtime-ingress tests, and product/demo tests when examples change.
+- The existing protocol kernel already owns exact contracts, policy decisions,
+  one-use greenlights/refusals, gateway checks, receipts, refusals, proof gaps,
+  isolation, and terminal certificates.
+- The existing service workflow admission schema already hard-codes
+  non-authority boundaries for admission and handle records.
+- Sidecar audits found the right source shape but unsafe vocabulary pressure:
+  `product surface` is overloaded, `sdk.policy` is currently named as an
+  authority surface, product projection terms lack one source-owned lifecycle
+  map, and runtime composition needs same-envelope/non-composition gates.
+- The current run has primary-source research, source snapshot, blocked checks,
+  and five sidecar audits under
+  `runs/20260525T110908Z-architectural-north-star/`.
 
 ## Non-Proofs
 
-This plan does not prove live x402 provider custody, settlement finality, seller middleware, facilitator operation, broad x402 compatibility, hosted operation, external registry lookup, marketplace trust, cross-org passport trust, native host containment, browser-side control, aggregate spend enforcement, provider-grade auth.md credential lifecycle, or Tier 3 hosted product readiness.
-
-It also does not prove that users will interpret Badge correctly. The plan resolves that by using `ServiceWorkflowHandle` as the source/API noun and treating Badge as optional narrative copy only. User-facing simplicity must come from state separation and explicit non-authority fields, not from a magical noun.
+This plan does not prove live x402 provider custody, settlement/finality,
+facilitator operation, seller middleware, marketplace trust, cross-org trust,
+aggregate spend enforcement, hosted operation, hosted org auth,
+retention/search, broad runtime containment, or user comprehension of the
+projection vocabulary.
 
 ## Selected Macro Move
 
-Build a two-tier simplification program:
+Replace "dual product/protocol lanes" with this architecture:
 
 ```text
-Tier 1: Source-owned non-authority surface contract
-  -> service workflow story
-  -> ServiceWorkflowAdmission / ServiceWorkflowHandle schema
-  -> non-authority ID fields
-  -> architecture and claim-boundary guards
-  -> docs and plain-language convergence
-
-Tier 2: Activation and readback convergence
-  -> SDK/CLI/MCP/example surfaces use the same model
-  -> generated-agent and runtime misuse gates
-  -> local fixture connects admitted workflow context to one fresh x402 exact action request
-  -> receipt/refusal/proof-gap readback remains event-specific
-  -> Tier 3 remains blocked until proof gates pass or proof gaps are explicit
+Projection vocabulary
+  Passport / ServiceWorkflowAdmission / ServiceWorkflowHandle / Clearance / Outcome
+    over
+ProtectedActionEvent lifecycle
+  exact contract -> policy/refusal -> one-use greenlight -> gateway check -> terminal evidence
+    enforced by
+Gateway-owned mutation adapters and protocol kernel transitions
+    reconstructed through
+Receipts, refusals, proof gaps, isolation, terminal certificates, and support bundles
 ```
 
-The five non-authority ID fields are part of the surface contract only:
+The repo may keep `src/surfaces` as an implementation folder, but canonical docs
+must split three concepts:
+
+- product projection/readback surfaces: non-authority surfaces for service
+  workflow, evidence, reports, demos, and copy;
+- role-scoped protocol transition clients: SDK/HTTP clients that transport a
+  specific protocol transition under custody and kernel/gateway authority;
+- the protocol authority spine: the only place that creates policy decisions,
+  one-use greenlights/refusals, gateway checks, receipts, refusals, proof gaps,
+  isolation, and terminal certificates.
+
+None of these are peer product/protocol truth lanes. Product projection
+surfaces never create authority. Role-scoped transition clients do not make
+product nouns authoritative; they are transport into the protocol authority
+spine.
+
+## Execution Thesis
+
+The correction succeeds by making projection subordinate to protocol authority
+in both language and mechanism:
+
+1. Canonical docs name one protected-action event spine.
+2. Source owns a service-workflow lifecycle projection map under `src/surfaces`.
+3. Architecture tests require product vocabulary to remain projection/readback.
+4. Runtime/protected-action tests prove mixed-family and x402/auth.md
+   composition cannot blur authority contexts.
+5. Review and evidence gates distinguish planning proof from execution proof.
+
+## Ten-Star Success Criteria
+
+- Exactly one authority spine is named and enforced in docs, source, and tests.
+- Product nouns are explicitly projection/readback nouns, never authority nouns.
+- Canonical docs no longer imply product/protocol peer lanes.
+- `ServiceWorkflowAdmission` and `ServiceWorkflowHandle` remain schema-level
+  non-authority records.
+- A source-owned service workflow lifecycle projection map ties Passport,
+  Admission, Handle, Clearance, Outcome, and Certificate to existing lifecycle
+  entries or explicit pre-contract evidence context.
+- Passport IDs remain correlation/reconstruction fields only.
+- Badge remains forbidden as a schema/protocol/export noun; if it appears, it is
+  read-only state label language only.
+- Case-study research is captured as mechanism rules with source URLs.
+- Runtime misuse remains covered for loops, retries, stale handles, dynamic
+  tools, raw sibling bypass, stale review, replay, and proof gaps.
+- Mixed-family runtime blocks either share one execution envelope or fail before
+  being projected as one runtime spine.
+- x402/auth.md composition remains separate exact contracts or refusal; no
+  composite credential-plus-payment authority artifact is created.
+- Hosted/Tier 3 remains blocked unless a separate hosted workspace or fresh
+  pre-hosted kernel task proves the missing gates.
+- A fresh agent can resume from `AGENT-HANDOFF.md` without chat memory.
+
+## Execution Slices
+
+This package decomposes the correction into:
 
 ```text
-passportPackageDigest
-passportPresentationId
-admissionId
-serviceWorkflowHandleId
-serviceWorkflowHandleDigest
+N0 - Research and macro-plan reset
+N1 - Canonical projection-over-spine language
+N2 - ProtectedActionEvent projection mapping
+N3 - Architecture guards against dual-lane drift
+N4 - Runtime/protected-action regression gates
+N5 - Review, validation, full repo gate, and commit closeout
 ```
 
-Each field must carry `createsAuthority: false` at the surface-object level and must not satisfy policy, gateway, signer, mutation, receipt, or certificate requirements.
+Each slice is detailed in `EXECUTION-SLICES.md` and assigned in `TASKS.jsonl`.
+
+## Non-Goals
+
+- Do not add a new protocol primitive for Passport, Admission, Handle, Outcome,
+  Certificate, Badge, or `ProtectedActionEvent` unless a separate source-owned
+  transition proposal proves a new enforceable state.
+- Do not remove `src/surfaces`; correct its meaning instead.
+- Do not widen package exports, CLI/MCP authority, SDK role powers, gateway
+  adapters, or hosted claims.
+- Do not claim live provider custody, x402 settlement, facilitator operation,
+  seller middleware, marketplace certification, cross-org trust, aggregate spend
+  enforcement, native host containment, hosted org auth, or retention/search.
+- Do not treat the case studies as evidence that Handshake already has their
+  enforcement properties.
+
+## Target State
+
+Canon says:
+
+```text
+Product vocabulary is projection/readback over one protected-action event spine.
+The protocol kernel remains the source-owned authority state machine.
+Projection surfaces expose proposal, context, evidence, and readback only.
+```
+
+Source/tests prove:
+
+- The service workflow schema cannot create authority.
+- Canonical docs must contain projection-over-spine wording.
+- Canonical docs must not describe product/protocol as peer authority lanes.
+- Product vocabulary cannot appear in protocol areas or root authority exports
+  as a shortcut.
+- Runtime handles can assist proposal context only; each protected action still
+  creates a fresh exact contract and reaches a fresh policy/gateway boundary.
+
+## Decisions
+
+- Keep `src/surfaces` as a source-owned implementation boundary.
+- Rename the mental model from `product surface vs protocol kernel` to
+  `projection/readback surface over protocol authority spine`.
+- Use `ProtectedActionEvent` as a documentation/testing lifecycle concept
+  source-owned through a `src/surfaces` projection map. Do not create a stored
+  protocol object yet.
+- Keep Passport as presentation evidence, Admission as service-side mapping,
+  Handle as context/readback reference, Clearance as fresh protected-action path,
+  and Outcome as terminal readback projection.
+- Treat Badge as unsafe shorthand unless explicitly marked as a read-only state
+  label derived from evidence.
+
+## Risks And Proof Gaps
+
+- The word `surface` is entrenched in code. The mitigation is explicit docs and
+  tests saying surface means projection/readback implementation boundary.
+- `Admission` remains overloaded with HTTP admission and service workflow
+  admission. The mitigation is explicit naming and tests that block policy/gate
+  implications.
+- Product UX is not solved by this slice. The result is source-owned
+  architecture and proof language, not a finished app front door.
+- Hosted/Tier 3 pressure remains a kernel-creep risk and stays blocked.
+
+## Blocking Concerns
+
+These are accepted-risk items for executing this correction plan only. They are
+not accepted as product truth, hosted claims, or release-complete posture. Each
+P0/P1 below is either assigned to an execution slice or preserved as a proof gap
+until source/tests prove the mechanism.
+
+- P0: `product surface` remains overloaded until canonical docs split product
+  projection/readback surfaces from role-scoped protocol transition clients.
+- P0: `sdk.policy` and similar clients must not be named authority surfaces;
+  they must be framed as custody-scoped transport into kernel transitions.
+- P0: product projection terms need a source-owned lifecycle projection map or
+  docs remain the only guard.
+- P0: mixed-family runtime blocks must prove one execution envelope or refuse.
+- P0: x402/auth.md composition must not produce one composite authority object.
+- P1: full product UX is still not implemented; this run corrects architecture
+  and source-owned projection semantics.
+
+## Verification Gates
+
+- Macro-plan validator:
+  `/Users/joelchan/.codex/skills/gsd-macro-plan/scripts/validate_macro_plan_output.py .planning/macro-plan`
+- Focused claim/architecture gates:
+  `npm run quality:claims`
+  `npm run quality:architecture`
+  `npm run test -- test/architecture/claim-boundary.test.ts test/architecture/workflow-admission-boundary.test.ts`
+- Runtime/product regression where touched:
+  `npm run test -- test/runtime/runtime-ingress.test.ts test/product/service-workflow-admission.test.ts`
+- Closeout:
+  `npm run format:check`
+  `npm run check:repo`
+
+## Runtime And Protected-Action Summary
+
+Runtime posture remains evidence-only. Codex, Claude Code, Hermes, OpenClaw,
+MCP, browser, A2A, OpenAPI, auth.md, and x402 do not share one containment
+model. Runtime ingress may record generated-execution evidence and propose
+contracts only.
+
+Protected-action posture remains one event at a time. Projection vocabulary may
+help prepare context, but every consequential action still requires a fresh
+exact contract, policy/refusal, one-use greenlight when allowed, gateway check
+before mutation, and terminal receipt/refusal/replay/proof-gap/certificate
+evidence. x402/auth.md composition and mixed-family dispatches are blocking
+runtime gates until focused tests prove separation or refusal.
+
+## Long-Running End Condition
+
+The run is complete only when research, macro plan, implementation, evaluation,
+sidecar/review evidence, and git commits all support one conclusion: Handshake
+has one protocol authority spine, and product vocabulary is projection/readback
+over that spine.
+
+## Handoff To Phase Planning
+
+Detailed phase work starts from `EXECUTION-SLICES.md` and `TASKS.jsonl`, not
+from chat memory. The first implementation slice is canonical docs plus
+claim-boundary guards. The second implementation slice source-owns the service
+workflow lifecycle projection map under `src/surfaces`. Runtime P0 gates follow
+before closeout. Fresh agents must read `AGENT-HANDOFF.md`,
+`RUNTIME-GATES.md`, `PROTECTED-ACTION-GATES.md`, and sidecar audits before
+editing.
+
+## Smallest Next Mechanism
+
+Install a source-owned `Product Vocabulary Is Projection Only` guard in
+canonical docs and `test/architecture/claim-boundary.test.ts`, then run the
+focused claim/architecture gates before touching broader examples.
 
 ## Plan Status
 
 `READY_FOR_AGENT_EXECUTION`
-
-The executable claim is narrow: a bounded agent can start the first implementation slice from `AGENT-HANDOFF.md` without chat-only context. This status does not mean all Tier 1/Tier 2 work is implemented, and it does not mean Tier 3 can start. Former decision-gated concerns are resolved into implementation gates: the user accepted a full plan plus implementation sequence, while non-authority, runtime, protected-action, evidence, and review checks remain required stop conditions.
-
-## Execution Thesis
-
-The simplification succeeds by changing the user’s first model, not by changing the authority spine.
-
-The user should see:
-
-```text
-Show Passport -> Service Admission -> Workflow Handle -> Request Clearance -> Read Outcome
-```
-
-The implementation must still preserve:
-
-```text
-Evidence refs -> CandidateAction -> ActionContract -> PolicyDecision -> one-use Greenlight/Refusal -> GatewayCheck -> Receipt/Refusal/ProofGap
-```
-
-Tier 1 creates the non-authority model and proves it cannot create authority. Tier 2 connects that model to activation, runtime, and example surfaces so developers do not meet raw protocol internals first. Tier 3 stays locked until the local/source-owned simplification path is coherent.
-
-## Non-Goals
-
-- Do not add `Passport`, `Admission`, `Badge`, or `ServiceWorkflowHandle` as protocol primitives.
-- Do not widen `OperatingEnvelope.allowedResources` from a passport or handle.
-- Do not let a handle become a bearer token, greenlight, gateway pass, credential ref, signer input, payment payload, receipt, certificate, or mutation command.
-- Do not claim hosted operation, provider custody, settlement, marketplace trust, cross-org trust, native host containment, aggregate spend enforcement, live provider verification, or Tier 3 readiness.
-- Do not turn `.planning/` artifacts into repo-facing source names, package scripts, public exports, or canonical docs.
-- Do not build a full x402/auth.md live demo before surface non-authority gates exist.
-
-## Target State
-
-Tier 1 target state:
-
-- `docs/internal/service-workflow-story.md` explains Passport, Service Admission, Workflow Handle, Action Request, Clearance, and Outcome in plain language.
-- `src/surfaces/service-workflow-admission.ts` defines `ServiceWorkflowAdmission` and `ServiceWorkflowHandle` as non-authority product-surface records.
-- Tests prove the new surface cannot create or satisfy policy, greenlight, gateway check, mutation, receipt, certificate, signer use, payment material, raw credentials, or resource widening.
-- Canonical docs use the simplified flow without overclaiming.
-
-Tier 2 target state:
-
-- README first-use, protocol-layman docs, SDK role-client guidance, CLI/MCP descriptions, and examples converge on the same simplified flow.
-- A local example emits JSON and Markdown for service workflow admission and a fresh x402 action request path.
-- Runtime and generated-agent negative cases cover loops, retries, branches, dynamic tool construction, stale review, changed observed parameters, raw sibling bypass, replay, proof gaps, and isolation.
-- Product tests prove admission/readback and protected-action outcome evidence remain separate.
-
-## Decisions
-
-- Accept `Passport` as a docs/story input noun only.
-- Accept `ServiceWorkflowAdmission` as the source/API surface output noun.
-- Accept `ServiceWorkflowHandle` as the carried workflow context noun.
-- Treat `Badge` as optional narrative shorthand only; do not make it a schema, protocol, export, or route noun.
-- Split non-authority IDs into `passportPackageDigest`, `passportPresentationId`, `admissionId`, `serviceWorkflowHandleId`, and `serviceWorkflowHandleDigest`.
-- Keep the first implementation in docs, `src/surfaces`, architecture tests, and product tests before any x402/auth.md fixture expansion.
-- Keep Tier 3 blocked until Tier 1/Tier 2 gates are verified or explicitly recorded as proof gaps.
-
-## Blocking Concerns
-
-The plan carries strict implementation gates:
-
-- Non-authority flags are mandatory on admission and handle objects.
-- The handle must not be accepted as policy, gateway, signer, mutation, receipt, or certificate evidence.
-- Multi-host runtime posture must stay host-specific and proof-gap aware.
-- Source placement must remain outside protocol areas unless a future source-owned transition proves a new enforceable state.
-- Product docs must include exact fields, failure states, and proof gates; metaphor-only docs are insufficient.
-- Protected-event terminalization remains the economic unit; passport validation is adoption plumbing, not the bought authority claim.
-
-## Runtime And Protected-Action Summary
-
-Runtime posture:
-
-| Target | Evidence | Posture |
-| --- | --- | --- |
-| Codex | Existing local profile/readiness and MCP proposal evidence | Strongest local profile; no host-wide containment claim |
-| Claude Code | Managed/profile parity artifacts in current x402 protected-tool lane | Profile evidence only |
-| Hermes | Tool-packet/profile artifact | Profile evidence only |
-| OpenClaw | Tool-packet/profile artifact | Profile evidence only |
-| MCP | Local proposal/evidence server and read-only resources | Proposal/readback only |
-| x402 | One buyer-side exact per-call local proof lane | Protected-action family; no live provider/settlement claim |
-| auth.md | Provenance and credential-custody evidence profile | Evidence and future protected API call family |
-| Browser, A2A, OpenAPI | Operation, route, and side-channel evidence contexts | Proof-gap surfaces until gateway-owned path exists |
-
-Protected-action posture: the first Tier 2 fixture may connect an admitted workflow handle to one `x402_payment.exact` action request, but only after the handle is proven non-authority. The handle may help populate context and evidence refs. It cannot skip candidate action, exact contract, policy, one-use greenlight/refusal, gateway check, or terminal readback.
-
-## Verification Gates
-
-- Execute `npm run quality:claims` after canonical docs or public language changes.
-- Execute `npm run quality:architecture` after source surfaces, naming, exports, CLI, MCP, SDK, or adapter posture changes.
-- Execute the focused protocol simplification slice when proposal/evidence/readback paths change: `npm run test -- test/protocol/kernel-compilation-contract.test.ts test/protocol/kernel-policy-gateway.test.ts test/protocol/evidence-projections.test.ts test/runtime/runtime-ingress.test.ts`.
-- Execute product/demo tests after adding the service workflow example.
-- Execute `npm run format:check` and `npm run check:repo` before claiming implementation closeout.
-- Validate this macro-plan package with `/Users/joelchan/.codex/skills/gsd-macro-plan/scripts/validate_macro_plan_output.py .planning/macro-plan`.
-
-## Risks And Proof Gaps
-
-Primary risk: the friendly product layer becomes authority-shaped. The mitigation is schema-level non-authority flags, architecture gates, product tests, runtime negative cases, and refusal/proof-gap readback.
-
-Secondary risk: Tier 2 tries to prove too much too early. The mitigation is a local/source-owned fixture first, explicit non-claims, and no live-provider or hosted claim until a separate evidence packet proves it.
-
-Long-run risk: Tier 3 pressure causes kernel/package creep. The mitigation is a hard gate: Tier 3 may consume the simplified Tier 1/Tier 2 surface only after source gates pass; if Tier 3 needs kernel changes, those return as separate Tier 1/Tier 2 work.
-
-## Handoff To Phase Planning
-
-Detailed phase planning should start from `EXECUTION-SLICES.md`, not from chat memory. Slice T1-01 is the first implementation step: create the internal story doc and source-owned surface contract skeleton in a way that is immediately testable. Slice T1-02 and T1-03 add the strict schema and guard tests. Tier 2 slices begin only after Tier 1 gates pass.
-
-Fresh agents must read `AGENT-HANDOFF.md`, `PROTECTED-ACTION-GATES.md`, `RUNTIME-GATES.md`, and `TASKS.jsonl` before editing source. They must source-open named files before implementation and preserve user-owned dirty state.
-
-## Smallest Next Mechanism
-
-Implement the Tier 1 surface spine:
-
-```text
-docs/internal/service-workflow-story.md
-src/surfaces/service-workflow-admission.ts
-test/architecture/workflow-admission-boundary.test.ts
-```
-
-The story and schema must define the five non-authority IDs, require fresh action contracts for protected events, and prove the surface cannot create authority.
