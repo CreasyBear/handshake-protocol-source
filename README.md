@@ -121,7 +121,10 @@ it uses real local MCP stdio proposal/evidence proof;
 `npm run demo:aps` writes `examples/x402-protected-spend/output/latest.md` and
 is not hosted operation, not broad x402 compatibility; `npm run demo:adapter-sdk`
 writes `examples/external-adapter-sdk/output/latest.md` and is not policy evaluation,
-not gateway check, not mutation.
+not gateway check, not mutation;
+`npm run demo:service-workflow-admission` writes
+`examples/service-workflow-admission/output/latest.md` and is admission readback
+plus handle context only, not clearance or authority.
 
 No adapter family defines the protocol. This package is not broad x402
 compatibility, not live provider custody, hosted mutation authority, production

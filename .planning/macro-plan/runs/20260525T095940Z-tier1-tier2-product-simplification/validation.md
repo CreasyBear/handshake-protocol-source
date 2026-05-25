@@ -59,3 +59,23 @@ git diff --check
 ```
 
 Open next slice: MPLAN-007 / T2-02 local service workflow admission example.
+
+T2-02 landed a runnable local `service-workflow-admission` example that
+validates one admission/handle packet, composes the existing x402 protected
+spend demo as the separate fresh-clearance path, and writes JSON plus Markdown
+readback. It did not introduce a new protocol primitive, gateway fixture,
+policy evaluator, signer path, mutation runner, public root export, hosted
+operation claim, provider custody claim, settlement claim, or handle-as-
+permission behavior. Verified gates:
+
+```bash
+npm run test -- test/product/service-workflow-admission.test.ts
+npm run test -- test/product/service-workflow-admission.test.ts test/product/x402-protected-spend-demo-report.test.ts
+npm run check:types
+npm run quality:architecture
+npm run quality:claims
+npm run format:check
+git diff --check
+```
+
+Open next slice: MPLAN-008 / T2-03 generated-agent and runtime misuse tests.

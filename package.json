@@ -87,6 +87,7 @@
     "test": "bun test",
     "demo:self-hosted": "bun run ./examples/self-hosted-activation/run.ts",
     "demo:aps": "bun run ./examples/x402-protected-spend/run.ts",
+    "demo:service-workflow-admission": "bun run ./examples/service-workflow-admission/run.ts",
     "demo:adapter-sdk": "bun run ./examples/external-adapter-sdk/run.ts",
     "demo:x402-tool-profiles": "bun run ./examples/x402-protected-tool-profiles/run.ts",
     "demo:mcp-transcript": "bun run ./examples/mcp-reference-transcript/run.ts",
