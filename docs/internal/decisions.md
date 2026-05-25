@@ -43,6 +43,7 @@ Shared product/protocol vocabulary:
 
 - `protocol kernel`: the source-owned state machine and schemas for exact contracts, policy decisions, one-use greenlights, gateway checks, receipts, refusals, proof gaps, isolation, and terminal certificates.
 - `product surface`: CLI, MCP, SDK, docs, demo, or service-facing readback surfaces that expose proposal/evidence/readback without creating authority.
+- `ServiceWorkflowAdmission` and `ServiceWorkflowHandle`: non-authority product-surface records for presented evidence, service-side admission status, correlation, and readback context. They do not create identity, policy decisions, greenlights, gateway checks, mutations, receipts, certificates, reusable auth, signer use, or spend approval; each protected action still requires a fresh exact action contract.
 - `AuthorityCertificate`: verifiable terminal evidence for one event. The certificate is terminal evidence, not permission, identity, settlement, hosted trust, or reusable auth.
 - Distribution is separate from authority. Public npm availability does not create authority, and MCP Registry discoverability remains a proof gap until verified.
 

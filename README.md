@@ -19,6 +19,23 @@ exposes proposal/evidence without creating authority. Public npm availability
 does not create authority. MCP Registry discoverability remains a proof gap
 until registry acceptance and lookup are verified.
 
+First-use product surfaces should teach the service workflow as:
+
+```text
+Show Passport
+-> ServiceWorkflowAdmission
+-> ServiceWorkflowHandle
+-> Request Clearance for one protected action
+-> Read Outcome
+```
+
+`Passport` means a presented evidence package, not identity or reusable auth.
+`ServiceWorkflowAdmission` means service-side accepted/refused/stale/proof-gap
+mapping, not policy. `ServiceWorkflowHandle` means correlation and readback
+context only, not permission. Each protected action still requires a fresh exact
+action contract, policy decision, one-use greenlight or refusal, and gateway
+check before mutation.
+
 Package: `handshake-protocol-kernel@0.2.7`. MCP name:
 `io.github.CreasyBear/handshake-protocol-kernel`. Runtime: Node.js `>=20`.
 License: Apache-2.0. Published package repository form: package artifact repository, not source mirror.

@@ -29,6 +29,45 @@ certificate. A product surface is the CLI, MCP, SDK, docs, demo, or
 service-facing readback that exposes proposal and evidence without creating
 authority.
 
+## The Service Workflow Surface
+
+The simple service-facing story is:
+
+```text
+Show Passport
+-> ServiceWorkflowAdmission
+-> ServiceWorkflowHandle
+-> Request Clearance
+-> Read Outcome
+```
+
+That story hides protocol detail from the user. It does not hide authority.
+
+`Passport` is the evidence bundle the agent shows a service. It is not identity,
+trust, permission, spend approval, signer access, or reusable auth.
+
+`ServiceWorkflowAdmission` is the service's accepted, refused, stale, or
+proof-gap mapping of that presented evidence. It is not a policy decision,
+greenlight, gateway check, receipt, certificate, or mutation permission.
+
+`ServiceWorkflowHandle` is a workflow context reference the agent can carry for
+correlation and readback. It is not a badge, bearer token, retry permission,
+x402 payment approval, auth.md credential, gateway pass, or receipt export.
+
+The surface may carry these IDs:
+
+```text
+passportPackageDigest
+passportPresentationId
+admissionId
+serviceWorkflowHandleId
+serviceWorkflowHandleDigest
+```
+
+Those IDs help reconstruct which bundle was shown and which workflow context was
+used. They do not authorize action. Every protected action still starts with a
+fresh exact work order.
+
 ## The Work Order
 
 A vague request is not enough.

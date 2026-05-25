@@ -20,6 +20,12 @@ Handshake's category is protected actions for automated decision making.
   refusals, proof gaps, isolation, and terminal certificates.
 - A product surface is CLI, MCP, SDK, docs, demo, or service-facing readback that
   exposes proposal/evidence/readback without creating authority.
+- The service workflow story is a product-surface translation only:
+  `Passport -> ServiceWorkflowAdmission -> ServiceWorkflowHandle -> fresh
+protected-action clearance -> terminal outcome`. Passport, admission, and
+  handle records are evidence/readback context; they are not identity, policy,
+  greenlight, gateway check, mutation permission, receipt export, terminal
+  certificate, or reusable auth.
 - The certificate is terminal evidence, not permission, identity, settlement,
   hosted trust, or reusable auth.
 - Public npm availability does not create authority. MCP Registry

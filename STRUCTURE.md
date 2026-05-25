@@ -100,6 +100,7 @@ src/
   surfaces/
     boundary-manifest.ts
     outcome.ts
+    service-workflow-admission/
   index.ts
   experimental.ts
   worker.ts
