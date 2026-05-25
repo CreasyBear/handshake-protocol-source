@@ -119,6 +119,8 @@ describe("package surface", () => {
     );
     expect(pkg.scripts["check:repo"]).toContain("npm run build && npm run check:types");
     expect(pkg.scripts["check:repo"]).toContain("npm run pack:check");
+    expect(pkg.scripts["release:admin:check"]).toBe("node scripts/check-release-admin.js");
+    expect(pkg.scripts["release:admin:check:remote"]).toBe("node scripts/check-release-admin.js --remote-readback");
   });
 
   it("keeps MCP registry metadata synchronized and non-authority", () => {

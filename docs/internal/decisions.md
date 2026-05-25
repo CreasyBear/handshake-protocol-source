@@ -637,3 +637,15 @@ A public source repository would expose source; it still would not create
 policy decisions, greenlights, gateway checks, mutations, certificates, hosted
 operation, or MCP Registry discoverability. Public npm availability remains
 distribution only and does not create authority.
+
+Release administration must run through `npm run release:admin:check` before
+artifact pushes, GitHub release creation, repository metadata edits, or launch
+claims. The gate is intentionally separate from normal CI: it clones source into
+a clean temporary checkout, installs from lockfile, runs `npm run check:repo`,
+projects the package-artifact repository, verifies the artifact boundary and
+pinned Trusted Publishing workflow, and smokes artifact imports plus CLI. It
+does not publish to npm, create GitHub releases, change repository metadata,
+create authority, create policy decisions, issue greenlights, perform gateway
+checks, mutate protected surfaces, or register MCP discoverability. Use
+`npm run release:admin:check:remote` after source and artifact pushes when
+remote ref readback is required before launch-admin metadata work.
