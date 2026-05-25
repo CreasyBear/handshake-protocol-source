@@ -15,12 +15,16 @@ Handshake's category is protected actions for automated decision making.
 - Product language centers on the cleared protected-action event: one terminal
   Handshake event with reconstructable evidence that a service can accept,
   refuse, or treat as a proof gap.
-- The protocol kernel is the source-owned state machine and schema set for exact
-  contracts, policy decisions, one-use greenlights, gateway checks, receipts,
-  refusals, proof gaps, isolation, and terminal certificates.
-- A product surface is CLI, MCP, SDK, docs, demo, or service-facing readback that
-  exposes proposal/evidence/readback without creating authority.
-- The service workflow story is a product-surface translation only:
+- The protocol kernel is the source-owned authority state machine and schema
+  set for exact contracts, policy decisions, one-use greenlights, gateway
+  checks, receipts, refusals, proof gaps, isolation, and terminal certificates.
+- A product surface is a projection/readback surface such as CLI, MCP, docs,
+  demo, or service-facing readback that exposes proposal/evidence/readback
+  without creating authority.
+- Role-scoped protocol transition clients, including SDK policy and gateway
+  clients, transport specific kernel transitions under custody. They are not
+  product authority surfaces and do not make product nouns authoritative.
+- The service workflow story is a projection/readback translation only:
   `Passport -> ServiceWorkflowAdmission -> ServiceWorkflowHandle -> fresh
 protected-action clearance -> terminal outcome`. Passport, admission, and
   handle records are evidence/readback context; they are not identity, policy,

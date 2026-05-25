@@ -28,6 +28,7 @@ import {
   runtimeIngressEvidenceRefs,
   signingSecretForDispatch,
   supportedGrammarVersionForBlock,
+  type RuntimeIngressFamilyConfig,
   type RuntimeIngressConfig,
 } from "./families";
 import { runtimeIngressDispatchNodeId } from "./node-ids";
@@ -37,6 +38,7 @@ import {
   type ParsedRuntimeIngressObservedDispatch,
   type RuntimeIngressDispatchBlock,
 } from "./schemas";
+import { runtimeIngressFamilyIdForDispatchKind, type RuntimeIngressFamilyId } from "./registry";
 export { RuntimeIngressDispatchBlockSchema, RuntimeIngressObservedDispatchSchema } from "./schemas";
 export { runtimeIngressDispatchNodeId } from "./node-ids";
 export type { RuntimeIngressConfig } from "./families";
@@ -173,6 +175,7 @@ export async function proposeRuntimeIngressActionContracts(
   blockValue: RuntimeIngressDispatchBlock,
 ): Promise<RuntimeIngressResult> {
   const block = RuntimeIngressDispatchBlockSchema.parse(blockValue);
+  assertRuntimeIngressSameEnvelope(config, block);
   const runtimeExecution = await protocol.createRuntimeExecution(
     await buildRuntimeIngressExecutionInput(config, block),
   );
@@ -530,6 +533,56 @@ function unsupportedReasonCodesForDispatch(dispatch: ParsedRuntimeIngressObserve
 
 function runtimeIngressDispatchRefusalReasonCodes(block: ParsedRuntimeIngressDispatchBlock): string[] {
   return unique(block.dispatches.flatMap((dispatch) => dispatchSpecificRefusalReasonCodes(dispatch)));
+}
+
+const runtimeIngressSameEnvelopeFields = [
+  "tenantId",
+  "organizationId",
+  "principalId",
+  "agentId",
+  "runId",
+  "runtimeAdapterId",
+  "operatingEnvelopeId",
+  "gatewayRegistryRef",
+] as const satisfies readonly (keyof RuntimeIngressFamilyConfig)[];
+
+function assertRuntimeIngressSameEnvelope(
+  config: RuntimeIngressConfig,
+  block: ParsedRuntimeIngressDispatchBlock,
+): void {
+  const familyConfigs = uniqueRuntimeIngressFamilyConfigs(config, block);
+  if (familyConfigs.length <= 1) return;
+
+  const base = familyConfigs[0];
+  if (!base) return;
+  for (const candidate of familyConfigs.slice(1)) {
+    for (const field of runtimeIngressSameEnvelopeFields) {
+      if (candidate.config[field] !== base.config[field]) {
+        throw new Error(
+          [
+            "Runtime ingress mixed-family dispatch block requires one same-envelope projection.",
+            `${candidate.familyId} config ${field} does not match ${base.familyId}.`,
+            "Split the generated execution block into separate protected-action proposals or align the execution envelope before projection.",
+          ].join(" "),
+        );
+      }
+    }
+  }
+}
+
+function uniqueRuntimeIngressFamilyConfigs(
+  config: RuntimeIngressConfig,
+  block: ParsedRuntimeIngressDispatchBlock,
+): { familyId: RuntimeIngressFamilyId; config: RuntimeIngressFamilyConfig }[] {
+  const familyConfigs = new Map<RuntimeIngressFamilyId, RuntimeIngressFamilyConfig>();
+  for (const dispatch of block.dispatches) {
+    const familyId = runtimeIngressFamilyIdForDispatchKind(dispatch.dispatchKind);
+    if (!familyId) throw new Error(`Runtime ingress dispatch family is not registered: ${dispatch.dispatchKind}`);
+    if (!familyConfigs.has(familyId)) {
+      familyConfigs.set(familyId, runtimeConfigForDispatch(config, dispatch));
+    }
+  }
+  return [...familyConfigs].map(([familyId, familyConfig]) => ({ familyId, config: familyConfig }));
 }
 
 async function createFinalizedToolCallDraft(

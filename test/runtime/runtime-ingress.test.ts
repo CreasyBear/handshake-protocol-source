@@ -19,6 +19,7 @@ import {
 } from "../../src/runtime";
 import { runtimeIngressFamilyRegistry } from "../../src/runtime/ingress/registry";
 import { futureIso, makeKernelFixture, registerFixtureObjects } from "../support/fixtures";
+import { authMdRuntimeConfig, authMdRuntimeDispatch, installedAuthMdKernel } from "../support/auth-md-flow";
 import { packageInstallRuntimeConfig } from "../support/package-install-flow";
 
 const x402Digest = `sha256:${"9".repeat(64)}` as const;
@@ -439,13 +440,13 @@ describe("runtime ingress adapter", () => {
     await expectNoRuntimeAuthorityRecords(fixture.store);
   });
 
-  it("retains mixed-family grammar while routing each dispatch through its family config", async () => {
-    const { fixture, x402RuntimeConfig, x402Proposal } = await installedMixedIngressFixture();
+  it("retains mixed-family grammar only when every dispatch config shares one execution envelope", async () => {
+    const { fixture, packageRuntimeConfig, x402RuntimeConfig, x402Proposal } = await installedMixedIngressFixture();
 
     const result = await proposeRuntimeIngressActionContracts(
       fixture.kernel,
       {
-        packageInstall: packageInstallRuntimeConfig(fixture),
+        packageInstall: packageRuntimeConfig,
         x402Payment: x402RuntimeConfig,
       },
       {
@@ -475,6 +476,89 @@ describe("runtime ingress adapter", () => {
     expect(result.proposals[1]?.actionContract?.requiredPriorActionContractIds).toEqual([packageActionContractId]);
     expect(await recordCount(fixture.store, "action_contract")).toBe(2);
     await expectNoRuntimeAuthorityRecords(fixture.store);
+  });
+
+  it("rejects mixed-family dispatch blocks with different envelopes before recording runtime evidence", async () => {
+    const { fixture, packageRuntimeConfig, x402RuntimeConfig, x402Proposal } = await installedMixedIngressFixture();
+
+    await expect(
+      proposeRuntimeIngressActionContracts(
+        fixture.kernel,
+        {
+          packageInstall: { ...packageRuntimeConfig, operatingEnvelopeId: "env_different_runtime_block" },
+          x402Payment: x402RuntimeConfig,
+        },
+        {
+          principalIntentRef: "intent:install package and fetch paid context through mismatched envelopes",
+          generatedCodeOrSpecRef: "runtime:dispatch-block-mixed-envelope-mismatch",
+          dispatchBoundaryRef: "dispatch-boundary:mixed-envelope-mismatch",
+          dispatches: [
+            {
+              dispatchKind: "wrapped_package_install",
+              dispatchRef: "dispatch:package-install:mixed-mismatch",
+              package: "hono",
+              versionRange: "^4.12.19",
+            },
+            x402Dispatch(
+              x402Proposal,
+              "dispatch:x402-payment:mixed-mismatch",
+              upstreamX402DispatchBinding(x402Proposal),
+            ),
+          ],
+        },
+      ),
+    ).rejects.toThrow("Runtime ingress mixed-family dispatch block requires one same-envelope projection.");
+
+    expect(await recordCount(fixture.store, "runtime_execution")).toBe(0);
+    expect(await recordCount(fixture.store, "generated_execution_graph")).toBe(0);
+    expect(await recordCount(fixture.store, "action_contract")).toBe(0);
+    await expectNoRuntimeAuthorityRecords(fixture.store);
+  });
+
+  it("refuses x402 plus auth.md composition with separate envelopes instead of creating composite authority", async () => {
+    const authFixture = await installedAuthMdKernel();
+    const x402Proposal = await compileX402InstallProposal(validX402InstallInput());
+    const x402Records = requireX402Records(x402Proposal);
+    await authFixture.kernel.putCatalogObject({ objectType: "tool_capability", payload: x402Records.toolCapability });
+    await authFixture.kernel.putCatalogObject({ objectType: "action_type", payload: x402Records.actionType });
+    await authFixture.kernel.putCatalogObject({
+      objectType: "gateway_registry_entry",
+      payload: x402Records.gatewayRegistryEntry,
+    });
+    await authFixture.kernel.putCatalogObject({
+      objectType: "operating_envelope",
+      payload: x402Records.operatingEnvelope,
+    });
+    const x402CredentialRef = await registerX402WalletCredentialRef(authFixture.kernel, x402Proposal, x402Records);
+    const x402AuthorityRef = await registerX402DelegatedAuthorityRef(authFixture.kernel, x402Proposal, x402Records);
+
+    await expect(
+      proposeRuntimeIngressActionContracts(
+        authFixture.kernel,
+        {
+          authMdProtectedApiCall: authMdRuntimeConfig(authFixture),
+          x402Payment: x402RuntimeConfigFor(x402Proposal, x402Records, x402CredentialRef, x402AuthorityRef),
+        },
+        {
+          principalIntentRef: "intent:pay and call credentialed API through one generated block",
+          generatedCodeOrSpecRef: "runtime:dispatch-block-x402-auth-md-composite",
+          dispatchBoundaryRef: "dispatch-boundary:x402-auth-md-composite",
+          dispatches: [
+            x402Dispatch(
+              x402Proposal,
+              "dispatch:x402-payment:auth-md-composite",
+              upstreamX402DispatchBinding(x402Proposal),
+            ),
+            authMdRuntimeDispatch(authFixture, "dispatch:auth-md:composite"),
+          ],
+        },
+      ),
+    ).rejects.toThrow("Runtime ingress mixed-family dispatch block requires one same-envelope projection.");
+
+    expect(await recordCount(authFixture.store, "runtime_execution")).toBe(0);
+    expect(await recordCount(authFixture.store, "generated_execution_graph")).toBe(0);
+    expect(await recordCount(authFixture.store, "action_contract")).toBe(0);
+    await expectNoRuntimeAuthorityRecords(authFixture.store);
   });
 
   it("propagates x402 body and provider posture into the exact runtime contract", async () => {
@@ -1087,35 +1171,65 @@ async function installedMixedIngressFixture() {
   });
   await fixture.kernel.putCatalogObject({ objectType: "operating_envelope", payload: x402Records.operatingEnvelope });
   const x402CredentialRef = await registerX402WalletCredentialRef(fixture.kernel, x402Proposal, x402Records);
-  const x402AuthorityRef = await registerX402DelegatedAuthorityRef(fixture.kernel, x402Proposal, x402Records);
+  const mixedEnvelope = {
+    ...fixture.envelope,
+    envelopeId: "env_mixed_runtime_ingress",
+    objectiveRef: "intent:install package and fetch paid context",
+    allowedActionClasses: ["package.install", "x402_payment.exact"],
+    allowedGateways: [fixture.gateway.gatewayId, x402Records.gatewayRegistryEntry.gatewayId],
+    allowedResources: ["npm:hono", x402Proposal.resourceRef],
+    evidenceRequirements: ["package_lock_diff", "x402_payment_required"],
+  };
+  await fixture.kernel.putCatalogObject({ objectType: "operating_envelope", payload: mixedEnvelope });
+  const x402AuthorityRef = await registerX402DelegatedAuthorityRef(fixture.kernel, x402Proposal, {
+    ...x402Records,
+    operatingEnvelope: mixedEnvelope,
+  });
+  const packageRuntimeConfig = {
+    ...packageInstallRuntimeConfig(fixture),
+    operatingEnvelopeId: mixedEnvelope.envelopeId,
+  };
   return {
     fixture,
     x402Proposal,
+    packageRuntimeConfig,
     x402RuntimeConfig: {
-      tenantId: x402Proposal.tenantId,
-      organizationId: x402Proposal.organizationId,
-      principalId: x402Records.operatingEnvelope.principalId,
-      agentId: x402Records.operatingEnvelope.agentId,
-      runId: "run_demo",
-      runtimeAdapterId: x402Records.toolCapability.runtimeAdapterId,
-      operatingEnvelopeId: x402Records.operatingEnvelope.envelopeId,
-      toolCatalogRef: `${x402Records.toolCapability.toolCatalogId}@${x402Records.toolCapability.toolCatalogVersion}`,
-      actionCatalogRef: `${x402Records.actionType.actionCatalogId}@${x402Records.actionType.actionCatalogVersion}`,
-      gatewayRegistryRef: `gateway_registry@${x402Records.gatewayRegistryEntry.gatewayRegistryVersion}`,
-      gatewayReadinessRef: "handshake://local/x402/gateway-readiness.json",
-      gatewayReadinessDigest: x402Digest,
-      policyVersionRef: `${x402Proposal.policyPackRef}@${x402Proposal.policyPackVersion}`,
-      policyVersionDigest: x402Digest,
-      toolCapabilityId: x402Records.toolCapability.toolCapabilityId,
-      actionTypeId: x402Records.actionType.actionTypeId,
-      gatewayRegistryEntryId: x402Records.gatewayRegistryEntry.gatewayRegistryEntryId,
-      gatewayId: x402Records.gatewayRegistryEntry.gatewayId,
-      gatewayCredentialBinding: x402WalletGatewayCredentialBindingFor(x402CredentialRef),
-      delegatedAuthorityBinding: x402DelegatedSpendAuthorityBindingFor(x402AuthorityRef),
-      maxAtomicAmountPerCall: x402Proposal.spendBounds.maxAtomicAmountPerCall,
-      contractExpiresAt: futureIso(),
-      signingSecret: "test-secret",
+      ...x402RuntimeConfigFor(x402Proposal, x402Records, x402CredentialRef, x402AuthorityRef),
+      operatingEnvelopeId: mixedEnvelope.envelopeId,
     },
+  };
+}
+
+function x402RuntimeConfigFor(
+  proposal: X402InstallProposal,
+  records: NonNullable<X402InstallProposal["compiledRecords"]>,
+  credentialRef: GatewayCredentialRef,
+  authorityRef: DelegatedAuthorityRef,
+) {
+  return {
+    tenantId: proposal.tenantId,
+    organizationId: proposal.organizationId,
+    principalId: records.operatingEnvelope.principalId,
+    agentId: records.operatingEnvelope.agentId,
+    runId: "run_demo",
+    runtimeAdapterId: records.toolCapability.runtimeAdapterId,
+    operatingEnvelopeId: records.operatingEnvelope.envelopeId,
+    toolCatalogRef: `${records.toolCapability.toolCatalogId}@${records.toolCapability.toolCatalogVersion}`,
+    actionCatalogRef: `${records.actionType.actionCatalogId}@${records.actionType.actionCatalogVersion}`,
+    gatewayRegistryRef: `gateway_registry@${records.gatewayRegistryEntry.gatewayRegistryVersion}`,
+    gatewayReadinessRef: "handshake://local/x402/gateway-readiness.json",
+    gatewayReadinessDigest: x402Digest,
+    policyVersionRef: `${proposal.policyPackRef}@${proposal.policyPackVersion}`,
+    policyVersionDigest: x402Digest,
+    toolCapabilityId: records.toolCapability.toolCapabilityId,
+    actionTypeId: records.actionType.actionTypeId,
+    gatewayRegistryEntryId: records.gatewayRegistryEntry.gatewayRegistryEntryId,
+    gatewayId: records.gatewayRegistryEntry.gatewayId,
+    gatewayCredentialBinding: x402WalletGatewayCredentialBindingFor(credentialRef),
+    delegatedAuthorityBinding: x402DelegatedSpendAuthorityBindingFor(authorityRef),
+    maxAtomicAmountPerCall: proposal.spendBounds.maxAtomicAmountPerCall,
+    contractExpiresAt: futureIso(),
+    signingSecret: "test-secret",
   };
 }
 

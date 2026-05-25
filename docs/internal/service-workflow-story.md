@@ -1,8 +1,8 @@
 # Service Workflow Story
 
-This story is a product surface over the existing protocol kernel. It makes the
-first-use path easier to understand, but it does not create a new authority
-primitive.
+This story is a product projection/readback surface over the existing protocol
+authority spine. It makes the first-use path easier to understand, but it does
+not create a new authority primitive or a peer product truth lane.
 
 ## Plain Flow
 

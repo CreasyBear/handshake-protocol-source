@@ -2,15 +2,21 @@
 
 ## Authority owner
 
-Shared boundary manifests for SDK, CLI, MCP, and other non-kernel product surfaces.
+Shared boundary manifests, service workflow projection maps, and non-authority
+outcomes for projection/readback surfaces.
 
 ## Current proof claim
 
-This lane records source-owned surface posture only. It does not create protocol authority, route behavior, SDK behavior, CLI behavior, MCP behavior, or gateway enforcement.
+This lane records source-owned projection posture only. It does not create
+protocol authority, route behavior, SDK behavior, CLI behavior, MCP behavior,
+or gateway enforcement.
 
 ## Use cases
 
-Give architecture tests one canonical contract for surface ids, custody roles, allowed route families, forbidden route families, forbidden imports, forbidden credential shapes, required non-authority flags, and claim-boundary labels.
+Give architecture tests one canonical contract for surface ids, custody roles,
+allowed route families, forbidden route families, forbidden imports, forbidden
+credential shapes, required non-authority flags, service workflow lifecycle
+projection mapping, and claim-boundary labels.
 
 ## Constraints and assumptions
 
@@ -18,7 +24,21 @@ Surface manifests are guardrails for implementation and review. The protocol ker
 
 ## Core components
 
-`boundary-manifest.ts` defines the shared surface boundary table consumed by architecture tests. `activation-gate.ts` defines the evidence-scoped activation verdict report, required success criteria, and blocking anti-patterns used to decide whether local proof can unblock later operated-surface work. `product-launch-gate-resolution.ts` defines selected, raised-bar, blocked, and cut-line launch gate decisions so product gates cannot remain vague planning branches. `release-proof.ts` defines public distribution release-state evidence for package readiness, publication, registry discoverability, proof gaps, and authority non-claims. `x402-protected-tool-acceptance.ts` defines the production acceptance matrix for the first protected-tool product path as a release-admission contract, not policy or gateway behavior.
+`boundary-manifest.ts` defines the shared surface boundary table consumed by
+architecture tests. `service-workflow-lifecycle-projections.ts` maps Passport,
+ServiceWorkflowAdmission, ServiceWorkflowHandle, Clearance, Outcome, and
+AuthorityCertificate to pre-contract context or existing lifecycle entries
+without creating a protocol primitive. `activation-gate.ts` defines the
+evidence-scoped activation verdict report, required success criteria, and
+blocking anti-patterns used to decide whether local proof can unblock later
+operated-surface work. `product-launch-gate-resolution.ts` defines selected,
+raised-bar, blocked, and cut-line launch gate decisions so product gates cannot
+remain vague planning branches. `release-proof.ts` defines public distribution
+release-state evidence for package readiness, publication, registry
+discoverability, proof gaps, and authority non-claims.
+`x402-protected-tool-acceptance.ts` defines the production acceptance matrix for
+the first protected-tool product path as a release-admission contract, not
+policy or gateway behavior.
 
 ## Failure and scale posture
 

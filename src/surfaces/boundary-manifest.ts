@@ -68,7 +68,7 @@ export const surfaceAuthorityPostures = [
   "evidence_only",
   "setup_only",
   "transport_only",
-  "policy_authority",
+  "policy_transition_transport",
 ] as const;
 
 export type SurfaceAuthorityPosture = (typeof surfaceAuthorityPostures)[number];
@@ -298,7 +298,7 @@ export const surfaceBoundaryManifest = {
     status: "active",
     plane: "operator",
     custodyRole: "control_plane",
-    authorityPosture: "policy_authority",
+    authorityPosture: "policy_transition_transport",
     sourceRoots: ["src/sdk/surface-clients/policy-client.ts", "src/sdk/surface-clients/transport.ts"],
     allowedRouteFamilies: ["policy_decision_write"],
     forbiddenRouteFamilies: [
@@ -361,7 +361,7 @@ export const surfaceBoundaryManifest = {
       rawInternalRecordIncluded: false,
       receiptExportCreated: false,
     },
-    claimBoundaryLabels: [...sharedClaimBoundaries, "policy_authority_is_not_gateway_execution"],
+    claimBoundaryLabels: [...sharedClaimBoundaries, "policy_transition_transport_is_not_gateway_execution"],
   },
   "sdk.adapter": {
     id: "sdk.adapter",

@@ -41,8 +41,9 @@ Builder-buyer product language centers on a cleared protected-action event: one 
 
 Shared product/protocol vocabulary:
 
-- `protocol kernel`: the source-owned state machine and schemas for exact contracts, policy decisions, one-use greenlights, gateway checks, receipts, refusals, proof gaps, isolation, and terminal certificates.
-- `product surface`: CLI, MCP, SDK, docs, demo, or service-facing readback surfaces that expose proposal/evidence/readback without creating authority.
+- `protocol kernel`: the source-owned authority state machine and schemas for exact contracts, policy decisions, one-use greenlights, gateway checks, receipts, refusals, proof gaps, isolation, and terminal certificates.
+- `product surface`: projection/readback surfaces such as CLI, MCP, docs, demos, or service-facing readbacks that expose proposal/evidence/readback without creating authority.
+- `role-scoped protocol transition client`: an SDK or HTTP client that transports a specific kernel transition under custody. It is not a product authority surface and does not make product nouns authoritative.
 - `ServiceWorkflowAdmission` and `ServiceWorkflowHandle`: non-authority product-surface records for presented evidence, service-side admission status, correlation, and readback context. They do not create identity, policy decisions, greenlights, gateway checks, mutations, receipts, certificates, reusable auth, signer use, or spend approval; each protected action still requires a fresh exact action contract.
 - `AuthorityCertificate`: verifiable terminal evidence for one event. The certificate is terminal evidence, not permission, identity, settlement, hosted trust, or reusable auth.
 - Distribution is separate from authority. Public npm availability does not create authority, and MCP Registry discoverability remains a proof gap until verified.
@@ -50,11 +51,11 @@ Shared product/protocol vocabulary:
 The current kernel centers on protected action control:
 
 ```text
-exact action contract
+CandidateAction / exact action contract
 -> exact policy decision
--> one-use gateway-bound greenlight
+-> one-use gateway-bound greenlight or refusal
 -> gateway check before mutation
--> receipt, refusal, or proof gap
+-> receipt, refusal, replay refusal, proof gap, or optional terminal certificate
 ```
 
 The first official wedge is one buyer-side `x402_payment.exact` per-call

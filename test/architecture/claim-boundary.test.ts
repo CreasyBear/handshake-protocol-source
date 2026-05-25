@@ -101,6 +101,7 @@ describe("claim boundary", () => {
     const protocolArchitecture = readFileSync("docs/internal/protocol-kernel-architecture.md", "utf8");
     const protocolLayman = readFileSync("docs/internal/protocol-layman.md", "utf8");
     const protocolNotes = readFileSync("docs/internal/protocol-notes.md", "utf8");
+    const serviceWorkflowStory = readFileSync("docs/internal/service-workflow-story.md", "utf8");
     const x402Walkthrough = readFileSync("examples/x402-protected-spend/README.md", "utf8");
     const httpLane = readFileSync("src/http/LANE.md", "utf8");
     const runtimeLane = readFileSync("src/runtime/LANE.md", "utf8");
@@ -143,6 +144,28 @@ describe("claim boundary", () => {
           /auth\.md authorizes mutation/i,
           /MCP protects all tools/i,
           /npm package creates hosted enforcement/i,
+        ],
+      },
+      {
+        label: "projection over one authority spine",
+        sources: [
+          { name: "README.md", text: readme },
+          { name: "STRUCTURE.md", text: structure },
+          { name: "docs/internal/decisions.md", text: decisions },
+          { name: "docs/internal/protocol-notes.md", text: protocolNotes },
+          { name: "docs/internal/service-workflow-story.md", text: serviceWorkflowStory },
+          { name: "src/surfaces/LANE.md", text: readFileSync("src/surfaces/LANE.md", "utf8") },
+        ],
+        requiredPatterns: [
+          /projection\/readback/i,
+          /protocol\s+(?:authority spine|authority state machine|kernel)/i,
+          /without creating authority|not create authority|does not create/i,
+        ],
+        forbiddenPatterns: [
+          /product (?:truth|authority) lane (?:owns|creates|authorizes)/i,
+          /creates? (?:a )?peer product truth lane/i,
+          /product surface (?:creates|mints|issues) authority/i,
+          /role-scoped protocol transition clients? (?:are|become) product authority surfaces/i,
         ],
       },
       {

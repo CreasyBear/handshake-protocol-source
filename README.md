@@ -13,13 +13,16 @@ permission.
 Category: protected actions for automated decision making; certificate is terminal evidence, not permission.
 
 Core terms: a `cleared protected-action event` is one terminal event with
-reconstructable evidence; the `protocol kernel` is the state machine and schema
-set; a `product surface` is CLI, MCP, SDK, docs, demo, or service readback that
-exposes proposal/evidence without creating authority. Public npm availability
+reconstructable evidence; the `protocol kernel` is the only authority state
+machine and schema set; a `product surface` is a projection/readback surface
+such as CLI, MCP, docs, demo, or service readback that exposes
+proposal/evidence without creating authority. Role-scoped protocol transition
+clients, such as SDK policy or gateway clients, transport specific kernel
+transitions under custody; they are not product authority surfaces. Public npm availability
 does not create authority. MCP Registry discoverability remains a proof gap
 until registry acceptance and lookup are verified.
 
-First-use product surfaces should teach the service workflow as:
+First-use product projection/readback surfaces should teach the service workflow as:
 
 ```text
 Show Passport
@@ -97,7 +100,8 @@ and redacted evidence readback. The package root still exposes the lower-level
 `HandshakeClient`, but first-slice activation should teach role-scoped clients
 first. `InstallClient` performs one server-side setup commit, not hosted
 installation authority. `PolicyClient.evaluatePolicy()` evaluates one exact
-action contract; it cannot perform the gateway check or mutate.
+action contract through the protocol authority spine; it is not a product
+surface, cannot perform the gateway check, and cannot mutate.
 
 Use `adapter-sdk` for third-party protected-action adapter packs and
 install-proposal shape review. It is definition-only: not an install client, not
@@ -127,9 +131,10 @@ not gateway check, not mutation;
 plus handle context only, not clearance or authority.
 
 Hosted admission lock: this service workflow simplification is not a
-hosted-operation go-ahead. Hosted product work may consume the surface only
-after the pre-hosted service workflow gates have source-owned proof or explicit
-proof-gap posture. If hosted work needs hosted operation, provider custody,
+hosted-operation go-ahead. Hosted product work may consume projection/readback
+surfaces only after the pre-hosted service workflow gates have source-owned
+proof or explicit proof-gap posture. If hosted work needs hosted operation,
+provider custody,
 settlement/finality, marketplace or certification, cross-org trust, aggregate
 spend enforcement, hosted org auth, retention/search, or new kernel exports,
 route it to a separate hosted workspace or a new pre-hosted kernel task. Do not
