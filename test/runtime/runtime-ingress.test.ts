@@ -608,6 +608,66 @@ describe("runtime ingress adapter", () => {
     await expectNoRuntimeAuthorityRecords(fixture.store);
   });
 
+  it("refuses stale or dynamic x402 handle context before protected-action authority", async () => {
+    const { fixture, runtimeConfig, proposal } = await installedX402IngressFixture();
+    const handleEvidenceRef = "service-workflow-handle:x402-demo:001";
+    const staleReviewRef = "review:stale-rendered-plan:x402-demo";
+
+    const result = await proposeRuntimeIngressActionContracts(
+      fixture.kernel,
+      { x402Payment: runtimeConfig },
+      {
+        principalIntentRef: "intent:pay from stale service workflow review",
+        generatedCodeOrSpecRef: "runtime:dispatch-block-x402-stale-handle",
+        dispatchBoundaryRef: "dispatch-boundary:x402-stale-handle",
+        dispatches: [
+          {
+            dispatchKind: "wrapped_x402_payment",
+            dispatchRef: "dispatch:x402-payment:stale-handle",
+            endpointUrl: proposal.endpointEvidence.endpointUrl,
+            payee: proposal.endpointEvidence.payee,
+            network: proposal.endpointEvidence.network,
+            token: proposal.endpointEvidence.token,
+            atomicAmount: "2000",
+            paymentRequirementsDigest: proposal.endpointEvidence.paymentRequirementsDigest,
+            dynamicToolConstructionDetected: true,
+            lateBoundParameterRefs: [handleEvidenceRef, staleReviewRef],
+            evidenceRefs: [handleEvidenceRef, staleReviewRef],
+          },
+        ],
+      },
+    );
+
+    expect(result.outcome).toBe("one_or_more_dispatches_refused");
+    expect(result.responsePosture).toMatchObject({
+      authorityCreated: false,
+      credentialMaterialIncluded: false,
+      greenlightCreated: false,
+      gatewayCheckPerformed: false,
+      mutationAttempted: false,
+      mutationCommandIncluded: false,
+      actionContractRefs: [],
+      nextAction: "recraft_request",
+    });
+    expect(result.runtimeExecution.evidenceRefs).toEqual(expect.arrayContaining([handleEvidenceRef, staleReviewRef]));
+    expect(result.runtimeExecution.unobservedRegionRefs).toEqual([handleEvidenceRef, staleReviewRef]);
+    expect(result.generatedExecutionGraph.coverageStatus).toBe("unsupported_or_ambiguous");
+    expect(result.generatedExecutionGraph.nodes[0]?.unsupportedReasonCodes).toEqual(
+      expect.arrayContaining(["runtime_ingress_dynamic_tool_construction", "runtime_ingress_late_bound_parameters"]),
+    );
+    const proposalResult = result.proposals[0];
+    if (!proposalResult || proposalResult.outcome !== "intent_compilation_refused") throw new Error("expected refusal");
+    expect(proposalResult.refusalReasonCodes).toEqual(
+      expect.arrayContaining([
+        "runtime_dynamic_tool_construction_detected",
+        "runtime_unobserved_regions_present",
+        "generated_execution_graph_not_contractable",
+      ]),
+    );
+    expect(await recordCount(fixture.store, "action_contract")).toBe(0);
+    await expectNoRuntimeAuthorityRecords(fixture.store);
+  });
+
   it("refuses ambiguous x402 payment dispatch as unknown consequential behavior", async () => {
     const { fixture, runtimeConfig, proposal } = await installedX402IngressFixture();
 
@@ -755,6 +815,76 @@ describe("runtime ingress adapter", () => {
     expect(second.idempotencyKey).toStartWith("x402-payment:");
     expect(second.idempotencyKey).not.toBe(first.idempotencyKey);
     expect(second.requiredPriorActionContractIds).toEqual([first.actionContractId]);
+    expect(await recordCount(fixture.store, "action_contract")).toBe(2);
+    await expectNoRuntimeAuthorityRecords(fixture.store);
+  });
+
+  it("records handle-context x402 retries as separate fresh contracts without aggregate spend authority", async () => {
+    const { fixture, runtimeConfig, proposal } = await installedX402IngressFixture();
+    const handleEvidenceRef = "service-workflow-handle:x402-demo:001";
+    const handleDigestRef = "service-workflow-handle-digest:sha256:2222222222222222";
+
+    const result = await proposeRuntimeIngressActionContracts(
+      fixture.kernel,
+      { x402Payment: runtimeConfig },
+      {
+        principalIntentRef: "intent:retry paid request from service workflow context",
+        generatedCodeOrSpecRef: "runtime:dispatch-block-x402-handle-context-retry",
+        dispatchBoundaryRef: "dispatch-boundary:x402-handle-context-retry",
+        dispatches: [
+          x402Dispatch(proposal, "dispatch:x402-payment:handle-context-1", {
+            atomicAmount: "2000",
+            evidenceRefs: [handleEvidenceRef, handleDigestRef],
+          }),
+          x402Dispatch(proposal, "dispatch:x402-payment:handle-context-2", {
+            atomicAmount: "2500",
+            evidenceRefs: [handleEvidenceRef, handleDigestRef],
+            retryOfDispatchRef: "dispatch:x402-payment:handle-context-1",
+            loopIteration: 1,
+          }),
+        ],
+      },
+    );
+
+    expect(result.outcome).toBe("action_contracts_proposed");
+    expect(result.responsePosture).toMatchObject({
+      authorityCreated: false,
+      credentialMaterialIncluded: false,
+      greenlightCreated: false,
+      gatewayCheckPerformed: false,
+      mutationAttempted: false,
+      mutationCommandIncluded: false,
+      receiptExportCreated: false,
+    });
+    expect(result.runtimeExecution.evidenceRefs).toEqual(expect.arrayContaining([handleEvidenceRef, handleDigestRef]));
+    expect(result.runtimeExecution.loopDetected).toBe(true);
+    expect(result.runtimeExecution.retryDetected).toBe(true);
+    expect(result.responsePosture.reasonCodes).toEqual(
+      expect.arrayContaining(["runtime_ingress_loop_detected", "runtime_ingress_retry_detected"]),
+    );
+    const first = result.proposals[0]?.actionContract;
+    const second = result.proposals[1]?.actionContract;
+    if (!first || !second) throw new Error("expected two x402 contracts");
+    expect(first.parameters).toMatchObject({ atomicAmount: "2000" });
+    expect(second.parameters).toMatchObject({ atomicAmount: "2500" });
+    expect(first.actionContractId).not.toBe(second.actionContractId);
+    expect(first.idempotencyKey).not.toBe(second.idempotencyKey);
+    expect(second.requiredPriorActionContractIds).toEqual([first.actionContractId]);
+    const contractAuthorityText = JSON.stringify({
+      firstParameters: first.parameters,
+      firstBounds: first.bounds,
+      firstGatewayCredentialRefs: first.gatewayCredentialRefs,
+      firstDelegatedAuthorityRefs: first.delegatedAuthorityRefs,
+      secondParameters: second.parameters,
+      secondBounds: second.bounds,
+      secondGatewayCredentialRefs: second.gatewayCredentialRefs,
+      secondDelegatedAuthorityRefs: second.delegatedAuthorityRefs,
+    });
+    expect(contractAuthorityText).not.toContain(handleEvidenceRef);
+    expect(contractAuthorityText).not.toContain(handleDigestRef);
+    expect(contractAuthorityText).not.toContain("PaymentPayload");
+    expect(contractAuthorityText).not.toContain("PAYMENT-SIGNATURE");
+    expect(contractAuthorityText).not.toContain("privateKey");
     expect(await recordCount(fixture.store, "action_contract")).toBe(2);
     await expectNoRuntimeAuthorityRecords(fixture.store);
   });

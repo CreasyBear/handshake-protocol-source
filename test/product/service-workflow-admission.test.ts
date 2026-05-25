@@ -12,25 +12,12 @@ const outputMarkdownPath = `${repoRoot}/examples/service-workflow-admission/outp
 
 describe("service workflow admission example", () => {
   it("emits admission/readback context separately from fresh x402 clearance", async () => {
-    const proc = Bun.spawn([process.execPath, "run", "./examples/service-workflow-admission/run.ts"], {
-      cwd: repoRoot,
-      stdout: "pipe",
-      stderr: "pipe",
-    });
-    const stdoutPromise = proc.stdout ? new Response(proc.stdout).text() : Promise.resolve("");
-    const stderrPromise = proc.stderr ? new Response(proc.stderr).text() : Promise.resolve("");
-    const exitCode = await proc.exited;
-    const stdout = await stdoutPromise;
-    const stderr = await stderrPromise;
+    const { output, markdown, source, stdout } = await runServiceWorkflowAdmissionDemo();
 
-    expect(stderr).toBe("");
-    expect(exitCode).toBe(0);
     expect(stdout).toContain("# Service Workflow Admission Example");
     expect(stdout).toContain("Wrote: examples/service-workflow-admission/output/latest.md");
     expect(stdout).toContain("Wrote: examples/service-workflow-admission/output/latest.json");
 
-    const output = await Bun.file(outputJsonPath).json();
-    const markdown = await Bun.file(outputMarkdownPath).text();
     const admission = ServiceWorkflowAdmissionSchema.parse(output.admissionPacket);
     const handle = ServiceWorkflowHandleSchema.parse(output.workflowHandle);
 
@@ -105,11 +92,161 @@ describe("service workflow admission example", () => {
     expect(markdown.toLowerCase()).toContain("admission readback is not receipt evidence");
     expect(markdown).toContain("The handle is not permission");
     expect(markdown).toContain("ActionContract -> PolicyDecision ->");
-
-    const source = readFileSync(`${repoRoot}/examples/service-workflow-admission/run.ts`, "utf8");
     expect(source).not.toContain("HandshakeKernel");
     expect(source).not.toContain("PolicyClient");
     expect(source).not.toContain("runX402WalletGateway");
     expect(source).not.toContain('from "../../src/runtime"');
   });
+
+  it("keeps workflow handles unusable as protected-action authority under generated-agent misuse shapes", async () => {
+    const { output, markdown } = await runServiceWorkflowAdmissionDemo();
+    const admission = ServiceWorkflowAdmissionSchema.parse(output.admissionPacket);
+    const handle = ServiceWorkflowHandleSchema.parse(output.workflowHandle);
+
+    expect(handle.allowedUse).toBe("correlation_and_readback_context_only");
+    expect(handle.nextProtectedActionRequirement).toBe("fresh_action_contract_required");
+    expect(handle.authorityBoundary).toMatchObject({
+      createsAuthority: false,
+      createsPolicyDecision: false,
+      createsGreenlight: false,
+      performsGatewayCheck: false,
+      permitsMutation: false,
+      exportsReceipt: false,
+      mintsTerminalCertificate: false,
+      isReusableAuth: false,
+      isGatewayBinding: false,
+      freshActionContractRequired: true,
+    });
+    expect(output.freshClearanceRequest).toMatchObject({
+      contextAuthorityCreated: false,
+      freshActionContractRequired: true,
+    });
+    expect(Object.keys(output.freshClearanceRequest.contextRefs).sort()).toEqual(
+      [
+        "admissionId",
+        "passportPackageDigest",
+        "passportPresentationId",
+        "serviceWorkflowHandleDigest",
+        "serviceWorkflowHandleId",
+      ].sort(),
+    );
+
+    const admissionAndHandleText = JSON.stringify({
+      admissionPacket: output.admissionPacket,
+      workflowHandle: output.workflowHandle,
+    });
+    for (const authorityField of [
+      "policyDecisionRef",
+      "greenlightRef",
+      "gatewayCheckRef",
+      "mutationAttemptRef",
+      "receiptRef",
+      "authorityCertificateRef",
+      "signerRef",
+      "credentialRef",
+      "PaymentPayload",
+      "PAYMENT-SIGNATURE",
+      "gatewayCredentialBinding",
+      "delegatedAuthorityBinding",
+      "reusableClearance",
+    ]) {
+      expect(admissionAndHandleText).not.toContain(authorityField);
+    }
+
+    for (const protectedActionAuthorityRef of [
+      output.freshClearanceAuthorityPath.actionContractId,
+      output.freshClearanceAuthorityPath.policyDecisionId,
+      output.freshClearanceAuthorityPath.greenlightId,
+      output.freshClearanceAuthorityPath.gateAttemptId,
+      output.freshClearanceAuthorityPath.receiptId,
+    ]) {
+      expect(admissionAndHandleText).not.toContain(protectedActionAuthorityRef);
+    }
+
+    expect(admission.runtimePosture).toEqual([
+      expect.objectContaining({
+        rawSiblingBypassPostureRef: "bypass-posture:x402-raw-sibling",
+        nativeContainmentClaimed: false,
+        proofGapRefs: ["proof-gap:host-wide-containment"],
+      }),
+    ]);
+    expect(output.admissionReadback).toMatchObject({
+      policyDecisionRef: null,
+      greenlightRef: null,
+      gatewayCheckRef: null,
+      mutationAttemptRef: null,
+      receiptRef: null,
+      authorityCertificateRef: null,
+      nextActionRequirement: "fresh_action_contract_required",
+    });
+
+    expect(output.generatedAgentMisusePosture).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          scenario: "handle_reuse_in_loop",
+          expectedBoundary: "fresh_action_contract_required",
+          acceptedAsAuthority: false,
+        }),
+        expect.objectContaining({
+          scenario: "retry_after_changed_parameters",
+          expectedBoundary: "fresh_action_contract_required",
+          acceptedAsAuthority: false,
+        }),
+        expect.objectContaining({
+          scenario: "dynamic_tool_construction",
+          expectedBoundary: "runtime_refusal_or_proof_gap",
+          acceptedAsAuthority: false,
+        }),
+        expect.objectContaining({
+          scenario: "stale_rendered_review",
+          expectedBoundary: "fresh_action_contract_required",
+          acceptedAsAuthority: false,
+        }),
+        expect.objectContaining({
+          scenario: "raw_sibling_x402_bypass",
+          expectedBoundary: "bypass_evidence_only",
+          acceptedAsAuthority: false,
+        }),
+        expect.objectContaining({
+          scenario: "replay_after_greenlight",
+          expectedBoundary: "one_use_greenlight_only",
+          acceptedAsAuthority: false,
+        }),
+        expect.objectContaining({
+          scenario: "admission_proof_gap",
+          expectedBoundary: "proof_gap_not_authority",
+          acceptedAsAuthority: false,
+        }),
+      ]),
+    );
+    for (const item of output.generatedAgentMisusePosture) {
+      expect(item.acceptedAsAuthority).toBe(false);
+    }
+    expect(markdown).toContain("Generated-Agent Misuse Posture");
+    expect(markdown).toContain("dynamic_tool_construction");
+    expect(markdown).toContain("raw_sibling_x402_bypass");
+  });
 });
+
+async function runServiceWorkflowAdmissionDemo() {
+  const proc = Bun.spawn([process.execPath, "run", "./examples/service-workflow-admission/run.ts"], {
+    cwd: repoRoot,
+    stdout: "pipe",
+    stderr: "pipe",
+  });
+  const stdoutPromise = proc.stdout ? new Response(proc.stdout).text() : Promise.resolve("");
+  const stderrPromise = proc.stderr ? new Response(proc.stderr).text() : Promise.resolve("");
+  const exitCode = await proc.exited;
+  const stdout = await stdoutPromise;
+  const stderr = await stderrPromise;
+
+  expect(stderr).toBe("");
+  expect(exitCode).toBe(0);
+
+  return {
+    stdout,
+    output: await Bun.file(outputJsonPath).json(),
+    markdown: await Bun.file(outputMarkdownPath).text(),
+    source: readFileSync(`${repoRoot}/examples/service-workflow-admission/run.ts`, "utf8"),
+  };
+}

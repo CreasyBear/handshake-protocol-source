@@ -145,6 +145,57 @@ const output = {
     protectedActionProofGapRefs: stringArrayField(evidencePosture, "proofGapRefs"),
     protectedActionRefusalRefs: stringArrayField(evidencePosture, "refusalRefs"),
   },
+  generatedAgentMisusePosture: [
+    {
+      scenario: "handle_reuse_in_loop",
+      generatedShape: "agent loop carries the same service workflow handle into another x402 attempt",
+      expectedBoundary: "fresh_action_contract_required",
+      acceptedAsAuthority: false,
+      resultingPosture: "separate_action_contract_or_refusal_required",
+    },
+    {
+      scenario: "retry_after_changed_parameters",
+      generatedShape: "agent retries with changed amount, endpoint, payee, or request body after the handle was issued",
+      expectedBoundary: "fresh_action_contract_required",
+      acceptedAsAuthority: false,
+      resultingPosture: "changed_parameter_refusal_or_new_exact_contract_required",
+    },
+    {
+      scenario: "dynamic_tool_construction",
+      generatedShape: "agent constructs a protected tool name or x402 endpoint dynamically from handle context",
+      expectedBoundary: "runtime_refusal_or_proof_gap",
+      acceptedAsAuthority: false,
+      resultingPosture: "recraft_request_before_contract",
+    },
+    {
+      scenario: "stale_rendered_review",
+      generatedShape: "agent acts from a rendered review whose underlying protected-action parameters drifted",
+      expectedBoundary: "fresh_action_contract_required",
+      acceptedAsAuthority: false,
+      resultingPosture: "stale_review_cannot_authorize_changed_parameters",
+    },
+    {
+      scenario: "raw_sibling_x402_bypass",
+      generatedShape: "agent calls direct MCP, browser, network, or x402 payment route outside the gateway",
+      expectedBoundary: "bypass_evidence_only",
+      acceptedAsAuthority: false,
+      resultingPosture: "stop_or_isolate_until_recovered",
+    },
+    {
+      scenario: "replay_after_greenlight",
+      generatedShape: "agent reuses a prior greenlight or payment attempt after the handle stays valid",
+      expectedBoundary: "one_use_greenlight_only",
+      acceptedAsAuthority: false,
+      resultingPosture: "replay_refusal",
+    },
+    {
+      scenario: "admission_proof_gap",
+      generatedShape: "agent treats accepted admission with proof gaps as clearance",
+      expectedBoundary: "proof_gap_not_authority",
+      acceptedAsAuthority: false,
+      resultingPosture: "fresh_action_contract_required_after_gap_resolution_or_refusal",
+    },
+  ],
   authorityAudit: {
     passportCreatedAuthority: false,
     admissionCreatedAuthority: false,
@@ -287,6 +338,17 @@ only.
 | Protected-action outcome evidence | ${report.evidenceSeparation.protectedActionOutcomeRefs.map((ref) => `\`${ref}\``).join(", ")} |
 | Protected-action proof gaps | ${report.evidenceSeparation.protectedActionProofGapRefs.map((ref) => `\`${ref}\``).join(", ") || "none"} |
 | Protected-action refusals | ${report.evidenceSeparation.protectedActionRefusalRefs.map((ref) => `\`${ref}\``).join(", ")} |
+
+## Generated-Agent Misuse Posture
+
+| Scenario | Boundary | Authority accepted | Resulting posture |
+| --- | --- | --- | --- |
+${report.generatedAgentMisusePosture
+  .map(
+    (item) =>
+      `| \`${item.scenario}\` | \`${item.expectedBoundary}\` | \`${item.acceptedAsAuthority}\` | \`${item.resultingPosture}\` |`,
+  )
+  .join("\n")}
 
 ## Non-Claims
 

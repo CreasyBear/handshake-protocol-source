@@ -39,6 +39,9 @@ workflow admission.
 - The workflow handle is not permission.
 - x402 clearance appears only in the fresh protected-action path:
   `ActionContract -> PolicyDecision -> one-use Greenlight -> GatewayCheck`.
+- The generated-agent misuse posture lists loop/retry reuse, changed
+  parameters, dynamic tool construction, stale review, raw sibling bypass,
+  replay, and proof-gap cases as non-authority outcomes.
 
 ## What This Does Not Prove
 
@@ -49,3 +52,5 @@ workflow admission.
 - No host-wide containment.
 - No reusable passport authority.
 - No handle-as-permission.
+- No auth, policy, gateway admission, signer access, payment approval, receipt
+  evidence, or reusable clearance from admission or handle records.

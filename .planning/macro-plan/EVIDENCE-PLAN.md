@@ -2,7 +2,14 @@
 
 ## Current Evidence
 
-The plan is grounded in canonical docs, the current macro map, and current codebase maps. Canon proves the authority chain and product-surface boundary. The macro map proves lens convergence around non-authority product simplification. The codebase maps identify source placement, tests, and proof gaps. Source implementation is still required for the new service workflow surface.
+The plan is grounded in canonical docs, the current macro map, and current
+codebase maps. Canon proves the authority chain and product-surface boundary.
+The macro map proves lens convergence around non-authority product
+simplification. The codebase maps identify source placement, tests, and proof
+gaps. Tier 1 source implementation now owns the service workflow story,
+non-authority admission/handle schemas, and boundary tests. Tier 2 source
+implementation now owns active CLI/MCP/SDK posture alignment, the runnable local
+service workflow admission example, and generated-agent/runtime misuse gates.
 
 Current structural validation result:
 
@@ -42,6 +49,13 @@ npm run test -- test/protocol/kernel-compilation-contract.test.ts test/protocol/
 ```
 
 Tier 2 example and integration verification will use a new focused product test plus existing x402/auth.md gateway tests when those surfaces are touched.
+
+T2-03 generated-agent/runtime misuse verification:
+
+```bash
+npm run test -- test/product/service-workflow-admission.test.ts
+npm run test -- test/runtime/runtime-ingress.test.ts
+```
 
 Full closeout:
 
@@ -125,7 +139,9 @@ No browser or visual evidence is required for the first Tier 1 implementation be
 
 Runtime artifacts to collect during Tier 2:
 
-- runtime ingress negative cases;
+- runtime ingress negative cases for dynamic/stale handle-context refusal;
+- runtime ingress loop/retry cases proving handle evidence does not become
+  aggregate spend authority;
 - MCP proposal/readback output;
 - host profile posture rows;
 - raw sibling bypass inventory;

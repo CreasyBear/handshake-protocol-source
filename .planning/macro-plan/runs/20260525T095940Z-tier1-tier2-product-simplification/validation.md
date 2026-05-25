@@ -79,3 +79,23 @@ git diff --check
 ```
 
 Open next slice: MPLAN-008 / T2-03 generated-agent and runtime misuse tests.
+
+T2-03 landed generated-agent and runtime misuse gates. The local service
+workflow admission artifact now emits explicit non-authority misuse posture for
+loop/retry handle reuse, changed parameters, dynamic tool construction, stale
+rendered review, raw sibling x402 bypass, replay, and proof-gap cases. Runtime
+ingress tests tie service workflow handle evidence to x402 stale/dynamic
+refusal and loop/retry attempts while preserving fresh per-call action
+contracts and no policy, greenlight, gateway check, signer, mutation, receipt,
+or certificate records. Verified gates:
+
+```bash
+npm run test -- test/product/service-workflow-admission.test.ts
+npm run test -- test/runtime/runtime-ingress.test.ts
+npm run check:types
+npm run quality:architecture
+npm run quality:claims
+npm run format:check
+```
+
+Open next slice: MPLAN-009 / T2-04 protected-action fixture gate.
