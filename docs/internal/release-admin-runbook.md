@@ -135,6 +135,34 @@ For a security or broken-release incident:
 5. add the missed precondition to the smallest failing gate;
 6. promote only after remote readback proves the exact fixed artifact.
 
+## npm Maintainer Posture Command
+
+Run the local maintainer posture check before release review:
+
+```bash
+npm run release:npm:posture
+```
+
+That command verifies the local package identity, release scripts, `pack:check`
+binding, absence of install-time lifecycle scripts, package file allowlist,
+README non-authority claims, and high-activity runbook posture. It is also part
+of `npm run pack:check`.
+
+After npm publication, dist-tag changes, deprecations, or artifact-repository
+publish workflow changes, run:
+
+```bash
+npm run release:npm:posture:remote
+```
+
+Remote posture readback verifies public npm registry availability, `latest`
+dist-tag alignment, registry signature metadata, provenance metadata, and
+download telemetry classification. It still cannot verify private npm account
+settings, long-lived token absence, package maintainer list intent, Trusted
+Publishing UI configuration, support-channel monitoring, or whether downloads
+represent real users. Those remain manual external checks and must not be
+smoothed into "green" local proof.
+
 ## Forbidden Shortcuts
 
 - Do not treat a local green gate as release proof when `dist/` or

@@ -115,12 +115,17 @@ describe("package surface", () => {
     expect(pkg.scripts["demo:adapter-sdk"]).toBe("bun run ./examples/external-adapter-sdk/run.ts");
     expect(pkg.scripts["demo:x402-tool-profiles"]).toBe("bun run ./examples/x402-protected-tool-profiles/run.ts");
     expect(pkg.scripts["pack:check"]).toBe(
-      "npm run build && node scripts/check-package-surface.mjs && node scripts/check-published-entrypoints.mjs && node scripts/check-clean-installed-activation.mjs && node scripts/check-release-proof.mjs",
+      "npm run build && node scripts/check-package-surface.mjs && node scripts/check-published-entrypoints.mjs && node scripts/check-clean-installed-activation.mjs && node scripts/check-release-proof.mjs && node scripts/check-npm-maintainer-posture.mjs",
     );
     expect(pkg.scripts["check:repo"]).toContain("npm run build && npm run check:types");
     expect(pkg.scripts["check:repo"]).toContain("npm run pack:check");
     expect(pkg.scripts["release:admin:check"]).toBe("node scripts/check-release-admin.js");
     expect(pkg.scripts["release:admin:check:remote"]).toBe("node scripts/check-release-admin.js --remote-readback");
+    expect(pkg.scripts["release:npm:posture"]).toBe("node scripts/check-npm-maintainer-posture.mjs");
+    expect(pkg.scripts["release:npm:posture:remote"]).toBe(
+      "node scripts/check-npm-maintainer-posture.mjs --registry-readback",
+    );
+    expect(pkg.scripts["quality:architecture"]).toContain("test/architecture/npm-maintainer-posture.test.ts");
   });
 
   it("keeps MCP registry metadata synchronized and non-authority", () => {

@@ -85,6 +85,10 @@ describe("release admin gate", () => {
     expect(runbook).toContain("no install-time telemetry, phone-home behavior");
     expect(runbook).toContain("Support intake should classify every public report");
     expect(runbook).toContain("Do not answer support pressure");
+    expect(runbook).toContain("npm Maintainer Posture Command");
+    expect(runbook).toContain("npm run release:npm:posture");
+    expect(runbook).toContain("npm run release:npm:posture:remote");
+    expect(runbook).toContain("manual external checks");
     expect(runbook).toContain("Forbidden Shortcuts");
     expect(runbook).toContain("Do not treat a local green gate as release proof");
     expect(runbook).toContain("do not patch only the observed CI symptom");
