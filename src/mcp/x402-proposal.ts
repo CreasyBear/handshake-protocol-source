@@ -1,5 +1,10 @@
 import { z } from "zod";
 import type { RuntimeClient } from "../sdk/surface-clients";
+import {
+  ServiceWorkflowContextRefsSchema,
+  serviceWorkflowContextCorrelationRef,
+  serviceWorkflowContextEvidenceRefs,
+} from "../surfaces/service-workflow-admission";
 import { mcpActionContractProposedOutcome, mcpNonContractOutcome, mcpToolResult, type McpToolResult } from "./output";
 import { digestMcp, type McpJsonValue } from "./digest";
 
@@ -102,6 +107,7 @@ export const McpX402PaymentProposalInputSchema = z.strictObject({
   retryDetected: z.boolean().default(false),
   branchDetected: z.boolean().default(false),
   correlationRef: McpRefSchema.nullable().default(null),
+  serviceWorkflowContextRefs: ServiceWorkflowContextRefsSchema.optional(),
 });
 
 export type McpX402PaymentProposalInput = z.input<typeof McpX402PaymentProposalInputSchema>;
@@ -366,6 +372,7 @@ async function proposeContract(
     input.paymentRequiredEvidenceRef,
     trustedBinding.gatewayReadinessRef,
     trustedBinding.policyVersionRef,
+    ...serviceWorkflowEvidenceRefs(input),
     ...delegatedAuthorityEvidenceRefs(input),
   ]);
   const executionBlockDigest = await digestMcp({
@@ -380,6 +387,7 @@ async function proposeContract(
     providerEnvironmentRef: input.providerEnvironmentRef,
     selectedPaymentRequirementIndex: input.selectedPaymentRequirementIndex,
     selectedPaymentRequirementDigest: input.selectedPaymentRequirementDigest,
+    serviceWorkflowContextRefs: input.serviceWorkflowContextRefs ?? null,
     gatewayReadinessDigest: trustedBinding.gatewayReadinessDigest,
     policyVersionDigest: trustedBinding.policyVersionDigest,
   });
@@ -476,7 +484,7 @@ async function proposeContract(
       purposeCode: "x402_paid_request",
       expectedSideEffectCodes: ["x402_payment_signature_created"],
       evidenceRefs,
-      clearingEvidenceRefs: input.correlationRef ? { correlationRef: input.correlationRef } : {},
+      clearingEvidenceRefs: clearingEvidenceRefs(input),
       bounds: {
         endpointDomain: new URL(input.endpointUrl).hostname,
         payee: input.payee,
@@ -580,6 +588,18 @@ async function proposeContract(
   );
 }
 
+function serviceWorkflowEvidenceRefs(input: ParsedMcpX402PaymentProposalInput): string[] {
+  return input.serviceWorkflowContextRefs ? serviceWorkflowContextEvidenceRefs(input.serviceWorkflowContextRefs) : [];
+}
+
+function clearingEvidenceRefs(input: ParsedMcpX402PaymentProposalInput): { correlationRef?: string } {
+  if (input.correlationRef) return { correlationRef: input.correlationRef };
+  if (input.serviceWorkflowContextRefs) {
+    return { correlationRef: serviceWorkflowContextCorrelationRef(input.serviceWorkflowContextRefs) };
+  }
+  return {};
+}
+
 async function deriveMcpX402IdempotencyKey(
   input: ParsedMcpX402PaymentProposalInput,
   trustedBinding: McpTrustedProposalBinding | null,
@@ -612,6 +632,7 @@ async function deriveMcpX402IdempotencyKey(
     paymentRequirementsDigest: input.paymentRequirementsDigest,
     selectedPaymentRequirementIndex: input.selectedPaymentRequirementIndex,
     selectedPaymentRequirementDigest: input.selectedPaymentRequirementDigest,
+    serviceWorkflowContextRefs: input.serviceWorkflowContextRefs ?? null,
     delegatedAuthorityRefId: input.delegatedAuthorityBinding.delegatedAuthorityRefId,
     delegatedAuthorityRefDigest: input.delegatedAuthorityBinding.delegatedAuthorityRefDigest,
     delegatedAuthorityPolicyPackRef: input.delegatedAuthorityBinding.policyPackRef,

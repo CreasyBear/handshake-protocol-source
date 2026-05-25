@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import { proposeMcpX402Payment, type McpRuntimeProposalClient } from "../../src/mcp/x402-proposal";
-import { digest, validProposalInput } from "./mcp-schema-contract.test";
+import { digest, serviceWorkflowContextRefs, validProposalInput } from "./mcp-schema-contract.test";
 
 describe("MCP x402 proposal bridge", () => {
   it("creates runtime evidence, draft, compilation, and action contract only", async () => {
@@ -91,6 +91,40 @@ describe("MCP x402 proposal bridge", () => {
     expect(compileCandidate.evidenceRefs).toEqual(
       expect.arrayContaining(["handshake://local/x402/gateway-readiness.json", "policy:x402-payment-exact:mcp@v1"]),
     );
+  });
+
+  it("carries typed service workflow context as evidence metadata, not delegated authority", async () => {
+    const calls: Array<{ name: string; input: unknown }> = [];
+    const input = { ...validProposalInput(), serviceWorkflowContextRefs: serviceWorkflowContextRefs() };
+
+    const result = await proposeMcpX402Payment(input, trustedOptions(fakeRuntimeClient(calls)));
+
+    expect(result.isError).toBe(false);
+    expect(result.structuredContent).toMatchObject({
+      outcome: "action_contract_proposed",
+      authorityCreated: false,
+      greenlightCreated: false,
+      gatewayCheckPerformed: false,
+      mutationAttempted: false,
+    });
+
+    const compileCandidate = compileIntentCandidate(calls);
+    expect(compileCandidate.evidenceRefs).toEqual(
+      expect.arrayContaining([
+        `service-workflow-context:passport-package:${input.serviceWorkflowContextRefs.passportPackageDigest}`,
+        `service-workflow-context:presentation:${input.serviceWorkflowContextRefs.passportPresentationId}`,
+        `service-workflow-context:admission:${input.serviceWorkflowContextRefs.admissionId}`,
+        `service-workflow-context:handle:${input.serviceWorkflowContextRefs.serviceWorkflowHandleId}`,
+        `service-workflow-context:handle-digest:${input.serviceWorkflowContextRefs.serviceWorkflowHandleDigest}`,
+      ]),
+    );
+    expect(compileCandidate.clearingEvidenceRefs).toEqual({
+      correlationRef: `service-workflow-context:${input.serviceWorkflowContextRefs.serviceWorkflowHandleId}`,
+    });
+    expect(JSON.stringify(compileCandidate.delegatedAuthorityRefs)).not.toContain("serviceWorkflowHandle");
+    expect(JSON.stringify(compileCandidate)).not.toContain("greenlightRef");
+    expect(JSON.stringify(compileCandidate)).not.toContain("gatewayCheckRef");
+    expect(JSON.stringify(compileCandidate)).not.toContain("receiptRef");
   });
 
   it("refuses stale metadata, not-ready install, offline gateway, unknown gateway, and amount overrun before runtime calls", async () => {
@@ -496,6 +530,7 @@ function compileIntentCandidate(calls: Array<{ name: string; input: unknown }>) 
     bounds: Record<string, unknown>;
     delegatedAuthorityRefs: unknown[];
     evidenceRefs: string[];
+    clearingEvidenceRefs: Record<string, string>;
   };
 }
 

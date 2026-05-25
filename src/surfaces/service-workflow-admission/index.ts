@@ -3,6 +3,7 @@ import { z } from "zod";
 const sha256DigestSchema = z.string().regex(/^sha256:[a-f0-9]{64}$/);
 
 export const serviceWorkflowAdmissionSchemaVersion = "handshake.service-workflow-admission.v0.1" as const;
+export const principalAgentLinkSchemaVersion = "handshake.principal-agent-link.v0.1" as const;
 
 export const serviceWorkflowClaimStatuses = ["accepted", "refused", "stale", "proof_gap", "quarantined"] as const;
 
@@ -51,6 +52,53 @@ export const serviceWorkflowAuthorityBoundary = {
   isGatewayBinding: false,
   freshActionContractRequired: true,
 } as const satisfies ServiceWorkflowAuthorityBoundary;
+
+export const ServiceWorkflowContextRefsSchema = z.strictObject({
+  passportPackageDigest: sha256DigestSchema,
+  passportPresentationId: z.string().min(1),
+  admissionId: z.string().min(1),
+  serviceWorkflowHandleId: z.string().min(1),
+  serviceWorkflowHandleDigest: sha256DigestSchema,
+});
+
+export type ServiceWorkflowContextRefs = z.infer<typeof ServiceWorkflowContextRefsSchema>;
+
+export const PrincipalAgentLinkSchema = z.strictObject({
+  schemaVersion: z.literal(principalAgentLinkSchemaVersion),
+  principalAgentLinkId: z.string().min(1),
+  principalAgentLinkDigest: sha256DigestSchema,
+  tenantId: z.string().min(1),
+  organizationId: z.string().min(1),
+  projectId: z.string().min(1).nullable(),
+  workspaceId: z.string().min(1).nullable(),
+  principalId: z.string().min(1),
+  agentId: z.string().min(1),
+  principalSubjectDigest: sha256DigestSchema,
+  agentSubjectDigest: sha256DigestSchema,
+  authProviderRef: z.string().min(1),
+  linkEvidenceRefs: z.array(z.string().min(1)),
+  scopeRefs: z.array(z.string().min(1)),
+  issuedAt: z.string().datetime({ offset: true }),
+  expiresAt: z.string().datetime({ offset: true }).nullable(),
+  revokedAt: z.string().datetime({ offset: true }).nullable(),
+  authorityBoundary: ServiceWorkflowAuthorityBoundarySchema,
+  createsAuthority: z.literal(false),
+  createsPolicyDecision: z.literal(false),
+  createsGreenlight: z.literal(false),
+  performsGatewayCheck: z.literal(false),
+  permitsMutation: z.literal(false),
+  exportsReceipt: z.literal(false),
+  mintsTerminalCertificate: z.literal(false),
+  containsCredentialMaterial: z.literal(false),
+  containsPaymentMaterial: z.literal(false),
+  widensOperatingEnvelope: z.literal(false),
+  isReusableAuth: z.literal(false),
+  isGatewayBinding: z.literal(false),
+  freshActionContractRequired: z.literal(true),
+  allowedUse: z.literal("scoped_evidence_for_envelope_setup_and_readback_only"),
+});
+
+export type PrincipalAgentLink = z.infer<typeof PrincipalAgentLinkSchema>;
 
 export const ServiceWorkflowClaimResultSchema = z.strictObject({
   claimRef: z.string().min(1),
@@ -114,4 +162,29 @@ export type ServiceWorkflowAdmission = z.infer<typeof ServiceWorkflowAdmissionSc
 
 export function serviceWorkflowNonAuthorityBoundary(): ServiceWorkflowAuthorityBoundary {
   return ServiceWorkflowAuthorityBoundarySchema.parse(serviceWorkflowAuthorityBoundary);
+}
+
+export function serviceWorkflowContextRefFromHandle(handle: ServiceWorkflowHandle): ServiceWorkflowContextRefs {
+  return ServiceWorkflowContextRefsSchema.parse({
+    passportPackageDigest: handle.passportPackageDigest,
+    passportPresentationId: handle.passportPresentationId,
+    admissionId: handle.admissionId,
+    serviceWorkflowHandleId: handle.serviceWorkflowHandleId,
+    serviceWorkflowHandleDigest: handle.serviceWorkflowHandleDigest,
+  });
+}
+
+export function serviceWorkflowContextEvidenceRefs(contextRefs: ServiceWorkflowContextRefs): string[] {
+  const parsed = ServiceWorkflowContextRefsSchema.parse(contextRefs);
+  return [
+    `service-workflow-context:passport-package:${parsed.passportPackageDigest}`,
+    `service-workflow-context:presentation:${parsed.passportPresentationId}`,
+    `service-workflow-context:admission:${parsed.admissionId}`,
+    `service-workflow-context:handle:${parsed.serviceWorkflowHandleId}`,
+    `service-workflow-context:handle-digest:${parsed.serviceWorkflowHandleDigest}`,
+  ];
+}
+
+export function serviceWorkflowContextCorrelationRef(contextRefs: ServiceWorkflowContextRefs): string {
+  return `service-workflow-context:${ServiceWorkflowContextRefsSchema.parse(contextRefs).serviceWorkflowHandleId}`;
 }

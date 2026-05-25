@@ -52,6 +52,18 @@ mintsTerminalCertificate: false
 freshActionContractRequired: true
 ```
 
+The source contract for carrying those five fields is
+`ServiceWorkflowContextRefsSchema`. MCP may accept that object as proposal
+metadata for one fresh x402 contract. SDK, HTTP, runtime, package-root, and
+protocol-public surfaces must not accept that schema as permission or as an
+authority shortcut unless a separate package-surface decision and proof gate
+are opened.
+
+`PrincipalAgentLink` is also evidence-only. It may help a hosted service record
+which principal scoped which agent for a tenant, organization, project, or
+workspace. It is not a bearer credential, reusable auth, spend approval, policy
+decision, greenlight, gateway check, receipt, or envelope-widening authority.
+
 ## Protected Action Boundary
 
 A service can admit standing evidence into a workflow context. That is still
@@ -96,3 +108,8 @@ permission. A new protected action requires a new exact contract.
 - Do not claim hosted operation, provider custody, settlement finality,
   marketplace trust, broad runtime containment, or cross-org trust from this
   surface.
+- Do not claim customer gateway custody from local fixture evidence.
+  `customer_gateway_evidence` requires official external verification, current
+  custody and resolver posture, lease/rotation or equivalent time-bounded
+  evidence, attestation evidence, redaction success, and no raw payment or
+  credential material.

@@ -328,6 +328,147 @@ describe("credential custody protocol records", () => {
     expect(JSON.stringify(packet)).not.toMatch(/private[_-]?key|PAYMENT-SIGNATURE|PaymentPayload|package-token/);
   });
 
+  it("records customer gateway custody evidence only with official verification and current redacted lease evidence", async () => {
+    const fixture = makeKernelFixture();
+    const credentialRef = await registerFixtureCredentialRef(
+      fixture,
+      credentialRefInput({
+        gatewayCredentialRefId: "gcr_customer_gateway_token",
+        custodyStatus: "gateway_held",
+        providerClass: "customer_gateway_provider",
+        providerRegistryRef: "provider-registry:customer-gateway",
+      }),
+    );
+    const posture = await recordGatewayCheckedPosture(fixture, { credentialCustodyStatus: "gateway_held" });
+
+    const packet = await fixture.kernel.recordGatewayCustodyProofPacket(
+      custodyProofPacketInput({
+        gatewayCredentialRefId: credentialRef.gatewayCredentialRefId,
+        gatewayCredentialRefDigest: credentialRef.gatewayCredentialRefDigest,
+        protectedPathPostureId: posture.protectedPathPostureId,
+        protectedPathPostureDigest: posture.postureDigest,
+        bypassProbeIds: posture.bypassProbeIds,
+        bypassProbeDigests: posture.bypassProbeDigests,
+        custodyClaimLevel: "customer_gateway_evidence",
+        custodyProviderClass: "customer_gateway_provider",
+        custodyProviderRegistryRef: "provider-registry:customer-gateway",
+        externalVerificationStatus: "verified_by_official_source",
+        attestationRefs: ["attestation:customer-gateway:official"],
+        attestationDigests: [`sha256:${"7".repeat(64)}`],
+        redactedAuditRefs: ["audit:redacted:customer-gateway"],
+        redactedAuditDigest: `sha256:${"8".repeat(64)}`,
+      }),
+    );
+
+    expect(packet).toMatchObject({
+      custodyClaimLevel: "customer_gateway_evidence",
+      credentialCustodyStatus: "gateway_held",
+      custodyDriftStatus: "current",
+      resolverDriftStatus: "current",
+      redactionStatus: "redacted",
+      externalVerificationStatus: "verified_by_official_source",
+      secretMaterialIncluded: false,
+      authorityCreated: false,
+    } satisfies Partial<GatewayCustodyProofPacket>);
+    expect(packet.leaseRef).toBe("lease:package-manager-token");
+    expect(packet.attestationRefs).toContain("attestation:customer-gateway:official");
+    expect(JSON.stringify(packet)).not.toMatch(
+      /PaymentPayload|PAYMENT-SIGNATURE|private[_-]?key|rawCredentialMaterial|api[_-]?key/,
+    );
+  });
+
+  it("rejects customer gateway custody claims with fixture custody, stale proof, drift, failed redaction, or missing lease evidence", async () => {
+    const cases = [
+      {
+        name: "fixture custody",
+        credential: credentialRefInput({ custodyStatus: "fixture_gateway_held" }),
+        posture: { credentialCustodyStatus: "fixture_gateway_held" as const },
+        packet: { externalVerificationStatus: "verified_by_official_source" as const },
+        error: "Fixture custody cannot satisfy customer or provider custody claims",
+      },
+      {
+        name: "missing external verification",
+        packet: { externalVerificationStatus: "required_before_live_claim" as const },
+        error: "Customer/provider custody proof requires official external verification evidence",
+      },
+      {
+        name: "custody drift",
+        packet: {
+          custodyDriftStatus: "provider_drift" as const,
+          externalVerificationStatus: "verified_by_official_source" as const,
+        },
+        error: "Gateway custody proof packet cannot be recorded as current when custody or resolver drift is present",
+      },
+      {
+        name: "resolver drift",
+        packet: {
+          resolverDriftStatus: "resolver_drift" as const,
+          externalVerificationStatus: "verified_by_official_source" as const,
+        },
+        error: "Gateway custody proof packet cannot be recorded as current when custody or resolver drift is present",
+      },
+      {
+        name: "failed redaction",
+        packet: {
+          redactionStatus: "redaction_failed" as const,
+          externalVerificationStatus: "verified_by_official_source" as const,
+        },
+        error: "Gateway custody proof packet cannot expose failed redaction as usable evidence",
+      },
+      {
+        name: "missing lease",
+        packet: { leaseRef: null, externalVerificationStatus: "verified_by_official_source" as const },
+        error: "Customer/provider custody proof requires current lease and attestation evidence",
+      },
+      {
+        name: "missing attestation",
+        packet: {
+          attestationRefs: [],
+          attestationDigests: [],
+          externalVerificationStatus: "verified_by_official_source" as const,
+        },
+        error: "Customer/provider custody proof requires current lease and attestation evidence",
+      },
+    ];
+
+    for (const entry of cases) {
+      const fixture = makeKernelFixture();
+      const credentialRef = await registerFixtureCredentialRef(
+        fixture,
+        credentialRefInput({
+          gatewayCredentialRefId: `gcr_customer_gateway_${entry.name.replaceAll(" ", "_")}`,
+          custodyStatus: "gateway_held",
+          providerClass: "customer_gateway_provider",
+          providerRegistryRef: `provider-registry:customer-gateway:${entry.name.replaceAll(" ", "-")}`,
+          ...(entry.credential ?? {}),
+        }),
+      );
+      const posture = await recordGatewayCheckedPosture(fixture, {
+        credentialCustodyStatus: "gateway_held",
+        ...(entry.posture ?? {}),
+      });
+      await expect(
+        fixture.kernel.recordGatewayCustodyProofPacket(
+          custodyProofPacketInput({
+            gatewayCustodyProofPacketId: `gcpp_customer_gateway_${entry.name.replaceAll(" ", "_")}`,
+            gatewayCredentialRefId: credentialRef.gatewayCredentialRefId,
+            gatewayCredentialRefDigest: credentialRef.gatewayCredentialRefDigest,
+            protectedPathPostureId: posture.protectedPathPostureId,
+            protectedPathPostureDigest: posture.postureDigest,
+            bypassProbeIds: posture.bypassProbeIds,
+            bypassProbeDigests: posture.bypassProbeDigests,
+            custodyClaimLevel: "customer_gateway_evidence",
+            custodyProviderClass: "customer_gateway_provider",
+            custodyProviderRegistryRef: `provider-registry:customer-gateway:${entry.name.replaceAll(" ", "-")}`,
+            attestationRefs: ["attestation:customer-gateway:official"],
+            attestationDigests: [`sha256:${"7".repeat(64)}`],
+            ...(entry.packet ?? {}),
+          }),
+        ),
+      ).rejects.toThrow(entry.error);
+    }
+  });
+
   it("changes the custody proof digest when resolver, lease, or attestation material changes", async () => {
     const fixture = makeKernelFixture();
     const credentialRef = await registerFixtureCredentialRef(fixture);
@@ -365,9 +506,10 @@ describe("credential custody protocol records", () => {
 
 async function registerFixtureCredentialRef(
   fixture: ReturnType<typeof makeKernelFixture>,
+  input: RegisterGatewayCredentialRefInput = credentialRefInput(),
 ): Promise<GatewayCredentialRef> {
   await registerFixtureObjects(fixture);
-  return fixture.kernel.registerGatewayCredentialRef(credentialRefInput());
+  return fixture.kernel.registerGatewayCredentialRef(input);
 }
 
 async function proposeCredentialBoundContract(
@@ -395,7 +537,9 @@ async function proposeCredentialBoundContract(
   return { compilation, contract };
 }
 
-function credentialRefInput(): RegisterGatewayCredentialRefInput {
+function credentialRefInput(
+  overrides: Partial<RegisterGatewayCredentialRefInput> = {},
+): RegisterGatewayCredentialRefInput {
   return {
     tenantId: "tenant_demo",
     organizationId: "org_demo",
@@ -416,6 +560,7 @@ function credentialRefInput(): RegisterGatewayCredentialRefInput {
     resolverVersion: "v1",
     evidenceExpectationRefs: ["evidence:credential-resolution"],
     expiresAt: futureIso(),
+    ...overrides,
   };
 }
 
@@ -431,7 +576,10 @@ function credentialBindingFor(credentialRef: GatewayCredentialRef) {
   };
 }
 
-async function recordGatewayCheckedPosture(fixture: ReturnType<typeof makeKernelFixture>) {
+async function recordGatewayCheckedPosture(
+  fixture: ReturnType<typeof makeKernelFixture>,
+  overrides: { credentialCustodyStatus?: RegisterGatewayCredentialRefInput["custodyStatus"] } = {},
+) {
   const bypassProbeIds = await recordSafeBypassProbes(fixture);
   return fixture.kernel.createProtectedPathPosture({
     tenantId: "tenant_demo",
@@ -442,7 +590,7 @@ async function recordGatewayCheckedPosture(fixture: ReturnType<typeof makeKernel
     resourceRef: "npm:hono",
     protectedSurfaceKind: "package_manager",
     postureState: "gateway_checked",
-    credentialCustodyStatus: "gateway_resolved_from_vault",
+    credentialCustodyStatus: overrides.credentialCustodyStatus ?? "gateway_resolved_from_vault",
     rawSiblingToolStatus: "blocked",
     sourceAuthority: "gateway_probe",
     reasonCodes: ["test_gateway_probe_passed"],

@@ -30,6 +30,11 @@ protected-action clearance -> terminal outcome`. Passport, admission, and
   handle records are evidence/readback context; they are not identity, policy,
   greenlight, gateway check, mutation permission, receipt export, terminal
   certificate, or reusable auth.
+- `PrincipalAgentLink` and `ServiceWorkflowContextRefs` are product projection
+  contracts, not protocol authority primitives. They may provide setup evidence
+  and proposal metadata, but they cannot approve spend, widen an envelope,
+  satisfy delegated authority, perform a gateway check, or replace a fresh
+  exact action contract.
 - The certificate is terminal evidence, not permission, identity, settlement,
   hosted trust, or reusable auth.
 - Public npm availability does not create authority. MCP Registry
@@ -132,6 +137,11 @@ Protocol areas may depend on foundation/events/context/store and other area publ
 - `catalog-envelope`: declared tool, action, gateway, and envelope records; catalog presence is not authorization. Envelopes may carry provider-neutral participant identity bindings, but those bindings are evidence-only links to the opaque principal/agent refs.
 - `delegated-authority`: redacted principal/agent/runtime/envelope/gateway scoped attempt-authority refs; registering a ref records bounds and evidence expectations only, and creates no policy decision, greenlight, gateway check, mutation authority, or receipt. Revocation and expiry are separate status-transition evidence that creates `authority_ref` isolation without mutating the original ref.
 - `credential-custody`: opaque gateway credential refs, redacted gateway custody proof packets, and post-gate resolution evidence; no provider clients or secret retrieval API.
+  Customer or provider gateway custody claims require official external
+  verification, current custody and resolver posture, time-bounded lease or
+  rotation evidence, attestation evidence, redaction success, and no raw
+  credential or payment material. Fixture-local custody remains local proof and
+  cannot satisfy `customer_gateway_evidence`.
 - `runtime-evidence`: generated execution evidence; evidence can propose but cannot authorize.
 - `generated-execution-graph`: normalized generated-code/spec evidence and action candidates.
 - `tool-call-draft`: opened, streaming, finalized, invalid, or abandoned generated tool-call input state.

@@ -123,6 +123,7 @@ export const protocolReasonCodes = [
   code("gateway_custody_proof_bypass_probe_mismatch", "transition_error", "credential_custody"),
   code("gateway_custody_proof_external_verification_required", "transition_error", "credential_custody"),
   code("gateway_custody_proof_fixture_cannot_claim_customer_custody", "transition_error", "credential_custody"),
+  code("gateway_custody_proof_customer_evidence_missing", "transition_error", "credential_custody"),
   code("gateway_custody_proof_drifted", "transition_error", "credential_custody"),
   code("gateway_custody_proof_redaction_failed", "transition_error", "credential_custody"),
 
