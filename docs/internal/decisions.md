@@ -617,9 +617,9 @@ Handshake has two repository boundaries for release administration:
 - `CreasyBear/handshake-protocol-source` is the full source workbench. It owns
   source code, tests, internal docs, release projection scripts, source tags,
   and the source CI gate. Its workflow runs `npm run check:repo`, and that gate
-  must build declaration output before typechecking package subpath imports so a
-  clean checkout does not depend on preexisting `dist/` state. It must not
-  contain npm Trusted Publishing authority.
+  must build declaration and bundle output before typechecking and test-time
+  package subpath imports so a clean checkout does not depend on preexisting
+  `dist/` state. It must not contain npm Trusted Publishing authority.
 - `CreasyBear/handshake-protocol-kernel` is the published package artifact
   repository. It owns the projected npm package boundary: `bin/`, `dist/`,
   `README.md`, `CHANGELOG.md`, `LICENSE`, `NOTICE`, `package.json`,
