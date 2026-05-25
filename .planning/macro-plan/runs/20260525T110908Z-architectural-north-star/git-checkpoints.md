@@ -10,7 +10,8 @@ evidence so the architecture correction remains reconstructable.
 | Commit | Purpose |
 | --- | --- |
 | `bdcec05` | Reset architecture macro plan around projection-over-spine north star. |
-| pending | Commit implementation of projection map, docs, runtime gate, tests, and validation evidence. |
+| `c8db729` | Implement projection map, docs, runtime same-envelope guard, tests, and validation evidence. |
+| pending | Record closeout evidence after implementation commit. |
 
 ## Working Tree Notes
 
