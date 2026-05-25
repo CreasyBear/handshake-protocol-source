@@ -38,7 +38,11 @@ release-state evidence for package readiness, publication, registry
 discoverability, proof gaps, and authority non-claims.
 `x402-protected-tool-acceptance.ts` defines the production acceptance matrix for
 the first protected-tool product path as a release-admission contract, not
-policy or gateway behavior.
+policy or gateway behavior. `proof-packets/` owns focused readback packet
+projectors for clean installed activation, Codex host activation, distribution
+provenance, live x402 requirement readback, and product-completion closeout; the
+folder keeps each packet family local while preserving the single projection
+seam consumed by tests and scripts.
 
 ## Failure and scale posture
 
