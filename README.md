@@ -126,6 +126,15 @@ not gateway check, not mutation;
 `examples/service-workflow-admission/output/latest.md` and is admission readback
 plus handle context only, not clearance or authority.
 
+Hosted admission lock: this service workflow simplification is not a
+hosted-operation go-ahead. Hosted product work may consume the surface only
+after the pre-hosted service workflow gates have source-owned proof or explicit
+proof-gap posture. If hosted work needs hosted operation, provider custody,
+settlement/finality, marketplace or certification, cross-org trust, aggregate
+spend enforcement, hosted org auth, retention/search, or new kernel exports,
+route it to a separate hosted workspace or a new pre-hosted kernel task. Do not
+expand protocol kernel exports for hosted needs without fresh proof gates.
+
 No adapter family defines the protocol. This package is not broad x402
 compatibility, not live provider custody, hosted mutation authority, production
 hosted readiness, generic MCP/runtime control, host-wide containment,

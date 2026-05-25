@@ -64,12 +64,21 @@ npm run test -- test/product/service-workflow-admission.test.ts
 npm run test -- test/adapters/x402-wallet-gateway.test.ts test/integration/x402-d1-http.test.ts
 ```
 
+T2-05 Tier 3 lock verification:
+
+```bash
+npm run test -- test/architecture/claim-boundary.test.ts
+npm run check:repo
+```
+
 Full closeout:
 
 ```bash
 npm run format:check
 npm run check:repo
 ```
+
+Current full closeout status: `npm run check:repo` passes after MPLAN-010.
 
 ## Replay And Refusal Cases
 
@@ -153,6 +162,7 @@ Runtime artifacts to collect during Tier 2:
   `x402_payment.exact` path without carrying payment material;
 - auth.md provenance/proof-gap posture showing no composite credential plus
   spend authority artifact;
+- Tier 3 admission lock in canonical docs and claim-boundary tests;
 - MCP proposal/readback output;
 - host profile posture rows;
 - raw sibling bypass inventory;

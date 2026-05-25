@@ -115,3 +115,21 @@ npm run test -- test/adapters/x402-wallet-gateway.test.ts test/integration/x402-
 ```
 
 Open next slice: MPLAN-010 / T2-05 Tier 3 lock and final release gate.
+
+T2-05 landed the Tier 3 admission lock and final release gate in canonical
+docs plus claim-boundary tests. The lock states that service workflow
+simplification is not a hosted-operation go-ahead, Tier 3 may consume or extend
+the surface only after Tier 1/Tier 2 proof or explicit proof-gap posture, and
+hosted operation or kernel-export needs must route to a separate hosted
+workspace or a new Tier 1/Tier 2 kernel task with fresh proof gates. Verified
+gates:
+
+```bash
+npm run test -- test/architecture/claim-boundary.test.ts
+npm run check:repo
+```
+
+Final status: MPLAN-001 through MPLAN-010 are complete. Tier 1/Tier 2 product
+simplification is implemented and repo-gated. Tier 3 remains locked behind a
+separate hosted workspace or fresh Tier 1/Tier 2 kernel task if hosted needs
+require kernel changes.

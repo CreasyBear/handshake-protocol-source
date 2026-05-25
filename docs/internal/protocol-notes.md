@@ -31,6 +31,13 @@ protected-action clearance -> terminal outcome`. Passport, admission, and
 - Public npm availability does not create authority. MCP Registry
   discoverability remains a proof gap until registry acceptance and lookup are
   verified.
+- Hosted admission lock: service workflow simplification is not a
+  hosted-operation go-ahead. Hosted work may consume the surface only after the
+  pre-hosted service workflow gates have source-owned proof or proof-gap
+  posture. Hosted operation, provider custody, settlement/finality, marketplace
+  or certification, cross-org trust, aggregate spend enforcement, hosted org
+  auth, retention/search, or new kernel exports require a separate hosted
+  workspace or a new pre-hosted kernel task with fresh proof gates.
 
 ## Required Separation
 

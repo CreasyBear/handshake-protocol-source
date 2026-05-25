@@ -112,11 +112,14 @@ If a gateway cannot enforce before consequence, this is advisory, not Handshake.
 
 ## Checkpoints
 
-- After macro-plan validation: git checkpoint.
-- After Tier 1 story/schema/tests pass focused gates: git checkpoint.
-- After docs convergence passes claims/format checks: git checkpoint.
-- After Tier 2 example/runtime gates pass: git checkpoint.
-- Before any Tier 3 work: stop and report proof state.
+- Macro-plan validation: committed.
+- Tier 1 story/schema/tests and docs convergence: committed.
+- Tier 2 active surface alignment, local example, runtime misuse gates, and
+  protected-action fixture gate: committed.
+- Tier 3 admission lock and final release gate: committed after `npm run
+  check:repo`.
+- Before any Tier 3 work: stop and confirm separate hosted workspace or fresh
+  Tier 1/Tier 2 kernel task.
 
 ## Stop Conditions
 
@@ -148,10 +151,14 @@ Use `npm run check:repo` before claiming implementation closeout.
 
 ## Proof Gaps
 
-- No source-owned service workflow admission schema exists yet.
-- No negative tests yet prove the five non-authority IDs cannot create authority.
-- No local service workflow example exists yet.
-- No live provider custody, settlement, hosted operation, or native host containment is proven.
+- No live provider custody, settlement, hosted operation, or native host
+  containment is proven.
+- No marketplace/certification, cross-org trust, aggregate spend enforcement,
+  hosted org auth, retention/search, or hosted mutation authority is proven.
+- auth.md plus x402 remains non-composite provenance/proof-gap posture unless a
+  future fresh action family clears its own gates.
+- Tier 3 remains locked behind a separate hosted workspace or a new Tier 1/Tier
+  2 kernel task with fresh proof gates.
 
 ## Non-Claims
 
@@ -159,4 +166,7 @@ This handoff does not authorize Tier 3, hosted operation, provider custody, sett
 
 ## Next Agent Step
 
-Implement Slice T1-01 and T1-02 together only far enough to make the boundary testable: add `docs/internal/service-workflow-story.md`, add `src/surfaces/service-workflow-admission.ts`, then add or update architecture tests so the new surface is provably non-authority.
+No Tier 1/Tier 2 simplification slice remains open. If the user opens Tier 3,
+start from the Tier 3 admission lock in `docs/internal/decisions.md` and route
+hosted operation to a separate hosted workspace or a fresh Tier 1/Tier 2 kernel
+task before changing protocol exports.

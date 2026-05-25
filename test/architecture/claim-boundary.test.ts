@@ -177,6 +177,34 @@ describe("claim boundary", () => {
         ],
       },
       {
+        label: "hosted admission lock",
+        sources: [
+          { name: "README.md", text: readme },
+          { name: "docs/internal/decisions.md", text: decisions },
+          { name: "docs/internal/protocol-notes.md", text: protocolNotes },
+        ],
+        required: [
+          "Hosted admission lock",
+          "not a hosted-operation go-ahead",
+          "pre-hosted service workflow gates",
+          "hosted operation",
+          "provider custody",
+          "settlement/finality",
+          "marketplace or certification",
+          "cross-org trust",
+          "aggregate spend enforcement",
+          "hosted org auth",
+          "retention/search",
+          "separate hosted workspace",
+          "new pre-hosted kernel task",
+          "fresh proof gates",
+        ],
+        forbiddenPatterns: [
+          /service workflow simplification (?:creates|proves|unblocks) hosted operation/i,
+          /may expand protocol kernel exports for hosted needs/i,
+        ],
+      },
+      {
         label: "expansion admission criteria",
         sources: [
           { name: "docs/internal/decisions.md", text: decisions },

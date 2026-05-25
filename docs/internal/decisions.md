@@ -229,6 +229,32 @@ repo write, CI/deploy, cloud configuration, database/data-plane, marketplace,
 agent-management, or other protected actions remain proof contexts rather than
 execution-ready product surfaces.
 
+## Hosted Admission Lock
+
+Accepted: pre-hosted product simplification is not a hosted-operation
+go-ahead.
+
+Hosted product work may consume or extend the service workflow surface only
+after the pre-hosted service workflow gates have source-owned proof or
+explicitly accepted proof-gap posture. The current completed gates prove
+non-authority admission/handle schema, active surface alignment, local example
+readback, generated-agent misuse refusal, and one fresh `x402_payment.exact`
+fixture gate. They do not prove hosted operation, provider/customer custody,
+settlement/finality, marketplace or certification, cross-org trust, aggregate
+spend enforcement, hosted org auth, retention/search, or hosted mutation
+authority.
+
+If hosted work needs hosted operation, tenant/org auth, hosted custody, retention,
+search, marketplace/certification, cross-org trust, aggregate spend, or new
+protocol-kernel exports, route that work to a separate hosted workspace or a
+new pre-hosted kernel task with its own generated execution shape, protected
+action path, gateway authority holder, credential holder, bypass posture,
+evidence path, proof-gap model, non-claims, and `npm run check:repo` proof.
+That follow-on work must carry fresh proof gates.
+
+This checkout must not expand protocol kernel exports for hosted needs merely
+because the service workflow product surface is now simpler.
+
 ## Market And Expansion Scoring Boundary
 
 Accepted: market scoring is strategy input, not enforcement proof. A wedge can
