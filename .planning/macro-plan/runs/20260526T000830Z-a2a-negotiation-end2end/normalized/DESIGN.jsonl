@@ -1,0 +1,2 @@
+{"lens":"DESIGN","severity":"P0","finding":"Accepted offer can be mistaken for authorized action.","required_change":"Render agreement status separately from policy and gateway status."}
+{"lens":"DESIGN","severity":"P1","finding":"Evidence can disappear behind summaries.","required_change":"Every obligation row must expose exact refs and terminal posture."}

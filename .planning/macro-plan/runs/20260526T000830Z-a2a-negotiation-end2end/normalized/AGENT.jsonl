@@ -1,0 +1,2 @@
+{"lens":"AGENT","severity":"P0","finding":"Agent may implement generic negotiation without protected-action clearing.","required_change":"Require slice handoffs with runtime profile, write scopes, tool contract, and stop conditions."}
+{"lens":"AGENT","severity":"P1","finding":"Raw x402 payment path would escape the contract boundary.","required_change":"Fixture must prove signer/payment material stays behind VerifiedGatewayCheck."}
