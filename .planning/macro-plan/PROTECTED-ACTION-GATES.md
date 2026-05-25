@@ -36,6 +36,16 @@ serviceWorkflowHandle -> fresh x402_payment.exact action request -> ActionContra
 
 The handle is context and evidence refs only.
 
+Non-composite rail rule:
+
+```text
+serviceWorkflowHandle -> fresh x402_payment.exact action request
+serviceWorkflowHandle -> fresh auth_md_protected_api_call.exact action request
+```
+
+These are separate rails. No fixture may merge x402 spend authority and auth.md
+credential authority into one authority artifact.
+
 ## Authority Boundary
 
 Authority begins at exact policy evaluation over an `ActionContract`, then proceeds to one-use greenlight/refusal and gateway check. Admission and handle surfaces must explicitly state:

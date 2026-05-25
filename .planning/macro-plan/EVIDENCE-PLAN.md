@@ -57,6 +57,13 @@ npm run test -- test/product/service-workflow-admission.test.ts
 npm run test -- test/runtime/runtime-ingress.test.ts
 ```
 
+T2-04 protected-action fixture gate verification:
+
+```bash
+npm run test -- test/product/service-workflow-admission.test.ts
+npm run test -- test/adapters/x402-wallet-gateway.test.ts test/integration/x402-d1-http.test.ts
+```
+
 Full closeout:
 
 ```bash
@@ -142,6 +149,10 @@ Runtime artifacts to collect during Tier 2:
 - runtime ingress negative cases for dynamic/stale handle-context refusal;
 - runtime ingress loop/retry cases proving handle evidence does not become
   aggregate spend authority;
+- service workflow fixture gate proving handle context feeds one fresh
+  `x402_payment.exact` path without carrying payment material;
+- auth.md provenance/proof-gap posture showing no composite credential plus
+  spend authority artifact;
 - MCP proposal/readback output;
 - host profile posture rows;
 - raw sibling bypass inventory;

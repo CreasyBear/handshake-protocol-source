@@ -42,6 +42,8 @@ workflow admission.
 - The generated-agent misuse posture lists loop/retry reuse, changed
   parameters, dynamic tool construction, stale review, raw sibling bypass,
   replay, and proof-gap cases as non-authority outcomes.
+- auth.md is recorded as provenance or proof-gap posture only; it is not
+  composed with x402 spend into one fixture authority.
 
 ## What This Does Not Prove
 
@@ -54,3 +56,4 @@ workflow admission.
 - No handle-as-permission.
 - No auth, policy, gateway admission, signer access, payment approval, receipt
   evidence, or reusable clearance from admission or handle records.
+- No composite auth.md plus x402 authority artifact.

@@ -226,6 +226,99 @@ describe("service workflow admission example", () => {
     expect(markdown).toContain("dynamic_tool_construction");
     expect(markdown).toContain("raw_sibling_x402_bypass");
   });
+
+  it("gates the x402 fixture behind fresh clearance without leaking payment or auth.md authority", async () => {
+    const { output, markdown } = await runServiceWorkflowAdmissionDemo();
+    const admission = ServiceWorkflowAdmissionSchema.parse(output.admissionPacket);
+    const handle = ServiceWorkflowHandleSchema.parse(output.workflowHandle);
+
+    expect(output.protectedActionFixtureGate).toMatchObject({
+      serviceWorkflowContextRole: "correlation_context_only",
+      contextAuthorityCreated: false,
+      freshActionContractRequired: true,
+      freshActionContractId: output.freshClearanceAuthorityPath.actionContractId,
+      policyDecisionId: output.freshClearanceAuthorityPath.policyDecisionId,
+      greenlightId: output.freshClearanceAuthorityPath.greenlightId,
+      gatewayCheckAttemptId: output.freshClearanceAuthorityPath.gateAttemptId,
+      receiptId: output.freshClearanceAuthorityPath.receiptId,
+      admissionReadbackReceiptRef: null,
+      paymentMaterialBoundary: {
+        admissionOrHandlePaymentMaterialIncluded: false,
+        runtimeCredentialMaterialVisible: "absent",
+        signedRetryCountBeforeGateway: 0,
+        signerInvocationBoundary: "after_verified_gateway_check_only",
+        paymentMaterialCreatedOnlyAfterVerifiedGatewayCheck: true,
+      },
+      authMdBoundary: {
+        includedInFixture: false,
+        posture: "provenance_or_proof_gap_only",
+        compositeAuthorityCreated: false,
+        proofGapRef: "proof-gap:auth-md-not-composed-into-t2-04",
+      },
+    });
+    expect(output.protectedActionFixtureGate.paymentMaterialBoundary.paymentSignatureHeaderRef).toStartWith(
+      "credential:x402-payment-signature:",
+    );
+    expect(output.protectedActionFixtureGate.paymentMaterialBoundary.paymentPayloadRef).toStartWith(
+      "credential:x402-payment-payload:",
+    );
+    expect(output.authMdPosture).toEqual({
+      includedInProtectedActionFixture: false,
+      authorityPosture: "provenance_or_proof_gap_only",
+      compositeAuthorityCreated: false,
+      separateProtectedActionRequired:
+        "auth_md_protected_api_call.exact_requires_fresh_action_contract_policy_greenlight_gateway_check",
+      proofGapRefs: ["proof-gap:auth-md-not-composed-into-t2-04"],
+    });
+
+    const admissionHandleAndReadbackText = JSON.stringify({
+      admission,
+      handle,
+      admissionReadback: output.admissionReadback,
+      freshClearanceRequest: output.freshClearanceRequest,
+    });
+    for (const forbidden of [
+      output.protectedActionFixtureGate.paymentMaterialBoundary.paymentSignatureHeaderRef,
+      output.protectedActionFixtureGate.paymentMaterialBoundary.paymentPayloadRef,
+      "PaymentPayload",
+      "PAYMENT-SIGNATURE",
+      "auth_md_access_token",
+      "rawCredentialMaterial",
+      "privateKey",
+    ]) {
+      expect(admissionHandleAndReadbackText).not.toContain(forbidden);
+    }
+    const authMdPostureText = JSON.stringify(output.authMdPosture);
+    for (const forbidden of [
+      "credentialRef",
+      "gatewayCredentialRefId",
+      "policyDecisionRef",
+      "greenlightRef",
+      "gatewayCheckRef",
+      "receiptRef",
+      "rawCredentialMaterial",
+    ]) {
+      expect(authMdPostureText).not.toContain(forbidden);
+    }
+    expect(output.freshClearanceRequest.contextRefs).toEqual({
+      passportPackageDigest: handle.passportPackageDigest,
+      passportPresentationId: handle.passportPresentationId,
+      admissionId: handle.admissionId,
+      serviceWorkflowHandleId: handle.serviceWorkflowHandleId,
+      serviceWorkflowHandleDigest: handle.serviceWorkflowHandleDigest,
+    });
+    expect(output.freshClearanceAuthorityPath).toMatchObject({
+      actionClass: "x402_payment.exact",
+      policyDecision: "greenlight",
+      gateDecision: "passed",
+      changedParameterDecision: "refused",
+      changedParameterReasonCode: "params_mismatch",
+      replayDecision: "refused",
+      replayReasonCode: "already_consumed",
+    });
+    expect(markdown).toContain("Protected-Action Fixture Gate");
+    expect(markdown).toContain("auth.md composite authority created");
+  });
 });
 
 async function runServiceWorkflowAdmissionDemo() {

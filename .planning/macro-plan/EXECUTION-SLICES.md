@@ -559,7 +559,7 @@ The first fixture that connects service workflow admission to a protected action
 
 ### Objective
 
-Connect one admitted workflow context to one fresh buyer-side `x402_payment.exact` action request, preserving auth.md as provenance if included and x402 as one exact per-call protected action.
+Connect one admitted workflow context to one fresh buyer-side `x402_payment.exact` action request. Record auth.md as provenance/proof-gap only; do not compose auth.md credential authority with x402 spend authority in this fixture.
 
 ### Source Evidence
 

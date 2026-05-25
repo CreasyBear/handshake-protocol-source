@@ -99,3 +99,19 @@ npm run format:check
 ```
 
 Open next slice: MPLAN-009 / T2-04 protected-action fixture gate.
+
+T2-04 landed the protected-action fixture gate on the service workflow
+admission example. The example now proves the workflow handle is
+correlation-only context for one fresh `x402_payment.exact` path, records the
+fresh ActionContract, PolicyDecision, Greenlight, GatewayCheck, and Receipt
+refs separately from admission/readback, and verifies payment material appears
+only as gateway evidence after verified gateway check. auth.md is explicitly
+recorded as provenance/proof-gap posture only, not a composite credential plus
+spend authority artifact. Verified gates:
+
+```bash
+npm run test -- test/product/service-workflow-admission.test.ts
+npm run test -- test/adapters/x402-wallet-gateway.test.ts test/integration/x402-d1-http.test.ts
+```
+
+Open next slice: MPLAN-010 / T2-05 Tier 3 lock and final release gate.

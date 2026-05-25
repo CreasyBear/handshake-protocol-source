@@ -22,7 +22,11 @@ const x402Output = asRecord(await Bun.file(x402OutputPath).json(), "x402 output"
 const x402Report = asRecord(x402Output.report, "x402 report");
 const protectedAction = asRecord(x402Report.protectedAction, "x402 protectedAction");
 const authorityPath = asRecord(x402Report.authorityPath, "x402 authorityPath");
+const actorsAndCustody = asRecord(x402Report.actorsAndCustody, "x402 actorsAndCustody");
 const evidencePosture = asRecord(x402Report.evidencePosture, "x402 evidencePosture");
+const challengePhaseEvidence = phaseEvidence(x402Output, "0_sandbox_payment_required_challenge");
+const runtimeProposalPhaseEvidence = phaseEvidence(x402Output, "2_runtime_proposal");
+const gatewaySignaturePhaseEvidence = phaseEvidence(x402Output, "4_gateway_admission_and_signature");
 
 const workflowHandle = ServiceWorkflowHandleSchema.parse({
   schemaVersion: serviceWorkflowAdmissionSchemaVersion,
@@ -137,6 +141,40 @@ const output = {
     changedParameterReasonCode: stringField(authorityPath, "changedParameterReasonCode"),
     replayDecision: stringField(authorityPath, "replayDecision"),
     replayReasonCode: stringField(authorityPath, "replayReasonCode"),
+  },
+  protectedActionFixtureGate: {
+    serviceWorkflowContextRole: "correlation_context_only",
+    contextAuthorityCreated: false,
+    freshActionContractRequired: true,
+    freshActionContractId: stringField(authorityPath, "actionContractId"),
+    policyDecisionId: stringField(authorityPath, "policyDecisionId"),
+    greenlightId: stringField(authorityPath, "greenlightId"),
+    gatewayCheckAttemptId: stringField(authorityPath, "gateAttemptId"),
+    receiptId: stringField(authorityPath, "receiptId"),
+    admissionReadbackReceiptRef: null,
+    paymentMaterialBoundary: {
+      admissionOrHandlePaymentMaterialIncluded: false,
+      runtimeCredentialMaterialVisible: stringField(runtimeProposalPhaseEvidence, "credentialMaterialVisibleToRuntime"),
+      signedRetryCountBeforeGateway: numberField(challengePhaseEvidence, "signedRetryCountBeforeGateway"),
+      signerInvocationBoundary: stringField(actorsAndCustody, "signerInvocationBoundary"),
+      paymentSignatureHeaderRef: nullableStringField(gatewaySignaturePhaseEvidence, "paymentSignatureHeaderRef"),
+      paymentPayloadRef: nullableStringField(gatewaySignaturePhaseEvidence, "paymentPayloadRef"),
+      paymentMaterialCreatedOnlyAfterVerifiedGatewayCheck: true,
+    },
+    authMdBoundary: {
+      includedInFixture: false,
+      posture: "provenance_or_proof_gap_only",
+      compositeAuthorityCreated: false,
+      proofGapRef: "proof-gap:auth-md-not-composed-into-t2-04",
+    },
+  },
+  authMdPosture: {
+    includedInProtectedActionFixture: false,
+    authorityPosture: "provenance_or_proof_gap_only",
+    compositeAuthorityCreated: false,
+    separateProtectedActionRequired:
+      "auth_md_protected_api_call.exact_requires_fresh_action_contract_policy_greenlight_gateway_check",
+    proofGapRefs: ["proof-gap:auth-md-not-composed-into-t2-04"],
   },
   evidenceSeparation: {
     admissionEvidenceRefs: admissionPacket.claimResults.flatMap((claim) => claim.evidenceRefs),
@@ -274,6 +312,27 @@ function stringArrayField(record: Record<string, unknown>, key: string): string[
   return value;
 }
 
+function numberField(record: Record<string, unknown>, key: string): number {
+  const value = record[key];
+  if (typeof value !== "number") throw new Error(`${key} must be a number.`);
+  return value;
+}
+
+function nullableStringField(record: Record<string, unknown>, key: string): string | null {
+  const value = record[key];
+  if (value === null) return null;
+  if (typeof value !== "string") throw new Error(`${key} must be a string or null.`);
+  return value;
+}
+
+function phaseEvidence(report: Record<string, unknown>, phaseName: string): Record<string, unknown> {
+  const phases = report.phases;
+  if (!Array.isArray(phases)) throw new Error("x402 output phases must be an array.");
+  const phase = phases.find((entry) => asRecord(entry, "x402 phase").phase === phaseName);
+  if (!phase) throw new Error(`x402 phase not found: ${phaseName}`);
+  return asRecord(asRecord(phase, "x402 phase").evidence, `${phaseName} evidence`);
+}
+
 function renderMarkdown(report: typeof output): string {
   return `# Service Workflow Admission Example
 
@@ -328,6 +387,21 @@ receipt, certificate, credential material, x402 \`PaymentPayload\`, or
 x402 clearance comes only from fresh \`ActionContract -> PolicyDecision ->
 one-use Greenlight -> GatewayCheck\`. The workflow handle contributes context
 only.
+
+## Protected-Action Fixture Gate
+
+| Field | Value |
+| --- | --- |
+| Context role | \`${report.protectedActionFixtureGate.serviceWorkflowContextRole}\` |
+| Fresh contract required | \`${report.protectedActionFixtureGate.freshActionContractRequired}\` |
+| Gateway check attempt | \`${report.protectedActionFixtureGate.gatewayCheckAttemptId}\` |
+| Runtime credential material visible | \`${report.protectedActionFixtureGate.paymentMaterialBoundary.runtimeCredentialMaterialVisible}\` |
+| Signed retry count before gateway | \`${report.protectedActionFixtureGate.paymentMaterialBoundary.signedRetryCountBeforeGateway}\` |
+| Signer boundary | \`${report.protectedActionFixtureGate.paymentMaterialBoundary.signerInvocationBoundary}\` |
+| Payment material after gateway only | \`${report.protectedActionFixtureGate.paymentMaterialBoundary.paymentMaterialCreatedOnlyAfterVerifiedGatewayCheck}\` |
+| auth.md composite authority created | \`${report.protectedActionFixtureGate.authMdBoundary.compositeAuthorityCreated}\` |
+| auth.md posture | \`${report.authMdPosture.authorityPosture}\` |
+| auth.md separate action required | \`${report.authMdPosture.separateProtectedActionRequired}\` |
 
 ## Evidence Separation
 
