@@ -26,6 +26,17 @@ export const McpGatewayPostureSchema = z.enum(["online", "offline", "unknown"]);
 export type McpInstallPosture = z.infer<typeof McpInstallPostureSchema>;
 export type McpGatewayPosture = z.infer<typeof McpGatewayPostureSchema>;
 
+const McpDelegatedAuthorityBindingSchema = z.strictObject({
+  authorityUseName: McpRefSchema,
+  delegatedAuthorityRefId: McpIdSchema,
+  delegatedAuthorityRefDigest: DigestSchema,
+  requiredGrantStatus: z.literal("active").default("active"),
+  authorityKind: z.literal("spend"),
+  policyPackRef: McpRefSchema,
+  policyPackVersion: McpIdSchema,
+  evidenceExpectationRefs: McpSmallListSchema(McpRefSchema).default([]),
+});
+
 export const McpX402PaymentProposalInputSchema = z.strictObject({
   requestId: McpIdSchema,
   tenantId: McpIdSchema,
@@ -50,6 +61,7 @@ export const McpX402PaymentProposalInputSchema = z.strictObject({
   actionTypeId: McpIdSchema,
   gatewayRegistryEntryId: McpIdSchema,
   gatewayId: McpIdSchema,
+  delegatedAuthorityBinding: McpDelegatedAuthorityBindingSchema,
   contractExpiresAt: IsoDateSchema,
   idempotencyKey: McpIdSchema,
   endpointUrl: McpUrlSchema,
@@ -111,6 +123,18 @@ export type ProposeMcpX402PaymentOptions = {
   installPosture?: McpInstallPosture;
   gatewayPosture?: McpGatewayPosture;
   trustedMaxAtomicAmountPerCall?: `${number}` | string;
+  gatewayReadinessRef?: string;
+  gatewayReadinessDigest?: `sha256:${string}` | string;
+  policyVersionRef?: string;
+  policyVersionDigest?: `sha256:${string}` | string;
+};
+
+type McpTrustedProposalBinding = {
+  trustedMaxAtomicAmountPerCall: string;
+  gatewayReadinessRef: string;
+  gatewayReadinessDigest: `sha256:${string}`;
+  policyVersionRef: string;
+  policyVersionDigest: `sha256:${string}`;
 };
 
 export async function proposeMcpX402Payment(
@@ -128,7 +152,8 @@ export async function proposeMcpX402Payment(
     });
   }
   const input = parsed.data;
-  const idempotencyKey = await deriveMcpX402IdempotencyKey(input);
+  const trustedBinding = trustedProposalBinding(options);
+  const idempotencyKey = await deriveMcpX402IdempotencyKey(input, trustedBinding.binding);
 
   if (options.toolsListChanged) {
     return mcpNonContractOutcome({
@@ -172,11 +197,11 @@ export async function proposeMcpX402Payment(
     });
   }
 
-  if (!options.trustedMaxAtomicAmountPerCall) {
+  if (!trustedBinding.binding) {
     return mcpNonContractOutcome({
       outcome: "install_not_ready",
       phase: "readiness",
-      reasonCodes: ["mcp_trusted_spend_bound_missing"],
+      reasonCodes: trustedBinding.reasonCodes,
       nextAction: "fix_install",
       metadataRef: input.metadataRef,
       evidenceRefs: [preContractInstallHealthRef(input.requestId)],
@@ -214,7 +239,7 @@ export async function proposeMcpX402Payment(
     });
   }
 
-  if (compareAtomic(input.atomicAmount, options.trustedMaxAtomicAmountPerCall) > 0) {
+  if (compareAtomic(input.atomicAmount, trustedBinding.binding.trustedMaxAtomicAmountPerCall) > 0) {
     return mcpNonContractOutcome({
       outcome: "refused",
       phase: "proposal",
@@ -245,7 +270,7 @@ export async function proposeMcpX402Payment(
   }
 
   try {
-    return await proposeContract(input, idempotencyKey, options.runtimeClient, options.trustedMaxAtomicAmountPerCall);
+    return await proposeContract(input, idempotencyKey, options.runtimeClient, trustedBinding.binding);
   } catch (error) {
     const code = errorCode(error);
     const transitionEvidence = errorTransitionEvidence(error, input.paymentRequiredEvidenceRef);
@@ -332,10 +357,17 @@ async function proposeContract(
   input: ParsedMcpX402PaymentProposalInput,
   idempotencyKey: string,
   runtimeClient: McpRuntimeProposalClient,
-  trustedMaxAtomicAmountPerCall: string,
+  trustedBinding: McpTrustedProposalBinding,
 ): Promise<McpToolResult> {
   const resourceRef = x402ResourceRef(input);
-  const parameters = x402Parameters(input);
+  const parameters = x402Parameters(input, trustedBinding);
+  const delegatedAuthorityRefs = [input.delegatedAuthorityBinding];
+  const evidenceRefs = unique([
+    input.paymentRequiredEvidenceRef,
+    trustedBinding.gatewayReadinessRef,
+    trustedBinding.policyVersionRef,
+    ...delegatedAuthorityEvidenceRefs(input),
+  ]);
   const executionBlockDigest = await digestMcp({
     requestId: input.requestId,
     metadataDigest: input.metadataDigest,
@@ -348,6 +380,8 @@ async function proposeContract(
     providerEnvironmentRef: input.providerEnvironmentRef,
     selectedPaymentRequirementIndex: input.selectedPaymentRequirementIndex,
     selectedPaymentRequirementDigest: input.selectedPaymentRequirementDigest,
+    gatewayReadinessDigest: trustedBinding.gatewayReadinessDigest,
+    policyVersionDigest: trustedBinding.policyVersionDigest,
   });
 
   const runtimeExecution = await runtimeClient.createRuntimeExecution({
@@ -371,7 +405,7 @@ async function proposeContract(
     branchDetected: input.branchDetected,
     dynamicToolConstructionDetected: false,
     accessPosture: "controlled_outbound",
-    evidenceRefs: [input.metadataRef, input.paymentRequiredEvidenceRef],
+    evidenceRefs: unique([input.metadataRef, ...evidenceRefs]),
   });
 
   const openedDraft = await runtimeClient.createToolCallDraft({
@@ -388,8 +422,9 @@ async function proposeContract(
     resourceRef,
     parameters,
     nonSecretParamsSummary: parameters,
+    delegatedAuthorityRefs,
     expiresAt: input.contractExpiresAt,
-    evidenceRefs: [input.paymentRequiredEvidenceRef],
+    evidenceRefs,
   });
 
   const toolCallDraft = await runtimeClient.transitionToolCallDraft({
@@ -397,7 +432,8 @@ async function proposeContract(
     nextDraftState: "finalized",
     parameters,
     nonSecretParamsSummary: parameters,
-    evidenceRefs: [input.paymentRequiredEvidenceRef],
+    delegatedAuthorityRefs,
+    evidenceRefs,
   });
 
   const intentCompilation = await runtimeClient.compileIntent({
@@ -419,9 +455,11 @@ async function proposeContract(
     generatedCodeOrSpecRefs: [input.generatedCodeOrSpecRef],
     declaredAssumptions: [
       "mcp proposal supplied one official exact x402 payment requirement selection",
+      "mcp proposal supplied one bound delegated spend authority ref",
+      "mcp runtime supplied trusted readiness and policy-version digests outside model input",
       "generated execution graph creation is not exposed by the role-scoped runtime surface",
     ],
-    requiredEvidenceRefs: [input.paymentRequiredEvidenceRef],
+    requiredEvidenceRefs: evidenceRefs,
     candidate: {
       toolCapabilityId: input.toolCapabilityId,
       actionTypeId: input.actionTypeId,
@@ -434,9 +472,10 @@ async function proposeContract(
       recoveryRecommendationId: null,
       parameters,
       nonSecretParamsSummary: parameters,
+      delegatedAuthorityRefs,
       purposeCode: "x402_paid_request",
       expectedSideEffectCodes: ["x402_payment_signature_created"],
-      evidenceRefs: [input.paymentRequiredEvidenceRef],
+      evidenceRefs,
       clearingEvidenceRefs: input.correlationRef ? { correlationRef: input.correlationRef } : {},
       bounds: {
         endpointDomain: new URL(input.endpointUrl).hostname,
@@ -445,7 +484,9 @@ async function proposeContract(
         network: input.network,
         token: input.token,
         asset: input.asset,
-        maxAtomicAmountPerCall: trustedMaxAtomicAmountPerCall,
+        maxAtomicAmountPerCall: trustedBinding.trustedMaxAtomicAmountPerCall,
+        gatewayReadinessDigest: trustedBinding.gatewayReadinessDigest,
+        policyVersionDigest: trustedBinding.policyVersionDigest,
       },
       idempotencyKey,
       rollbackHint: "recover through payment response or facilitator evidence; do not reuse prior authority",
@@ -539,7 +580,10 @@ async function proposeContract(
   );
 }
 
-async function deriveMcpX402IdempotencyKey(input: ParsedMcpX402PaymentProposalInput): Promise<string> {
+async function deriveMcpX402IdempotencyKey(
+  input: ParsedMcpX402PaymentProposalInput,
+  trustedBinding: McpTrustedProposalBinding | null,
+): Promise<string> {
   const digest = await digestMcp({
     schemaVersion: "handshake.mcp.x402.idempotency.v1",
     tenantId: input.tenantId,
@@ -568,13 +612,22 @@ async function deriveMcpX402IdempotencyKey(input: ParsedMcpX402PaymentProposalIn
     paymentRequirementsDigest: input.paymentRequirementsDigest,
     selectedPaymentRequirementIndex: input.selectedPaymentRequirementIndex,
     selectedPaymentRequirementDigest: input.selectedPaymentRequirementDigest,
+    delegatedAuthorityRefId: input.delegatedAuthorityBinding.delegatedAuthorityRefId,
+    delegatedAuthorityRefDigest: input.delegatedAuthorityBinding.delegatedAuthorityRefDigest,
+    delegatedAuthorityPolicyPackRef: input.delegatedAuthorityBinding.policyPackRef,
+    delegatedAuthorityPolicyPackVersion: input.delegatedAuthorityBinding.policyPackVersion,
+    gatewayReadinessDigest: trustedBinding?.gatewayReadinessDigest ?? null,
+    policyVersionDigest: trustedBinding?.policyVersionDigest ?? null,
     sequenceNumber: input.sequenceNumber,
     requiredPriorActionContractIds: input.requiredPriorActionContractIds,
   });
   return `mcp-x402:${digest.slice("sha256:".length)}`;
 }
 
-function x402Parameters(input: ParsedMcpX402PaymentProposalInput): Record<string, McpJsonValue> {
+function x402Parameters(
+  input: ParsedMcpX402PaymentProposalInput,
+  trustedBinding: McpTrustedProposalBinding,
+): Record<string, McpJsonValue> {
   return {
     endpointUrl: input.endpointUrl,
     endpointDomain: new URL(input.endpointUrl).hostname,
@@ -605,7 +658,55 @@ function x402Parameters(input: ParsedMcpX402PaymentProposalInput): Record<string
     metadataDigest: input.metadataDigest,
     toolCatalogDigest: input.toolCatalogDigest,
     gatewayRegistryDigest: input.gatewayRegistryDigest,
+    gatewayReadinessRef: trustedBinding.gatewayReadinessRef,
+    gatewayReadinessDigest: trustedBinding.gatewayReadinessDigest,
+    policyVersionRef: trustedBinding.policyVersionRef,
+    policyVersionDigest: trustedBinding.policyVersionDigest,
   };
+}
+
+function trustedProposalBinding(options: ProposeMcpX402PaymentOptions): {
+  binding: McpTrustedProposalBinding | null;
+  reasonCodes: string[];
+} {
+  const reasonCodes: string[] = [];
+  if (!options.trustedMaxAtomicAmountPerCall) reasonCodes.push("mcp_trusted_spend_bound_missing");
+  if (!options.gatewayReadinessRef || !options.gatewayReadinessDigest) {
+    reasonCodes.push("mcp_trusted_readiness_binding_missing");
+  }
+  if (!options.policyVersionRef || !options.policyVersionDigest) {
+    reasonCodes.push("mcp_policy_version_binding_missing");
+  }
+  if (reasonCodes.length > 0) return { binding: null, reasonCodes };
+
+  const parsed = z
+    .strictObject({
+      trustedMaxAtomicAmountPerCall: AtomicAmountSchema,
+      gatewayReadinessRef: McpRefSchema,
+      gatewayReadinessDigest: DigestSchema,
+      policyVersionRef: McpRefSchema,
+      policyVersionDigest: DigestSchema,
+    })
+    .safeParse({
+      trustedMaxAtomicAmountPerCall: options.trustedMaxAtomicAmountPerCall,
+      gatewayReadinessRef: options.gatewayReadinessRef,
+      gatewayReadinessDigest: options.gatewayReadinessDigest,
+      policyVersionRef: options.policyVersionRef,
+      policyVersionDigest: options.policyVersionDigest,
+    });
+  if (!parsed.success) return { binding: null, reasonCodes: ["mcp_trusted_proposal_binding_invalid"] };
+  return {
+    binding: {
+      ...parsed.data,
+      gatewayReadinessDigest: parsed.data.gatewayReadinessDigest as `sha256:${string}`,
+      policyVersionDigest: parsed.data.policyVersionDigest as `sha256:${string}`,
+    },
+    reasonCodes: [],
+  };
+}
+
+function delegatedAuthorityEvidenceRefs(input: ParsedMcpX402PaymentProposalInput): string[] {
+  return input.delegatedAuthorityBinding.evidenceExpectationRefs;
 }
 
 function mcpX402PostureRefusalReasonCodes(input: ParsedMcpX402PaymentProposalInput): string[] {
@@ -641,6 +742,10 @@ function compareAtomic(left: string, right: string): number {
   const normalizedRight = right.replace(/^0+(?=\d)/, "");
   if (normalizedLeft.length !== normalizedRight.length) return normalizedLeft.length > normalizedRight.length ? 1 : -1;
   return normalizedLeft.localeCompare(normalizedRight);
+}
+
+function unique<T>(values: readonly T[]): T[] {
+  return [...new Set(values)];
 }
 
 function errorCode(error: unknown): string {

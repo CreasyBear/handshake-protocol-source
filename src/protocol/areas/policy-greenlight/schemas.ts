@@ -11,7 +11,14 @@ import {
 } from "../../foundation/schema-core";
 import { RequiredProtectedPathStateSchema } from "../catalog-envelope/schemas";
 
-export const PolicyDecisionValueSchema = z.enum(["greenlight", "refuse", "review_required", "halt", "quarantine"]);
+export const PolicyDecisionValueSchema = z.enum([
+  "greenlight",
+  "refuse",
+  "review_required",
+  "halt",
+  "quarantine",
+  "proof_gap",
+]);
 export type PolicyDecisionValue = z.infer<typeof PolicyDecisionValueSchema>;
 
 export const PolicyDecisionSchema = ProtocolBaseSchema.extend({
@@ -41,16 +48,27 @@ export const GreenlightSchema = ProtocolBaseSchema.extend({
   actionContractId: IdSchema,
   policyDecisionId: IdSchema,
   gatewayRegistryEntryId: IdSchema,
+  gatewayRegistryDigest: DigestSchema.nullable().default(null),
   gatewayRegistryVersion: z.string().min(1),
   gatewayId: IdSchema,
   gatewayPolicyVersion: z.string().min(1),
+  policyVersionRef: z.string().min(1).nullable().default(null),
+  policyVersionDigest: DigestSchema.nullable().default(null),
+  gatewayReadinessRef: z.string().min(1).nullable().default(null),
+  gatewayReadinessDigest: DigestSchema.nullable().default(null),
   actionClass: z.string().min(1),
   resourceRef: ResourceRefSchema,
   requiredProtectedPathState: RequiredProtectedPathStateSchema,
   protectedPathPostureId: IdSchema.nullable(),
   protectedPathPostureDigest: DigestSchema.nullable(),
+  gatewayCredentialRefIds: z.array(IdSchema).default([]),
+  gatewayCredentialRefDigests: z.array(DigestSchema).default([]),
+  delegatedAuthorityRefIds: z.array(IdSchema).default([]),
+  delegatedAuthorityRefDigests: z.array(DigestSchema).default([]),
   paramsDigest: DigestSchema,
   contractDigest: DigestSchema,
+  idempotencyKey: IdSchema.nullable().default(null),
+  idempotencyLedgerKeyDigest: DigestSchema.nullable().default(null),
   maxUses: z.literal(1),
   issuedAt: IsoDateSchema,
   notBefore: IsoDateSchema,

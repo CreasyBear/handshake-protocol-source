@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { requiredGatewayCheckedBypassProbeKinds, type BypassProbeKind } from "../../protocol/areas/bypass-probe";
+import type { CredentialCustodyStatus } from "../../protocol/areas/catalog-envelope";
 import { digestCanonical } from "../../protocol/foundation/canonical";
 import {
   DigestSchema,
@@ -14,6 +15,16 @@ import {
   type InstallProposalCompiledKernelRecords,
 } from "../../install/install-proposal";
 import { ProtectedActionAdapterPackSchema } from "../../install/protected-action-adapter-pack";
+import type {
+  DelegatedAuthorityBinding,
+  DelegatedAuthorityRef,
+  RegisterDelegatedAuthorityRefInput,
+} from "../../protocol/areas/delegated-authority";
+import type {
+  GatewayCredentialBinding,
+  GatewayCredentialRef,
+  RegisterGatewayCredentialRefInput,
+} from "../../protocol/areas/credential-custody";
 
 const AtomicAmountSchema = z.string().regex(/^(?:0|[1-9]\d*)$/);
 
@@ -183,8 +194,125 @@ export async function compileX402InstallProposal(inputValue: X402InstallProposal
   });
 }
 
+export async function buildX402WalletGatewayCredentialRefInput(
+  proposal: X402InstallProposal,
+  recordsValue: InstallProposalCompiledKernelRecords | null = proposal.compiledRecords,
+): Promise<RegisterGatewayCredentialRefInput> {
+  const records = requireCompiledRecords(recordsValue);
+  const providerRegistryRef = `provider:x402-wallet-gateway:${proposal.walletGatewayProfile.walletGatewayId}`;
+  const providerRegistryDigest = await digestCanonical({
+    walletGatewayId: proposal.walletGatewayProfile.walletGatewayId,
+    gatewayId: proposal.walletGatewayProfile.gatewayId,
+    gatewayAdapterId: proposal.walletGatewayProfile.gatewayAdapterId,
+    gatewayAdapterVersion: proposal.walletGatewayProfile.gatewayAdapterVersion,
+    signerHandleRef: proposal.walletGatewayProfile.signerRef,
+    signerCustodyStatus: proposal.walletGatewayProfile.signerCustodyStatus,
+    supportedNetworks: proposal.walletGatewayProfile.supportedNetworks,
+    supportedTokens: proposal.walletGatewayProfile.supportedTokens,
+    resourceRef: proposal.resourceRef,
+  });
+  return {
+    tenantId: proposal.tenantId,
+    organizationId: proposal.organizationId,
+    principalId: proposal.spendBounds.principalId,
+    gatewayId: records.gatewayRegistryEntry.gatewayId,
+    gatewayRegistryEntryId: records.gatewayRegistryEntry.gatewayRegistryEntryId,
+    protectedSurfaceKind: "x402_payment",
+    actionClasses: ["x402_payment.exact"],
+    resourceRefs: [proposal.resourceRef],
+    resourceNamespaceRef: records.gatewayRegistryEntry.resourceNamespaceRef,
+    credentialKind: "x402_wallet_signer",
+    custodyStatus: credentialCustodyStatusForWalletSigner(proposal.walletGatewayProfile.signerCustodyStatus),
+    providerClass: "x402_wallet_gateway",
+    providerRegistryRef,
+    providerRegistryDigest,
+    resolverRef: `resolver:x402-wallet-gateway:${proposal.walletGatewayProfile.walletGatewayId}`,
+    resolverVersion: proposal.walletGatewayProfile.gatewayAdapterVersion,
+    evidenceExpectationRefs: unique([
+      ...proposal.endpointEvidence.evidenceRefs,
+      `evidence:x402-wallet-gateway-profile:${proposal.walletGatewayProfile.walletGatewayId}`,
+      `evidence:x402-wallet-gateway-custody:${proposal.walletGatewayProfile.walletGatewayId}`,
+    ]),
+    issuedAt: proposal.createdAt,
+    expiresAt: proposal.spendBounds.expiresAt,
+  };
+}
+
+export function x402WalletGatewayCredentialBindingFor(credentialRef: GatewayCredentialRef): GatewayCredentialBinding {
+  return {
+    credentialUseName: "x402_wallet_signer",
+    gatewayCredentialRefId: credentialRef.gatewayCredentialRefId,
+    gatewayCredentialRefDigest: credentialRef.gatewayCredentialRefDigest,
+    providerRegistryRef: credentialRef.providerRegistryRef,
+    providerRegistryDigest: credentialRef.providerRegistryDigest,
+    requiredCredentialCustodyStatus: credentialRef.custodyStatus,
+    evidenceExpectationRefs: credentialRef.evidenceExpectationRefs,
+  };
+}
+
+export async function buildX402DelegatedSpendAuthorityRefInput(
+  proposal: X402InstallProposal,
+  recordsValue: InstallProposalCompiledKernelRecords | null = proposal.compiledRecords,
+): Promise<RegisterDelegatedAuthorityRefInput> {
+  const records = requireCompiledRecords(recordsValue);
+  return {
+    tenantId: proposal.tenantId,
+    organizationId: proposal.organizationId,
+    principalId: proposal.spendBounds.principalId,
+    agentId: proposal.spendBounds.agentId,
+    runtimeAdapterId: proposal.spendBounds.runtimeAdapterId,
+    operatingEnvelopeId: records.operatingEnvelope.envelopeId,
+    gatewayId: records.gatewayRegistryEntry.gatewayId,
+    gatewayRegistryEntryId: records.gatewayRegistryEntry.gatewayRegistryEntryId,
+    protectedSurfaceKind: "x402_payment",
+    actionClasses: ["x402_payment.exact"],
+    resourceRefs: [proposal.resourceRef],
+    authorityKind: "spend",
+    grantStatus: "active",
+    policyPackRef: proposal.policyPackRef,
+    policyPackVersion: proposal.policyPackVersion,
+    amountParameterName: "atomicAmount",
+    maxAtomicAmountPerAction: proposal.spendBounds.maxAtomicAmountPerCall,
+    evidenceExpectationRefs: unique([
+      ...proposal.endpointEvidence.evidenceRefs,
+      `evidence:x402-delegated-spend:${proposal.spendBounds.principalId}:${proposal.spendBounds.agentId}`,
+    ]),
+    issuedAt: proposal.spendBounds.issuedAt,
+    expiresAt: proposal.spendBounds.expiresAt,
+  };
+}
+
+export function x402DelegatedSpendAuthorityBindingFor(
+  delegatedAuthorityRef: DelegatedAuthorityRef,
+): DelegatedAuthorityBinding {
+  return {
+    authorityUseName: "x402_delegated_spend",
+    delegatedAuthorityRefId: delegatedAuthorityRef.delegatedAuthorityRefId,
+    delegatedAuthorityRefDigest: delegatedAuthorityRef.delegatedAuthorityRefDigest,
+    requiredGrantStatus: "active",
+    authorityKind: "spend",
+    policyPackRef: delegatedAuthorityRef.policyPackRef,
+    policyPackVersion: delegatedAuthorityRef.policyPackVersion,
+    evidenceExpectationRefs: delegatedAuthorityRef.evidenceExpectationRefs,
+  };
+}
+
+function credentialCustodyStatusForWalletSigner(
+  signerCustodyStatus: X402WalletGatewayProfile["signerCustodyStatus"],
+): CredentialCustodyStatus {
+  if (signerCustodyStatus === "agent_exposed") return "unsafe_agent_visible";
+  return signerCustodyStatus;
+}
+
 export function x402PaymentResourceRef(input: { network: string; payee: string; endpointUrl: string }): string {
   return `x402:${input.network}:${input.payee}:${input.endpointUrl}`;
+}
+
+function requireCompiledRecords(
+  records: InstallProposalCompiledKernelRecords | null,
+): InstallProposalCompiledKernelRecords {
+  if (!records) throw new Error("x402 wallet gateway credential ref requires compiled install records.");
+  return records;
 }
 
 function buildCompiledKernelRecords(
@@ -227,7 +355,7 @@ function buildCompiledKernelRecords(
       actionCatalogVersion: input.actionCatalogVersion,
       actionClass: "x402_payment.exact",
       protectedSurfaceKind: "x402_payment",
-      requiredContractFields: ["gatewayId", "resourceRef", "paramsDigest", "idempotencyKey"],
+      requiredContractFields: ["gatewayId", "resourceRef", "paramsDigest", "idempotencyKey", "delegatedAuthorityRefs"],
       canonicalParameterSchemaRef: x402PaymentExactAdapterPack.parameterSchemaRef,
       resourceRefSchemaRef: "schema:x402-payment-resource-ref:v1",
       requiredEvidenceTypes: ["x402_payment_required", "x402_payment_signature"],
@@ -326,6 +454,10 @@ function domainFromUrl(value: string): string {
 
 function containsWildcard(values: string[]): boolean {
   return values.some((value) => value === "*" || value.includes("*"));
+}
+
+function unique(values: string[]): string[] {
+  return [...new Set(values)];
 }
 
 function compareAtomic(left: string, right: string): number {

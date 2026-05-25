@@ -1,4 +1,5 @@
 import { digestCanonical } from "../foundation/canonical";
+import type { JsonValue } from "../foundation/schema-core";
 import type { ActionContract } from "../areas/action-contract";
 import type { GatewayRegistryEntry } from "../areas/catalog-envelope";
 import type { CredentialResolutionEvidence } from "../areas/credential-custody";
@@ -62,6 +63,7 @@ export function projectContractEvidence(contract: ActionContract): ContractEvide
     paramsDigest: contract.paramsDigest,
     nonSecretParamsSummary: contract.nonSecretParamsSummary,
     gatewayCredentialRefs: contract.gatewayCredentialRefs,
+    delegatedAuthorityRefs: contract.delegatedAuthorityRefs,
     evidenceRefs: contract.evidenceRefs,
     clearingEvidenceRefs: contract.clearingEvidenceRefs,
     signaturePosture: contract.signaturePosture,
@@ -118,6 +120,7 @@ export async function projectAgentTransactionEnvelope(
   const credentialResolutionEvidenceRefs = credentialResolutionEvidence
     .map((evidence) => protocolObjectRef("credential_resolution_evidence", evidence.credentialResolutionEvidenceId))
     .filter(unique);
+  const signerInvocationEvidenceRefs = signerInvocationEvidenceRefsFor(surfaceOperationEvidenceRefs);
   const gatewayCredentialRefs = gatewayCredentialEvidenceRefs([
     ...surfaceOperationEvidenceRefs,
     ...input.contract.gatewayCredentialRefs.map((ref) =>
@@ -125,9 +128,15 @@ export async function projectAgentTransactionEnvelope(
     ),
     ...credentialResolutionEvidenceRefs,
   ]);
+  const delegatedAuthorityRefs = redactedProjectionRefs(
+    input.contract.delegatedAuthorityRefs.map((ref) =>
+      protocolObjectRef("delegated_authority_ref", ref.delegatedAuthorityRefId),
+    ),
+  );
   const downstreamRefs = downstreamEvidenceRefs(surfaceOperationEvidenceRefs);
   const envelopeEvidenceRefs = [
     ...redactedProjectionRefs(input.contract.evidenceRefs),
+    ...delegatedAuthorityRefs,
     ...redactedProjectionRefs(input.receipt?.evidenceRefs ?? []),
     ...redactedProjectionRefs(proofGaps.flatMap((proofGap) => proofGap.affectedObjectRefs)),
     ...redactedProjectionRefs(refusals.flatMap((refusal) => refusal.evidenceRefs)),
@@ -177,11 +186,14 @@ export async function projectAgentTransactionEnvelope(
       mutationAttempt: input.mutationAttempt ?? null,
       surfaceOperationEvidenceRefs,
       gatewayCredentialEvidenceRefs: gatewayCredentialRefs,
+      credentialResolutionEvidenceRefs,
+      signerInvocationEvidenceRefs,
       downstreamEvidenceRefs: downstreamRefs,
     }),
     surfaceOperationEvidenceRefs,
     gatewayCredentialEvidenceRefs: gatewayCredentialRefs,
     credentialResolutionEvidenceRefs,
+    signerInvocationEvidenceRefs,
     downstreamEvidenceRefs: downstreamRefs,
     authMdEvidenceRefs,
     authMdEvidenceLabels: authMdEvidenceLabels({
@@ -228,8 +240,15 @@ export async function projectAgentTransactionEnvelope(
     omittedFields: ["actionContract.parameters", "actionContract.secretRefs", "receipt.evidenceRefs.raw"],
     envelopeDigest: null,
   };
-  const envelopeDigest = await digestCanonical(envelopeSeed);
-  return AgentTransactionEnvelopeProjectionSchema.parse({ ...envelopeSeed, envelopeDigest });
+  const envelopeWithPlaceholderDigest = AgentTransactionEnvelopeProjectionSchema.parse({
+    ...envelopeSeed,
+    envelopeDigest: "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+  });
+  const envelopeDigest = await digestCanonical({
+    ...(envelopeWithPlaceholderDigest as unknown as Record<string, JsonValue>),
+    envelopeDigest: null,
+  });
+  return AgentTransactionEnvelopeProjectionSchema.parse({ ...envelopeWithPlaceholderDigest, envelopeDigest });
 }
 
 function scopedRefusals(refusals: Refusal[], contract: ActionContract): Refusal[] {
@@ -595,6 +614,18 @@ function gatewayCredentialEvidenceRefs(refs: readonly string[]): string[] {
     .filter(unique);
 }
 
+function signerInvocationEvidenceRefsFor(refs: readonly string[]): string[] {
+  return refs
+    .filter(
+      (ref) =>
+        ref.startsWith("evidence:x402-payment-signature:") ||
+        ref.startsWith("evidence:x402-official-payment-signature:") ||
+        ref.startsWith("credential:x402-payment-signature:") ||
+        ref.startsWith("credential:x402-local-fixture-signature:"),
+    )
+    .filter(unique);
+}
+
 function downstreamEvidenceRefs(refs: readonly string[]): string[] {
   return refs
     .filter((ref) => ref.startsWith("evidence:") && (ref.includes("payment-response") || ref.includes("signed-retry")))
@@ -608,10 +639,14 @@ function surfaceOperationEvidenceLabels(input: {
   mutationAttempt: MutationAttempt | null;
   surfaceOperationEvidenceRefs: readonly string[];
   gatewayCredentialEvidenceRefs: readonly string[];
+  credentialResolutionEvidenceRefs: readonly string[];
+  signerInvocationEvidenceRefs: readonly string[];
   downstreamEvidenceRefs: readonly string[];
 }): string[] {
   const labels: string[] = [];
   if (input.gateAttempt) labels.push("local_gateway_check");
+  if (input.credentialResolutionEvidenceRefs.length > 0) labels.push("gateway_credential_resolution");
+  if (input.signerInvocationEvidenceRefs.length > 0) labels.push("gateway_signer_invocation");
   if (input.gatewayCredentialEvidenceRefs.length > 0) {
     labels.push(
       hasPaymentCredentialEvidence(input.surfaceOperationEvidenceRefs)

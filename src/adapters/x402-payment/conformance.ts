@@ -53,6 +53,8 @@ export type X402FirstWedgeSurfaceClassification =
 
 export const X402FirstWedgeEvidenceLabelSchema = z.enum([
   "local_gateway_check",
+  "gateway_credential_resolution",
+  "gateway_signer_invocation",
   "payment_payload_created",
   "downstream_reconciliation_recorded",
   "payment_response_received",
@@ -72,6 +74,8 @@ export type X402FirstWedgeEvidenceLabelClassification = {
   authorityCreated: false;
   evidenceRole:
     | "gateway_check"
+    | "gateway_credential_resolution"
+    | "gateway_signer_invocation"
     | "gateway_held_payment_credential"
     | "downstream_reconciliation"
     | "payment_response"
@@ -116,6 +120,8 @@ const x402FirstWedgeEvidenceLabelClassifications = {
   facilitator_verify_failed: evidenceLabel("facilitator_verify_failed", "facilitator_verify"),
   facilitator_verify_succeeded: evidenceLabel("facilitator_verify_succeeded", "facilitator_verify"),
   local_gateway_check: evidenceLabel("local_gateway_check", "gateway_check"),
+  gateway_credential_resolution: evidenceLabel("gateway_credential_resolution", "gateway_credential_resolution"),
+  gateway_signer_invocation: evidenceLabel("gateway_signer_invocation", "gateway_signer_invocation"),
   local_reference_downstream_fixture: evidenceLabel("local_reference_downstream_fixture", "local_reference_fixture"),
   downstream_reconciliation_recorded: evidenceLabel("downstream_reconciliation_recorded", "downstream_reconciliation"),
   payment_payload_created: evidenceLabel("payment_payload_created", "gateway_held_payment_credential"),
@@ -140,16 +146,23 @@ const x402FirstWedgeEvidenceLabelClassifications = {
 } as const satisfies Record<X402FirstWedgeEvidenceLabel, X402FirstWedgeEvidenceLabelClassification>;
 
 const X402PaymentConformanceReason = {
+  browserSidePaymentNotBlocked: "x402_browser_side_payment_not_blocked",
   directCoreSigningNotBlocked: "x402_direct_core_signing_not_blocked",
+  directX402ClientNotBlocked: "x402_direct_x402_client_not_blocked",
   failureClosedProbeFailed: "x402_failure_closed_probe_failed",
   mcpDirectPaymentNotBlocked: "x402_mcp_direct_payment_not_blocked",
+  packageScriptPaymentNotBlocked: "x402_package_script_payment_not_blocked",
   paidAxiosClientNotBlocked: "x402_paid_axios_client_not_blocked",
   paidFetchClientNotBlocked: "x402_paid_fetch_client_not_blocked",
+  rawNetworkPaymentNotBlocked: "x402_raw_network_payment_not_blocked",
   rawPaymentSignatureHeaderNotBlocked: "x402_raw_payment_signature_header_not_blocked",
+  rawPaymentSignatureInjectionNotBlocked: "x402_raw_payment_signature_injection_not_blocked",
   rawPrivateKeyEnvNotAbsent: "x402_raw_private_key_env_not_absent",
   siblingWrapperNotBlocked: "x402_sibling_wrapper_not_blocked",
   signerNotGatewayHeld: "x402_signer_not_gateway_held",
   tokenPassthroughNotBlocked: "x402_token_passthrough_not_blocked",
+  unmanagedMcpServerNotBlocked: "x402_unmanaged_mcp_server_not_blocked",
+  unmanagedToolPacketNotBlocked: "x402_unmanaged_tool_packet_not_blocked",
   wrapperDriftPresent: "x402_wrapper_drift_present",
 } as const;
 
@@ -227,16 +240,23 @@ export const X402PaymentConformancePostureSchema = z.strictObject({
   signerCustodyStatus: z.enum(["gateway_held", "fixture_gateway_held", "agent_exposed", "unknown"]),
   rawPrivateKeyEnvStatus: z.enum(["absent", "present", "unknown"]),
   directCoreClientSigningStatus: z.enum(["blocked", "absent", "present", "unknown"]),
+  directX402ClientStatus: z.enum(["blocked", "absent", "present", "unknown"]).default("absent"),
   paidFetchClientStatus: z.enum(["blocked", "absent", "present", "unknown"]),
   paidAxiosClientStatus: z.enum(["blocked", "absent", "present", "unknown"]),
+  packageScriptPaymentStatus: z.enum(["blocked", "absent", "present", "unknown"]).default("absent"),
+  browserSidePaymentStatus: z.enum(["blocked", "absent", "present", "unknown"]).default("absent"),
+  rawNetworkPaymentStatus: z.enum(["blocked", "absent", "present", "unknown"]).default("absent"),
   rawPaymentSignatureHeaderStatus: z.enum(["blocked", "absent", "present", "unknown"]),
+  rawPaymentSignatureInjectionStatus: z.enum(["blocked", "absent", "present", "unknown"]).default("absent"),
   siblingX402WrapperStatus: z.enum(["blocked", "absent", "present", "unknown"]),
   mcpDirectPaymentStatus: z.enum(["blocked", "absent", "present", "unknown"]),
+  unmanagedMcpServerStatus: z.enum(["blocked", "absent", "present", "unknown"]).default("absent"),
+  unmanagedToolPacketStatus: z.enum(["blocked", "absent", "present", "unknown"]).default("absent"),
   tokenPassthroughStatus: z.enum(["blocked", "absent", "present", "unknown"]),
   wrapperDriftStatus: z.enum(["absent", "present", "unknown"]),
   failureClosedStatus: z.enum(["passed", "failed", "unknown"]),
 });
-export type X402PaymentConformancePosture = z.infer<typeof X402PaymentConformancePostureSchema>;
+export type X402PaymentConformancePosture = z.input<typeof X402PaymentConformancePostureSchema>;
 
 export type X402PaymentConformanceResult = {
   adapterPackId: "adapter_pack_x402_payment_exact";
@@ -259,20 +279,41 @@ export function checkX402PaymentInstallConformance(
   if (!["blocked", "absent"].includes(posture.directCoreClientSigningStatus)) {
     reasonCodes.push(X402PaymentConformanceReason.directCoreSigningNotBlocked);
   }
+  if (!["blocked", "absent"].includes(posture.directX402ClientStatus)) {
+    reasonCodes.push(X402PaymentConformanceReason.directX402ClientNotBlocked);
+  }
   if (!["blocked", "absent"].includes(posture.paidFetchClientStatus)) {
     reasonCodes.push(X402PaymentConformanceReason.paidFetchClientNotBlocked);
   }
   if (!["blocked", "absent"].includes(posture.paidAxiosClientStatus)) {
     reasonCodes.push(X402PaymentConformanceReason.paidAxiosClientNotBlocked);
   }
+  if (!["blocked", "absent"].includes(posture.packageScriptPaymentStatus)) {
+    reasonCodes.push(X402PaymentConformanceReason.packageScriptPaymentNotBlocked);
+  }
+  if (!["blocked", "absent"].includes(posture.browserSidePaymentStatus)) {
+    reasonCodes.push(X402PaymentConformanceReason.browserSidePaymentNotBlocked);
+  }
+  if (!["blocked", "absent"].includes(posture.rawNetworkPaymentStatus)) {
+    reasonCodes.push(X402PaymentConformanceReason.rawNetworkPaymentNotBlocked);
+  }
   if (!["blocked", "absent"].includes(posture.rawPaymentSignatureHeaderStatus)) {
     reasonCodes.push(X402PaymentConformanceReason.rawPaymentSignatureHeaderNotBlocked);
+  }
+  if (!["blocked", "absent"].includes(posture.rawPaymentSignatureInjectionStatus)) {
+    reasonCodes.push(X402PaymentConformanceReason.rawPaymentSignatureInjectionNotBlocked);
   }
   if (!["blocked", "absent"].includes(posture.siblingX402WrapperStatus)) {
     reasonCodes.push(X402PaymentConformanceReason.siblingWrapperNotBlocked);
   }
   if (!["blocked", "absent"].includes(posture.mcpDirectPaymentStatus)) {
     reasonCodes.push(X402PaymentConformanceReason.mcpDirectPaymentNotBlocked);
+  }
+  if (!["blocked", "absent"].includes(posture.unmanagedMcpServerStatus)) {
+    reasonCodes.push(X402PaymentConformanceReason.unmanagedMcpServerNotBlocked);
+  }
+  if (!["blocked", "absent"].includes(posture.unmanagedToolPacketStatus)) {
+    reasonCodes.push(X402PaymentConformanceReason.unmanagedToolPacketNotBlocked);
   }
   if (!["blocked", "absent"].includes(posture.tokenPassthroughStatus)) {
     reasonCodes.push(X402PaymentConformanceReason.tokenPassthroughNotBlocked);

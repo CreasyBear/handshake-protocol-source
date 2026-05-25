@@ -5,9 +5,13 @@ import { HandshakeClient, type HandshakeFetch } from "../../src/sdk/client";
 import { runBypassProbeExecutors } from "../../src/adapters/protected-path-probes";
 import { x402PaymentHostileBypassProbeExecutors } from "../../src/adapters/x402-payment/bypass-probes";
 import {
+  buildX402DelegatedSpendAuthorityRefInput,
+  buildX402WalletGatewayCredentialRefInput,
   compileX402InstallProposal,
   type X402InstallProposal,
   type X402InstallProposalInput,
+  x402DelegatedSpendAuthorityBindingFor,
+  x402WalletGatewayCredentialBindingFor,
 } from "../../src/adapters/x402-payment/install-proposal";
 import { runX402WalletGateway, type X402PaymentParameters } from "../../src/adapters/x402-payment/wallet-gateway";
 import { runPackageInstallGateway } from "../../src/adapters/package-install/gateway";
@@ -17,6 +21,8 @@ import { verifyAuthorityCertificate, type AuthorityCertificateSignerInput } from
 import { projectX402AuthorityCertificateEvidenceProfile } from "../../src/conformance";
 import { proposeRuntimeIngressActionContracts } from "../../src/runtime";
 import type { ProtocolStore } from "../../src/protocol/store/port";
+import type { GatewayCredentialRef } from "../../src/protocol/areas/credential-custody";
+import type { DelegatedAuthorityRef } from "../../src/protocol/areas/delegated-authority";
 import {
   createPackageManifestSurface,
   packageInstallObservedParameters,
@@ -39,6 +45,8 @@ const tokens = {
   gateway_custody: "aps_gateway_custody_token",
   review_custody: "aps_review_custody_token",
 } as const;
+const x402CredentialRefs = new WeakMap<X402InstallProposal, GatewayCredentialRef>();
+const x402AuthorityRefs = new WeakMap<X402InstallProposal, DelegatedAuthorityRef>();
 
 describe("adapter-backed APS proof spine", () => {
   it("proves x402 runtime ingress composes through the adapter gateway into redacted transaction evidence", async () => {
@@ -436,6 +444,8 @@ async function installX402ProofProfile(fixture: ReturnType<typeof makeKernelFixt
     payload: records.gatewayRegistryEntry,
   });
   await fixture.kernel.putCatalogObject({ objectType: "operating_envelope", payload: records.operatingEnvelope });
+  const credentialRef = await registerX402WalletCredentialRef(fixture, proposal, records);
+  const authorityRef = await registerX402DelegatedAuthorityRef(fixture, proposal, records);
   return {
     proposal,
     records,
@@ -450,10 +460,16 @@ async function installX402ProofProfile(fixture: ReturnType<typeof makeKernelFixt
       toolCatalogRef: `${records.toolCapability.toolCatalogId}@${records.toolCapability.toolCatalogVersion}`,
       actionCatalogRef: `${records.actionType.actionCatalogId}@${records.actionType.actionCatalogVersion}`,
       gatewayRegistryRef: `gateway_registry@${records.gatewayRegistryEntry.gatewayRegistryVersion}`,
+      gatewayReadinessRef: "handshake://local/x402/gateway-readiness.json",
+      gatewayReadinessDigest: x402Digest,
+      policyVersionRef: `${proposal.policyPackRef}@${proposal.policyPackVersion}`,
+      policyVersionDigest: x402Digest,
       toolCapabilityId: records.toolCapability.toolCapabilityId,
       actionTypeId: records.actionType.actionTypeId,
       gatewayRegistryEntryId: records.gatewayRegistryEntry.gatewayRegistryEntryId,
       gatewayId: records.gatewayRegistryEntry.gatewayId,
+      gatewayCredentialBinding: x402WalletGatewayCredentialBindingFor(credentialRef),
+      delegatedAuthorityBinding: x402DelegatedSpendAuthorityBindingFor(authorityRef),
       maxAtomicAmountPerCall: proposal.spendBounds.maxAtomicAmountPerCall,
       contractExpiresAt: futureIso(),
       signingSecret: "test-secret",
@@ -513,6 +529,30 @@ async function recordGatewayCheckedX402Posture(
     bypassProbeIds: probes.map((probe) => probe.bypassProbeId),
     expiresAt: futureIso(),
   });
+}
+
+async function registerX402WalletCredentialRef(
+  fixture: ReturnType<typeof makeKernelFixture>,
+  proposal: X402InstallProposal,
+  records: NonNullable<X402InstallProposal["compiledRecords"]>,
+): Promise<GatewayCredentialRef> {
+  const credentialRef = await fixture.kernel.registerGatewayCredentialRef(
+    await buildX402WalletGatewayCredentialRefInput(proposal, records),
+  );
+  x402CredentialRefs.set(proposal, credentialRef);
+  return credentialRef;
+}
+
+async function registerX402DelegatedAuthorityRef(
+  fixture: ReturnType<typeof makeKernelFixture>,
+  proposal: X402InstallProposal,
+  records: NonNullable<X402InstallProposal["compiledRecords"]>,
+): Promise<DelegatedAuthorityRef> {
+  const authorityRef = await fixture.kernel.registerDelegatedAuthorityRef(
+    await buildX402DelegatedSpendAuthorityRefInput(proposal, records),
+  );
+  x402AuthorityRefs.set(proposal, authorityRef);
+  return authorityRef;
 }
 
 async function expectRuntimeCannotUseAuthority(

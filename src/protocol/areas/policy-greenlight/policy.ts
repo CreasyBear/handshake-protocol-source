@@ -4,7 +4,7 @@ import type { IsolationState } from "../isolation-breaker";
 import type { ReviewDecision } from "../review-binding";
 
 export type PolicyEvaluationResult = {
-  decision: "greenlight" | "refuse" | "review_required" | "halt" | "quarantine";
+  decision: "greenlight" | "refuse" | "review_required" | "halt" | "quarantine" | "proof_gap";
   reasonCode: string;
   reason: string;
   matchedRuleIds: string[];

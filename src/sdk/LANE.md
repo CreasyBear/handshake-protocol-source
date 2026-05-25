@@ -43,16 +43,20 @@ Protocol primitive internals, storage implementations, Hono app internals, runti
 ## Public surface
 
 Root exports remain `HandshakeClient`, `HandshakeClientError`, client options,
-fetch adapter types, transition methods, and redacted diagnostic evidence
-projection reads.
+fetch adapter types, transition methods including the gateway-custody route for
+registering opaque `GatewayCredentialRef` records, and redacted diagnostic
+evidence projection reads. Registering a credential ref records custody
+metadata only; it does not expose or resolve the mutation credential.
 
 Role-scoped activation clients are exposed through the explicit
 `handshake-protocol-kernel/sdk/role-clients` package subpath. That subpath may
-export `RuntimeClient`, `EvidenceClient`, `HandshakeClientError`, and safe
-transport types only. It must not export `HandshakeClient`, role-token maps,
-fallback transition-token options, install clients, gateway clients, policy
-methods, greenlight methods, receipt-export methods, certificate minting, raw
-record reads, signer material, or mutation commands.
+export `InstallClient`, `ControlPlaneClient`, `RuntimeClient`, `GatewayClient`,
+`PolicyClient`, `EvidenceClient`, `HandshakeClientError`, and safe transport types only. It must
+not export `HandshakeClient`, role-token maps, fallback transition-token
+options, receipt-export methods, certificate minting, raw record reads, signer
+material, or mutation commands. Policy authority is exposed only through
+`PolicyClient.evaluatePolicy()`, not through runtime, evidence, install,
+gateway, CLI, MCP, profile, package, or support surfaces.
 
 ## Extraction trigger
 
@@ -64,17 +68,50 @@ This lane sends requests and parses responses. It must not infer authority from 
 
 ## Role-client adoption closeout
 
-First-slice activation code should use `RuntimeClient` and `EvidenceClient` from
+First-slice activation code should use `InstallClient`, `RuntimeClient`,
+`GatewayClient`, `ControlPlaneClient`, `PolicyClient`, and `EvidenceClient` from
 `handshake-protocol-kernel/sdk/role-clients`, not the low-level
 `HandshakeClient` token-map transport. `HandshakeClient` remains useful for
 protocol tests and internal HTTP route parity, but it teaches the wrong shape
 for agent-facing activation because it can carry multiple role tokens.
 
-`RuntimeClient` may create runtime execution evidence, tool-call drafts, intent
-compilations, and action-contract proposals through `runtime_evidence` custody.
-Those methods produce proposal records only. They do not evaluate policy,
+`InstallClient` may register compiled `InstallProposal` catalog,
+gateway-registry, and operating-envelope records through `control_plane`
+custody using one server-side setup commit. Ready proposals atomically register
+compiled setup records; refused proposals record refusal evidence. It is setup
+evidence, not hosted installation authority. It does not compile install
+proposals, evaluate policy, issue greenlights, perform gateway checks, register
+credential refs, resolve credentials, use signers, run probes, mutate protected
+surfaces, export receipts, mint certificates, or read raw records.
+
+`RuntimeClient` may create runtime execution evidence, submit a runtime ingress
+dispatch block, create tool-call drafts, compile intent, and propose
+action-contracts through `runtime_evidence` custody. Those methods produce
+proposal records or compiler refusals only. They do not evaluate policy,
 greenlight, gateway-check, mutate, export receipts, mint certificates, recover,
 install, isolate, or sign.
+
+`ControlPlaneClient` may register delegated authority refs and record terminal
+delegated authority status transitions through `control_plane` custody. Those
+methods manage delegated attempt-authority evidence and authority-ref isolation
+only. They do not evaluate policy, issue greenlights, perform gateway checks,
+resolve gateway credentials, use signers, mutate protected surfaces, export
+receipts, or mint certificates.
+
+`PolicyClient` may evaluate exact action-contract policy through
+`control_plane` custody. It is the narrow policy-authority surface: it may
+create one policy decision and optional one-use greenlight or refusal, but it
+does not perform gateway checks, resolve gateway credentials, use signers,
+mutate protected surfaces, read evidence, manage delegated authority, install
+setup records, export receipts, or mint certificates.
+
+`GatewayClient` may register gateway credential refs, record gateway custody
+proof packets, create bypass probes, record protected-path posture, perform
+gateway checks, record post-gate credential-resolution evidence, and reconcile
+downstream protected-surface operation state through `gateway_custody`. It is
+gateway transport only. It does not expose signer helpers, payment payload
+creation, policy evaluation, delegated-authority management, receipt export,
+certificate minting, raw record reads, or mutation commands.
 
 `EvidenceClient` may read redacted projections and verify a supplied terminal
 `AuthorityCertificate` against explicit pinned local trust material. It does
@@ -90,5 +127,5 @@ Challenge and support posture:
   identities, reason codes, and local trust verification results;
 - never request or include `PaymentPayload`, `PAYMENT-SIGNATURE`, private keys,
   signer refs, raw store records, role-token maps, or gateway credentials;
-- keep `InstallClient` and `GatewayClient` as deferred contracts until the user
-  explicitly expands this package surface beyond runtime/evidence.
+- keep new role clients off the subpath until their custody role, route family,
+  non-authority posture, and package-surface tests are explicit.

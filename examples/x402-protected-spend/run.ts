@@ -1,28 +1,49 @@
 import { mkdir, writeFile } from "node:fs/promises";
-import { EvidenceClient, RuntimeClient, type HandshakeFetch } from "handshake-protocol-kernel/sdk/role-clients";
+import {
+  ControlPlaneClient,
+  EvidenceClient,
+  GatewayClient,
+  InstallClient,
+  PolicyClient,
+  RuntimeClient,
+  type HandshakeFetch,
+} from "handshake-protocol-kernel/sdk/role-clients";
 import { createApp, type WorkerBindings } from "../../src/http/app";
 import { runBypassProbeExecutors } from "../../src/adapters/protected-path-probes";
 import { x402PaymentHostileBypassProbeExecutors } from "../../src/adapters/x402-payment/bypass-probes";
 import {
+  buildX402DelegatedSpendAuthorityRefInput,
+  buildX402WalletGatewayCredentialRefInput,
   compileX402InstallProposal,
   type X402InstallProposal,
   type X402InstallProposalInput,
+  x402DelegatedSpendAuthorityBindingFor,
+  x402WalletGatewayCredentialBindingFor,
 } from "../../src/adapters/x402-payment/install-proposal";
 import {
-  buildX402PaymentCompileIntentInput,
   buildX402PaymentAttemptFromRequiredEvidence,
   type X402PaymentAttempt,
   type X402PaymentRuntimeConfig,
 } from "../../src/adapters/x402-payment/action-proposal";
-import { runX402WalletGateway, type X402PaymentParameters } from "../../src/adapters/x402-payment/wallet-gateway";
+import type { InstallProposal } from "../../src/install";
+import type { ProtectedX402ToolFacadeInput, ProtectedX402ToolFacadeResult } from "../../src/x402-protected-tool";
+import {
+  runX402WalletGateway,
+  type X402PaymentParameters,
+  type X402WalletGatewayResult,
+} from "../../src/adapters/x402-payment/wallet-gateway";
 import {
   createLocalX402PaidHttpSandbox,
   createLocalX402SandboxSigningSurface,
 } from "../../src/adapters/x402-payment/sandbox-http";
 import { type AuthorityCertificateSignerInput } from "../../src";
-import type { ActionContract, IntentCompilationRecord, RuntimeExecutionRecord, ToolCallDraft } from "../../src";
 import { digestCanonical } from "../../src/protocol/foundation/canonical";
 import { nowIso } from "../../src/protocol/foundation/ids";
+import type { JsonValue } from "../../src/protocol/foundation/schema-core";
+import type { ActionContract } from "../../src/protocol/areas/action-contract/schemas";
+import type { GatewayCredentialRef, GatewayCustodyProofPacket } from "../../src/protocol/areas/credential-custody";
+import type { DelegatedAuthorityRef } from "../../src/protocol/areas/delegated-authority";
+import type { ProtectedPathPosture } from "../../src/protocol/public/schemas";
 import { InMemoryProtocolStore } from "../../src/storage/memory";
 import { HandshakeKernel } from "../../src/protocol/kernel";
 import type { ProtocolStore } from "../../src/protocol/store/port";
@@ -131,18 +152,53 @@ const attempt = await buildX402PaymentAttemptFromRequiredEvidence({
 });
 const proposal = await compileX402InstallProposal(officialInstallInput(attempt.paymentRequirementsDigest));
 const records = requireRecords(proposal);
-await kernel.putCatalogObject({ objectType: "tool_capability", payload: records.toolCapability });
-await kernel.putCatalogObject({ objectType: "action_type", payload: records.actionType });
-await kernel.putCatalogObject({ objectType: "gateway_registry_entry", payload: records.gatewayRegistryEntry });
-await kernel.putCatalogObject({ objectType: "operating_envelope", payload: records.operatingEnvelope });
-await recordGatewayCheckedPosture(proposal, records);
 const roleClients = httpRoleClientsForStore(store);
-
-const runtime = await proposeOfficialX402ThroughRuntimeClient(
-  roleClients.runtimeClient,
-  runtimeConfig(proposal, records),
-  attempt,
+const installSetup = await roleClients.installClient.registerInstallProposalCompiledRecords(
+  baseInstallProposalForRegistration(proposal),
 );
+if (installSetup.outcome !== "compiled_records_registered") {
+  throw new Error(`Expected install setup records, got ${installSetup.outcome}.`);
+}
+const credentialRef = await roleClients.gatewayClient.registerGatewayCredentialRef(
+  await buildX402WalletGatewayCredentialRefInput(proposal, records),
+);
+const delegatedAuthorityRef = await roleClients.controlPlaneClient.registerDelegatedAuthorityRef(
+  await buildX402DelegatedSpendAuthorityRefInput(proposal, records),
+);
+const protectedPathPosture = await recordGatewayCheckedPosture(roleClients.gatewayClient, proposal, records);
+const custodyProofPacket = await recordGatewayCustodyProofPacket(
+  roleClients.gatewayClient,
+  proposal,
+  records,
+  credentialRef,
+  protectedPathPosture,
+);
+const runtimeConfigValue = await runtimeConfig(
+  proposal,
+  records,
+  credentialRef,
+  delegatedAuthorityRef,
+  custodyProofPacket,
+);
+const protectedToolModule = await loadProtectedToolModule();
+
+const protectedToolFacadeInput = await buildProtectedToolFacadeInput(
+  runtimeConfigValue,
+  records,
+  proposal,
+  attempt,
+  custodyProofPacket,
+);
+const protectedToolFacade = protectedToolModule.prepareProtectedX402ToolDispatch(protectedToolFacadeInput);
+if (protectedToolFacade.outcome !== "dispatch_block_prepared") {
+  throw new Error(`Expected protected x402 tool facade to prepare dispatch, got ${protectedToolFacade.outcome}.`);
+}
+const runtime = await roleClients.runtimeClient.proposeRuntimeIngressActionContracts({
+  tenantId: proposal.tenantId,
+  organizationId: proposal.organizationId,
+  config: { x402Payment: runtimeConfigValue },
+  dispatchBlock: protectedToolFacade.runtimeIngressBlock,
+});
 const runtimeProposal = runtime.proposals[0];
 if (!runtimeProposal || runtimeProposal.outcome !== "action_contract_proposed") {
   throw new Error(`Expected runtime to propose an action contract, got ${runtime.outcome}.`);
@@ -150,7 +206,7 @@ if (!runtimeProposal || runtimeProposal.outcome !== "action_contract_proposed") 
 const contract = runtimeProposal.actionContract;
 const beforePolicyCounts = await recordCounts();
 
-const policy = await kernel.evaluatePolicy({
+const policy = await roleClients.policyClient.evaluatePolicy({
   actionContractId: contract.actionContractId,
   envelopeId: records.operatingEnvelope.envelopeId,
   signingSecret: "test-secret",
@@ -166,8 +222,21 @@ const surface = createLocalX402SandboxSigningSurface({
   selectedPaymentRequirementIndex: evidence.selectedPaymentRequirementIndex,
   selectedPaymentRequirementDigest: evidence.selectedPaymentRequirementDigest,
 });
+const changedParameterProbe = await runX402WalletGateway({
+  protocol: roleClients.gatewayClient,
+  surface,
+  actionContractId: contract.actionContractId,
+  greenlightId: greenlight.greenlightId,
+  observedParameters: {
+    ...(contract.parameters as X402PaymentParameters),
+    atomicAmount: "2501",
+  },
+  surfaceOperationRef: "surface-op:demo-official-x402-param-drift",
+});
+const signerInvocationsAfterChangedParameterProbe = signer.signatureCount();
+const signedRetryCountAfterChangedParameterProbe = sandbox.snapshot().signedRetryCount;
 const gateway = await runX402WalletGateway({
-  protocol: kernel,
+  protocol: roleClients.gatewayClient,
   surface,
   actionContractId: contract.actionContractId,
   greenlightId: greenlight.greenlightId,
@@ -179,10 +248,12 @@ const envelope = await roleClients.evidenceClient.getAgentTransactionEnvelopePro
 const signers = await fixtureEd25519Signers();
 if (!gateway.gatewayCheck.receipt) throw new Error("Expected gateway receipt.");
 const receipt = gateway.gatewayCheck.receipt;
-const certificate = await kernel.createAuthorityCertificate({
+const localTerminalEvidence = await mintLocalReferenceTerminalEvidence({
+  protocolKernel: kernel,
   terminalObjectRef: `receipt:${receipt.receiptId}`,
   signers: signerInputs(signers),
 });
+const certificate = localTerminalEvidence.certificate;
 const trustBundle = trustMaterial(signers);
 const certificateVerification = await roleClients.evidenceClient.verifyAuthorityCertificate(certificate, trustBundle);
 const contractView = await roleClients.evidenceClient.getContractEvidenceProjection(contract.actionContractId);
@@ -192,12 +263,26 @@ const installHealth = await roleClients.evidenceClient.getProtectedPathInstallHe
 );
 
 const replay = await runX402WalletGateway({
-  protocol: kernel,
+  protocol: roleClients.gatewayClient,
   surface,
   actionContractId: contract.actionContractId,
   greenlightId: greenlight.greenlightId,
   observedParameters: contract.parameters as X402PaymentParameters,
   surfaceOperationRef: "surface-op:demo-official-x402-replay",
+});
+const hostileInstalledPathMatrix = await buildHostileInstalledPathMatrix({
+  protectedToolModule,
+  protectedToolFacadeInput,
+  roleClients,
+  proposal,
+  runtimeConfigValue,
+  contract,
+  changedParameterProbe,
+  signerInvocationsAfterChangedParameterProbe,
+  signedRetryCountAfterChangedParameterProbe,
+  replay,
+  signerInvocationsAfterReplay: signer.signatureCount(),
+  signedRetryCountAfterReplay: sandbox.snapshot().signedRetryCount,
 });
 
 const phases = [
@@ -217,12 +302,55 @@ const phases = [
     },
   },
   {
-    phase: "1_runtime_proposal",
+    phase: "0b_role_scoped_activation_setup",
+    verdict: "pass",
+    evidence: {
+      installSetupOutcome: installSetup.outcome,
+      commitAtomicity: installSetup.commitAtomicity,
+      recordRefs: installSetup.recordRefs,
+      credentialRefId: credentialRef.gatewayCredentialRefId,
+      delegatedAuthorityRefId: delegatedAuthorityRef.delegatedAuthorityRefId,
+      protectedPathPostureId: protectedPathPosture.protectedPathPostureId,
+      custodyProofPacketId: custodyProofPacket.gatewayCustodyProofPacketId,
+      installAuthorityCreated: installSetup.authorityCreated,
+      installGreenlightCreated: installSetup.greenlightCreated,
+      installGatewayCheckPerformed: installSetup.gatewayCheckPerformed,
+      installMutationAttempted: installSetup.mutationAttempted,
+      custodyProofSecretMaterialIncluded: custodyProofPacket.secretMaterialIncluded,
+      postureState: protectedPathPosture.postureState,
+      gatewayCredentialCustodyStatus: credentialRef.custodyStatus,
+    },
+  },
+  {
+    phase: "1_protected_tool_facade_dispatch",
+    verdict: "pass",
+    evidence: {
+      toolName: protectedToolFacade.toolName,
+      facadeImportSource: protectedToolModule.importSource,
+      outcome: protectedToolFacade.outcome,
+      productBinding: protectedToolFacade.productBinding,
+      idempotencyKey: protectedToolFacade.idempotencyKey,
+      runtimeDispatchPrepared: protectedToolFacade.runtimeIngressBlock !== null,
+      runtimeDispatchKind: protectedToolFacade.runtimeIngressBlock.dispatches[0]?.dispatchKind ?? null,
+      dispatchBoundaryRef: protectedToolFacade.runtimeIngressBlock.dispatchBoundaryRef,
+      authorityCreated: protectedToolFacade.authorityCreated,
+      greenlightCreated: protectedToolFacade.greenlightCreated,
+      gatewayCheckPerformed: protectedToolFacade.gatewayCheckPerformed,
+      mutationAttempted: protectedToolFacade.mutationAttempted,
+      credentialMaterialIncluded: protectedToolFacade.credentialMaterialIncluded,
+      nextAction: protectedToolFacade.nextAction,
+      nonClaims: protectedToolFacade.nonClaims,
+    },
+  },
+  {
+    phase: "2_runtime_proposal",
     verdict: "pass",
     evidence: {
       outcome: runtime.outcome,
       runtimeExecutionId: runtime.runtimeExecution.runtimeExecutionId,
-      toolCallDraftId: runtime.toolCallDraft.toolCallDraftId,
+      generatedExecutionGraphId: runtime.generatedExecutionGraph.generatedExecutionGraphId,
+      graphCoverageStatus: runtime.generatedExecutionGraph.coverageStatus,
+      toolCallDraftId: runtimeProposal.toolCallDraft.toolCallDraftId,
       intentCompilationId: runtimeProposal.intentCompilation.intentCompilationId,
       actionContractId: contract.actionContractId,
       actionClass: contract.actionClass,
@@ -234,16 +362,28 @@ const phases = [
     },
   },
   {
-    phase: "2_policy_greenlight",
+    phase: "3_policy_greenlight",
     verdict: "pass",
     evidence: {
+      policyAuthoritySurface: "PolicyClient.evaluatePolicy",
+      policyAuthorityRole: "control_plane",
       decision: policy.decision.decision,
       greenlightId: greenlight.greenlightId,
       decisionReasonCode: policy.decision.decisionReasonCode,
+      gatewayCheckPerformed: policy.gatewayCheckPerformed,
+      mutationAttempted: policy.mutationAttempted,
     },
   },
   {
-    phase: "3_gateway_admission_and_signature",
+    phase: "3b_hostile_installed_path_matrix",
+    verdict: "pass",
+    evidence: {
+      matrix: hostileInstalledPathMatrix,
+      allCasesPreventedConsequence: hostileInstalledPathMatrix.every((row) => row.consequencePrevented),
+    },
+  },
+  {
+    phase: "4_gateway_admission_and_signature",
     verdict: "pass",
     evidence: {
       outcome: gateway.outcome,
@@ -256,7 +396,7 @@ const phases = [
     },
   },
   {
-    phase: "4_sandbox_paid_retry",
+    phase: "5_sandbox_paid_retry",
     verdict: "pass",
     evidence: {
       signedRetryCount: sandbox.snapshot().signedRetryCount,
@@ -271,7 +411,7 @@ const phases = [
     },
   },
   {
-    phase: "5_redacted_evidence_envelope",
+    phase: "6_redacted_evidence_envelope",
     verdict: "pass",
     evidence: {
       gatewayAdmissionStatus: envelope.gatewayAdmissionStatus,
@@ -284,9 +424,14 @@ const phases = [
     },
   },
   {
-    phase: "6_terminal_certificate",
+    phase: "7_local_reference_terminal_certificate",
     verdict: "pass",
     evidence: {
+      issuerSurface: localTerminalEvidence.issuerSurface,
+      proofBoundary: localTerminalEvidence.proofBoundary,
+      roleScopedProductionPath: localTerminalEvidence.roleScopedProductionPath,
+      includedInStrictProtectedGatewayClaim: localTerminalEvidence.includedInStrictProtectedGatewayClaim,
+      terminalEvidenceSource: localTerminalEvidence.terminalEvidenceSource,
       authorityCertificateId: certificate.authorityCertificateId,
       terminalKind: certificate.terminal.terminalKind,
       verificationOutcome: certificateVerification.outcome,
@@ -294,7 +439,7 @@ const phases = [
     },
   },
   {
-    phase: "7_replay_refusal",
+    phase: "8_replay_refusal",
     verdict: "pass",
     evidence: {
       outcome: replay.outcome,
@@ -335,8 +480,26 @@ function buyerReadableApsReport() {
       name: "x402_paid_http_call.exact",
       activationSurface: "Self-hosted activation over local foundation kernel evidence",
       currentClaim:
-        "One generated x402 exact spend attempt was reduced to an exact contract, greenlit once, checked by the gateway before signer use, recorded as redacted evidence, locally certified, and replay-refused.",
+        "One protected x402 tool dispatch was prepared without authority, reduced to an exact contract through runtime ingress, greenlit once, checked by the gateway before signer use, recorded as redacted evidence, locally certified, and replay-refused.",
       proofBoundary: "local_reference",
+    },
+    protectedToolGatewayHandoff: {
+      toolName: protectedToolFacade.toolName,
+      facadeImportSource: protectedToolModule.importSource,
+      facadeOutcome: protectedToolFacade.outcome,
+      protectedSurfaceKind: protectedToolFacade.protectedSurfaceKind,
+      actionClass: protectedToolFacade.actionClass,
+      runtimeDispatchPrepared: protectedToolFacade.runtimeIngressBlock !== null,
+      dispatchBoundaryRef: protectedToolFacade.runtimeIngressBlock.dispatchBoundaryRef,
+      dispatchRef: protectedToolFacade.runtimeIngressBlock.dispatches[0]?.dispatchRef ?? null,
+      productBinding: protectedToolFacade.productBinding,
+      authorityCreated: protectedToolFacade.authorityCreated,
+      greenlightCreated: protectedToolFacade.greenlightCreated,
+      gatewayCheckPerformed: protectedToolFacade.gatewayCheckPerformed,
+      mutationAttempted: protectedToolFacade.mutationAttempted,
+      credentialMaterialIncluded: protectedToolFacade.credentialMaterialIncluded,
+      handoffBoundary:
+        "the protected tool facade prepares proposal/runtime evidence only; runtime ingress proposes the contract and the wallet gateway signs only after VerifiedGatewayCheck",
     },
     protectedAction: {
       actionClass: contract.actionClass,
@@ -387,6 +550,8 @@ function buyerReadableApsReport() {
       policyDecisionId: policy.decision.policyDecisionId,
       policyDecision: policy.decision.decision,
       policyDecisionReasonCode: policy.decision.decisionReasonCode,
+      policyAuthoritySurface: "PolicyClient.evaluatePolicy",
+      policyAuthorityRole: "control_plane",
       greenlightId: greenlight.greenlightId,
       gateAttemptId: gateway.gatewayCheck.gateAttempt.gateAttemptId,
       gateDecision: gateway.gatewayCheck.gateAttempt.gateDecision,
@@ -395,6 +560,8 @@ function buyerReadableApsReport() {
       authorityRecordsBeforePolicy: beforePolicyCounts,
       signerInvocationsAfterGatewayAdmission: signer.signatureCount(),
       signedRetryCountAfterGatewayAdmission: sandbox.snapshot().signedRetryCount,
+      changedParameterDecision: changedParameterProbe.gatewayCheck.gateAttempt.gateDecision,
+      changedParameterReasonCode: changedParameterProbe.gatewayCheck.gateAttempt.gateDecisionReasonCode,
       replayDecision: replay.gatewayCheck.gateAttempt.gateDecision,
       replayReasonCode: replay.gatewayCheck.gateAttempt.gateDecisionReasonCode,
       signerInvocationsAfterReplay: signer.signatureCount(),
@@ -429,12 +596,21 @@ function buyerReadableApsReport() {
           sandboxChallenge.evidenceBoundary,
       },
     },
+    hostileGeneratedExecutionMatrix: hostileInstalledPathMatrix,
     terminalPosture: {
       terminalKind: certificate.terminal.terminalKind,
+      productionTerminalEvidenceSource: "receipt",
       authorityCertificateId: certificate.authorityCertificateId,
       verificationOutcome: certificateVerification.outcome,
       signerRoles: certificate.signatures.map((signature) => signature.signerRole),
       trustBoundary: "local_pinned_trust_material_only",
+      localReferenceCertificate: {
+        issuerSurface: localTerminalEvidence.issuerSurface,
+        proofBoundary: localTerminalEvidence.proofBoundary,
+        roleScopedProductionPath: localTerminalEvidence.roleScopedProductionPath,
+        includedInStrictProtectedGatewayClaim: localTerminalEvidence.includedInStrictProtectedGatewayClaim,
+        terminalEvidenceSource: localTerminalEvidence.terminalEvidenceSource,
+      },
       replayRefusal: {
         gateDecision: replay.gatewayCheck.gateAttempt.gateDecision,
         reasonCode: replay.gatewayCheck.gateAttempt.gateDecisionReasonCode,
@@ -464,8 +640,13 @@ function buyerReadableApsReport() {
       "cross-org AuthorityCertificate trust",
       "marketplace certification",
       "clearing-house readiness",
+      "role-scoped terminal certificate issuer",
     ],
     missingProofObjects: [
+      {
+        proofObject: "role-scoped terminal evidence issuer",
+        requiredBeforeClaim: "production certificate issuance",
+      },
       {
         proofObject: "external custody proof packet",
         requiredBeforeClaim: "provider/customer gateway custody",
@@ -486,103 +667,177 @@ function buyerReadableApsReport() {
   };
 }
 
-async function proposeOfficialX402ThroughRuntimeClient(
-  client: RuntimeClient,
-  config: X402PaymentRuntimeConfig,
-  initialAttempt: X402PaymentAttempt,
-): Promise<{
-  outcome: "action_contracts_proposed";
-  runtimeExecution: RuntimeExecutionRecord;
-  toolCallDraft: ToolCallDraft;
-  proposals: readonly [
+type HostileInstalledPathMatrixRow = {
+  caseId: string;
+  attackSurface: string;
+  boundary: string;
+  outcome: string;
+  reasonCodes: string[];
+  runtimeDispatchPrepared: boolean;
+  actionContractsCreated: number;
+  authorityCreated: boolean;
+  gatewayCheckPerformed: boolean;
+  mutationAttempted: boolean;
+  signerInvocationsAfterAttempt: number;
+  signedRetryCountAfterAttempt: number;
+  consequencePrevented: boolean;
+};
+
+async function buildHostileInstalledPathMatrix(input: {
+  protectedToolModule: ProtectedToolModule;
+  protectedToolFacadeInput: ProtectedX402ToolFacadeInput;
+  roleClients: ReturnType<typeof httpRoleClientsForStore>;
+  proposal: X402InstallProposal;
+  runtimeConfigValue: X402PaymentRuntimeConfig;
+  contract: ActionContract;
+  changedParameterProbe: X402WalletGatewayResult;
+  signerInvocationsAfterChangedParameterProbe: number;
+  signedRetryCountAfterChangedParameterProbe: number;
+  replay: X402WalletGatewayResult;
+  signerInvocationsAfterReplay: number;
+  signedRetryCountAfterReplay: number;
+}): Promise<HostileInstalledPathMatrixRow[]> {
+  const stalePolicy = input.protectedToolModule.prepareProtectedX402ToolDispatch({
+    ...input.protectedToolFacadeInput,
+    requestId: "req_x402_hostile_stale_policy",
+    policyFreshness: "stale",
+  });
+  const rawX402Payload = input.protectedToolModule.prepareProtectedX402ToolDispatch({
+    ...input.protectedToolFacadeInput,
+    requestId: "req_x402_hostile_raw_payload",
+    PaymentPayload: "raw-payload",
+  });
+  const siblingMcp = await input.roleClients.runtimeClient.proposeRuntimeIngressActionContracts({
+    tenantId: input.proposal.tenantId,
+    organizationId: input.proposal.organizationId,
+    config: { x402Payment: input.runtimeConfigValue },
+    dispatchBlock: {
+      principalIntentRef: "intent:hostile direct x402 MCP payment",
+      generatedCodeOrSpecRef: "runtime:hostile-installed-x402-direct-mcp",
+      dispatchBoundaryRef: "dispatch-boundary:x402-installed-hostile-matrix",
+      dispatches: [
+        {
+          dispatchKind: "raw_sibling_x402_payment",
+          dispatchRef: "dispatch:x402-installed-hostile:mcp-direct",
+          rawCommandRef: "mcp:x402.directPayment",
+          rawCommandSummary: ["mcp.invoke", "x402.directPayment", input.proposal.endpointEvidence.endpointUrl],
+          endpointUrl: input.proposal.endpointEvidence.endpointUrl,
+          payee: input.proposal.endpointEvidence.payee,
+          network: input.proposal.endpointEvidence.network,
+          token: input.proposal.endpointEvidence.token,
+          atomicAmount: (input.contract.parameters as X402PaymentParameters).atomicAmount,
+          paymentRequirementsDigest: input.proposal.endpointEvidence.paymentRequirementsDigest,
+        },
+      ],
+    },
+  });
+
+  return [
     {
-      outcome: "action_contract_proposed";
-      intentCompilation: IntentCompilationRecord;
-      actionContract: ActionContract;
+      caseId: "stale_policy_metadata",
+      attackSurface: "installed facade input",
+      boundary: "facade preflight before runtime dispatch",
+      outcome: stalePolicy.outcome,
+      reasonCodes: stalePolicy.reasonCodes,
+      runtimeDispatchPrepared: stalePolicy.runtimeIngressBlock !== null,
+      actionContractsCreated: 0,
+      authorityCreated: stalePolicy.authorityCreated,
+      gatewayCheckPerformed: stalePolicy.gatewayCheckPerformed,
+      mutationAttempted: stalePolicy.mutationAttempted,
+      signerInvocationsAfterAttempt: 0,
+      signedRetryCountAfterAttempt: 0,
+      consequencePrevented:
+        stalePolicy.outcome === "metadata_stale" &&
+        stalePolicy.runtimeIngressBlock === null &&
+        stalePolicy.reasonCodes.includes("protected_x402_policy_stale"),
+    },
+    {
+      caseId: "raw_x402_payment_payload_input",
+      attackSurface: "installed facade schema",
+      boundary: "strict schema before runtime dispatch",
+      outcome: rawX402Payload.outcome,
+      reasonCodes: rawX402Payload.reasonCodes,
+      runtimeDispatchPrepared: rawX402Payload.runtimeIngressBlock !== null,
+      actionContractsCreated: 0,
+      authorityCreated: rawX402Payload.authorityCreated,
+      gatewayCheckPerformed: rawX402Payload.gatewayCheckPerformed,
+      mutationAttempted: rawX402Payload.mutationAttempted,
+      signerInvocationsAfterAttempt: 0,
+      signedRetryCountAfterAttempt: 0,
+      consequencePrevented:
+        rawX402Payload.outcome === "tool_execution_error" &&
+        rawX402Payload.runtimeIngressBlock === null &&
+        rawX402Payload.reasonCodes.includes("protected_x402_input_schema_invalid"),
+    },
+    {
+      caseId: "sibling_mcp_direct_payment",
+      attackSurface: "runtime ingress raw sibling MCP route",
+      boundary: "runtime graph refusal before action contract",
+      outcome: siblingMcp.outcome,
+      reasonCodes: siblingMcp.responsePosture.reasonCodes,
+      runtimeDispatchPrepared: false,
+      actionContractsCreated: siblingMcp.responsePosture.actionContractRefs.length,
+      authorityCreated: siblingMcp.responsePosture.authorityCreated,
+      gatewayCheckPerformed: siblingMcp.responsePosture.gatewayCheckPerformed,
+      mutationAttempted: siblingMcp.responsePosture.mutationAttempted,
+      signerInvocationsAfterAttempt: 0,
+      signedRetryCountAfterAttempt: 0,
+      consequencePrevented:
+        siblingMcp.outcome === "one_or_more_dispatches_refused" &&
+        siblingMcp.responsePosture.actionContractRefs.length === 0 &&
+        siblingMcp.generatedExecutionGraph.coverageStatus === "contains_bypass_risk" &&
+        siblingMcp.generatedExecutionGraph.terminalReasonCodes.includes("runtime_ingress_raw_sibling_bypass"),
+    },
+    {
+      caseId: "changed_observed_parameters",
+      attackSurface: "gateway observed-parameter check",
+      boundary: "gateway check before signer use",
+      outcome: input.changedParameterProbe.outcome,
+      reasonCodes: [input.changedParameterProbe.gatewayCheck.gateAttempt.gateDecisionReasonCode],
+      runtimeDispatchPrepared: false,
+      actionContractsCreated: 0,
+      authorityCreated: false,
+      gatewayCheckPerformed: true,
+      mutationAttempted: input.changedParameterProbe.gatewayCheck.mutationAttempt !== null,
+      signerInvocationsAfterAttempt: input.signerInvocationsAfterChangedParameterProbe,
+      signedRetryCountAfterAttempt: input.signedRetryCountAfterChangedParameterProbe,
+      consequencePrevented:
+        input.changedParameterProbe.outcome === "gateway_check_refused" &&
+        input.changedParameterProbe.gatewayCheck.gateAttempt.gateDecisionReasonCode === "params_mismatch" &&
+        input.changedParameterProbe.gatewayCheck.mutationAttempt === null &&
+        input.signerInvocationsAfterChangedParameterProbe === 0 &&
+        input.signedRetryCountAfterChangedParameterProbe === 0,
+    },
+    {
+      caseId: "consumed_greenlight_replay",
+      attackSurface: "gateway one-use greenlight check",
+      boundary: "gateway check before signer reuse",
+      outcome: input.replay.outcome,
+      reasonCodes: [input.replay.gatewayCheck.gateAttempt.gateDecisionReasonCode],
+      runtimeDispatchPrepared: false,
+      actionContractsCreated: 0,
+      authorityCreated: false,
+      gatewayCheckPerformed: true,
+      mutationAttempted: input.replay.gatewayCheck.mutationAttempt !== null,
+      signerInvocationsAfterAttempt: input.signerInvocationsAfterReplay,
+      signedRetryCountAfterAttempt: input.signedRetryCountAfterReplay,
+      consequencePrevented:
+        input.replay.outcome === "gateway_check_refused" &&
+        input.replay.gatewayCheck.gateAttempt.gateDecisionReasonCode === "already_consumed" &&
+        input.replay.gatewayCheck.mutationAttempt === null &&
+        input.signerInvocationsAfterReplay === 1 &&
+        input.signedRetryCountAfterReplay === 1,
     },
   ];
-}> {
-  const paymentRequiredEvidenceRef = initialAttempt.paymentRequiredEvidenceRef ?? "evidence:x402-payment-required";
-  const runtimeExecution = await client.createRuntimeExecution({
-    tenantId: config.tenantId,
-    organizationId: config.organizationId,
-    principalIntentRef: initialAttempt.principalIntentRef,
-    principalId: config.principalId,
-    agentId: config.agentId,
-    runId: config.runId,
-    runtimeAdapterId: config.runtimeAdapterId,
-    executionShape: "single_tool_call",
-    runtimePosture: "protected_capability",
-    executionBlockRef: "runtime:demo-official-x402-dispatch-block",
-    executionBlockDigest: await digestCanonical({
-      executionBlockRef: "runtime:demo-official-x402-dispatch-block",
-      dispatchRef: "dispatch:demo-official-x402:1",
-      paymentRequiredEvidenceRef,
-    }),
-    generatedCodeOrSpecRefs: [initialAttempt.generatedCodeOrSpecRef],
-    allowedToolCapabilityIds: [config.toolCapabilityId],
-    observedToolCallRefs: ["dispatch:demo-official-x402:1"],
-    observedConsequentialCallCount: 1,
-    accessPosture: "controlled_outbound",
-    evidenceRefs: [paymentRequiredEvidenceRef],
-  });
-  const attemptWithRuntime = { ...initialAttempt, runtimeExecutionId: runtimeExecution.runtimeExecutionId };
-  const draftInput = await buildX402PaymentCompileIntentInput(config, attemptWithRuntime);
-  const openedDraft = await client.createToolCallDraft({
-    tenantId: config.tenantId,
-    organizationId: config.organizationId,
-    runtimeExecutionId: runtimeExecution.runtimeExecutionId,
-    generatedExecutionGraphId: null,
-    generatedExecutionNodeId: null,
-    toolCapabilityId: config.toolCapabilityId,
-    actionTypeId: config.actionTypeId,
-    gatewayRegistryEntryId: config.gatewayRegistryEntryId,
-    actionClass: "x402_payment.exact",
-    gatewayId: config.gatewayId,
-    resourceRef: draftInput.candidate.resourceRef,
-    parameters: draftInput.candidate.parameters,
-    nonSecretParamsSummary: draftInput.candidate.nonSecretParamsSummary,
-    expiresAt: config.contractExpiresAt,
-    evidenceRefs: draftInput.candidate.evidenceRefs,
-  });
-  const toolCallDraft = await client.transitionToolCallDraft({
-    toolCallDraftId: openedDraft.toolCallDraftId,
-    nextDraftState: "finalized",
-    parameters: draftInput.candidate.parameters,
-    nonSecretParamsSummary: draftInput.candidate.nonSecretParamsSummary,
-    secretRefs: {},
-    gatewayCredentialRefs: [],
-    evidenceRefs: draftInput.candidate.evidenceRefs,
-  });
-  const attemptWithDraft = { ...attemptWithRuntime, toolCallDraftId: toolCallDraft.toolCallDraftId };
-  const compilation = await client.compileIntent(await buildX402PaymentCompileIntentInput(config, attemptWithDraft));
-  if (compilation.candidateAction.candidateStatus !== "contractable") {
-    throw new Error(
-      `Expected contractable x402 candidate, got ${compilation.candidateAction.refusalReasonCodes.join(",")}`,
-    );
-  }
-  const candidateDigest = compilation.candidateAction.candidateDigest;
-  if (!candidateDigest) throw new Error("Contractable x402 candidate is missing its digest.");
-  const actionContract = await client.proposeActionContract({
-    intentCompilationId: compilation.intentCompilationId,
-    candidateActionId: compilation.candidateAction.candidateActionId,
-    candidateDigest,
-    ...(config.signingSecret ? { signingSecret: config.signingSecret } : {}),
-  });
-  return {
-    outcome: "action_contracts_proposed",
-    runtimeExecution,
-    toolCallDraft,
-    proposals: [{ outcome: "action_contract_proposed", intentCompilation: compilation, actionContract }],
-  };
 }
 
 async function recordGatewayCheckedPosture(
+  gatewayClient: GatewayClient,
   installProposal: X402InstallProposal,
   compiled: NonNullable<X402InstallProposal["compiledRecords"]>,
 ) {
   const probes = await runBypassProbeExecutors(
-    kernel,
+    gatewayClient,
     {
       tenantId: installProposal.tenantId,
       organizationId: installProposal.organizationId,
@@ -611,7 +866,7 @@ async function recordGatewayCheckedPosture(
       },
     }),
   );
-  await kernel.createProtectedPathPosture({
+  return gatewayClient.createProtectedPathPosture({
     tenantId: installProposal.tenantId,
     organizationId: installProposal.organizationId,
     runtimeAdapterId: compiled.toolCapability.runtimeAdapterId,
@@ -630,10 +885,112 @@ async function recordGatewayCheckedPosture(
   });
 }
 
-function runtimeConfig(
+async function recordGatewayCustodyProofPacket(
+  gatewayClient: GatewayClient,
   installProposal: X402InstallProposal,
   compiled: NonNullable<X402InstallProposal["compiledRecords"]>,
-): X402PaymentRuntimeConfig {
+  credentialRef: GatewayCredentialRef,
+  protectedPathPosture: ProtectedPathPosture,
+): Promise<GatewayCustodyProofPacket> {
+  const leaseExpiresAt = futureIso(30);
+  return gatewayClient.recordGatewayCustodyProofPacket({
+    tenantId: installProposal.tenantId,
+    organizationId: installProposal.organizationId,
+    gatewayCredentialRefId: credentialRef.gatewayCredentialRefId,
+    gatewayCredentialRefDigest: credentialRef.gatewayCredentialRefDigest,
+    protectedPathPostureId: protectedPathPosture.protectedPathPostureId,
+    protectedPathPostureDigest: protectedPathPosture.postureDigest,
+    gatewayInstallEvidenceRefs: [
+      `install:${installProposal.installProposalId}`,
+      `gateway-registry-entry:${compiled.gatewayRegistryEntry.gatewayRegistryEntryId}`,
+    ],
+    gatewayInstallEvidenceDigests: [installProposal.installDigest],
+    bypassProbeIds: protectedPathPosture.bypassProbeIds,
+    bypassProbeDigests: protectedPathPosture.bypassProbeDigests,
+    custodyClaimLevel: "customer_gateway_evidence",
+    custodyProviderClass: "x402_wallet_gateway",
+    custodyProviderRegistryRef: credentialRef.providerRegistryRef,
+    custodyProviderRegistryDigest: credentialRef.providerRegistryDigest,
+    opaqueKeyHandleRef: "opaque-key-handle:x402-wallet-gateway:demo",
+    opaqueKeyHandleDigest: await digestCanonical(
+      asJson({
+        signerHandleRef: installProposal.walletGatewayProfile.signerRef,
+        gatewayId: compiled.gatewayRegistryEntry.gatewayId,
+      }),
+    ),
+    leaseRef: "lease:x402-wallet-gateway:demo",
+    leaseVersion: "lease-v1",
+    leaseIssuedAt: nowIso(),
+    leaseExpiresAt,
+    attestationRefs: ["attestation:x402-wallet-gateway:self-hosted-demo"],
+    attestationDigests: [
+      await digestCanonical(
+        asJson({
+          providerRegistryRef: credentialRef.providerRegistryRef,
+          gatewayRegistryEntryId: compiled.gatewayRegistryEntry.gatewayRegistryEntryId,
+        }),
+      ),
+    ],
+    redactedAuditRefs: ["audit:x402-wallet-gateway:redacted-demo"],
+    redactedAuditDigest: await digestCanonical(
+      asJson({
+        gatewayCredentialRefId: credentialRef.gatewayCredentialRefId,
+        redactionProfileRef: "gateway-custody-proof-packet:v0.2-redacted",
+      }),
+    ),
+    custodyDriftStatus: "current",
+    resolverDriftStatus: "current",
+    redactionStatus: "redacted",
+    externalVerificationStatus: "verified_by_official_source",
+    recordedAt: nowIso(),
+    expiresAt: leaseExpiresAt,
+  });
+}
+
+async function runtimeConfig(
+  installProposal: X402InstallProposal,
+  compiled: NonNullable<X402InstallProposal["compiledRecords"]>,
+  credentialRef: GatewayCredentialRef,
+  delegatedAuthorityRef: DelegatedAuthorityRef,
+  custodyProofPacket: GatewayCustodyProofPacket,
+): Promise<X402PaymentRuntimeConfig> {
+  const policyVersionRef = `${installProposal.policyPackRef}@${installProposal.policyPackVersion}`;
+  const policyVersionDigest = await digestCanonical(
+    asJson({ policyPackRef: installProposal.policyPackRef, policyPackVersion: installProposal.policyPackVersion }),
+  );
+  const gatewayRegistrationRef = `gateway-registration:${compiled.gatewayRegistryEntry.gatewayId}`;
+  const probePostureDigest = await digestCanonical(
+    asJson({
+      bypassPosture: "gateway_checked",
+      actionClass: "x402_payment.exact",
+      gatewayId: compiled.gatewayRegistryEntry.gatewayId,
+      resourceRef: installProposal.resourceRef,
+    }),
+  );
+  const contractExpiresAt = futureIso();
+  const gatewayCredentialBinding = x402WalletGatewayCredentialBindingFor(credentialRef);
+  const gatewayReadinessDigest = await digestCanonical(
+    asJson({
+      readinessScope: "pre_contract",
+      readinessProofLevel: "control_plane_registration",
+      installDigest: installProposal.installDigest,
+      probePostureDigest,
+      gatewayRegistrationRef,
+      gatewayCredentialRefDigest: gatewayCredentialBinding.gatewayCredentialRefDigest,
+      gatewayCredentialCustodyStatus: gatewayCredentialBinding.requiredCredentialCustodyStatus,
+      gatewayCustodyProofPacketRef: `gateway-custody-proof:${custodyProofPacket.gatewayCustodyProofPacketId}`,
+      gatewayCustodyProofPacketDigest: custodyProofPacket.gatewayCustodyProofPacketDigest,
+      gatewayCustodyClaimLevel: custodyProofPacket.custodyClaimLevel,
+      gatewayCustodyExternalVerificationStatus: custodyProofPacket.externalVerificationStatus,
+      gatewayCustodyProofExpiresAt: custodyProofPacket.expiresAt,
+      gatewayPosture: "online",
+      policyVersionRef,
+      policyVersionDigest,
+      gatewayRegistryEntryId: compiled.gatewayRegistryEntry.gatewayRegistryEntryId,
+      operatingEnvelopeId: compiled.operatingEnvelope.envelopeId,
+      expiresAt: contractExpiresAt,
+    }),
+  );
   return {
     tenantId: installProposal.tenantId,
     organizationId: installProposal.organizationId,
@@ -645,12 +1002,18 @@ function runtimeConfig(
     toolCatalogRef: `${compiled.toolCapability.toolCatalogId}@${compiled.toolCapability.toolCatalogVersion}`,
     actionCatalogRef: `${compiled.actionType.actionCatalogId}@${compiled.actionType.actionCatalogVersion}`,
     gatewayRegistryRef: `gateway_registry@${compiled.gatewayRegistryEntry.gatewayRegistryVersion}`,
+    gatewayReadinessRef: "handshake://local/x402/gateway-readiness.json",
+    gatewayReadinessDigest,
+    policyVersionRef,
+    policyVersionDigest,
     toolCapabilityId: compiled.toolCapability.toolCapabilityId,
     actionTypeId: compiled.actionType.actionTypeId,
     gatewayRegistryEntryId: compiled.gatewayRegistryEntry.gatewayRegistryEntryId,
     gatewayId: compiled.gatewayRegistryEntry.gatewayId,
+    gatewayCredentialBinding,
+    delegatedAuthorityBinding: x402DelegatedSpendAuthorityBindingFor(delegatedAuthorityRef),
     maxAtomicAmountPerCall: installProposal.spendBounds.maxAtomicAmountPerCall,
-    contractExpiresAt: futureIso(),
+    contractExpiresAt,
     signingSecret: "test-secret",
   };
 }
@@ -702,6 +1065,30 @@ function officialInstallInput(paymentRequirementsDigest: `sha256:${string}`): X4
   };
 }
 
+function baseInstallProposalForRegistration(proposalValue: X402InstallProposal): InstallProposal {
+  return {
+    installProposalId: proposalValue.installProposalId,
+    schemaVersion: proposalValue.schemaVersion,
+    tenantId: proposalValue.tenantId,
+    organizationId: proposalValue.organizationId,
+    createdAt: proposalValue.createdAt,
+    adapterPackId: proposalValue.adapterPackId,
+    adapterPackVersion: proposalValue.adapterPackVersion,
+    actionFamily: proposalValue.actionFamily,
+    protectedSurfaceKind: proposalValue.protectedSurfaceKind,
+    resourceRef: proposalValue.resourceRef,
+    status: proposalValue.status,
+    humanSummary: proposalValue.humanSummary,
+    refusalReasonCodes: proposalValue.refusalReasonCodes,
+    compiledRecords: proposalValue.compiledRecords,
+    policyPackRef: proposalValue.policyPackRef,
+    policyPackVersion: proposalValue.policyPackVersion,
+    bypassProbePlan: proposalValue.bypassProbePlan,
+    receiptExpectationRefs: proposalValue.receiptExpectationRefs,
+    installDigest: proposalValue.installDigest,
+  };
+}
+
 function trackedOfficialSigner() {
   let signatures = 0;
   return {
@@ -717,6 +1104,10 @@ function trackedOfficialSigner() {
 }
 
 function httpRoleClientsForStore(protocolStore: ProtocolStore): {
+  installClient: InstallClient;
+  controlPlaneClient: ControlPlaneClient;
+  policyClient: PolicyClient;
+  gatewayClient: GatewayClient;
   runtimeClient: RuntimeClient;
   evidenceClient: EvidenceClient;
 } {
@@ -729,6 +1120,42 @@ function httpRoleClientsForStore(protocolStore: ProtocolStore): {
   } satisfies WorkerBindings;
   const fetchImpl: HandshakeFetch = async (input, init) => app.request(requestPath(input), init, env);
   return {
+    installClient: new InstallClient(
+      "http://handshake.test",
+      {
+        roleCredential: tokens.control_plane,
+        requestIdentityFactory: () => "demo-x402-install-request",
+        originatingIdentity: "ref:example/x402-protected-spend",
+      },
+      fetchImpl,
+    ),
+    controlPlaneClient: new ControlPlaneClient(
+      "http://handshake.test",
+      {
+        roleCredential: tokens.control_plane,
+        requestIdentityFactory: () => "demo-x402-control-plane-request",
+        originatingIdentity: "ref:example/x402-protected-spend",
+      },
+      fetchImpl,
+    ),
+    policyClient: new PolicyClient(
+      "http://handshake.test",
+      {
+        roleCredential: tokens.control_plane,
+        requestIdentityFactory: () => "demo-x402-policy-request",
+        originatingIdentity: "ref:example/x402-protected-spend",
+      },
+      fetchImpl,
+    ),
+    gatewayClient: new GatewayClient(
+      "http://handshake.test",
+      {
+        roleCredential: tokens.gateway_custody,
+        requestIdentityFactory: () => "demo-x402-gateway-custody-request",
+        originatingIdentity: "ref:example/x402-protected-spend",
+      },
+      fetchImpl,
+    ),
     runtimeClient: new RuntimeClient(
       "http://handshake.test",
       {
@@ -786,6 +1213,27 @@ type FixtureEd25519Signer = {
   privateKeyPkcs8: string;
   publicKeyEd25519: string;
 };
+
+type LocalReferenceTerminalEvidenceInput = {
+  protocolKernel: HandshakeKernel;
+  terminalObjectRef: string;
+  signers: AuthorityCertificateSignerInput[];
+};
+
+async function mintLocalReferenceTerminalEvidence(input: LocalReferenceTerminalEvidenceInput) {
+  const certificate = await input.protocolKernel.createAuthorityCertificate({
+    terminalObjectRef: input.terminalObjectRef,
+    signers: input.signers,
+  });
+  return {
+    certificate,
+    issuerSurface: "kernel.createAuthorityCertificate",
+    proofBoundary: "local_reference_terminal_evidence_only",
+    roleScopedProductionPath: false,
+    includedInStrictProtectedGatewayClaim: false,
+    terminalEvidenceSource: "receipt",
+  } as const;
+}
 
 async function fixtureEd25519Signers(): Promise<FixtureEd25519Signer[]> {
   return Promise.all([
@@ -870,6 +1318,12 @@ function demoMarkdown(outputValue: typeof output): string {
     `- Boundary: ${outputValue.report.proofObject.proofBoundary}`,
     `- Claim: ${outputValue.report.proofObject.currentClaim}`,
     "",
+    "### Protected Tool Gateway Handoff",
+    "",
+    "```json",
+    JSON.stringify(outputValue.report.protectedToolGatewayHandoff, null, 2),
+    "```",
+    "",
     "### Protected Action",
     "",
     "```json",
@@ -930,4 +1384,188 @@ function demoMarkdown(outputValue: typeof output): string {
   );
   lines.push("");
   return `${lines.join("\n")}\n`;
+}
+
+async function buildProtectedToolFacadeInput(
+  config: X402PaymentRuntimeConfig,
+  compiled: NonNullable<X402InstallProposal["compiledRecords"]>,
+  installProposal: X402InstallProposal,
+  paymentAttempt: X402PaymentAttempt,
+  custodyProofPacket: GatewayCustodyProofPacket,
+): Promise<ProtectedX402ToolFacadeInput> {
+  const policyVersionRef = `${installProposal.policyPackRef}@${installProposal.policyPackVersion}`;
+  const policyVersionDigest = await digestCanonical(
+    asJson({ policyPackRef: installProposal.policyPackRef, policyPackVersion: installProposal.policyPackVersion }),
+  );
+  const gatewayRegistrationRef = `gateway-registration:${config.gatewayId}`;
+  const probePostureDigest = await digestCanonical(
+    asJson({
+      bypassPosture: "gateway_checked",
+      actionClass: "x402_payment.exact",
+      gatewayId: config.gatewayId,
+      resourceRef: installProposal.resourceRef,
+    }),
+  );
+  const readinessExpiresAt = config.contractExpiresAt;
+  const gatewayReadinessDigest = await digestCanonical(
+    asJson({
+      readinessScope: "pre_contract",
+      readinessProofLevel: "control_plane_registration",
+      installDigest: installProposal.installDigest,
+      probePostureDigest,
+      gatewayRegistrationRef,
+      gatewayCredentialRefDigest: config.gatewayCredentialBinding.gatewayCredentialRefDigest,
+      gatewayCredentialCustodyStatus: config.gatewayCredentialBinding.requiredCredentialCustodyStatus,
+      gatewayCustodyProofPacketRef: `gateway-custody-proof:${custodyProofPacket.gatewayCustodyProofPacketId}`,
+      gatewayCustodyProofPacketDigest: custodyProofPacket.gatewayCustodyProofPacketDigest,
+      gatewayCustodyClaimLevel: custodyProofPacket.custodyClaimLevel,
+      gatewayCustodyExternalVerificationStatus: custodyProofPacket.externalVerificationStatus,
+      gatewayCustodyProofExpiresAt: custodyProofPacket.expiresAt,
+      gatewayPosture: "online",
+      policyVersionRef,
+      policyVersionDigest,
+      gatewayRegistryEntryId: config.gatewayRegistryEntryId,
+      operatingEnvelopeId: config.operatingEnvelopeId,
+      expiresAt: readinessExpiresAt,
+    }),
+  );
+  return {
+    requestId: "req_x402_protected_tool_gateway_demo",
+    principalId: config.principalId,
+    agentId: config.agentId,
+    principalIntentRef: paymentAttempt.principalIntentRef,
+    generatedCodeOrSpecRef: paymentAttempt.generatedCodeOrSpecRef,
+    runtimeAdapterRef: config.runtimeAdapterId,
+    runId: config.runId,
+    dispatchBoundaryRef: "dispatch-boundary:x402-protected-tool-gateway-demo",
+    dispatchRef: "dispatch:x402-protected-tool-gateway-demo:1",
+    operatingEnvelopeId: config.operatingEnvelopeId,
+    toolCapabilityId: config.toolCapabilityId,
+    actionTypeId: config.actionTypeId,
+    gatewayRegistryEntryId: config.gatewayRegistryEntryId,
+    gatewayId: config.gatewayId,
+    policyOwnerRef: installProposal.policyPackRef,
+    evidenceConsumerRef: "evidence-consumer:self-hosted-activation",
+    contractExpiresAt: config.contractExpiresAt,
+    idempotencyKey: `x402-tool:${installProposal.installDigest.slice("sha256:".length)}`,
+    metadataDigest: await digestCanonical(
+      asJson({
+        source: "examples/x402-protected-spend",
+        installProposalId: installProposal.installProposalId,
+        paymentRequiredEvidenceRef: requireString(
+          paymentAttempt.paymentRequiredEvidenceRef,
+          "paymentRequiredEvidenceRef",
+        ),
+      }),
+    ),
+    toolCatalogDigest: await digestCanonical(asJson(compiled.toolCapability)),
+    actionCatalogDigest: await digestCanonical(asJson(compiled.actionType)),
+    gatewayRegistryDigest: await digestCanonical(asJson(compiled.gatewayRegistryEntry)),
+    metadataFreshness: "fresh",
+    policyFreshness: "fresh",
+    installReadiness: "trusted_gateway_ready",
+    gatewayPosture: "online",
+    readinessProofLevel: "control_plane_registration",
+    gatewayReadinessRef: "handshake://local/x402/gateway-readiness.json",
+    gatewayReadinessDigest,
+    readinessExpiresAt,
+    installDigest: installProposal.installDigest,
+    probePostureDigest,
+    gatewayRegistrationRef,
+    gatewayCredentialRefDigest: config.gatewayCredentialBinding.gatewayCredentialRefDigest,
+    gatewayCredentialCustodyStatus: config.gatewayCredentialBinding.requiredCredentialCustodyStatus,
+    gatewayCustodyProofPacketRef: `gateway-custody-proof:${custodyProofPacket.gatewayCustodyProofPacketId}`,
+    gatewayCustodyProofPacketDigest: custodyProofPacket.gatewayCustodyProofPacketDigest,
+    gatewayCustodyClaimLevel: custodyProofPacket.custodyClaimLevel,
+    gatewayCustodyExternalVerificationStatus: custodyProofPacket.externalVerificationStatus,
+    gatewayCustodyProofExpiresAt: custodyProofPacket.expiresAt,
+    policyVersionRef,
+    policyVersionDigest,
+    rawCredentialRefsIncluded: false,
+    endpointUrl: paymentAttempt.endpointUrl,
+    payee: paymentAttempt.payee,
+    payTo: requireString(paymentAttempt.payTo, "payTo"),
+    network: paymentAttempt.network,
+    token: paymentAttempt.token,
+    asset: requireString(paymentAttempt.asset, "asset"),
+    atomicAmount: paymentAttempt.atomicAmount,
+    x402EvidenceProfile: "official_payment_required",
+    paymentRequirementsDigest: paymentAttempt.paymentRequirementsDigest,
+    paymentRequiredEvidenceRef: requireString(paymentAttempt.paymentRequiredEvidenceRef, "paymentRequiredEvidenceRef"),
+    facilitatorRef: paymentAttempt.facilitatorRef ?? null,
+    intendedHttpMethod: requireString(paymentAttempt.intendedHttpMethod, "intendedHttpMethod"),
+    intendedRequestUrl: requireString(paymentAttempt.intendedRequestUrl, "intendedRequestUrl"),
+    intendedRequestBodyPosture: paymentAttempt.intendedRequestBodyPosture ?? "no_body",
+    intendedRequestBodyDigest: paymentAttempt.intendedRequestBodyDigest ?? null,
+    selectedHeadersDigest: requireString(paymentAttempt.selectedHeadersDigest, "selectedHeadersDigest"),
+    providerEnvironmentPosture: paymentAttempt.providerEnvironmentPosture ?? "local_reference_sandbox",
+    providerEnvironmentRef: paymentAttempt.providerEnvironmentRef ?? null,
+    x402Version: requireNumber(paymentAttempt.x402Version, "x402Version"),
+    x402Scheme: "exact",
+    maxTimeoutSeconds: requireNumber(paymentAttempt.maxTimeoutSeconds, "maxTimeoutSeconds"),
+    selectedPaymentRequirementIndex: requireNumber(
+      paymentAttempt.selectedPaymentRequirementIndex,
+      "selectedPaymentRequirementIndex",
+    ),
+    selectedPaymentRequirementDigest: requireString(
+      paymentAttempt.selectedPaymentRequirementDigest,
+      "selectedPaymentRequirementDigest",
+    ) as `sha256:${string}`,
+    sdkPackageVersions: paymentAttempt.sdkPackageVersions ?? {},
+    extensionKeys: paymentAttempt.extensionKeys ?? [],
+    sequenceNumber: paymentAttempt.sequenceNumber ?? 1,
+    loopDetected: false,
+    retryDetected: false,
+    branchDetected: false,
+    correlationRef: "correlation:x402:protected-tool-gateway-demo",
+    evidenceRefs: ["evidence:x402-protected-tool-facade:self-hosted", `install:${installProposal.installProposalId}`],
+  };
+}
+
+function requireString(value: string | null | undefined, label: string): string {
+  if (!value) throw new Error(`Expected protected x402 tool facade input ${label}.`);
+  return value;
+}
+
+function requireNumber(value: number | null | undefined, label: string): number {
+  if (value === null || value === undefined) {
+    throw new Error(`Expected protected x402 tool facade input ${label}.`);
+  }
+  return value;
+}
+
+function asJson(value: unknown): JsonValue {
+  return JSON.parse(JSON.stringify(value)) as JsonValue;
+}
+
+type ProtectedToolModule = {
+  importSource: "source" | "clean_installed_package";
+  prepareProtectedX402ToolDispatch(input: unknown): ProtectedX402ToolFacadeResult;
+};
+
+async function loadProtectedToolModule(): Promise<ProtectedToolModule> {
+  const moduleUrl = protectedToolModuleUrlFromArgs();
+  if (moduleUrl) {
+    const installedModule = (await import(moduleUrl)) as {
+      prepareProtectedX402ToolDispatch(input: unknown): ProtectedX402ToolFacadeResult;
+    };
+    return {
+      importSource: "clean_installed_package",
+      prepareProtectedX402ToolDispatch: installedModule.prepareProtectedX402ToolDispatch,
+    };
+  }
+
+  const sourceModule = await import("../../src/x402-protected-tool");
+  return {
+    importSource: "source",
+    prepareProtectedX402ToolDispatch: sourceModule.prepareProtectedX402ToolDispatch,
+  };
+}
+
+function protectedToolModuleUrlFromArgs(): string | undefined {
+  const index = process.argv.indexOf("--x402-protected-tool-module-url");
+  if (index === -1) return undefined;
+  const value = process.argv[index + 1];
+  if (!value) throw new Error("--x402-protected-tool-module-url requires a module URL value.");
+  return value;
 }

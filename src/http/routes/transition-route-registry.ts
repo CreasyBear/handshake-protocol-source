@@ -17,8 +17,11 @@ import {
   RecordCredentialResolutionEvidenceInputSchema,
   RecordGatewayCustodyProofPacketInputSchema,
   ReconcileSurfaceOperationInputSchema,
+  RegisterInstallProposalCompiledRecordsInputSchema,
+  RegisterDelegatedAuthorityRefInputSchema,
   RegisterGatewayCredentialRefInputSchema,
   ResolveRecoveryTerminalConflictInputSchema,
+  TransitionDelegatedAuthorityStatusInputSchema,
   TransitionToolCallDraftInputSchema,
   TransitionRecoveryRecommendationStatusInputSchema,
 } from "../../protocol/public/inputs";
@@ -27,9 +30,12 @@ import {
   ActionTypeSchema,
   BypassProbeSchema,
   CredentialResolutionEvidenceSchema,
+  DelegatedAuthorityRefSchema,
+  DelegatedAuthorityStatusTransitionSchema,
   GatewayCredentialRefSchema,
   GatewayCustodyProofPacketSchema,
   GatewayRegistryEntrySchema,
+  InstallSetupResultSchema,
   IntentCompilationRecordSchema,
   IsolationStateSchema,
   OperatingEnvelopeSchema,
@@ -42,6 +48,7 @@ import {
   ToolCallDraftSchema,
   ToolCapabilitySchema,
 } from "../../protocol/public/schemas";
+import { RuntimeIngressProposalInputSchema } from "../../runtime/ingress";
 import type { TransitionCallerRole } from "../admission/caller-auth";
 import { directBodyScope, recordScope, type TransitionScopeResolver } from "./transition-scope-resolvers";
 import type { TransitionRouteId } from "./transition-invokers";
@@ -51,6 +58,7 @@ import {
   PolicyEvaluationResponseSchema,
   RecoveryRecommendationStatusResponseSchema,
   RecoveryTerminalConflictResolutionResponseSchema,
+  RuntimeIngressProposalResponseSchema,
   SurfaceOperationReconciliationResponseSchema,
 } from "./transition-response-schemas";
 
@@ -111,6 +119,16 @@ export const transitionRouteDefinitions = [
     OperatingEnvelopeSchema,
   ),
   route(
+    "registerInstallProposalCompiledRecords",
+    "/v0.2/install-proposals/compiled-records",
+    "control_plane",
+    directBodyScope,
+    "Atomically register compiled install proposal records as setup evidence without minting authority",
+    RegisterInstallProposalCompiledRecordsInputSchema,
+    "Install setup result",
+    InstallSetupResultSchema,
+  ),
+  route(
     "registerGatewayCredentialRef",
     "/v0.2/gateway-credential-refs",
     "gateway_custody",
@@ -119,6 +137,26 @@ export const transitionRouteDefinitions = [
     RegisterGatewayCredentialRefInputSchema,
     "Gateway credential ref",
     GatewayCredentialRefSchema,
+  ),
+  route(
+    "registerDelegatedAuthorityRef",
+    "/v0.2/delegated-authority-refs",
+    "control_plane",
+    directBodyScope,
+    "Register a principal-scoped delegated authority ref without minting a greenlight",
+    RegisterDelegatedAuthorityRefInputSchema,
+    "Delegated authority ref",
+    DelegatedAuthorityRefSchema,
+  ),
+  route(
+    "transitionDelegatedAuthorityStatus",
+    "/v0.2/delegated-authority-status-transitions",
+    "control_plane",
+    recordScope("delegated_authority_ref", "delegatedAuthorityRefId", "delegated_authority_ref_missing"),
+    "Record terminal delegated authority status and authority-ref isolation without minting mutation authority",
+    TransitionDelegatedAuthorityStatusInputSchema,
+    "Delegated authority status transition",
+    DelegatedAuthorityStatusTransitionSchema,
   ),
   route(
     "recordGatewayCustodyProofPacket",
@@ -159,6 +197,16 @@ export const transitionRouteDefinitions = [
     CreateRuntimeExecutionInputSchema,
     "Runtime execution record",
     RuntimeExecutionRecordSchema,
+  ),
+  route(
+    "proposeRuntimeIngressActionContracts",
+    "/v0.2/runtime-ingress/action-contracts",
+    "runtime_evidence",
+    directBodyScope,
+    "Propose action contracts from a generated runtime dispatch block without policy or gateway authority",
+    RuntimeIngressProposalInputSchema,
+    "Runtime ingress proposal outcome",
+    RuntimeIngressProposalResponseSchema,
   ),
   route(
     "createBypassProbe",

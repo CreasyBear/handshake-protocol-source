@@ -13,11 +13,26 @@ Handshake quality is not cosmetic polish detached from the control primitive. Th
 - Missing evidence is recorded as a proof gap.
 - Isolation state must be checked before future greenlights and gateway checks.
 
+## Product And Protocol Language
+
+- Product language centers on the cleared protected-action event: one terminal Handshake event with reconstructable evidence that a service can accept, refuse, or treat as a proof gap.
+- The protocol kernel is the source-owned state machine and schema set. It owns exact contracts, policy decisions, one-use greenlights, gateway checks, receipts, refusals, proof gaps, isolation, and terminal certificates.
+- A product surface is CLI, MCP, SDK, docs, demo, or service-facing code that exposes proposal/evidence/readback without creating authority.
+- The certificate is terminal evidence, not permission, identity, settlement, hosted trust, or reusable auth.
+- Public npm availability does not create authority. MCP Registry discoverability remains a proof gap until verified.
+- Production proof is ledgered by evidence state. Hosted operation, provider
+  custody, settlement/finality, facilitator operation, seller middleware,
+  marketplace/certification, cross-org trust, broad x402 compatibility,
+  aggregate spend enforcement, MCP Registry discoverability, and host-wide
+  containment stay proof gaps, outside claims, or cut lines until source
+  evidence and gates change.
+
 ## Repo Shape
 
 - `src/protocol` owns protocol meaning.
 - `src/http` owns transport, admission, route metadata, handlers, and response mapping.
 - `src/runtime` owns generated-execution proposal helpers; it does not issue authority.
+- `src/adapter-sdk` owns third-party adapter definition helpers; it does not register runtime ingress, bind gateways, or issue authority.
 - `src/adapters` owns reference gateway fixtures; mutation follows `VerifiedGatewayCheck`.
 - `src/conformance` owns reference checks that verify protocol posture without creating authority.
 - `src/storage` owns atomic record, stream, and cache mechanics.
@@ -133,6 +148,13 @@ Architecture tests must enforce:
 - no overclaiming function names;
 - curated root exports;
 - import posture between protocol, HTTP, storage, runtime, adapters, and SDK.
+
+Expansion tests must enforce that no second action family is called
+execution-ready until source and tests name its generated execution shape,
+protected path, gateway authority holder, credential holder,
+`CandidateAction`/refusal boundary, bypass posture, evidence/readback path,
+proof-gap model, recovery/isolation path, non-claims, focused gates, package
+gates, and full repo gate.
 
 ## Closeout
 

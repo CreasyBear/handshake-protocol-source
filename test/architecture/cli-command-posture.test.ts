@@ -40,6 +40,7 @@ describe("CLI command posture", () => {
       "support.bundle",
       "install.x402-payment",
       "probes.x402-payment",
+      "register.x402-gateway-readiness",
       "install.health",
       "conformance.x402-payment",
     ]);
@@ -47,7 +48,7 @@ describe("CLI command posture", () => {
     expect(cliCommandManifest.every((command) => command.childProcessEnvInheritance === "none")).toBe(true);
     expect(
       cliCommandManifest.filter((command) => command.filesystemWrites.length > 0).map((command) => command.id),
-    ).toEqual(["init", "install.x402-payment", "probes.x402-payment"]);
+    ).toEqual(["init", "install.x402-payment", "probes.x402-payment", "register.x402-gateway-readiness"]);
   });
 
   it("rejects mutation-shaped command names and authority route families", () => {

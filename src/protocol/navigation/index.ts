@@ -3,10 +3,13 @@ import type { ProtocolObjectType } from "../areas/object-registry/schemas";
 
 export type KernelTransitionMethod =
   | "putCatalogObject"
+  | "registerInstallProposalCompiledRecords"
   | "compileIntent"
   | "createRuntimeExecution"
   | "createGeneratedExecutionGraph"
   | "registerGatewayCredentialRef"
+  | "registerDelegatedAuthorityRef"
+  | "transitionDelegatedAuthorityStatus"
   | "recordGatewayCustodyProofPacket"
   | "recordCredentialResolutionEvidence"
   | "createBypassProbe"
@@ -32,10 +35,13 @@ export type ProtocolTransitionId =
   | "registerActionType"
   | "registerGatewayRegistryEntry"
   | "registerOperatingEnvelope"
+  | "registerInstallProposalCompiledRecords"
   | "compileIntent"
   | "createRuntimeExecution"
   | "createGeneratedExecutionGraph"
   | "registerGatewayCredentialRef"
+  | "registerDelegatedAuthorityRef"
+  | "transitionDelegatedAuthorityStatus"
   | "recordGatewayCustodyProofPacket"
   | "recordCredentialResolutionEvidence"
   | "createBypassProbe"
@@ -58,10 +64,12 @@ export type ProtocolTransitionId =
 
 export type ProtocolTransitionPhase =
   | "catalog"
+  | "install_setup"
   | "intent_compilation"
   | "runtime_evidence"
   | "generated_execution_graph"
   | "credential_custody"
+  | "delegated_authority"
   | "protected_path_posture"
   | "action_contract"
   | "authority_certificate"
@@ -102,6 +110,24 @@ export const protocolNavigation = [
   catalogEntry("registerGatewayRegistryEntry", "gateway_registry_entry"),
   catalogEntry("registerOperatingEnvelope", "operating_envelope"),
   {
+    transitionId: "registerInstallProposalCompiledRecords",
+    kernelMethod: "registerInstallProposalCompiledRecords",
+    phase: "install_setup",
+    outcomeClasses: ["recorded", "refusal", "conflict"],
+    recordsWritten: [
+      "tool_capability",
+      "action_type",
+      "gateway_registry_entry",
+      "operating_envelope",
+      "refusal",
+      "contract_stream_event",
+    ],
+    eventsEmitted: ["install_setup_recorded", "install_setup_refused"],
+    authorityBoundary: "install setup evidence only",
+    evidenceObligation:
+      "atomically register compiled setup records or refusal without issuing policy, greenlight, gate, credential, mutation, receipt, or certificate authority",
+  },
+  {
     transitionId: "compileIntent",
     kernelMethod: "compileIntent",
     phase: "intent_compilation",
@@ -140,6 +166,28 @@ export const protocolNavigation = [
     eventsEmitted: ["gateway_credential_ref_registered"],
     authorityBoundary: "gateway credential custody evidence only",
     evidenceObligation: "record opaque gateway credential ref without exposing secret material or minting authority",
+  },
+  {
+    transitionId: "registerDelegatedAuthorityRef",
+    kernelMethod: "registerDelegatedAuthorityRef",
+    phase: "delegated_authority",
+    outcomeClasses: ["recorded"],
+    recordsWritten: ["delegated_authority_ref", "contract_stream_event"],
+    eventsEmitted: ["delegated_authority_ref_registered"],
+    authorityBoundary: "delegated authority evidence only",
+    evidenceObligation:
+      "record principal-scoped attempt authority bounds without issuing policy, greenlight, gate, or mutation authority",
+  },
+  {
+    transitionId: "transitionDelegatedAuthorityStatus",
+    kernelMethod: "transitionDelegatedAuthorityStatus",
+    phase: "delegated_authority",
+    outcomeClasses: ["recorded"],
+    recordsWritten: ["delegated_authority_status_transition", "isolation_state", "contract_stream_event"],
+    eventsEmitted: ["delegated_authority_status_changed", "isolation_changed"],
+    authorityBoundary: "future authority reduction only",
+    evidenceObligation:
+      "record terminal delegated authority status and authority-ref isolation without minting mutation authority",
   },
   {
     transitionId: "recordGatewayCustodyProofPacket",
@@ -235,11 +283,26 @@ export const protocolNavigation = [
     transitionId: "evaluatePolicy",
     kernelMethod: "evaluatePolicy",
     phase: "policy",
-    outcomeClasses: ["greenlight", "refusal", "review_required", "conflict"],
-    recordsWritten: ["policy_decision", "greenlight", "contract_stream_event"],
-    eventsEmitted: ["policy_decision_recorded", "action_greenlit", "action_refused", "review_required"],
+    outcomeClasses: ["greenlight", "refusal", "review_required", "proof_gap", "conflict"],
+    recordsWritten: [
+      "policy_decision",
+      "greenlight",
+      "refusal",
+      "proof_gap",
+      "idempotency_ledger_entry",
+      "contract_stream_event",
+    ],
+    eventsEmitted: [
+      "policy_decision_recorded",
+      "action_greenlit",
+      "action_refused",
+      "review_required",
+      "proof_gap_recorded",
+      "idempotency_ledger_recorded",
+    ],
     authorityBoundary: "policy decision and optional one-use greenlight",
-    evidenceObligation: "bind exact contract, envelope, isolation, sequence, and posture evidence",
+    evidenceObligation:
+      "bind exact contract, envelope, isolation, sequence, protected-path, credential, readiness, policy-version, and idempotency evidence",
   },
   {
     transitionId: "createReviewArtifact",

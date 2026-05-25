@@ -8,5 +8,6 @@ export {
   type RuntimeIngressDispatchBlock,
   type RuntimeIngressObservedDispatch,
   type RuntimeIngressProtocol,
+  type RuntimeIngressProposalInput,
   type RuntimeIngressResult,
 } from "./ingress";

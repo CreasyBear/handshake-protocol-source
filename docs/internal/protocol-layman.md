@@ -8,7 +8,7 @@ guide conflicts with the protocol definition, the protocol definition wins.
 
 ## The Simple Idea
 
-Handshake exists because agents will do real work through tools.
+Handshake exists because automated systems and agents will do real work through tools.
 
 Some of that work changes things that matter: packages, repos, deploys, cloud
 settings, CI, databases, and other protected systems.
@@ -18,6 +18,16 @@ Handshake says:
 > Before an agent changes a protected system, turn the attempted change into an
 > exact work order, check that exact work order, make the real gate check the
 > pass before anything changes, and keep a record of what happened.
+
+For a builder-buyer, the product outcome is a cleared protected-action event: a
+specific terminal Handshake event with reconstructable evidence that a service
+can accept, refuse, or treat as a proof gap.
+
+The protocol kernel is the source-owned machinery that records the exact work
+order, decision, pass, gate check, receipt/refusal/proof gap, and optional
+certificate. A product surface is the CLI, MCP, SDK, docs, demo, or
+service-facing readback that exposes proposal and evidence without creating
+authority.
 
 ## The Work Order
 
@@ -122,21 +132,48 @@ That record is a receipt.
 A receipt proves the Handshake chain. It does not prove the action was useful,
 safe, profitable, or successful everywhere downstream.
 
+## The Certificate
+
+After a receipt, durable refusal, proof gap, or replay refusal exists, Handshake
+can emit an `AuthorityCertificate`.
+
+The certificate is terminal evidence, not permission. It is not identity,
+settlement, hosted trust, reusable auth, or a pass for another action.
+
+A service can use a certificate during an event by verifying pinned trust
+material and checking:
+
+- the terminal kind;
+- the action class;
+- the resource;
+- required signer roles;
+- gateway admission;
+- certificate and key status.
+
+The service then decides `accept`, `refuse`, or `proof_gap` for its own flow.
+
 ## What This Repo Proves Today
 
 This repo proves the local kernel mechanics: exact work orders, one-use passes,
 gateway checks, refusals, proof gaps, idempotency duplicate handling, local D1
 reconstruction, x402 payment runtime ingress, local payment gateway fixture
 coverage, package-install parameter binding, provider-neutral credential refs
-and redacted resolution evidence, and representation shapes that cannot create
-permission.
+and redacted resolution evidence, auth.md protected API call provenance/custody
+evidence, and representation shapes that cannot create permission.
 
 It does not prove a live hosted service, a real external payment provider
 gateway, live vault-provider custody, generic MCP/runtime control, x402
 aggregate payment-budget management, or independent package-material verification.
 It does include local AuthorityCertificate minting and offline pinned-key
-verification, but not cross-org trust, live key revocation, hosted verify APIs,
+verification and non-mutating hosted verifier projections over configured local
+trust material, but not cross-org trust, live key revocation authority,
 marketplace certification, or provider custody.
+
+Local/source-owned surfaces are validated. Public npm
+`handshake-protocol-kernel@0.2.7` is verified by trusted-publish workflow,
+registry readback, npm signature metadata, provenance publication, and clean
+installed-artifact smoke; public npm availability does not create authority. MCP
+Registry discoverability remains a proof gap.
 
 ## The Whole Flow
 

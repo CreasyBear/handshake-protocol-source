@@ -27,6 +27,7 @@ export type ProtectedActionParamsDigestInput = {
   parameters: Record<string, unknown>;
   secretRefs?: Record<string, string> | undefined;
   gatewayCredentialRefs?: unknown[] | undefined;
+  delegatedAuthorityRefs?: unknown[] | undefined;
 };
 
 export async function protectedActionParamsDigest(
@@ -38,6 +39,9 @@ export async function protectedActionParamsDigest(
   };
   if (input.gatewayCredentialRefs && input.gatewayCredentialRefs.length > 0) {
     material.gatewayCredentialRefs = JSON.parse(JSON.stringify(input.gatewayCredentialRefs)) as JsonValue;
+  }
+  if (input.delegatedAuthorityRefs && input.delegatedAuthorityRefs.length > 0) {
+    material.delegatedAuthorityRefs = JSON.parse(JSON.stringify(input.delegatedAuthorityRefs)) as JsonValue;
   }
   return digestCanonical(material);
 }

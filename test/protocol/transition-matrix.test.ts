@@ -21,10 +21,14 @@ describe("foundation transition matrix", () => {
       .map((entry) => String(entry.transitionId))
       .sort();
     const routeIds = transitionRouteDefinitions.map((route) => String(route.routeId)).sort();
+    const protocolBackedRouteIds = transitionRouteDefinitions
+      .filter((route) => route.routeId !== "proposeRuntimeIngressActionContracts")
+      .map((route) => String(route.routeId))
+      .sort();
     const invokerIds = Object.keys(transitionInvokers).sort();
 
-    expect(navigationIds).toEqual(routeIds);
-    expect(navigationIds).toEqual(invokerIds);
+    expect(navigationIds).toEqual(protocolBackedRouteIds);
+    expect(routeIds).toEqual(invokerIds);
     expect(new Set(navigationIds).size).toBe(navigationIds.length);
   });
 
@@ -69,6 +73,8 @@ describe("foundation transition matrix", () => {
       "compileIntent",
       "createRuntimeExecution",
       "createGeneratedExecutionGraph",
+      "registerInstallProposalCompiledRecords",
+      "registerDelegatedAuthorityRef",
       "createBypassProbe",
       "recordGatewayCustodyProofPacket",
       "createToolCallDraft",

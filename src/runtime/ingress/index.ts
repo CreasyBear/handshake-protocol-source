@@ -1,3 +1,6 @@
+import { z } from "zod";
+import { AuthMdProtectedApiCallRuntimeConfigSchema } from "../../adapters/auth-md/action-proposal";
+import { X402PaymentRuntimeConfigSchema } from "../../adapters/x402-payment/action-proposal";
 import type { ActionContract, ProposeActionContractInput } from "../../protocol/areas/action-contract";
 import type {
   CreateGeneratedExecutionGraphInput,
@@ -12,6 +15,7 @@ import type {
   ToolCallDraft,
   TransitionToolCallDraftInput,
 } from "../../protocol/areas/tool-call-draft";
+import { PackageInstallRuntimeConfigSchema } from "../package-install/action-proposal";
 import { digestCanonical, protectedActionParamsDigest } from "../../protocol/foundation/canonical";
 import type { JsonValue } from "../../protocol/foundation/schema-core";
 import {
@@ -46,6 +50,56 @@ export type {
   RuntimeIngressDispatchBlockRefs,
   RuntimeIngressObservedDispatch,
 } from "./schemas";
+
+export const RuntimeIngressConfigSchema = z
+  .strictObject({
+    packageInstall: PackageInstallRuntimeConfigSchema.optional(),
+    x402Payment: X402PaymentRuntimeConfigSchema.optional(),
+    authMdProtectedApiCall: AuthMdProtectedApiCallRuntimeConfigSchema.optional(),
+  })
+  .superRefine((config, context) => {
+    if (!config.packageInstall && !config.x402Payment && !config.authMdProtectedApiCall) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Runtime ingress proposal requires at least one dispatch-family config.",
+        path: ["config"],
+      });
+    }
+  });
+
+export const RuntimeIngressProposalInputSchema = z
+  .strictObject({
+    tenantId: z.string().min(1),
+    organizationId: z.string().min(1),
+    config: RuntimeIngressConfigSchema,
+    dispatchBlock: RuntimeIngressDispatchBlockSchema,
+  })
+  .superRefine((input, context) => {
+    const scopedConfigs = [
+      ["packageInstall", input.config.packageInstall],
+      ["x402Payment", input.config.x402Payment],
+      ["authMdProtectedApiCall", input.config.authMdProtectedApiCall],
+    ] as const;
+    for (const [family, config] of scopedConfigs) {
+      if (!config) continue;
+      if (config.tenantId !== input.tenantId) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `${family} runtime config tenantId must match the request tenantId.`,
+          path: ["config", family, "tenantId"],
+        });
+      }
+      if (config.organizationId !== input.organizationId) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `${family} runtime config organizationId must match the request organizationId.`,
+          path: ["config", family, "organizationId"],
+        });
+      }
+    }
+  });
+
+export type RuntimeIngressProposalInput = z.input<typeof RuntimeIngressProposalInputSchema>;
 
 export type RuntimeIngressResponsePosture = {
   schemaVersion: "handshake.runtime-ingress.outcome.v1";
@@ -375,6 +429,7 @@ async function buildRuntimeIngressGraphNode(
     parameters: candidate.parameters,
     secretRefs: candidate.secretRefs,
     gatewayCredentialRefs: candidate.gatewayCredentialRefs,
+    delegatedAuthorityRefs: candidate.delegatedAuthorityRefs,
   });
   const classification = nodeClassificationForDispatch(dispatch);
   const nodeGatewayBindingDigest =
@@ -494,6 +549,7 @@ async function createFinalizedToolCallDraft(
     gatewayId: compileInput.candidate.gatewayId,
     resourceRef: compileInput.candidate.resourceRef,
     gatewayCredentialRefs: compileInput.candidate.gatewayCredentialRefs,
+    delegatedAuthorityRefs: compileInput.candidate.delegatedAuthorityRefs,
     expiresAt: compileInput.candidate.expiresAt,
     evidenceRefs: compileInput.requiredEvidenceRefs,
   });
@@ -504,6 +560,7 @@ async function createFinalizedToolCallDraft(
     nonSecretParamsSummary: compileInput.candidate.nonSecretParamsSummary,
     secretRefs: compileInput.candidate.secretRefs,
     gatewayCredentialRefs: compileInput.candidate.gatewayCredentialRefs,
+    delegatedAuthorityRefs: compileInput.candidate.delegatedAuthorityRefs,
     finalizedAt: new Date().toISOString(),
     expiresAt: compileInput.candidate.expiresAt,
     evidenceRefs: compileInput.requiredEvidenceRefs,

@@ -185,17 +185,31 @@ export const RuntimeIngressObservedDispatchSchema = z.discriminatedUnion("dispat
 ]);
 export type RuntimeIngressObservedDispatch = z.input<typeof RuntimeIngressObservedDispatchSchema>;
 
-export const RuntimeIngressDispatchBlockSchema = z.strictObject({
-  principalIntentRef: RuntimeIngressRefSchema,
-  generatedCodeOrSpecRef: RuntimeIngressRefSchema,
-  dispatchBoundaryRef: RuntimeIngressRefSchema,
-  executionBlockRef: RuntimeIngressRefSchema.nullable().default(null),
-  graphNonce: z.string().min(8).nullable().default(null),
-  truncationStatus: z.enum(["complete", "truncated", "over_limit", "unknown"]).default("complete"),
-  unobservedRegionRefs: RuntimeIngressSmallListSchema(RuntimeIngressRefSchema).default([]),
-  evidenceRefs: RuntimeIngressSmallListSchema(RuntimeIngressRefSchema).default([]),
-  dispatches: z.array(RuntimeIngressObservedDispatchSchema).min(1).max(RuntimeIngressDispatchLimit),
-});
+export const RuntimeIngressDispatchBlockSchema = z
+  .strictObject({
+    principalIntentRef: RuntimeIngressRefSchema,
+    generatedCodeOrSpecRef: RuntimeIngressRefSchema,
+    dispatchBoundaryRef: RuntimeIngressRefSchema,
+    executionBlockRef: RuntimeIngressRefSchema.nullable().default(null),
+    graphNonce: z.string().min(8).nullable().default(null),
+    truncationStatus: z.enum(["complete", "truncated", "over_limit", "unknown"]).default("complete"),
+    unobservedRegionRefs: RuntimeIngressSmallListSchema(RuntimeIngressRefSchema).default([]),
+    evidenceRefs: RuntimeIngressSmallListSchema(RuntimeIngressRefSchema).default([]),
+    dispatches: z.array(RuntimeIngressObservedDispatchSchema).min(1).max(RuntimeIngressDispatchLimit),
+  })
+  .superRefine((block, context) => {
+    const seenDispatchRefs = new Set<string>();
+    block.dispatches.forEach((dispatch, index) => {
+      if (seenDispatchRefs.has(dispatch.dispatchRef)) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Runtime ingress dispatchRef must be unique within a dispatch block.",
+          path: ["dispatches", index, "dispatchRef"],
+        });
+      }
+      seenDispatchRefs.add(dispatch.dispatchRef);
+    });
+  });
 export type RuntimeIngressDispatchBlock = z.input<typeof RuntimeIngressDispatchBlockSchema>;
 
 export type ParsedRuntimeIngressDispatchBlock = z.infer<typeof RuntimeIngressDispatchBlockSchema>;

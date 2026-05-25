@@ -10,6 +10,22 @@ Every consequential mutation attempt must be reduced to an exact, inspectable, p
 
 Handshake's category is protected actions for automated decision making.
 
+## Product And Protocol Language
+
+- Product language centers on the cleared protected-action event: one terminal
+  Handshake event with reconstructable evidence that a service can accept,
+  refuse, or treat as a proof gap.
+- The protocol kernel is the source-owned state machine and schema set for exact
+  contracts, policy decisions, one-use greenlights, gateway checks, receipts,
+  refusals, proof gaps, isolation, and terminal certificates.
+- A product surface is CLI, MCP, SDK, docs, demo, or service-facing readback that
+  exposes proposal/evidence/readback without creating authority.
+- The certificate is terminal evidence, not permission, identity, settlement,
+  hosted trust, or reusable auth.
+- Public npm availability does not create authority. MCP Registry
+  discoverability remains a proof gap until registry acceptance and lookup are
+  verified.
+
 ## Required Separation
 
 - Vague intent is not an operating envelope.
@@ -97,6 +113,7 @@ Protocol areas may depend on foundation/events/context/store and other area publ
 ## Protocol Areas
 
 - `catalog-envelope`: declared tool, action, gateway, and envelope records; catalog presence is not authorization. Envelopes may carry provider-neutral participant identity bindings, but those bindings are evidence-only links to the opaque principal/agent refs.
+- `delegated-authority`: redacted principal/agent/runtime/envelope/gateway scoped attempt-authority refs; registering a ref records bounds and evidence expectations only, and creates no policy decision, greenlight, gateway check, mutation authority, or receipt. Revocation and expiry are separate status-transition evidence that creates `authority_ref` isolation without mutating the original ref.
 - `credential-custody`: opaque gateway credential refs, redacted gateway custody proof packets, and post-gate resolution evidence; no provider clients or secret retrieval API.
 - `runtime-evidence`: generated execution evidence; evidence can propose but cannot authorize.
 - `generated-execution-graph`: normalized generated-code/spec evidence and action candidates.
@@ -138,15 +155,103 @@ Protocol areas may depend on foundation/events/context/store and other area publ
   state is fixture-specific and never proves host-wide containment, package
   manager ecosystem protection, MCP/CLI/browser/shell/network protection, or
   x402 ecosystem coverage.
+- The x402 protected-tool facade/profile lane lets Codex, Claude, Hermes, and
+  OpenClaw host profiles expose the normal
+  `handshake.actions.x402_payment.propose` tool only after protected-tool
+  readiness is present and bound to the facade input. The readiness proof binds
+  install digest, probe posture digest, gateway registration, wallet-signer
+  credential-ref digest/custody, redacted gateway custody proof packet
+  digest/claim level/external-verification posture/expiry, policy version,
+  gateway registry entry, operating envelope, selected payment requirement
+  digest, raw sibling posture, explicit non-authority flags, and expiry; the
+  profile refuses if that proof drifts or if customer gateway custody is only
+  fixture-local. The profile emits transcript evidence, host bypass posture,
+  and non-claims; it does not create policy decisions, greenlights, gateway
+  checks, signer use, payment material, settlement, hosted operation, provider
+  custody, or host-wide containment.
+- The first host activation artifact is Codex-local: it binds the
+  `~/.codex/config.toml` MCP server target, `npx ... handshake-mcp` command,
+  wrapper/config digest, tool-list digest, source-observed gateway/one-use
+  evidence, and named raw sibling probes into a host-specific bypass proof
+  packet. It is not a live user host mutation, gateway check, signer path, or
+  host-wide containment claim.
+- The first external-runtime transcript target is Codex-local by source-owned
+  local verification default, with final user launch selection still a proof
+  gap. The transcript demonstrates proposal/readback compatibility and raw
+  sibling posture for the configured `handshake-mcp` path only. It does not
+  mutate `~/.codex/config.toml`, does not perform policy or gateway work, does
+  not invoke signers, and does not prove host-wide containment; Claude Code,
+  Hermes, OpenClaw, and generic MCP remain parity artifacts until selected and
+  verified.
+- The local x402 protected-spend walkthrough now starts from that facade:
+  protected-tool dispatch preparation -> runtime ingress proposal -> exact
+  action contract with a delegated spend `DelegatedAuthorityRef` plus
+  wallet-signer `GatewayCredentialRef` -> policy greenlight -> wallet gateway
+  check -> gateway-held signing surface. The delegated authority ref and
+  credential ref are bound into candidate/contract digest material and re-read
+  by policy and gateway checks, so stale or mismatched authority, stale signer
+  custody, credential-ref isolation, or authority-ref isolation refuses before
+  signing. Delegated-authority terminal status is recorded as a transition plus
+  `authority_ref` isolation, so future policy decisions and stale unconsumed
+  greenlights fail before signer use. This is still per-call local/reference
+  evidence, not aggregate spend-window enforcement, hosted/provider custody, or
+  host-wide containment.
+- The package gate includes a clean installed-artifact activation smoke: pack
+  the npm artifact, extract it under temporary `node_modules`, bare-import
+  `handshake-protocol-kernel/x402-protected-tool`, then run the local x402
+  protected-spend chain with the installed facade module. The smoke now also
+  asserts the installed-path hostile matrix: stale policy metadata, raw x402
+  payload input, sibling MCP direct payment, changed observed parameters, and
+  consumed-greenlight replay all stop before signer use, mutation, or reusable
+  authority.
+- The `./x402-protected-tool` package subpath exposes only the proposal facade,
+  protected-tool readiness contract, host profile descriptors, and Codex-local,
+  Claude Code managed-MCP, Hermes tool-packet, plus OpenClaw tool-packet
+  activation artifact builders. The activation artifacts bind one configured
+  wrapper or tool packet, config/tool-list digests, gateway/one-use evidence,
+  and named raw sibling probes. They are installable distribution posture for
+  the normal protected x402 tool, not gateway custody, signing authority, live
+  host mutation, native host certification, or host-wide containment.
+- The production acceptance matrix for the first x402 protected-tool path is
+  source-owned in `src/surfaces/x402-protected-tool-acceptance.ts`. It covers package
+  install, init/doctor, x402 install, local probes, gateway-readiness
+  registration, install health, host profile generation, protected tool
+  proposal, policy decision, gateway check before signer use, and redacted
+  readback/support evidence. Each step records surface owner, authority
+  posture, input evidence, output record, required non-authority flags, bypass
+  posture, proof gaps, validation gate, and stop condition. The matrix is a
+  release-admission contract only: readiness remains `pre_contract`, host
+  profiles remain posture artifacts, policy is the first authority transition,
+  the gateway check remains the signer boundary, and readback remains terminal
+  evidence rather than downstream success or retry permission.
+- First-use reason codes route to mechanisms, not retries: stale metadata or
+  digest drift means reload current evidence; unsafe shape, amount overrun,
+  dynamic tool construction, late-bound parameters, or unsupported x402 posture
+  means recraft the exact request; offline/readiness/status gaps mean wait or
+  fix install evidence; raw sibling or failure-open signals mean stop and
+  isolate as needed; isolation, quarantine, revocation, or delegated-authority
+  expiry means isolate; parameter/idempotency mismatch and consumed greenlights
+  require a new exact contract; proof gaps and downstream unknowns require
+  readback/support evidence before any new attempt.
+- The installed first-use guide in `README.md` must preserve the same split:
+  CLI and MCP commands stop at readiness, proposal, and redacted readback until
+  the role-scoped runtime, policy, and gateway clients run. Reason-code guidance
+  maps reload, recraft, wait/fix install, stop/isolate, read evidence, and
+  create-new-contract outcomes without turning a refusal, proof gap, replay, or
+  support bundle into retry permission. Schema-shaped samples should come from
+  source-owned demos or current schemas rather than hand-copied JSON in docs.
 - Payment-specific protected-action packs live under adapter/plugin lanes, not protocol areas.
 - The payment adapter has a local D1/HTTP establishment path, runtime ingress,
   local/reference paid-HTTP 402 challenge and post-gate signed retry evidence,
   and local hostile bypass/custody probe coverage under experimental/reference
-  adapter surfaces. The signed retry is downstream fixture observation after
-  gateway-created signature evidence, not a policy, greenlight, gateway, or
-  signing authority. It enforces per-call spend only; aggregate payment-budget
-  management is intentionally outside the current remit, and any local spend
-  window fields are non-enforced metadata. This is not live provider custody.
+  adapter surfaces. The first-slice path registers a redacted x402 wallet
+  signer credential ref and carries that binding through runtime config,
+  tool-call draft, intent compilation, and action contract. The signed retry is
+  downstream fixture observation after gateway-created signature evidence, not
+  a policy, greenlight, gateway, or signing authority. It enforces per-call
+  spend only; aggregate payment-budget management is intentionally outside the
+  current remit, and any local spend window fields are non-enforced metadata.
+  This is not live provider custody.
 - Protected mutation adapter conformance lives under the `./conformance` package subpath.
 - The auth.md adapter profile lives under the experimental/reference adapter
   surface. It treats the OAuth protected-resource to authorization-server
@@ -184,6 +289,44 @@ Protocol areas may depend on foundation/events/context/store and other area publ
   It emits runtime evidence, graph evidence, finalized tool-call drafts,
   compilations, contracts, and refusals; it does not issue policy decisions,
   greenlights, gateway checks, receipts, or mutations.
+- The role-scoped `ControlPlaneClient` exposes delegated authority registration
+  and terminal delegated-authority status transitions over `control_plane`
+  custody. It records attempt-authority evidence and authority-ref isolation
+  only; it does not evaluate policy, issue greenlights, perform gateway checks,
+  resolve credentials, use signers, mutate protected surfaces, export receipts,
+  or mint certificates.
+- The role-scoped `PolicyClient.evaluatePolicy()` exposes exact policy
+  evaluation over `control_plane` custody. It may create one policy decision and
+  optional one-use greenlight or refusal for an exact action contract. It does
+  not perform gateway checks, resolve credentials, use signers, mutate protected
+  surfaces, read evidence, export receipts, manage delegated authority
+  lifecycle, install setup records, or mint certificates.
+- The APS terminal `AuthorityCertificate` remains local-reference-only terminal
+  evidence. The strict role-scoped gateway path terminates at receipt, durable
+  refusal, replay refusal, or proof-gap readback until a separate terminal
+  evidence issuer exists; `EvidenceClient` verifies supplied certificates but
+  does not mint them.
+- The role-scoped `InstallClient` exposes setup-only registration of compiled
+  `InstallProposal` catalog, gateway-registry, and operating-envelope records
+  over `control_plane` custody through one server-side setup commit. Ready
+  proposals atomically register compiled setup records; refused proposals record
+  refusal evidence. It is setup evidence, not hosted installation authority, and
+  does not compile proposals, evaluate policy, issue greenlights, perform
+  gateway checks, register credential refs, resolve credentials, run probes,
+  mutate protected surfaces, export receipts, or mint certificates.
+- The role-scoped `GatewayClient` exposes gateway credential refs, gateway
+  custody proof packets, bypass probes, protected-path posture, gateway checks,
+  post-gate credential-resolution evidence, and downstream surface
+  reconciliation over `gateway_custody`. It is gateway transition transport
+  only; it does not expose signer helpers, payment payload creation, policy,
+  delegated-authority management, receipt export, certificate minting, raw
+  record reads, or mutation commands.
+- The role-scoped `RuntimeClient.proposeRuntimeIngressActionContracts()` method
+  and `/v0.2/runtime-ingress/action-contracts` route expose the same
+  proposal-only runtime ingress handoff over `runtime_evidence` custody. They
+  return contracts or compiler refusals plus explicit non-authority posture; they
+  do not perform policy, gateway, signer, mutation, receipt-export, or
+  certificate work.
 - Codemode multi-action, x402 payment ingress, package-install, and auth.md
   protected API runtime paths prove generated-execution proposal behavior.
 - Internal protected-action representation contracts prove Metadata, Challenge,
@@ -208,6 +351,27 @@ Protocol areas may depend on foundation/events/context/store and other area publ
 
 These are proof lanes, not provider-side enforcement claims.
 
+The production proof ledger lives in `docs/internal/decisions.md`. It keeps
+hosted operation, provider/customer gateway custody beyond local proof,
+settlement/finality, facilitator operation, seller middleware,
+marketplace/certification, cross-org trust, broad x402 compatibility, aggregate
+spend enforcement, MCP Registry discoverability, and host-wide containment in
+proof-gap, outside-claim, or cut-line status until source evidence changes.
+Expansion into a second action family requires a named generated execution
+shape, protected action path, gateway authority holder, credential holder,
+`CandidateAction`/refusal boundary, bypass posture, evidence path, proof-gap
+model, recovery/isolation path, non-claims, focused gates, package gates, and
+the full repo gate. Without that packet, the family remains a proof context, not
+an execution-ready product surface.
+
+Local/source-owned surfaces are validated for the protocol kernel and product
+surface boundary. Codex-local host invocation has been observed for a pinned
+`handshake-protocol-kernel@0.2.7` artifact, but that proves only host-origin MCP
+tool reachability. Public npm `handshake-protocol-kernel@0.2.7` availability is
+verified by trusted-publish workflow, registry readback, npm signature metadata,
+provenance publication, and clean installed-artifact smoke. Those distribution
+and host-activation facts do not create authority.
+
 ## AuthorityCertificate
 
 `AuthorityCertificate` and `verifyAuthorityCertificate()` are landed source
@@ -226,6 +390,12 @@ admission also has an explicit deployment config and read-entitlement split for
 redacted evidence reads; missing config, excluded roles, stale identities,
 missing scopes, disabled raw-read posture, and missing read-purpose bounds fail
 closed before the route can be treated as authority.
+
+A service event verifier may consume the certificate as portable evidence, but
+only after checking pinned trust material, terminal kind, action class, resource,
+required signer roles, gateway admission, and status. It should return
+`accept`, `refuse`, or `proof_gap`; it must not treat the certificate as a bearer
+permission token.
 
 This is still local foundation trust. Cross-org trust, remote JWKS trust fetch,
 live revocation authority, hosted mutation authority, production hosted

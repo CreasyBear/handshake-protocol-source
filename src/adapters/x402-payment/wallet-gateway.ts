@@ -24,6 +24,10 @@ import {
   type VerifiedGatewayCheck,
 } from "../../protocol/areas/gateway-gate";
 import type {
+  CredentialResolutionEvidence,
+  RecordCredentialResolutionEvidenceInput,
+} from "../../protocol/areas/credential-custody";
+import type {
   ReconcileSurfaceOperationInput,
   SurfaceOperationReconciliation,
   SurfaceOperationReconciliationResult,
@@ -68,12 +72,22 @@ export const X402PaymentParametersSchema = z.strictObject({
   facilitatorRef: z.string().min(1).nullable().default(null),
   sdkPackageVersions: z.record(z.string(), z.string().min(1)).default({}),
   extensionKeys: z.array(z.string().min(1)).default([]),
+  gatewayCredentialRefId: z.string().min(1),
+  gatewayCredentialRefDigest: DigestSchema,
+  gatewayReadinessRef: z.string().min(1),
+  gatewayReadinessDigest: DigestSchema,
+  policyVersionRef: z.string().min(1),
+  policyVersionDigest: DigestSchema,
 });
 export type X402PaymentParameters = z.infer<typeof X402PaymentParametersSchema>;
 
 export type X402PaymentSignatureCommand = {
   verifiedGate: VerifiedGatewayCheck;
   parameters: X402PaymentParameters;
+  credentialResolutionEvidence: CredentialResolutionEvidence;
+  credentialUseRef: string;
+  providerRequestRef: string;
+  providerOperationRef: string;
 };
 
 export type X402LocalReferenceSandboxEvidenceBoundary = {
@@ -129,6 +143,9 @@ export type CreateOfficialExactX402SigningSurfaceInput = {
 
 export type X402WalletGatewayProtocol = {
   gatewayCheck(input: GatewayCheckInput): Promise<GatewayCheckResult>;
+  recordCredentialResolutionEvidence(
+    input: RecordCredentialResolutionEvidenceInput,
+  ): Promise<CredentialResolutionEvidence>;
   reconcileSurfaceOperation(input: ReconcileSurfaceOperationInput): Promise<SurfaceOperationReconciliationResult>;
 };
 
@@ -145,30 +162,35 @@ export type X402WalletGatewayResult =
   | {
       outcome: "gateway_check_refused";
       gatewayCheck: GatewayCheckResult;
+      credentialResolutionEvidence: null;
       reconciliation: null;
       signatureEvidence: null;
     }
   | {
       outcome: "gateway_check_not_authoritative";
       gatewayCheck: GatewayCheckResult;
+      credentialResolutionEvidence: null;
       reconciliation: null;
       signatureEvidence: null;
     }
   | {
       outcome: "payment_signature_reconciled";
       gatewayCheck: GatewayCheckResult;
+      credentialResolutionEvidence: CredentialResolutionEvidence;
       reconciliation: SurfaceOperationReconciliation;
       signatureEvidence: X402PaymentSignatureEvidence;
     }
   | {
       outcome: "payment_signature_proof_gap";
       gatewayCheck: GatewayCheckResult;
+      credentialResolutionEvidence: CredentialResolutionEvidence;
       reconciliation: SurfaceOperationReconciliation;
       signatureEvidence: X402PaymentSignatureEvidence;
     }
   | {
       outcome: "payment_signature_failed";
       gatewayCheck: GatewayCheckResult;
+      credentialResolutionEvidence: CredentialResolutionEvidence | null;
       reconciliation: SurfaceOperationReconciliation;
       signatureEvidence: null;
     };
@@ -187,15 +209,43 @@ export async function runX402WalletGateway(input: X402WalletGatewayInput): Promi
   if (!verifiedGate) {
     const outcome =
       gatewayCheck.gateAttempt.gateDecision === "refused" ? "gateway_check_refused" : "gateway_check_not_authoritative";
-    return { outcome, gatewayCheck, reconciliation: null, signatureEvidence: null };
+    return { outcome, gatewayCheck, credentialResolutionEvidence: null, reconciliation: null, signatureEvidence: null };
   }
 
+  let credentialResolutionEvidence: CredentialResolutionEvidence | null = null;
   try {
-    const signatureEvidence = await input.surface.signPayment({ verifiedGate, parameters: observedParameters });
+    const providerRefs = providerRefsForGate(verifiedGate);
+    credentialResolutionEvidence = await input.protocol.recordCredentialResolutionEvidence({
+      actionContractId: input.actionContractId,
+      greenlightId: input.greenlightId,
+      gateAttemptId: verifiedGate.gateAttemptId,
+      gatewayCredentialRefId: observedParameters.gatewayCredentialRefId,
+      gatewayCredentialRefDigest: observedParameters.gatewayCredentialRefDigest,
+      requestDigest: await credentialResolutionRequestDigest(verifiedGate, observedParameters),
+      resultClass: "used_by_gateway",
+      resultReasonCode: "gate_passed",
+      redactionStatus: "redacted",
+      providerRequestRef: providerRefs.providerRequestRef,
+      providerOperationRef: providerRefs.providerOperationRef,
+      evidenceRefs: [
+        `gateway_credential_ref:${observedParameters.gatewayCredentialRefId}`,
+        `digest:${observedParameters.gatewayCredentialRefDigest}`,
+        `digest:${observedParameters.gatewayReadinessDigest}`,
+        `digest:${observedParameters.policyVersionDigest}`,
+      ],
+    });
+    const signatureEvidence = await input.surface.signPayment({
+      verifiedGate,
+      parameters: observedParameters,
+      credentialResolutionEvidence,
+      credentialUseRef: `gateway-credential-use:x402:${verifiedGate.gateAttemptId}`,
+      ...providerRefs,
+    });
     const evidenceRefs = [
       signatureEvidence.evidenceRef,
       signatureEvidence.paymentSignatureHeaderRef,
       `digest:${signatureEvidence.paymentSignatureDigest}`,
+      `credential_resolution_evidence:${credentialResolutionEvidence.credentialResolutionEvidenceId}`,
       signatureEvidence.paymentPayloadRef ?? null,
       signatureEvidence.paymentPayloadDigest ? `digest:${signatureEvidence.paymentPayloadDigest}` : null,
       signatureEvidence.paymentIdentifierRef ?? null,
@@ -219,7 +269,7 @@ export async function runX402WalletGateway(input: X402WalletGatewayInput): Promi
       signatureEvidence.downstreamPaymentStatus === "succeeded"
         ? "payment_signature_reconciled"
         : "payment_signature_proof_gap";
-    return { outcome, gatewayCheck, reconciliation, signatureEvidence };
+    return { outcome, gatewayCheck, credentialResolutionEvidence, reconciliation, signatureEvidence };
   } catch {
     const { reconciliation } = await input.protocol.reconcileSurfaceOperation({
       mutationAttemptId: verifiedGate.mutationAttemptId,
@@ -231,10 +281,21 @@ export async function runX402WalletGateway(input: X402WalletGatewayInput): Promi
       providerOperationRef: surfaceOperationRef,
       redactedDiagnosticsDigest: await digestCanonical({ adapter: "x402-wallet-gateway", surfaceOperationRef }),
       diagnosticsRedactionPosture: "digest_only",
-      evidenceRefs: [`evidence:x402-payment-signature-failed:${surfaceOperationRef}`],
+      evidenceRefs: [
+        `evidence:x402-payment-signature-failed:${surfaceOperationRef}`,
+        ...(credentialResolutionEvidence
+          ? [`credential_resolution_evidence:${credentialResolutionEvidence.credentialResolutionEvidenceId}`]
+          : []),
+      ],
       resolvedProofGapIds: [],
     });
-    return { outcome: "payment_signature_failed", gatewayCheck, reconciliation, signatureEvidence: null };
+    return {
+      outcome: "payment_signature_failed",
+      gatewayCheck,
+      credentialResolutionEvidence,
+      reconciliation,
+      signatureEvidence: null,
+    };
   }
 }
 
@@ -442,6 +503,40 @@ function assertSandboxProviderEnvironment(parameters: X402PaymentParameters): vo
   if (parameters.providerEnvironmentPosture !== "local_reference_sandbox") {
     throw new Error("Official x402 gateway signing refused non-reference provider environment posture.");
   }
+}
+
+async function credentialResolutionRequestDigest(
+  verifiedGate: VerifiedGatewayCheck,
+  parameters: X402PaymentParameters,
+): Promise<`sha256:${string}`> {
+  return digestCanonical({
+    profile: "x402_credential_resolution_request.v0",
+    actionContractId: verifiedGate.actionContractId,
+    gateAttemptId: verifiedGate.gateAttemptId,
+    gatewayCredentialRefDigest: parameters.gatewayCredentialRefDigest,
+    endpointUrl: parameters.endpointUrl,
+    intendedHttpMethod: parameters.intendedHttpMethod,
+    intendedRequestUrl: parameters.intendedRequestUrl,
+    intendedRequestBodyPosture: parameters.intendedRequestBodyPosture,
+    intendedRequestBodyDigest: parameters.intendedRequestBodyDigest,
+    selectedHeadersDigest: parameters.selectedHeadersDigest,
+    paymentRequirementsDigest: parameters.paymentRequirementsDigest,
+    selectedPaymentRequirementIndex: parameters.selectedPaymentRequirementIndex,
+    selectedPaymentRequirementDigest: parameters.selectedPaymentRequirementDigest,
+    paymentIdentifierDigest: parameters.paymentIdentifierDigest,
+    gatewayReadinessDigest: parameters.gatewayReadinessDigest,
+    policyVersionDigest: parameters.policyVersionDigest,
+  });
+}
+
+function providerRefsForGate(verifiedGate: VerifiedGatewayCheck): {
+  providerRequestRef: string;
+  providerOperationRef: string;
+} {
+  return {
+    providerRequestRef: `provider-request:x402:${verifiedGate.gateAttemptId}`,
+    providerOperationRef: `provider-operation:x402:${verifiedGate.gateAttemptId}`,
+  };
 }
 
 function paymentRequirementMatchesObservedParameters(

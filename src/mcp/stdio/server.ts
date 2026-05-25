@@ -3,6 +3,10 @@ import { mcpProposalTools, MCP_X402_PAYMENT_PROPOSE_TOOL } from "../catalog";
 import { McpStructuredContentSchema } from "../output";
 import {
   MCP_REFERENCE_METADATA_URI,
+  MCP_REFERENCE_GATEWAY_READINESS_DIGEST,
+  MCP_REFERENCE_GATEWAY_READINESS_REF,
+  MCP_REFERENCE_POLICY_VERSION_DIGEST,
+  MCP_REFERENCE_POLICY_VERSION_REF,
   MCP_REFERENCE_RECEIPT_TIMELINE_URI,
   MCP_REFERENCE_TRUSTED_MAX_ATOMIC_AMOUNT,
   referenceEvidenceClient,
@@ -30,6 +34,10 @@ export type HandshakeMcpStdioServerOptions = {
   readonly installPosture?: McpInstallPosture;
   readonly gatewayPosture?: McpGatewayPosture;
   readonly trustedMaxAtomicAmountPerCall?: string;
+  readonly gatewayReadinessRef?: string;
+  readonly gatewayReadinessDigest?: `sha256:${string}` | string;
+  readonly policyVersionRef?: string;
+  readonly policyVersionDigest?: `sha256:${string}` | string;
 };
 
 export function createHandshakeMcpStdioServer(options: HandshakeMcpStdioServerOptions = {}): McpServer {
@@ -83,6 +91,10 @@ export function createHandshakeMcpStdioServer(options: HandshakeMcpStdioServerOp
         ...(options.installPosture ? { installPosture: options.installPosture } : {}),
         ...(options.gatewayPosture ? { gatewayPosture: options.gatewayPosture } : {}),
         trustedMaxAtomicAmountPerCall: options.trustedMaxAtomicAmountPerCall ?? MCP_REFERENCE_TRUSTED_MAX_ATOMIC_AMOUNT,
+        gatewayReadinessRef: options.gatewayReadinessRef ?? MCP_REFERENCE_GATEWAY_READINESS_REF,
+        gatewayReadinessDigest: options.gatewayReadinessDigest ?? MCP_REFERENCE_GATEWAY_READINESS_DIGEST,
+        policyVersionRef: options.policyVersionRef ?? MCP_REFERENCE_POLICY_VERSION_REF,
+        policyVersionDigest: options.policyVersionDigest ?? MCP_REFERENCE_POLICY_VERSION_DIGEST,
       });
       return {
         content: result.content,

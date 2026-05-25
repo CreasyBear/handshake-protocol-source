@@ -326,6 +326,7 @@ async function createFinalizedToolCallDraft(
     gatewayId: compileInput.candidate.gatewayId,
     resourceRef: compileInput.candidate.resourceRef,
     gatewayCredentialRefs: compileInput.candidate.gatewayCredentialRefs,
+    delegatedAuthorityRefs: compileInput.candidate.delegatedAuthorityRefs,
     expiresAt: compileInput.candidate.expiresAt,
     evidenceRefs: compileInput.requiredEvidenceRefs,
   });
@@ -336,6 +337,7 @@ async function createFinalizedToolCallDraft(
     nonSecretParamsSummary: compileInput.candidate.nonSecretParamsSummary,
     secretRefs: compileInput.candidate.secretRefs,
     gatewayCredentialRefs: compileInput.candidate.gatewayCredentialRefs,
+    delegatedAuthorityRefs: compileInput.candidate.delegatedAuthorityRefs,
     finalizedAt: new Date().toISOString(),
     expiresAt: compileInput.candidate.expiresAt,
     evidenceRefs: compileInput.requiredEvidenceRefs,

@@ -207,6 +207,12 @@ export class InMemoryProtocolStore implements ProtocolStore {
     if (commit.events.some((event) => this.hasStreamOffset(event))) {
       return "stream_conflict";
     }
+    if (commit.recordConflictMode === "absent_or_same") {
+      for (const record of commit.records) {
+        const existing = this.records.get(recordKey(record.objectType, record.objectId));
+        if (existing && existing.canonicalDigest !== record.canonicalDigest) return "record_digest_conflict";
+      }
+    }
 
     const nextRecords = new Map(this.records);
     const nextEvents = [...this.events];

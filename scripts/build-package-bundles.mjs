@@ -3,10 +3,13 @@ import { spawnSync } from "node:child_process";
 const bundles = [
   ["./src/index.ts", "./dist/index.mjs"],
   ["./src/conformance/index.ts", "./dist/conformance/index.mjs"],
+  ["./src/adapter-sdk/index.ts", "./dist/adapter-sdk/index.mjs"],
+  ["./src/surfaces/index.ts", "./dist/surfaces/index.mjs"],
   ["./src/runtime/index.ts", "./dist/runtime/index.mjs"],
   ["./src/sdk/surface-clients/index.ts", "./dist/sdk/surface-clients/index.mjs"],
   ["./src/cli/index.ts", "./dist/cli/index.mjs"],
   ["./src/mcp/index.ts", "./dist/mcp/index.mjs"],
+  ["./src/x402-protected-tool/index.ts", "./dist/x402-protected-tool/index.mjs"],
   ["./src/experimental.ts", "./dist/experimental.mjs"],
   ["./src/cli/main.ts", "./dist/bin/handshake.mjs"],
   ["./src/mcp/stdio/entry.ts", "./dist/bin/handshake-mcp.mjs"],

@@ -94,6 +94,7 @@ async function getIntentCompilationContext(
     parameters: input.candidate.parameters,
     secretRefs: input.candidate.secretRefs,
     gatewayCredentialRefs: input.candidate.gatewayCredentialRefs,
+    delegatedAuthorityRefs: input.candidate.delegatedAuthorityRefs,
   });
   return {
     input,
@@ -152,6 +153,7 @@ async function buildCandidateAction(
     nonSecretParamsSummary: input.candidate.nonSecretParamsSummary,
     secretRefs: input.candidate.secretRefs,
     gatewayCredentialRefs: input.candidate.gatewayCredentialRefs,
+    delegatedAuthorityRefs: input.candidate.delegatedAuthorityRefs,
     purposeCode: input.candidate.purposeCode,
     expectedSideEffectCodes: input.candidate.expectedSideEffectCodes,
     evidenceRefs: input.candidate.evidenceRefs,

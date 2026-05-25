@@ -1,0 +1,104 @@
+# Changelog
+
+All notable public package changes are recorded here.
+
+This changelog tracks the installable `handshake-protocol-kernel` package and
+public artifact repository. It does not claim hosted operation, provider
+custody, settlement finality, marketplace certification, MCP Registry
+discoverability, or Handshake authority from publication alone.
+
+## 0.2.7 - 2026-05-25
+
+### Changed
+
+- Replaced the long npm-facing README with a shorter contract README focused on
+  install, first-use, MCP, SDK imports, the current x402 wedge, release proof
+  states, and explicit non-claims.
+- Published a package-page cleanup release so npm no longer carries the stale
+  `0.2.6` pre-publish sentence.
+- Kept the public repository as a package artifact repository, not a source
+  mirror.
+
+### Boundary Notes
+
+- This release does not broaden authority. The public package remains proposal,
+  evidence, conformance, SDK, CLI, and local MCP distribution only.
+- MCP Registry discoverability remains a proof gap until registry acceptance
+  and lookup are verified.
+- Public npm availability does not create authority.
+
+### Release State
+
+- `ready_to_publish`: verified locally by repo gates and package projection.
+- `actually_published`: verified by npm trusted-publish workflow, npm registry
+  readback, registry signature metadata, provenance publication, and clean
+  installed-artifact smoke.
+- `registry_discoverable`: pending MCP Registry acceptance and lookup.
+
+## 0.2.6 - 2026-05-25
+
+### Added
+
+- Added the `./x402-protected-tool` package subpath for the protected x402
+  proposal facade and host profile descriptors.
+- Added the `./adapter-sdk` package subpath for definition-only protected-action
+  adapter pack authoring and install-proposal report projection.
+- Added role-scoped SDK clients for install setup, delegated-authority control,
+  exact policy evaluation, gateway-custody transition transport, runtime
+  proposal, and redacted evidence readback.
+- Added local x402 install/probe/readiness CLI commands and clean
+  installed-artifact activation checks.
+- Added public package-artifact repository projection with a trusted-publish
+  GitHub Actions workflow for npm provenance publishing.
+
+### Changed
+
+- Renamed the MCP package identity to
+  `io.github.CreasyBear/handshake-protocol-kernel`.
+- Rewrote the package README around the public artifact boundary, authority
+  cut lines, x402 protected-action wedge, MCP server posture, trusted
+  publishing, and release proof states.
+- Tightened package-surface checks so the npm artifact remains limited to
+  runtime bundles, binaries, metadata, README, license notices, and this
+  changelog.
+- Expanded protocol evidence around delegated spend authority, gateway custody
+  proof packets, replay refusal, proof gaps, and protected-tool host profiles.
+
+### Boundary Notes
+
+- The official public package wedge remains one buyer-side
+  `x402_payment.exact` per-call protected action.
+- The MCP server remains proposal/evidence only. It does not create policy
+  decisions, greenlights, gateway checks, payment material, mutations, receipt
+  exports, AuthorityCertificates, hosted operation, or provider custody.
+- Public npm availability does not create authority.
+- MCP Registry discoverability remains a proof gap until registry acceptance
+  and lookup are verified.
+- An `AuthorityCertificate` remains terminal evidence, not permission,
+  identity, settlement, hosted trust, or reusable auth.
+
+### Release State
+
+- `ready_to_publish`: verified locally by repo gates and package projection.
+- `actually_published`: verified by npm trusted-publish workflow, npm registry
+  readback, registry signature metadata, provenance publication, and clean
+  installed-artifact smoke.
+- `registry_discoverable`: pending MCP Registry acceptance and lookup.
+
+## 0.2.5 - 2026-05-24
+
+### Added
+
+- Published the first public npm package artifact for
+  `handshake-protocol-kernel`.
+- Added bundled runtime, CLI, MCP, conformance, SDK, and experimental reference
+  entrypoints under `dist/`.
+- Added local JSON-output CLI evidence/readiness commands and local stdio MCP
+  proposal/evidence server binaries.
+
+### Boundary Notes
+
+- Public npm `0.2.5` established distribution evidence only.
+- The package did not claim hosted operation, provider custody, broad x402
+  compatibility, broad MCP control, settlement finality, marketplace
+  certification, or cross-org certificate trust.

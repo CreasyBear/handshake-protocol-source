@@ -1,8 +1,12 @@
 import { describe, expect, it } from "bun:test";
 import {
+  buildX402DelegatedSpendAuthorityRefInput,
+  buildX402WalletGatewayCredentialRefInput,
   compileX402InstallProposal,
   type X402InstallProposal,
   type X402InstallProposalInput,
+  x402DelegatedSpendAuthorityBindingFor,
+  x402WalletGatewayCredentialBindingFor,
 } from "../../src/adapters/x402-payment/install-proposal";
 import {
   buildX402PaymentAttemptFromRequiredEvidence,
@@ -18,6 +22,8 @@ import { x402PaymentHostileBypassProbeExecutors } from "../../src/adapters/x402-
 import { runBypassProbeExecutors } from "../../src/adapters/protected-path-probes";
 import { digestCanonical } from "../../src/protocol/foundation/canonical";
 import { nowIso } from "../../src/protocol/foundation/ids";
+import type { GatewayCredentialRef } from "../../src/protocol/areas/credential-custody";
+import type { DelegatedAuthorityRef } from "../../src/protocol/areas/delegated-authority";
 import { HandshakeClient } from "../../src/sdk/client";
 import { createD1HttpHarness, D1_HARNESS_CALLER_AUTH_TOKENS, type D1HttpHarness } from "../support/d1-http-harness";
 import { futureIso } from "../support/fixtures";
@@ -33,6 +39,7 @@ type CountRow = {
 };
 
 const digest = `sha256:${"d".repeat(64)}` as const;
+const x402AuthorityRefs = new WeakMap<X402InstallProposal, DelegatedAuthorityRef>();
 const officialSelectedHeadersDigest = `sha256:${"a".repeat(64)}` as const;
 const officialSignerAddress = "0x1111111111111111111111111111111111111111" as const;
 const officialPaymentIdentifier = "pay_handshake_exact_fixture_0001";
@@ -98,6 +105,8 @@ const officialPaymentRequired = {
   },
 } as const;
 
+const x402CredentialRefs = new WeakMap<X402InstallProposal, GatewayCredentialRef>();
+
 describe("x402 Hono/D1 wallet gateway establishment path", () => {
   it("creates x402 payment signature evidence only after D1-backed policy and gateway admission", async () => {
     const harness = await createD1HttpHarness();
@@ -147,15 +156,17 @@ describe("x402 Hono/D1 wallet gateway establishment path", () => {
         "mutation_attempted",
         "protected_surface_operation_claimed",
         "receipt_emitted",
+        "credential_resolution_recorded",
         "surface_operation_reconciled",
         "protected_surface_operation_released",
       ]);
-      expect(events.map((event) => event.offset)).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
+      expect(events.map((event) => event.offset)).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
       for (let index = 1; index < events.length; index += 1) {
         expect(events[index]?.previous_event_digest).toBe(events[index - 1]?.event_digest);
       }
 
       expect(await recordCount(harness, "mutation_attempt")).toBe(1);
+      expect(await recordCount(harness, "credential_resolution_evidence")).toBe(1);
       expect(await recordCount(harness, "surface_operation_reconciliation")).toBe(1);
       expect(await recordCount(harness, "proof_gap")).toBe(0);
     } finally {
@@ -239,10 +250,18 @@ describe("x402 Hono/D1 wallet gateway establishment path", () => {
       expect(envelope.surfaceOperationReconciliationRef).toBe(gatewayResult.reconciliation?.reconciliationId);
       expect(envelope.surfaceOperationEvidenceLabels).toEqual([
         "local_gateway_check",
+        "gateway_credential_resolution",
+        "gateway_signer_invocation",
         "payment_payload_created",
         "downstream_reconciliation_recorded",
         "payment_response_received",
       ]);
+      expect(envelope.credentialResolutionEvidenceRefs).toContain(
+        `credential_resolution_evidence:${gatewayResult.credentialResolutionEvidence?.credentialResolutionEvidenceId}`,
+      );
+      expect(envelope.signerInvocationEvidenceRefs).toContain(
+        gatewayResult.signatureEvidence.paymentSignatureHeaderRef,
+      );
       expect(envelope.surfaceOperationEvidenceLabels).not.toContain("paid_retry_attempted");
       expect(envelope.surfaceOperationEvidenceRefs).toContain(gatewayResult.signatureEvidence.evidenceRef);
       expect(envelope.surfaceOperationEvidenceRefs).toContain(
@@ -288,10 +307,12 @@ describe("x402 Hono/D1 wallet gateway establishment path", () => {
         "mutation_attempted",
         "protected_surface_operation_claimed",
         "receipt_emitted",
+        "credential_resolution_recorded",
         "surface_operation_reconciled",
         "protected_surface_operation_released",
       ]);
       expect(await recordCount(harness, "mutation_attempt")).toBe(1);
+      expect(await recordCount(harness, "credential_resolution_evidence")).toBe(1);
       expect(await recordCount(harness, "surface_operation_reconciliation")).toBe(1);
       expect(await recordCount(harness, "proof_gap")).toBe(0);
     } finally {
@@ -484,6 +505,8 @@ async function createX402Contract(harness: D1HttpHarness) {
   await client.registerActionType(records.actionType);
   await client.registerGatewayRegistryEntry(records.gatewayRegistryEntry);
   await client.registerOperatingEnvelope(records.operatingEnvelope);
+  await registerX402WalletCredentialRef(client, proposal, records);
+  await registerX402DelegatedAuthorityRef(client, proposal, records);
   await recordGatewayCheckedPosture(client, proposal, records);
 
   const runtimeResult = await proposeX402PaymentActionContract(client, runtimeConfig(proposal, records), {
@@ -529,6 +552,8 @@ async function createOfficialX402Contract(harness: D1HttpHarness, options: { pay
   await client.registerActionType(records.actionType);
   await client.registerGatewayRegistryEntry(records.gatewayRegistryEntry);
   await client.registerOperatingEnvelope(records.operatingEnvelope);
+  await registerX402WalletCredentialRef(client, proposal, records);
+  await registerX402DelegatedAuthorityRef(client, proposal, records);
   await recordGatewayCheckedPosture(client, proposal, records);
 
   const runtimeResult = await proposeX402PaymentActionContract(
@@ -616,6 +641,30 @@ async function recordGatewayCheckedPosture(
   });
 }
 
+async function registerX402WalletCredentialRef(
+  client: HandshakeClient,
+  proposal: X402InstallProposal,
+  records: NonNullable<X402InstallProposal["compiledRecords"]>,
+): Promise<GatewayCredentialRef> {
+  const credentialRef = await client.registerGatewayCredentialRef(
+    await buildX402WalletGatewayCredentialRefInput(proposal, records),
+  );
+  x402CredentialRefs.set(proposal, credentialRef);
+  return credentialRef;
+}
+
+async function registerX402DelegatedAuthorityRef(
+  client: HandshakeClient,
+  proposal: X402InstallProposal,
+  records: NonNullable<X402InstallProposal["compiledRecords"]>,
+): Promise<DelegatedAuthorityRef> {
+  const authorityRef = await client.registerDelegatedAuthorityRef(
+    await buildX402DelegatedSpendAuthorityRefInput(proposal, records),
+  );
+  x402AuthorityRefs.set(proposal, authorityRef);
+  return authorityRef;
+}
+
 function fakeSigningSurface(downstreamPaymentStatus: "succeeded" | "unknown") {
   let signatures = 0;
   return {
@@ -670,6 +719,10 @@ function requireCompiledRecords(proposal: X402InstallProposal): NonNullable<X402
 }
 
 function runtimeConfig(proposal: X402InstallProposal, records: NonNullable<X402InstallProposal["compiledRecords"]>) {
+  const credentialRef = x402CredentialRefs.get(proposal);
+  if (!credentialRef) throw new Error("expected registered x402 wallet credential ref");
+  const authorityRef = x402AuthorityRefs.get(proposal);
+  if (!authorityRef) throw new Error("expected registered x402 delegated authority ref");
   return {
     tenantId: proposal.tenantId,
     organizationId: proposal.organizationId,
@@ -681,10 +734,16 @@ function runtimeConfig(proposal: X402InstallProposal, records: NonNullable<X402I
     toolCatalogRef: `${records.toolCapability.toolCatalogId}@${records.toolCapability.toolCatalogVersion}`,
     actionCatalogRef: `${records.actionType.actionCatalogId}@${records.actionType.actionCatalogVersion}`,
     gatewayRegistryRef: `gateway_registry@${records.gatewayRegistryEntry.gatewayRegistryVersion}`,
+    gatewayReadinessRef: "handshake://local/x402/gateway-readiness.json",
+    gatewayReadinessDigest: digest,
+    policyVersionRef: `${proposal.policyPackRef}@${proposal.policyPackVersion}`,
+    policyVersionDigest: digest,
     toolCapabilityId: records.toolCapability.toolCapabilityId,
     actionTypeId: records.actionType.actionTypeId,
     gatewayRegistryEntryId: records.gatewayRegistryEntry.gatewayRegistryEntryId,
     gatewayId: records.gatewayRegistryEntry.gatewayId,
+    gatewayCredentialBinding: x402WalletGatewayCredentialBindingFor(credentialRef),
+    delegatedAuthorityBinding: x402DelegatedSpendAuthorityBindingFor(authorityRef),
     maxAtomicAmountPerCall: proposal.spendBounds.maxAtomicAmountPerCall,
     contractExpiresAt: futureIso(),
     signingSecret: "test-secret",

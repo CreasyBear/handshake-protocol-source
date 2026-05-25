@@ -7,7 +7,8 @@ describe("MCP x402 proposal bridge", () => {
     const calls: Array<{ name: string; input: unknown }> = [];
     const client = fakeRuntimeClient(calls);
 
-    const result = await proposeMcpX402Payment(validProposalInput(), trustedOptions(client));
+    const input = validProposalInput();
+    const result = await proposeMcpX402Payment(input, trustedOptions(client));
 
     expect(calls.map((call) => call.name)).toEqual([
       "createRuntimeExecution",
@@ -47,12 +48,24 @@ describe("MCP x402 proposal bridge", () => {
     expect(JSON.stringify(calls)).not.toContain("PaymentPayload");
     expect(JSON.stringify(calls)).not.toContain("PAYMENT-SIGNATURE");
 
-    const createDraftInput = callInput(calls, "createToolCallDraft") as { parameters: Record<string, unknown> };
+    const createDraftInput = callInput(calls, "createToolCallDraft") as {
+      parameters: Record<string, unknown>;
+      delegatedAuthorityRefs: unknown[];
+      evidenceRefs: string[];
+    };
     const transitionDraftInput = callInput(calls, "transitionToolCallDraft") as {
       parameters: Record<string, unknown>;
       nonSecretParamsSummary: Record<string, unknown>;
+      delegatedAuthorityRefs: unknown[];
+      evidenceRefs: string[];
     };
     const compileCandidate = compileIntentCandidate(calls);
+    expect(createDraftInput.delegatedAuthorityRefs).toEqual([input.delegatedAuthorityBinding]);
+    expect(transitionDraftInput.delegatedAuthorityRefs).toEqual([input.delegatedAuthorityBinding]);
+    expect(compileCandidate.delegatedAuthorityRefs).toEqual([input.delegatedAuthorityBinding]);
+    expect(createDraftInput.evidenceRefs).toContain("evidence:x402-delegated-spend:principal_demo:agent_demo");
+    expect(transitionDraftInput.evidenceRefs).toContain("evidence:x402-delegated-spend:principal_demo:agent_demo");
+    expect(compileCandidate.evidenceRefs).toContain("evidence:x402-delegated-spend:principal_demo:agent_demo");
     for (const parameters of [
       createDraftInput.parameters,
       transitionDraftInput.parameters,
@@ -65,8 +78,19 @@ describe("MCP x402 proposal bridge", () => {
         intendedRequestBodyDigest: null,
         providerEnvironmentPosture: "local_reference_sandbox",
         providerEnvironmentRef: null,
+        gatewayReadinessRef: "handshake://local/x402/gateway-readiness.json",
+        gatewayReadinessDigest: digest(13),
+        policyVersionRef: "policy:x402-payment-exact:mcp@v1",
+        policyVersionDigest: digest(17),
       });
     }
+    expect(compileCandidate.bounds).toMatchObject({
+      gatewayReadinessDigest: digest(13),
+      policyVersionDigest: digest(17),
+    });
+    expect(compileCandidate.evidenceRefs).toEqual(
+      expect.arrayContaining(["handshake://local/x402/gateway-readiness.json", "policy:x402-payment-exact:mcp@v1"]),
+    );
   });
 
   it("refuses stale metadata, not-ready install, offline gateway, unknown gateway, and amount overrun before runtime calls", async () => {
@@ -98,6 +122,26 @@ describe("MCP x402 proposal bridge", () => {
       }
       expect(calls).toEqual([]);
     }
+  });
+
+  it("refuses missing trusted readiness or policy binding before runtime calls", async () => {
+    const calls: Array<{ name: string; input: unknown }> = [];
+    const result = await proposeMcpX402Payment(validProposalInput(), {
+      runtimeClient: fakeRuntimeClient(calls),
+      trustedMaxAtomicAmountPerCall: "2000",
+    });
+
+    expect(result.isError).toBe(true);
+    expect(result.structuredContent).toMatchObject({
+      outcome: "install_not_ready",
+      phase: "readiness",
+      reasonCodes: ["mcp_trusted_readiness_binding_missing", "mcp_policy_version_binding_missing"],
+      authorityCreated: false,
+      greenlightCreated: false,
+      gatewayCheckPerformed: false,
+      mutationAttempted: false,
+    });
+    expect(calls).toEqual([]);
   });
 
   it("refuses oversized model proposal fields before runtime calls", async () => {
@@ -430,7 +474,14 @@ describe("MCP x402 proposal bridge", () => {
 });
 
 function trustedOptions(runtimeClient: McpRuntimeProposalClient) {
-  return { runtimeClient, trustedMaxAtomicAmountPerCall: "2000" };
+  return {
+    runtimeClient,
+    trustedMaxAtomicAmountPerCall: "2000",
+    gatewayReadinessRef: "handshake://local/x402/gateway-readiness.json",
+    gatewayReadinessDigest: digest(13),
+    policyVersionRef: "policy:x402-payment-exact:mcp@v1",
+    policyVersionDigest: digest(17),
+  };
 }
 
 function compileIntentCandidate(calls: Array<{ name: string; input: unknown }>) {
@@ -442,6 +493,9 @@ function compileIntentCandidate(calls: Array<{ name: string; input: unknown }>) 
     idempotencyKey: string;
     parameters: Record<string, unknown>;
     nonSecretParamsSummary: Record<string, unknown>;
+    bounds: Record<string, unknown>;
+    delegatedAuthorityRefs: unknown[];
+    evidenceRefs: string[];
   };
 }
 

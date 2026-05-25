@@ -13,8 +13,9 @@ This walkthrough exercises the local proof path:
 ```text
 generated wrapped_x402_payment dispatch
 -> local/reference 402 PAYMENT-REQUIRED challenge evidence
+-> protected x402 tool facade prepares one runtime dispatch without authority
 -> runtime ingress proposal evidence
--> ActionContract
+-> ActionContract with bound wallet-signer GatewayCredentialRef
 -> PolicyDecision and one-use Greenlight
 -> x402 wallet gateway check
 -> gateway-held official SDK signing surface after verified gate
@@ -25,9 +26,11 @@ generated wrapped_x402_payment dispatch
 
 ## What This Proves
 
-- A generated x402 dispatch can reach an exact `ActionContract`.
+- A generated x402 dispatch can pass through the protected-tool facade before it reaches an exact `ActionContract`.
 - A local/reference paid HTTP sandbox can emit official-shaped `PAYMENT-REQUIRED` evidence and observe one signed retry only after gateway-created signature evidence exists.
-- Runtime ingress creates no policy decision, greenlight, gateway check, mutation attempt, receipt, or certificate.
+- The protected-tool facade and runtime ingress create no policy decision, greenlight, gateway check, mutation attempt, receipt, or certificate.
+- Delegated spend is represented by a redacted `DelegatedAuthorityRef` bound into the exact contract, so stale, mismatched, or isolated authority refuses before signing.
+- The wallet signer is represented by a redacted `GatewayCredentialRef` bound into the exact contract, so stale signer custody or credential-ref isolation refuses before signing.
 - The official x402 signer and `PaymentPayload` creation stay outside the agent/runtime and run only after a verified gateway check.
 - Parameter mismatch and consumed-greenlight replay refuse before signer use.
 - Redacted projections expose signer invocation refs/digests and `PAYMENT-RESPONSE` evidence without raw credential material.
@@ -61,15 +64,22 @@ examples/x402-protected-spend/output/latest.md
 examples/x402-protected-spend/output/latest.json
 ```
 
+`npm run pack:check` repeats the protected-tool facade part from a clean
+installed artifact. It packs the npm package, extracts
+`handshake-protocol-kernel/x402-protected-tool` under temporary `node_modules`,
+proves the bare subpath import, and runs this same local gateway handoff with
+the installed facade module.
+
 It prints and writes named phases:
 
-1. `1_runtime_proposal`
-2. `2_policy_greenlight`
-3. `3_gateway_admission_and_signature`
-4. `4_sandbox_paid_retry`
-5. `5_redacted_evidence_envelope`
-6. `6_terminal_certificate`
-7. `7_replay_refusal`
+1. `1_protected_tool_facade_dispatch`
+2. `2_runtime_proposal`
+3. `3_policy_greenlight`
+4. `4_gateway_admission_and_signature`
+5. `5_sandbox_paid_retry`
+6. `6_redacted_evidence_envelope`
+7. `7_terminal_certificate`
+8. `8_replay_refusal`
 
 The report also includes `0_sandbox_payment_required_challenge` before authority exists.
 
@@ -101,27 +111,33 @@ Those tests cover:
 
 ## Integration Shape
 
-Use source-owned APIs and helpers. Do not write raw protocol records.
+Use source-owned APIs and public role-scoped helpers. Do not write raw protocol records.
 
 1. Compile the exact x402 install proposal with `compileX402InstallProposal()`.
-2. Register the compiled tool, action type, gateway registry entry, and operating envelope through the kernel or HTTP client.
-3. Record gateway-owned hostile probes and protected-path posture.
-4. Submit generated execution evidence with one `wrapped_x402_payment` dispatch through `proposeRuntimeIngressActionContracts()`.
-5. Treat the resulting `ActionContract` as proposal evidence only.
-6. Evaluate policy separately.
-7. Run the local/reference wallet gateway with `runX402WalletGateway()`.
-8. Record the local/reference sandbox signed retry as downstream fixture evidence only.
-9. Read the redacted transaction envelope projection.
-10. Optionally mint an `AuthorityCertificate` only after receipt, durable refusal, proof gap, or replay refusal exists.
+2. Register the compiled tool, action type, gateway registry entry, operating envelope, and redacted wallet-signer `GatewayCredentialRef` through the kernel or HTTP client.
+3. Record gateway-owned hostile probes, protected-path posture, and the redacted `GatewayCustodyProofPacket`.
+4. Prepare one `handshake.actions.x402_payment.propose` facade dispatch with `prepareProtectedX402ToolDispatch()`. The facade input must carry the bound trusted-readiness and gateway-custody proof fields; a plain `trusted_gateway_ready` flag is not enough.
+5. Submit the facade's `wrapped_x402_payment` runtime block through
+   `RuntimeClient.proposeRuntimeIngressActionContracts()` from
+   `handshake-protocol-kernel/sdk/role-clients`.
+6. Treat the resulting `ActionContract` as proposal evidence only.
+7. Evaluate policy separately.
+8. Run the local/reference wallet gateway with `runX402WalletGateway()`.
+9. Record the local/reference sandbox signed retry as downstream fixture evidence only.
+10. Read the redacted transaction envelope projection.
+11. Run the hostile installed-path matrix: stale policy metadata, raw x402 payload input, sibling MCP direct payment, changed observed parameters, and consumed-greenlight replay must all stop before consequence.
+12. Optionally mint a local-reference-only `AuthorityCertificate` only after receipt, durable refusal, proof gap, or replay refusal exists. This is terminal evidence for the local packet, not the strict role-scoped production gateway claim.
 
 ## Signer Custody
 
-The local/reference wallet gateway is the mutation credential holder. The generated code, runtime ingress, metadata, challenges, evidence projections, SDK reads, and review surfaces must not receive the signer, raw payment signature authority, official SDK signer client, raw `PaymentPayload`, or gateway custody route.
+The local/reference wallet gateway is the mutation credential holder. Runtime config carries only the redacted wallet-signer `GatewayCredentialRef` binding; generated code, runtime ingress, metadata, challenges, evidence projections, SDK reads, and review surfaces must not receive the signer, raw payment signature authority, official SDK signer client, raw `PaymentPayload`, or gateway custody route.
 
 The only accepted signer path in this walkthrough is:
 
 ```text
-verified gateway check
+fresh wallet-signer GatewayCredentialRef
+-> exact contract binding
+-> verified gateway check
 -> VerifiedGatewayCheck
 -> gateway-held official SDK signing surface
 ```
@@ -152,6 +168,6 @@ npm run test -- test/protocol/representation-contract.test.ts
 - Do not classify batch settlement as `x402_payment.exact`; it needs channel, voucher, claim, and refund state.
 - Do not include lifecycle hooks, MCP auto-pay, signed offers, signed receipts, seller middleware, or facilitator operation in this first wedge.
 - Do not treat facilitator verify evidence as settlement finality; verify/settle labels are reconstruction evidence only.
-- Do not describe `AuthorityCertificate` as permission, identity, settlement, provider custody, certification, or trust mark.
+- Do not describe `AuthorityCertificate` as permission, identity, settlement, provider custody, certification, production certificate issuance, or trust mark.
 - Do not introduce MCP or CLI mutation tools for this path.
 - Do not require a review UI unless source-owned renderer provenance exists.

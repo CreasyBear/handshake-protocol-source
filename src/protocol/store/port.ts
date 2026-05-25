@@ -111,6 +111,7 @@ export type GatewayCheckCommit = {
 };
 
 export type ProtocolCommit = {
+  recordConflictMode?: "replace" | "absent_or_same";
   greenlightIssuanceClaims?: GreenlightIssuanceClaim[];
   recoveryTerminalClaims?: RecoveryTerminalClaim[];
   protectedPathPostureIndexEntries?: ProtectedPathPostureIndexEntry[];
@@ -127,6 +128,7 @@ export type ProtocolCommit = {
 export type ProtocolCommitResult =
   | "committed"
   | "stream_conflict"
+  | "record_digest_conflict"
   | "recovery_terminal_conflict"
   | "greenlight_issuance_conflict"
   | "idempotency_ledger_conflict";

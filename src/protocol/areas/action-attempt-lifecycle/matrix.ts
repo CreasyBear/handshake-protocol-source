@@ -149,6 +149,23 @@ export const actionAttemptLifecycleMatrix: Partial<Record<ActionAttemptLifecycle
     { ...catalogRecorded, state: "catalog_conflict", terminalOutcome: "refusal" },
     "operating envelope conflict blocks bounds registration",
   ),
+  "registerInstallProposalCompiledRecords:recorded": entry(
+    catalogRecorded,
+    "compiled install proposal records were atomically registered as setup evidence",
+  ),
+  "registerInstallProposalCompiledRecords:refusal": entry(
+    {
+      phase: "compilation",
+      state: "candidate_refused",
+      authorityEffect: "none",
+      terminalOutcome: "refusal",
+    },
+    "refused install proposals record refusal evidence without partial catalog writes",
+  ),
+  "registerInstallProposalCompiledRecords:conflict": entry(
+    { ...catalogRecorded, state: "catalog_conflict", terminalOutcome: "refusal" },
+    "same-id different-digest install records block the entire setup commit",
+  ),
 
   "createRuntimeExecution:recorded": entry(
     {
@@ -185,6 +202,15 @@ export const actionAttemptLifecycleMatrix: Partial<Record<ActionAttemptLifecycle
       terminalOutcome: "evidence_only",
     },
     "gateway credential ref records custody evidence only and cannot expose credential material",
+  ),
+  "registerDelegatedAuthorityRef:recorded": entry(
+    {
+      phase: "observation",
+      state: "authority_scope_recorded",
+      authorityEffect: "evidence_only",
+      terminalOutcome: "evidence_only",
+    },
+    "delegated authority ref records principal-scoped attempt bounds without minting greenlight or mutation authority",
   ),
   "recordGatewayCustodyProofPacket:recorded": entry(
     {
@@ -368,6 +394,15 @@ export const actionAttemptLifecycleMatrix: Partial<Record<ActionAttemptLifecycle
     },
     "review requirement pauses authority until exact review binding resolves",
   ),
+  "evaluatePolicy:proof_gap": entry(
+    {
+      phase: "policy",
+      state: "policy_proof_gap",
+      authorityEffect: "none",
+      terminalOutcome: "proof_gap",
+    },
+    "policy evidence gaps record explicit non-authority instead of issuing a greenlight",
+  ),
   "evaluatePolicy:conflict": entry(
     {
       phase: "policy",
@@ -477,6 +512,15 @@ export const actionAttemptLifecycleMatrix: Partial<Record<ActionAttemptLifecycle
       terminalOutcome: "isolation",
     },
     "isolation state reduces future authority only",
+  ),
+  "transitionDelegatedAuthorityStatus:recorded": entry(
+    {
+      phase: "isolation",
+      state: "authority_status_recorded",
+      authorityEffect: "future_authority_reduction",
+      terminalOutcome: "isolation",
+    },
+    "terminal delegated authority status creates authority-ref isolation for future checks",
   ),
   "createBreakerDecision:recorded": entry(
     {

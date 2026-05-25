@@ -283,6 +283,9 @@ export class D1ProtocolStore implements ProtocolStore {
       await this.db.batch(this.statements.protocolCommitStatements(commit.records, commit.events, commit));
       return "committed";
     } catch (error) {
+      if (isRecordDigestConflict(error)) {
+        return "record_digest_conflict";
+      }
       if (isGreenlightIssuanceConflict(error)) {
         return "greenlight_issuance_conflict";
       }
@@ -387,6 +390,15 @@ function isStreamConflict(error: unknown): boolean {
   return (
     message.includes("stream_events") &&
     (message.includes("UNIQUE") || message.includes("unique") || message.includes("constraint"))
+  );
+}
+
+function isRecordDigestConflict(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return (
+    message.includes("protocol_records") &&
+    message.includes("canonical_digest") &&
+    (message.includes("NOT NULL") || message.includes("constraint"))
   );
 }
 

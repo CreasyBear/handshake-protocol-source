@@ -23,6 +23,7 @@ import {
   protectedPathPolicyInput,
 } from "../protected-path-posture";
 import { evaluateGatewayCredentialBindings, type GatewayCredentialBindingEvaluation } from "../credential-custody";
+import { evaluateDelegatedAuthorityBindings, type DelegatedAuthorityBindingEvaluation } from "../delegated-authority";
 import type { ProtectedPathPosture } from "../protected-path-posture";
 import type { ProtocolRecorder } from "../../events/records";
 import type { ReviewDecision } from "../review-binding";
@@ -32,10 +33,12 @@ import {
   type SequenceDependencyState,
 } from "./sequence-dependencies";
 import { type Greenlight, type PolicyDecision } from "./types";
+import type { JsonValue } from "./types";
 import { guardGreenlightIssuance, guardPolicyEvaluation } from "./guards";
 import type { TransitionGuardResult } from "../../foundation/transition-guards";
 import type { ProtocolStore, StoredProtocolRecord } from "../../store/port";
 import { isolationScopeRefsForContract } from "../object-registry";
+import type { ProofGap } from "../proof-gap";
 import { protocolObjectRef, type Refusal } from "../refusal";
 import { buildGreenlight, buildPolicyDecision, commitPolicyEvaluation } from "./policy-record";
 
@@ -57,6 +60,7 @@ type PolicyConstraintEvaluation = PolicyEvaluationContext & {
   idempotencyLedgerEntry: StoredProtocolRecord<IdempotencyLedgerEntry> | null;
   protectedPathEvaluation: ReturnType<typeof evaluateRequiredProtectedPathPosture>;
   gatewayCredentialBindingEvaluation: GatewayCredentialBindingEvaluation;
+  delegatedAuthorityBindingEvaluation: DelegatedAuthorityBindingEvaluation;
   policyInput: {
     contractDigest: string;
     envelopeId: string;
@@ -67,6 +71,7 @@ type PolicyConstraintEvaluation = PolicyEvaluationContext & {
     gatewayEnforcementMode: ActionContract["enforcementMode"];
     credentialCustodyStatus: ActionContract["credentialCustodyStatus"];
     gatewayCredentialRefs: GatewayCredentialBindingEvaluation["policyInput"];
+    delegatedAuthorityRefs: DelegatedAuthorityBindingEvaluation["policyInput"];
     protectedPathPosture: ReturnType<typeof protectedPathPolicyInput>;
     idempotencyLedger: {
       ledgerKeyDigest: `sha256:${string}`;
@@ -74,9 +79,29 @@ type PolicyConstraintEvaluation = PolicyEvaluationContext & {
       existingLedgerState: IdempotencyLedgerEntry["ledgerState"] | null;
       paramsDigestMatch: boolean | null;
     };
+    exactProtectedAction: ExactProtectedActionPolicyInput | null;
   };
   policyInputDigest: `sha256:${string}`;
   isolationSnapshot: string;
+};
+
+type ExactProtectedActionPolicyInput = {
+  actionTypeId: string;
+  actionTypeDigest: string;
+  actionClass: string;
+  protectedSurfaceKind: string;
+  gatewayRegistryDigest: string;
+  gatewayPolicyVersion: string;
+  policyVersionRef: string | null;
+  policyVersionDigest: string | null;
+  gatewayReadinessRef: string | null;
+  gatewayReadinessDigest: string | null;
+  paymentRequirementsDigest: string | null;
+  selectedPaymentRequirementDigest: string | null;
+  atomicAmount: string | null;
+  maxAtomicAmountPerCall: string | null;
+  gatewayCredentialRefDigests: string[];
+  delegatedAuthorityRefDigests: string[];
 };
 
 export type PolicyEvaluationResponse = {
@@ -89,6 +114,8 @@ export type PolicyEvaluationResponse = {
   greenlightRef: string | null;
   refusalRef: string | null;
   refusalReasonCode: string | null;
+  proofGapRef: string | null;
+  proofGapReasonCode: string | null;
   reviewRequired: boolean;
   nextAction: "use_greenlight_at_gateway" | "read_evidence" | "request_review";
   retryability: "not_retryable";
@@ -131,7 +158,7 @@ export async function evaluatePolicy(
   if (commitResult.status === "idempotency_ledger_conflict") {
     return commitIdempotencyConflictRefusal(store, recorder, constraints);
   }
-  return policyEvaluationResponse(decision, greenlight, commitResult.refusal);
+  return policyEvaluationResponse(decision, greenlight, commitResult.refusal, commitResult.proofGap);
 }
 
 async function getPolicyEvaluationContext(
@@ -178,6 +205,11 @@ async function derivePolicyConstraintEvaluation(
     context.contract,
     context.now,
   );
+  const delegatedAuthorityBindingEvaluation = await evaluateDelegatedAuthorityBindings(
+    store,
+    context.contract,
+    context.now,
+  );
   const policyInput = buildPolicyInput(
     context,
     isolationStates,
@@ -186,6 +218,7 @@ async function derivePolicyConstraintEvaluation(
     ledgerKeyDigest,
     idempotencyLedgerEntry,
     gatewayCredentialBindingEvaluation,
+    delegatedAuthorityBindingEvaluation,
   );
   const policyInputDigest = await digestCanonical(policyInput);
   return {
@@ -196,6 +229,7 @@ async function derivePolicyConstraintEvaluation(
     idempotencyLedgerEntry,
     protectedPathEvaluation,
     gatewayCredentialBindingEvaluation,
+    delegatedAuthorityBindingEvaluation,
     policyInput,
     policyInputDigest,
     isolationSnapshot: isolationSnapshotRef(isolationStates),
@@ -210,6 +244,7 @@ function buildPolicyInput(
   ledgerKeyDigest: `sha256:${string}`,
   idempotencyLedgerEntry: StoredProtocolRecord<IdempotencyLedgerEntry> | null,
   gatewayCredentialBindingEvaluation: GatewayCredentialBindingEvaluation,
+  delegatedAuthorityBindingEvaluation: DelegatedAuthorityBindingEvaluation,
 ): PolicyConstraintEvaluation["policyInput"] {
   return {
     contractDigest: context.contract.actionContractDigest,
@@ -221,6 +256,7 @@ function buildPolicyInput(
     gatewayEnforcementMode: context.contract.enforcementMode,
     credentialCustodyStatus: context.contract.credentialCustodyStatus,
     gatewayCredentialRefs: gatewayCredentialBindingEvaluation.policyInput,
+    delegatedAuthorityRefs: delegatedAuthorityBindingEvaluation.policyInput,
     protectedPathPosture: protectedPathPolicyInput(protectedPathPosture, context.now),
     idempotencyLedger: {
       ledgerKeyDigest,
@@ -230,6 +266,7 @@ function buildPolicyInput(
         ? idempotencyLedgerEntry.payload.paramsDigest === context.contract.paramsDigest
         : null,
     },
+    exactProtectedAction: exactProtectedActionPolicyInput(context.contract),
   };
 }
 
@@ -247,7 +284,9 @@ async function resolvePolicyDecisionValue(
     decisionValue = evaluateSequenceDependencies(constraints.sequenceDependencyStates) ?? decisionValue;
   }
   decisionValue = applyProtectedPathPolicy(decisionValue, constraints);
+  decisionValue = applyDelegatedAuthorityPolicy(decisionValue, constraints);
   decisionValue = applyGatewayCredentialRefPolicy(decisionValue, constraints);
+  decisionValue = applyExactProtectedActionPolicy(decisionValue, constraints);
   decisionValue = applyIdempotencyLedgerPolicy(decisionValue, constraints);
   if (decisionValue.decision === "review_required" && constraints.input.reviewDecisionId) {
     const reviewDecision = await recorder.requiredRecord<ReviewDecision>(
@@ -274,7 +313,9 @@ async function resolvePolicyDecisionValue(
           matchedRuleIds: ["review_decision_binding"],
         };
     decisionValue = applyProtectedPathPolicy(decisionValue, constraints);
+    decisionValue = applyDelegatedAuthorityPolicy(decisionValue, constraints);
     decisionValue = applyGatewayCredentialRefPolicy(decisionValue, constraints);
+    decisionValue = applyExactProtectedActionPolicy(decisionValue, constraints);
     decisionValue = applyIdempotencyLedgerPolicy(decisionValue, constraints);
   }
   return decisionValue;
@@ -329,17 +370,19 @@ async function commitIdempotencyConflictRefusal(
       },
     );
   }
-  return policyEvaluationResponse(decision, null, commitResult.refusal);
+  return policyEvaluationResponse(decision, null, commitResult.refusal, commitResult.proofGap);
 }
 
 function policyEvaluationResponse(
   decision: PolicyDecision,
   greenlight: Greenlight | null,
   refusal: Refusal | null,
+  proofGap: ProofGap | null,
 ): PolicyEvaluationResponse {
   const policyDecisionRef = protocolObjectRef("policy_decision", decision.policyDecisionId);
   const greenlightObjectRef = greenlight ? protocolObjectRef("greenlight", greenlight.greenlightId) : null;
   const refusalObjectRef = refusal ? protocolObjectRef("refusal", refusal.refusalId) : null;
+  const proofGapObjectRef = proofGap ? protocolObjectRef("proof_gap", proofGap.proofGapId) : null;
   return {
     decision,
     greenlight,
@@ -350,6 +393,8 @@ function policyEvaluationResponse(
     greenlightRef: greenlight?.greenlightId ?? null,
     refusalRef: refusal?.refusalId ?? null,
     refusalReasonCode: refusal?.reasonCode ?? null,
+    proofGapRef: proofGap?.proofGapId ?? null,
+    proofGapReasonCode: proofGap?.reasonCode ?? null,
     reviewRequired: decision.decision === "review_required",
     nextAction: greenlight
       ? "use_greenlight_at_gateway"
@@ -362,6 +407,7 @@ function policyEvaluationResponse(
       policyDecisionRef,
       greenlightObjectRef,
       refusalObjectRef,
+      proofGapObjectRef,
       decision.policyInputDigest,
     ].filter((ref): ref is string => typeof ref === "string"),
   };
@@ -397,8 +443,187 @@ function applyGatewayCredentialRefPolicy(
   };
 }
 
+function applyDelegatedAuthorityPolicy(
+  decisionValue: PolicyEvaluationResult,
+  constraints: PolicyConstraintEvaluation,
+): PolicyEvaluationResult {
+  if (decisionValue.decision !== "greenlight" || constraints.delegatedAuthorityBindingEvaluation.ok) {
+    return decisionValue;
+  }
+  return {
+    decision: "refuse",
+    reasonCode: constraints.delegatedAuthorityBindingEvaluation.reasonCode,
+    reason: constraints.delegatedAuthorityBindingEvaluation.reason,
+    matchedRuleIds: ["delegated_authority_ref_required"],
+  };
+}
+
+function applyExactProtectedActionPolicy(
+  decisionValue: PolicyEvaluationResult,
+  constraints: PolicyConstraintEvaluation,
+): PolicyEvaluationResult {
+  if (decisionValue.decision !== "greenlight" || !exactProtectedActionPolicyApplies(constraints.contract)) {
+    return decisionValue;
+  }
+
+  const failure = evaluateExactProtectedActionPolicyContract(constraints.contract);
+  if (!failure) return decisionValue;
+  return {
+    decision: failure.decision,
+    reasonCode: failure.reasonCode,
+    reason: failure.reason,
+    matchedRuleIds: ["exact_protected_action_policy_binding"],
+  };
+}
+
+function evaluateExactProtectedActionPolicyContract(
+  contract: ActionContract,
+): { decision: "refuse" | "proof_gap"; reasonCode: string; reason: string } | null {
+  if (contract.gatewayCredentialRefs.length !== 1) {
+    return {
+      decision: "proof_gap",
+      reasonCode: "protected_action_policy_credential_binding_missing",
+      reason: "Exact protected-action policy requires exactly one bound gateway credential ref.",
+    };
+  }
+  if (contract.delegatedAuthorityRefs.length !== 1) {
+    return {
+      decision: "proof_gap",
+      reasonCode: "protected_action_policy_delegated_authority_missing",
+      reason: "Exact protected-action policy requires exactly one delegated authority ref.",
+    };
+  }
+
+  const readinessRef = stringParameter(contract.parameters, "gatewayReadinessRef");
+  const readinessDigest = digestParameter(contract.parameters, "gatewayReadinessDigest");
+  const readinessBound = digestParameter(contract.bounds, "gatewayReadinessDigest");
+  if (!readinessRef || !readinessDigest) {
+    return {
+      decision: "proof_gap",
+      reasonCode: "protected_action_policy_readiness_binding_missing",
+      reason: "Exact protected-action policy requires trusted runtime-side gateway readiness ref and digest.",
+    };
+  }
+  if (readinessBound && readinessBound !== readinessDigest) {
+    return {
+      decision: "refuse",
+      reasonCode: "protected_action_policy_readiness_binding_mismatch",
+      reason: "Exact protected-action readiness digest drifted between parameters and bounds.",
+    };
+  }
+
+  const policyVersionRef = stringParameter(contract.parameters, "policyVersionRef");
+  const policyVersionDigest = digestParameter(contract.parameters, "policyVersionDigest");
+  const policyVersionBound = digestParameter(contract.bounds, "policyVersionDigest");
+  if (!policyVersionRef || !policyVersionDigest) {
+    return {
+      decision: "proof_gap",
+      reasonCode: "protected_action_policy_version_binding_missing",
+      reason: "Exact protected-action policy requires trusted runtime-side policy version ref and digest.",
+    };
+  }
+  if (policyVersionBound && policyVersionBound !== policyVersionDigest) {
+    return {
+      decision: "refuse",
+      reasonCode: "protected_action_policy_version_binding_mismatch",
+      reason: "Exact protected-action policy-version digest drifted between parameters and bounds.",
+    };
+  }
+
+  const paymentRequirementsDigest = digestParameter(contract.parameters, "paymentRequirementsDigest");
+  if (!paymentRequirementsDigest) {
+    return {
+      decision: "proof_gap",
+      reasonCode: "protected_action_policy_payment_requirement_binding_missing",
+      reason: "Exact protected-action policy requires payment requirement evidence to be digest-bound.",
+    };
+  }
+
+  const atomicAmount = atomicStringParameter(contract.parameters, "atomicAmount");
+  const maxAtomicAmountPerCall = atomicStringParameter(contract.bounds, "maxAtomicAmountPerCall");
+  if (!atomicAmount || !maxAtomicAmountPerCall) {
+    return {
+      decision: "proof_gap",
+      reasonCode: "protected_action_policy_amount_binding_missing",
+      reason: "Exact protected-action policy requires atomicAmount and maxAtomicAmountPerCall before greenlight.",
+    };
+  }
+  if (compareAtomic(atomicAmount, maxAtomicAmountPerCall) > 0) {
+    return {
+      decision: "refuse",
+      reasonCode: "protected_action_policy_amount_exceeds_action_bound",
+      reason: "Exact protected-action atomic amount exceeds the per-call policy bound.",
+    };
+  }
+
+  return null;
+}
+
 function buildGreenlightFromDecision(decision: PolicyDecision, constraints: PolicyConstraintEvaluation): Greenlight {
-  return buildGreenlight(constraints.contract, decision, constraints.now, constraints.protectedPathPosture);
+  return buildGreenlight(
+    constraints.contract,
+    decision,
+    constraints.now,
+    constraints.protectedPathPosture,
+    constraints.policyInput.idempotencyLedger.ledgerKeyDigest,
+  );
+}
+
+function exactProtectedActionPolicyInput(contract: ActionContract): ExactProtectedActionPolicyInput | null {
+  if (!exactProtectedActionPolicyApplies(contract)) return null;
+  return {
+    actionTypeId: contract.actionTypeId,
+    actionTypeDigest: contract.actionTypeDigest,
+    actionClass: contract.actionClass,
+    protectedSurfaceKind: contract.protectedSurfaceKind,
+    gatewayRegistryDigest: contract.gatewayRegistryDigest,
+    gatewayPolicyVersion: contract.gatewayPolicyVersion,
+    policyVersionRef: stringParameter(contract.parameters, "policyVersionRef"),
+    policyVersionDigest: stringParameter(contract.parameters, "policyVersionDigest"),
+    gatewayReadinessRef: stringParameter(contract.parameters, "gatewayReadinessRef"),
+    gatewayReadinessDigest: stringParameter(contract.parameters, "gatewayReadinessDigest"),
+    paymentRequirementsDigest: stringParameter(contract.parameters, "paymentRequirementsDigest"),
+    selectedPaymentRequirementDigest: stringParameter(contract.parameters, "selectedPaymentRequirementDigest"),
+    atomicAmount: stringParameter(contract.parameters, "atomicAmount"),
+    maxAtomicAmountPerCall: stringParameter(contract.bounds, "maxAtomicAmountPerCall"),
+    gatewayCredentialRefDigests: contract.gatewayCredentialRefs.map((ref) => ref.gatewayCredentialRefDigest).sort(),
+    delegatedAuthorityRefDigests: contract.delegatedAuthorityRefs.map((ref) => ref.delegatedAuthorityRefDigest).sort(),
+  };
+}
+
+function exactProtectedActionPolicyApplies(contract: ActionContract): boolean {
+  return (
+    hasParameter(contract.parameters, "gatewayReadinessRef") ||
+    hasParameter(contract.parameters, "gatewayReadinessDigest") ||
+    hasParameter(contract.parameters, "policyVersionRef") ||
+    hasParameter(contract.parameters, "policyVersionDigest") ||
+    hasParameter(contract.parameters, "paymentRequirementsDigest")
+  );
+}
+
+function hasParameter(parameters: Record<string, JsonValue>, key: string): boolean {
+  return Object.prototype.hasOwnProperty.call(parameters, key);
+}
+
+function stringParameter(parameters: Record<string, JsonValue>, key: string): string | null {
+  const value = parameters[key];
+  return typeof value === "string" && value.length > 0 ? value : null;
+}
+
+function digestParameter(parameters: Record<string, JsonValue>, key: string): `sha256:${string}` | null {
+  const value = stringParameter(parameters, key);
+  return value && /^sha256:[a-f0-9]{64}$/.test(value) ? (value as `sha256:${string}`) : null;
+}
+
+function atomicStringParameter(parameters: Record<string, JsonValue>, key: string): string | null {
+  const value = stringParameter(parameters, key);
+  return value && /^(?:0|[1-9]\d*)$/.test(value) ? value : null;
+}
+
+function compareAtomic(left: string, right: string): number {
+  const leftValue = BigInt(left);
+  const rightValue = BigInt(right);
+  return leftValue === rightValue ? 0 : leftValue > rightValue ? 1 : -1;
 }
 
 async function assertGreenlightIssuable(store: ProtocolStore, contract: ActionContract): Promise<void> {

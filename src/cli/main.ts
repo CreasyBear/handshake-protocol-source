@@ -15,6 +15,7 @@ import {
   installHealthCommand,
   installX402PaymentCommand,
   probesX402PaymentCommand,
+  registerX402GatewayReadinessCommand,
   x402PaymentConformanceCommand,
 } from "./x402";
 
@@ -142,6 +143,21 @@ export async function runCliCommand(argv: readonly string[]): Promise<unknown> {
   if (group === "install" && subcommand === "health") {
     if (maybePath && !maybePath.startsWith("--")) return installHealthProjectionCommand(await readJsonFile(maybePath));
     return installHealthCommand({ cwd: optionValue(argv, "--cwd") ?? process.cwd() });
+  }
+  if (group === "register" && subcommand === "x402-gateway-readiness" && maybePath) {
+    return registerX402GatewayReadinessCommand({
+      cwd: optionValue(argv, "--cwd") ?? process.cwd(),
+      inputValue: await readJsonFile(maybePath),
+      recordLocal: argv.includes("--record-local"),
+    });
+  }
+  if (group === "register" && subcommand === "x402-gateway-readiness") {
+    return cliCommandErrorOutput({
+      argv,
+      errorCode: "cli_required_argument_missing",
+      message: "register x402-gateway-readiness requires <path>.",
+      nextAction: "fix_arguments",
+    });
   }
   if (group === "probes" && subcommand === "x402-payment" && maybePath) {
     return probesX402PaymentCommand({

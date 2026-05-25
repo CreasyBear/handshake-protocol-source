@@ -1,4 +1,9 @@
 import type { HandshakeKernel } from "../../protocol/kernel";
+import {
+  RuntimeIngressProposalInputSchema,
+  type RuntimeIngressConfig,
+  proposeRuntimeIngressActionContracts as proposeRuntimeIngressActionContractsTransition,
+} from "../../runtime/ingress";
 
 export type TransitionInvoker = (kernel: HandshakeKernel, body: unknown) => Promise<unknown>;
 
@@ -19,11 +24,24 @@ export const transitionInvokers = {
     await kernel.putCatalogObject({ objectType: "operating_envelope", payload: body as never });
     return body;
   },
+  registerInstallProposalCompiledRecords: (kernel, body) =>
+    kernel.registerInstallProposalCompiledRecords(body as never),
   registerGatewayCredentialRef: (kernel, body) => kernel.registerGatewayCredentialRef(body as never),
+  registerDelegatedAuthorityRef: (kernel, body) => kernel.registerDelegatedAuthorityRef(body as never),
+  transitionDelegatedAuthorityStatus: (kernel, body) => kernel.transitionDelegatedAuthorityStatus(body as never),
   recordGatewayCustodyProofPacket: (kernel, body) => kernel.recordGatewayCustodyProofPacket(body as never),
   recordCredentialResolutionEvidence: (kernel, body) => kernel.recordCredentialResolutionEvidence(body as never),
   compileIntent: (kernel, body) => kernel.compileIntent(body as never),
   createRuntimeExecution: (kernel, body) => kernel.createRuntimeExecution(body as never),
+  proposeRuntimeIngressActionContracts: (kernel, body) => {
+    const input = RuntimeIngressProposalInputSchema.parse(body);
+    const config: RuntimeIngressConfig = {
+      ...(input.config.packageInstall ? { packageInstall: input.config.packageInstall } : {}),
+      ...(input.config.x402Payment ? { x402Payment: input.config.x402Payment } : {}),
+      ...(input.config.authMdProtectedApiCall ? { authMdProtectedApiCall: input.config.authMdProtectedApiCall } : {}),
+    };
+    return proposeRuntimeIngressActionContractsTransition(kernel, config, input.dispatchBlock);
+  },
   createBypassProbe: (kernel, body) => kernel.createBypassProbe(body as never),
   createToolCallDraft: (kernel, body) => kernel.createToolCallDraft(body as never),
   transitionToolCallDraft: (kernel, body) => kernel.transitionToolCallDraft(body as never),

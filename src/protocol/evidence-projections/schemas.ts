@@ -28,6 +28,7 @@ import {
   RawSiblingToolStatusSchema,
 } from "../areas/protected-path-posture/schemas";
 import { GatewayCredentialBindingSchema } from "../areas/credential-custody/schemas";
+import { DelegatedAuthorityBindingSchema } from "../areas/delegated-authority/schemas";
 import {
   DownstreamOutcomeStatusSchema,
   GatewayAdmissionStatusSchema,
@@ -57,6 +58,7 @@ export const ContractEvidenceProjectionSchema = z.strictObject({
   paramsDigest: DigestSchema,
   nonSecretParamsSummary: z.record(z.string(), JsonValueSchema),
   gatewayCredentialRefs: z.array(GatewayCredentialBindingSchema).default([]),
+  delegatedAuthorityRefs: z.array(DelegatedAuthorityBindingSchema).default([]),
   evidenceRefs: z.array(z.string()).default([]),
   clearingEvidenceRefs: ClearingEvidenceRefsSchema,
   signaturePosture: SignaturePostureSchema,
@@ -194,7 +196,9 @@ export const AgentTransactionEnvelopeProjectionSchema = z.strictObject({
   surfaceOperationEvidenceLabels: z.array(z.string().min(1)).default([]),
   surfaceOperationEvidenceRefs: z.array(z.string().min(1)).default([]),
   gatewayCredentialEvidenceRefs: z.array(z.string().min(1)).default([]),
+  delegatedAuthorityEvidenceRefs: z.array(z.string().min(1)).default([]),
   credentialResolutionEvidenceRefs: z.array(z.string().min(1)).default([]),
+  signerInvocationEvidenceRefs: z.array(z.string().min(1)).default([]),
   downstreamEvidenceRefs: z.array(z.string().min(1)).default([]),
   authMdEvidenceRefs: AuthMdEvidenceRefsProjectionSchema,
   authMdEvidenceLabels: z.array(z.string().min(1)).default([]),

@@ -11,7 +11,10 @@ import {
 import type { TransitionCallerRole } from "../../http/admission/caller-auth";
 import { HandshakeClientError, type HandshakeFetch } from "../client";
 
-export type RoleScopedTransportRole = Extract<TransitionCallerRole, "review_custody" | "runtime_evidence">;
+export type RoleScopedTransportRole = Extract<
+  TransitionCallerRole,
+  "control_plane" | "gateway_custody" | "review_custody" | "runtime_evidence"
+>;
 
 export type RoleScopedClientOptions = {
   roleCredential: string;

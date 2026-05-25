@@ -14,12 +14,16 @@ import {
 const expectedSurfaceIds: readonly SurfaceId[] = [
   "sdk.runtime",
   "sdk.evidence",
+  "sdk.control_plane",
+  "sdk.policy",
+  "sdk.adapter",
   "sdk.install",
   "sdk.gateway",
   "cli.operator",
   "cli.evidence",
   "cli.process",
   "mcp.runtime",
+  "x402.protected_tool",
 ];
 
 const authorityRouteFamilies: readonly SurfaceRouteFamily[] = [
@@ -34,11 +38,17 @@ const authorityRouteFamilies: readonly SurfaceRouteFamily[] = [
 const modelOrOperatorSurfaces: readonly SurfaceId[] = [
   "sdk.runtime",
   "sdk.evidence",
+  "sdk.control_plane",
+  "sdk.adapter",
+  "sdk.install",
   "cli.operator",
   "cli.evidence",
   "cli.process",
   "mcp.runtime",
+  "x402.protected_tool",
 ];
+
+const authoritySurfaces: readonly SurfaceId[] = ["sdk.policy"];
 
 describe("surface boundary posture", () => {
   it("defines one complete manifest entry for each planned product surface", () => {
@@ -72,6 +82,28 @@ describe("surface boundary posture", () => {
         if (!boundary.forbiddenRouteFamilies.includes(family)) {
           violations.push(`${id} does not forbid ${family}`);
         }
+      }
+    }
+
+    expect(violations.sort()).toEqual([]);
+  });
+
+  it("keeps explicit authority surfaces narrow and named", () => {
+    const violations: string[] = [];
+    for (const id of authoritySurfaces) {
+      const boundary = boundaryFor(id);
+      if (boundary.authorityPosture !== "policy_authority") {
+        violations.push(`${id} is not marked policy authority`);
+      }
+      if (!boundary.allowedRouteFamilies.includes("policy_decision_write")) {
+        violations.push(`${id} cannot write policy decisions`);
+      }
+      for (const family of ["gateway_check_write", "receipt_export_write", "certificate_mint_write"] as const) {
+        if (boundary.allowedRouteFamilies.includes(family)) violations.push(`${id} allows ${family}`);
+        if (!boundary.forbiddenRouteFamilies.includes(family)) violations.push(`${id} does not forbid ${family}`);
+      }
+      if (boundary.claimBoundaryLabels.includes("runtime_evidence_is_not_authority")) {
+        violations.push(`${id} is mislabeled as runtime proposal surface`);
       }
     }
 

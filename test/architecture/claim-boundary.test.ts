@@ -22,11 +22,18 @@ type ClaimMatrixEntry = {
   forbiddenPatterns?: RegExp[];
 };
 
+function normalizeRequiredClaim(text: string) {
+  return text.replace(/\s+/g, " ").toLowerCase();
+}
+
 function expectClaimMatrix(entries: ClaimMatrixEntry[]) {
   for (const entry of entries) {
     for (const source of entry.sources) {
+      const normalizedSource = normalizeRequiredClaim(source.text);
       for (const phrase of entry.required ?? []) {
-        expect(source.text, `${entry.label} must be stated in ${source.name}`).toContain(phrase);
+        expect(normalizedSource, `${entry.label} must be stated in ${source.name}`).toContain(
+          normalizeRequiredClaim(phrase),
+        );
       }
       for (const pattern of entry.requiredPatterns ?? []) {
         expect(source.text, `${entry.label} must match ${pattern} in ${source.name}`).toMatch(pattern);
@@ -41,11 +48,18 @@ function expectClaimMatrix(entries: ClaimMatrixEntry[]) {
 describe("claim boundary", () => {
   it("keeps public entrypoints separated by authority boundary", async () => {
     const root = await import("../../src");
+    const adapterSdk = await import("../../src/adapter-sdk");
     const runtime = await import("../../src/runtime");
     const conformance = await import("../../src/conformance");
     const experimental = await import("../../src/experimental");
+    const adapterSdkExportNames = Object.keys(adapterSdk).sort();
     const runtimeExportNames = Object.keys(runtime).sort();
 
+    expect(pkg.exports["./adapter-sdk"]).toEqual({
+      types: "./dist/adapter-sdk/index.d.ts",
+      import: "./dist/adapter-sdk/index.mjs",
+      default: "./dist/adapter-sdk/index.mjs",
+    });
     expect(pkg.exports["./runtime"]).toEqual({
       types: "./dist/runtime/index.d.ts",
       import: "./dist/runtime/index.mjs",
@@ -58,6 +72,12 @@ describe("claim boundary", () => {
     expect(Object.keys(root)).not.toContain("projectProtectedActionChallengeFromRefusal");
     expect(Object.keys(root)).not.toContain("experimentalRunPackageInstallGateway");
     expect(Object.keys(root)).not.toContain("checkProtectedMutationAdapterConformance");
+    expect(Object.keys(root)).not.toContain("defineProtectedActionAdapterPack");
+    expect(adapterSdkExportNames).toContain("defineProtectedActionAdapterPack");
+    expect(adapterSdkExportNames).toContain("projectAdapterSdkInstallProposalReport");
+    expect(adapterSdkExportNames.join(" ")).not.toMatch(
+      /GatewayCheck|Greenlight|Mutation|PolicyDecision|ReceiptExport/,
+    );
     expect(runtimeExportNames).toEqual([
       "RuntimeIngressDispatchBlockSchema",
       "RuntimeIngressObservedDispatchSchema",
@@ -74,13 +94,18 @@ describe("claim boundary", () => {
   it("requires docs to state local runtime ingress without provider or hosted claims", () => {
     const agents = readFileSync("AGENTS.md", "utf8");
     const readme = readFileSync("README.md", "utf8");
+    const quality = readFileSync("QUALITY.md", "utf8");
+    const structure = readFileSync("STRUCTURE.md", "utf8");
     const decisions = readFileSync("docs/internal/decisions.md", "utf8");
+    const protocolDefinition = readFileSync("docs/internal/protocol-definition.md", "utf8");
     const protocolArchitecture = readFileSync("docs/internal/protocol-kernel-architecture.md", "utf8");
+    const protocolLayman = readFileSync("docs/internal/protocol-layman.md", "utf8");
     const protocolNotes = readFileSync("docs/internal/protocol-notes.md", "utf8");
     const x402Walkthrough = readFileSync("examples/x402-protected-spend/README.md", "utf8");
     const httpLane = readFileSync("src/http/LANE.md", "utf8");
     const runtimeLane = readFileSync("src/runtime/LANE.md", "utf8");
     const conformanceLane = readFileSync("src/conformance/LANE.md", "utf8");
+    const adapterSdkLane = readFileSync("src/adapter-sdk/LANE.md", "utf8");
     const adaptersLane = readFileSync("src/adapters/LANE.md", "utf8");
     const canonicalSources = [
       { name: "AGENTS.md", text: agents },
@@ -88,8 +113,38 @@ describe("claim boundary", () => {
       { name: "docs/internal/decisions.md", text: decisions },
       { name: "docs/internal/protocol-notes.md", text: protocolNotes },
     ];
+    const allCanonicalSources = [
+      { name: "AGENTS.md", text: agents },
+      { name: "README.md", text: readme },
+      { name: "QUALITY.md", text: quality },
+      { name: "STRUCTURE.md", text: structure },
+      { name: "docs/internal/decisions.md", text: decisions },
+      { name: "docs/internal/protocol-definition.md", text: protocolDefinition },
+      { name: "docs/internal/protocol-kernel-architecture.md", text: protocolArchitecture },
+      { name: "docs/internal/protocol-layman.md", text: protocolLayman },
+      { name: "docs/internal/protocol-notes.md", text: protocolNotes },
+    ];
 
     expectClaimMatrix([
+      {
+        label: "product versus protocol language",
+        sources: allCanonicalSources,
+        required: [
+          "cleared protected-action event",
+          "protocol kernel",
+          "product surface",
+          "public npm availability does not create authority",
+          "MCP Registry discoverability remains a proof gap",
+        ],
+        requiredPatterns: [/certificate is terminal evidence, not permission/i],
+        forbiddenPatterns: [
+          /\bHandshake works\b/i,
+          /certificate (?:is|as|acts as|works as|becomes) (?:a )?(?:permission|auth token|authorization token|bearer token|reusable auth)/i,
+          /auth\.md authorizes mutation/i,
+          /MCP protects all tools/i,
+          /npm package creates hosted enforcement/i,
+        ],
+      },
       {
         label: "category boundary",
         sources: canonicalSources,
@@ -98,6 +153,91 @@ describe("claim boundary", () => {
           /Handshake is contracted execution infrastructure for engineering agents/i,
           /first (?:credible domain|wedge) (?:remains|is) engineering-agent actions/i,
           /use case: convert generated engineering-agent execution/i,
+        ],
+      },
+      {
+        label: "production proof ledger",
+        sources: [{ name: "docs/internal/decisions.md", text: decisions }],
+        required: [
+          "Production Proof Ledger And Expansion Admission",
+          "`x402_payment.exact` per-call path",
+          "Hosted operation",
+          "Provider/customer gateway custody",
+          "Settlement/finality",
+          "Facilitator operation",
+          "Seller middleware",
+          "Marketplace or certification",
+          "Cross-org trust",
+          "Broad x402 compatibility",
+          "Aggregate spend enforcement",
+          "MCP Registry discoverability",
+          "Host-wide containment",
+          "auth.md + x402",
+          "proof contexts rather than execution-ready product surfaces",
+        ],
+      },
+      {
+        label: "expansion admission criteria",
+        sources: [
+          { name: "docs/internal/decisions.md", text: decisions },
+          { name: "docs/internal/protocol-notes.md", text: protocolNotes },
+        ],
+        required: [
+          "generated execution shape",
+          "protected action path",
+          "gateway authority holder",
+          "credential holder",
+          "`CandidateAction`/refusal boundary",
+          "bypass posture",
+          "evidence path",
+          "proof-gap model",
+          "recovery/isolation path",
+          "non-claims",
+          "full repo gate",
+          "proof context",
+        ],
+      },
+      {
+        label: "market scoring is not enforcement proof",
+        sources: [{ name: "docs/internal/decisions.md", text: decisions }],
+        required: [
+          "Market And Expansion Scoring Boundary",
+          "market scoring is strategy input, not enforcement proof",
+          "enforcement merit",
+          "market merit",
+          "distribution merit",
+          "adoption merit",
+          "expansion merit",
+          "Agentic.Market/x402 protected buyer calls",
+          "`auth.md + x402` credentialed paid API calls",
+          "auth.md is a credential registration and discovery convention",
+          "MCP Registry is distribution metadata",
+          'The immediate market experiment is not "Handshake is listed as an x402 service."',
+          "Agentic.Market listing is blocked unless Handshake exposes a real x402-payable seller endpoint",
+          "safe buyer-side protected spend",
+          "not protected-action authority",
+        ],
+        forbiddenPatterns: [
+          /x402 (?:is|as|proves|becomes) (?:the )?first market/i,
+          /Agentic\.Market listing (?:is|as|proves|creates) (?:the )?product/i,
+          /auth\.md (?:authorizes|greenlights|permits) (?:a )?(?:protected )?(?:payment|mutation|action)/i,
+        ],
+      },
+      {
+        label: "first external runtime transcript boundary",
+        sources: [
+          { name: "docs/internal/decisions.md", text: decisions },
+          { name: "docs/internal/protocol-notes.md", text: protocolNotes },
+        ],
+        required: [
+          "Codex-local",
+          "proposal/readback compatibility",
+          "raw sibling posture",
+          "does not mutate `~/.codex/config.toml`",
+          "does not perform policy or gateway",
+          "does not invoke signers",
+          "host-wide containment",
+          "remain parity artifacts",
         ],
       },
       {
@@ -142,10 +282,37 @@ describe("claim boundary", () => {
         label: "README root teaching boundary",
         sources: [{ name: "README.md", text: readme }],
         required: [
-          'import { EvidenceClient, RuntimeClient } from "handshake-protocol-kernel/sdk/role-clients";',
-          "Use this subpath for runtime proposal and redacted evidence readback.",
+          "ControlPlaneClient,",
+          "EvidenceClient,",
+          "GatewayClient,",
+          "InstallClient,",
+          "PolicyClient,",
+          "RuntimeClient,",
+          'from "handshake-protocol-kernel/sdk/role-clients";',
+          "Use this subpath for install setup, delegated-authority lifecycle management,",
+          "exact policy evaluation",
+          "runtime proposal",
+          "gateway-custody transition transport",
+          "one server-side setup commit, not hosted installation authority",
+          "`PolicyClient.evaluatePolicy()` evaluates one exact action contract",
           "package root still exposes the lower-level",
           "first-slice activation should",
+        ],
+      },
+      {
+        label: "adapter SDK definition boundary",
+        sources: [
+          { name: "README.md", text: readme },
+          { name: "docs/internal/decisions.md", text: decisions },
+        ],
+        required: [
+          "third-party protected-action adapter packs",
+          "install-proposal shape",
+          "definition-only",
+          "not an install client",
+          "policy evaluator",
+          "certification",
+          "mutation runner",
         ],
       },
       {
@@ -165,6 +332,7 @@ describe("claim boundary", () => {
         label: "lane authority boundaries",
         sources: [
           { name: "src/runtime/LANE.md", text: runtimeLane },
+          { name: "src/adapter-sdk/LANE.md", text: adapterSdkLane },
           { name: "src/conformance/LANE.md", text: conformanceLane },
           { name: "src/adapters/LANE.md", text: adaptersLane },
         ],
@@ -218,6 +386,12 @@ describe("claim boundary", () => {
         ],
       },
     ]);
+
+    const expansionQualityCanon = `${quality}\n${structure}`;
+    expect(expansionQualityCanon).toContain("second action family");
+    expect(expansionQualityCanon).toContain("gateway authority holder");
+    expect(expansionQualityCanon).toContain("credential holder");
+    expect(expansionQualityCanon).toContain("quality/package/full-repo gates");
   });
 
   it("requires MCP docs to stay proposal/evidence only", () => {

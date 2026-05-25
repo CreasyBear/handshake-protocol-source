@@ -6,6 +6,10 @@ import type { McpRuntimeProposalClient, McpX402PaymentProposalInput } from "./x4
 export const MCP_REFERENCE_METADATA_URI = "handshake://metadata/actions/x402_payment.exact" as const;
 export const MCP_REFERENCE_RECEIPT_TIMELINE_URI = "handshake://evidence/receipts/rcp_mcp_gap/timeline" as const;
 export const MCP_REFERENCE_TRUSTED_MAX_ATOMIC_AMOUNT = "2000" as const;
+export const MCP_REFERENCE_GATEWAY_READINESS_REF = "handshake://local/x402/gateway-readiness.json" as const;
+export const MCP_REFERENCE_GATEWAY_READINESS_DIGEST = `sha256:${"a".repeat(64)}` as const;
+export const MCP_REFERENCE_POLICY_VERSION_REF = "policy:x402-payment-exact:mcp-reference@v1" as const;
+export const MCP_REFERENCE_POLICY_VERSION_DIGEST = `sha256:${"b".repeat(64)}` as const;
 
 export type McpReferenceRuntimeCall = { readonly name: string; readonly input: unknown };
 
@@ -37,6 +41,16 @@ export async function referenceProposalInput(
     actionTypeId: "atype_x402_payment",
     gatewayRegistryEntryId: "gwy_entry_x402",
     gatewayId: "gateway_x402",
+    delegatedAuthorityBinding: {
+      authorityUseName: "x402_delegated_spend",
+      delegatedAuthorityRefId: "dar_mcp_reference_x402",
+      delegatedAuthorityRefDigest: await digestMcp({ delegatedAuthorityRef: "mcp_reference_x402" }),
+      requiredGrantStatus: "active",
+      authorityKind: "spend",
+      policyPackRef: "policy:x402-payment-exact:mcp-reference",
+      policyPackVersion: "v1",
+      evidenceExpectationRefs: ["evidence:x402-delegated-spend:principal_demo:agent_demo"],
+    },
     contractExpiresAt: "2026-05-22T12:00:00.000Z",
     idempotencyKey: "idem:x402:demo",
     endpointUrl: "https://seller.example/protected",

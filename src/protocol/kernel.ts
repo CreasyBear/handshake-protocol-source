@@ -16,6 +16,16 @@ import type {
   RecordGatewayCustodyProofPacketInput,
   RegisterGatewayCredentialRefInput,
 } from "./areas/credential-custody";
+import {
+  registerDelegatedAuthorityRef as registerDelegatedAuthorityRefTransition,
+  transitionDelegatedAuthorityStatus as transitionDelegatedAuthorityStatusTransition,
+} from "./areas/delegated-authority";
+import type {
+  DelegatedAuthorityRef,
+  DelegatedAuthorityStatusTransition,
+  RegisterDelegatedAuthorityRefInput,
+  TransitionDelegatedAuthorityStatusInput,
+} from "./areas/delegated-authority";
 import { HandshakeProtocolError } from "./foundation/errors";
 import { gatewayCheck as gatewayCheckTransition, type GatewayCheckResult } from "./areas/gateway-gate";
 import type { GatewayCheckInput } from "./areas/gateway-gate";
@@ -25,6 +35,11 @@ import type {
   GeneratedExecutionGraph,
   GraphEvidenceIssuerContext,
 } from "./areas/generated-execution-graph";
+import {
+  registerInstallProposalCompiledRecords as registerInstallProposalCompiledRecordsTransition,
+  type InstallSetupResult,
+  type RegisterInstallProposalCompiledRecordsInput,
+} from "./areas/install-setup";
 import { createBypassProbe as createBypassProbeTransition } from "./areas/bypass-probe";
 import type { BypassProbe, CreateBypassProbeInput } from "./areas/bypass-probe";
 import {
@@ -105,6 +120,12 @@ export class HandshakeKernel {
     }
   }
 
+  registerInstallProposalCompiledRecords(
+    input: RegisterInstallProposalCompiledRecordsInput,
+  ): Promise<InstallSetupResult> {
+    return registerInstallProposalCompiledRecordsTransition(this.store, this.recorder, input);
+  }
+
   createRuntimeExecution(input: CreateRuntimeExecutionInput): Promise<RuntimeExecutionRecord> {
     return createRuntimeExecutionTransition(this.recorder, input);
   }
@@ -142,6 +163,16 @@ export class HandshakeKernel {
 
   registerGatewayCredentialRef(input: RegisterGatewayCredentialRefInput): Promise<GatewayCredentialRef> {
     return registerGatewayCredentialRefTransition(this.recorder, input);
+  }
+
+  registerDelegatedAuthorityRef(input: RegisterDelegatedAuthorityRefInput): Promise<DelegatedAuthorityRef> {
+    return registerDelegatedAuthorityRefTransition(this.recorder, input);
+  }
+
+  transitionDelegatedAuthorityStatus(
+    input: TransitionDelegatedAuthorityStatusInput,
+  ): Promise<DelegatedAuthorityStatusTransition> {
+    return transitionDelegatedAuthorityStatusTransition(this.recorder, input);
   }
 
   recordCredentialResolutionEvidence(

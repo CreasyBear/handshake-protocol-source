@@ -18,6 +18,7 @@ import {
 } from "../catalog-envelope/schemas";
 import { GeneratedExecutionCoverageStatusSchema } from "../generated-execution-graph/schemas";
 import { GatewayCredentialBindingSchema } from "../credential-custody/schemas";
+import { DelegatedAuthorityBindingSchema } from "../delegated-authority/schemas";
 
 export const ActionContractSchema = ProtocolBaseSchema.extend({
   actionContractId: IdSchema,
@@ -72,6 +73,7 @@ export const ActionContractSchema = ProtocolBaseSchema.extend({
   nonSecretParamsSummary: z.record(z.string(), JsonValueSchema),
   secretRefs: z.record(z.string(), z.string().min(1)).default({}),
   gatewayCredentialRefs: z.array(GatewayCredentialBindingSchema).default([]),
+  delegatedAuthorityRefs: z.array(DelegatedAuthorityBindingSchema).default([]),
   purposeCode: z.string().min(1),
   expectedSideEffectCodes: z.array(z.string().min(1)),
   evidenceRefs: z.array(z.string()).default([]),

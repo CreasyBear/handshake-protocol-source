@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { JsonValueSchema } from "../../foundation/schema-core";
 import { GatewayCredentialBindingSchema } from "../credential-custody/schemas";
+import { DelegatedAuthorityBindingSchema } from "../delegated-authority/schemas";
 
 export const CreateToolCallDraftInputSchema = z.strictObject({
   tenantId: z.string().min(1),
@@ -19,6 +20,7 @@ export const CreateToolCallDraftInputSchema = z.strictObject({
   nonSecretParamsSummary: z.record(z.string(), JsonValueSchema).default({}),
   secretRefs: z.record(z.string(), z.string().min(1)).default({}),
   gatewayCredentialRefs: z.array(GatewayCredentialBindingSchema).default([]),
+  delegatedAuthorityRefs: z.array(DelegatedAuthorityBindingSchema).default([]),
   expiresAt: z.string().datetime({ offset: true }),
   invalidReasonCodes: z.array(z.string().min(2)).default([]),
   evidenceRefs: z.array(z.string().min(1)).default([]),
@@ -32,6 +34,7 @@ export const TransitionToolCallDraftInputSchema = z.strictObject({
   nonSecretParamsSummary: z.record(z.string(), JsonValueSchema).optional(),
   secretRefs: z.record(z.string(), z.string().min(1)).optional(),
   gatewayCredentialRefs: z.array(GatewayCredentialBindingSchema).optional(),
+  delegatedAuthorityRefs: z.array(DelegatedAuthorityBindingSchema).optional(),
   finalizedAt: z.string().datetime({ offset: true }).nullable().optional(),
   expiresAt: z.string().datetime({ offset: true }).optional(),
   invalidReasonCodes: z.array(z.string().min(2)).optional(),

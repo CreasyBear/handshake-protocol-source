@@ -9,6 +9,7 @@ import {
   ResourceRefSchema,
 } from "../../foundation/schema-core";
 import { GatewayCredentialBindingSchema } from "../credential-custody/schemas";
+import { DelegatedAuthorityBindingSchema } from "../delegated-authority/schemas";
 
 export const ToolCallDraftStateSchema = z.enum(["opened", "streaming", "finalized", "invalid", "abandoned"]);
 export type ToolCallDraftState = z.infer<typeof ToolCallDraftStateSchema>;
@@ -29,6 +30,7 @@ export const ToolCallDraftSchema = ProtocolBaseSchema.extend({
   nonSecretParamsSummary: z.record(z.string(), JsonValueSchema),
   secretRefs: z.record(z.string(), z.string().min(1)).default({}),
   gatewayCredentialRefs: z.array(GatewayCredentialBindingSchema).default([]),
+  delegatedAuthorityRefs: z.array(DelegatedAuthorityBindingSchema).default([]),
   paramsDigest: DigestSchema,
   finalizedAt: IsoDateSchema.nullable().default(null),
   expiresAt: IsoDateSchema,

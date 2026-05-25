@@ -29,6 +29,7 @@ import type { ProtectedSurfaceOperationClaim } from "../operation-lifecycle";
 import { evaluateRequiredProtectedPathPosture, loadCurrentPostureForContract } from "../protected-path-posture";
 import type { ProtectedPathPosture } from "../protected-path-posture";
 import { evaluateGatewayCredentialBindings, type GatewayCredentialBindingEvaluation } from "../credential-custody";
+import { evaluateDelegatedAuthorityBindings, type DelegatedAuthorityBindingEvaluation } from "../delegated-authority";
 import { type JsonValue } from "./types";
 import {
   loadGatewayCheckSequenceDependencyStates,
@@ -68,6 +69,7 @@ type GatewayConstraintEvaluation = {
   isolationStates: IsolationState[];
   gatewayPolicyDrift: GatewayPolicyDriftCheck;
   protectedPathPosture: StoredProtocolRecord<ProtectedPathPosture> | null;
+  delegatedAuthorityBindingEvaluation: DelegatedAuthorityBindingEvaluation;
   gatewayCredentialBindingEvaluation: GatewayCredentialBindingEvaluation;
   idempotencyLedgerEntry: StoredProtocolRecord<IdempotencyLedgerEntry> | null;
   refusal: string | null;
@@ -135,6 +137,7 @@ async function deriveGatewayConstraintEvaluation(
     parameters: context.input.observedParameters,
     secretRefs: contract.secretRefs,
     gatewayCredentialRefs: contract.gatewayCredentialRefs,
+    delegatedAuthorityRefs: contract.delegatedAuthorityRefs,
   });
   const greenlightDigestSeen = await digestCanonical(greenlight as unknown as JsonValue);
   const isolationStates = await store.listIsolationStates([
@@ -142,15 +145,15 @@ async function deriveGatewayConstraintEvaluation(
     ...isolationScopeRefsForGreenlight(greenlight),
   ]);
   const protectedPathPosture = await loadCurrentPostureForContract(store, contract);
-  const idempotencyLedgerEntry = await store.getCurrentIdempotencyLedgerEntry(
-    await idempotencyLedgerKeyDigest(idempotencyLedgerKey(contract)),
-  );
+  const ledgerKeyDigest = await idempotencyLedgerKeyDigest(idempotencyLedgerKey(contract));
+  const idempotencyLedgerEntry = await store.getCurrentIdempotencyLedgerEntry(ledgerKeyDigest);
   const protectedPathEvaluation = evaluateRequiredProtectedPathPosture({
     contract,
     gateway: contract,
     posture: protectedPathPosture,
     now,
   });
+  const delegatedAuthorityBindingEvaluation = await evaluateDelegatedAuthorityBindings(store, contract, now);
   const gatewayCredentialBindingEvaluation = await evaluateGatewayCredentialBindings(store, contract, now);
   const sequenceDependencyStates = await loadGatewayCheckSequenceDependencyStates(store, contract);
   const sequenceDependencyReasonCode = gatewayCheckSequenceDependencyRefusalReason(sequenceDependencyStates);
@@ -159,9 +162,11 @@ async function deriveGatewayConstraintEvaluation(
     contract,
     greenlight,
     observedParamsDigest,
+    ledgerKeyDigest,
     isolationStates,
     now,
     gatewayPolicyDrift.reasonCode,
+    delegatedAuthorityBindingEvaluation.ok ? null : delegatedAuthorityBindingEvaluation.reasonCode,
     gatewayCredentialBindingEvaluation.ok ? null : gatewayCredentialBindingEvaluation.reasonCode,
     protectedPathEvaluation.ok ? null : protectedPathEvaluation.reasonCode,
     sequenceDependencyReasonCode,
@@ -177,6 +182,7 @@ async function deriveGatewayConstraintEvaluation(
     isolationStates,
     gatewayPolicyDrift,
     protectedPathPosture,
+    delegatedAuthorityBindingEvaluation,
     gatewayCredentialBindingEvaluation,
     idempotencyLedgerEntry,
     refusal,

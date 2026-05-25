@@ -3,7 +3,11 @@ import { digestMcp } from "./digest";
 import { mcpNonContractOutcome, type McpToolResult } from "./output";
 import {
   actionContractIdFrom,
+  MCP_REFERENCE_GATEWAY_READINESS_DIGEST,
+  MCP_REFERENCE_GATEWAY_READINESS_REF,
   MCP_REFERENCE_METADATA_URI,
+  MCP_REFERENCE_POLICY_VERSION_DIGEST,
+  MCP_REFERENCE_POLICY_VERSION_REF,
   MCP_REFERENCE_RECEIPT_TIMELINE_URI,
   MCP_REFERENCE_TRUSTED_MAX_ATOMIC_AMOUNT,
   metadataDigestFrom,
@@ -166,6 +170,16 @@ export const mcpX402ReferenceTranscriptContract = {
   ],
 } as const;
 
+function referenceTrustedProposalOptions() {
+  return {
+    trustedMaxAtomicAmountPerCall: MCP_REFERENCE_TRUSTED_MAX_ATOMIC_AMOUNT,
+    gatewayReadinessRef: MCP_REFERENCE_GATEWAY_READINESS_REF,
+    gatewayReadinessDigest: MCP_REFERENCE_GATEWAY_READINESS_DIGEST,
+    policyVersionRef: MCP_REFERENCE_POLICY_VERSION_REF,
+    policyVersionDigest: MCP_REFERENCE_POLICY_VERSION_DIGEST,
+  };
+}
+
 export async function buildMcpX402ReferenceTranscript(): Promise<McpReferenceTranscriptPack> {
   const catalogSnapshot = mcpCatalogSnapshot();
   const evidenceClient = referenceEvidenceClient();
@@ -176,7 +190,7 @@ export async function buildMcpX402ReferenceTranscript(): Promise<McpReferenceTra
   const validRuntime = referenceRuntimeClient();
   const validProposal = await proposeMcpX402Payment(validInput, {
     runtimeClient: validRuntime.client,
-    trustedMaxAtomicAmountPerCall: MCP_REFERENCE_TRUSTED_MAX_ATOMIC_AMOUNT,
+    ...referenceTrustedProposalOptions(),
   });
   const digestBoundRuntime = referenceRuntimeClient();
   const digestBoundProposal = await proposeMcpX402Payment(
@@ -191,7 +205,7 @@ export async function buildMcpX402ReferenceTranscript(): Promise<McpReferenceTra
     },
     {
       runtimeClient: digestBoundRuntime.client,
-      trustedMaxAtomicAmountPerCall: MCP_REFERENCE_TRUSTED_MAX_ATOMIC_AMOUNT,
+      ...referenceTrustedProposalOptions(),
     },
   );
   const actionContractId = actionContractIdFrom(validProposal);
@@ -204,21 +218,21 @@ export async function buildMcpX402ReferenceTranscript(): Promise<McpReferenceTra
   const staleProposal = await proposeMcpX402Payment(validInput, {
     runtimeClient: staleRuntime.client,
     currentMetadataDigest: await digestMcp({ caseId: "new_metadata_digest" }),
-    trustedMaxAtomicAmountPerCall: MCP_REFERENCE_TRUSTED_MAX_ATOMIC_AMOUNT,
+    ...referenceTrustedProposalOptions(),
   });
 
   const changedToolsRuntime = referenceRuntimeClient();
   const changedToolsProposal = await proposeMcpX402Payment(validInput, {
     runtimeClient: changedToolsRuntime.client,
     toolsListChanged: true,
-    trustedMaxAtomicAmountPerCall: MCP_REFERENCE_TRUSTED_MAX_ATOMIC_AMOUNT,
+    ...referenceTrustedProposalOptions(),
   });
 
   const installRuntime = referenceRuntimeClient();
   const installProposal = await proposeMcpX402Payment(validInput, {
     runtimeClient: installRuntime.client,
     installPosture: "missing",
-    trustedMaxAtomicAmountPerCall: MCP_REFERENCE_TRUSTED_MAX_ATOMIC_AMOUNT,
+    ...referenceTrustedProposalOptions(),
   });
   const installHealthUri = installProposal.structuredContent.evidenceRefs[0] ?? "";
   const installHealthRead = installHealthUri ? await readMcpResource(installHealthUri, evidenceClient) : null;
@@ -227,7 +241,7 @@ export async function buildMcpX402ReferenceTranscript(): Promise<McpReferenceTra
   const offlineProposal = await proposeMcpX402Payment(validInput, {
     runtimeClient: offlineRuntime.client,
     gatewayPosture: "offline",
-    trustedMaxAtomicAmountPerCall: MCP_REFERENCE_TRUSTED_MAX_ATOMIC_AMOUNT,
+    ...referenceTrustedProposalOptions(),
   });
 
   const amountRuntime = referenceRuntimeClient();
@@ -235,7 +249,7 @@ export async function buildMcpX402ReferenceTranscript(): Promise<McpReferenceTra
     { ...validInput, requestId: "req_mcp_x402_amount", atomicAmount: "3000" },
     {
       runtimeClient: amountRuntime.client,
-      trustedMaxAtomicAmountPerCall: MCP_REFERENCE_TRUSTED_MAX_ATOMIC_AMOUNT,
+      ...referenceTrustedProposalOptions(),
     },
   );
 
@@ -249,7 +263,7 @@ export async function buildMcpX402ReferenceTranscript(): Promise<McpReferenceTra
     },
     {
       runtimeClient: unsupportedBodyRuntime.client,
-      trustedMaxAtomicAmountPerCall: MCP_REFERENCE_TRUSTED_MAX_ATOMIC_AMOUNT,
+      ...referenceTrustedProposalOptions(),
     },
   );
 
@@ -264,7 +278,7 @@ export async function buildMcpX402ReferenceTranscript(): Promise<McpReferenceTra
     },
     {
       runtimeClient: liveProviderRuntime.client,
-      trustedMaxAtomicAmountPerCall: MCP_REFERENCE_TRUSTED_MAX_ATOMIC_AMOUNT,
+      ...referenceTrustedProposalOptions(),
     },
   );
 
@@ -273,7 +287,7 @@ export async function buildMcpX402ReferenceTranscript(): Promise<McpReferenceTra
     { ...validInput, requestId: "req_mcp_x402_params", dispatchRef: "dispatch:mcp:params" },
     {
       runtimeClient: paramsRuntime.client,
-      trustedMaxAtomicAmountPerCall: MCP_REFERENCE_TRUSTED_MAX_ATOMIC_AMOUNT,
+      ...referenceTrustedProposalOptions(),
     },
   );
 
@@ -282,7 +296,7 @@ export async function buildMcpX402ReferenceTranscript(): Promise<McpReferenceTra
     { ...validInput, requestId: "req_mcp_x402_replay", dispatchRef: "dispatch:mcp:replay" },
     {
       runtimeClient: replayRuntime.client,
-      trustedMaxAtomicAmountPerCall: MCP_REFERENCE_TRUSTED_MAX_ATOMIC_AMOUNT,
+      ...referenceTrustedProposalOptions(),
     },
   );
 
@@ -291,7 +305,7 @@ export async function buildMcpX402ReferenceTranscript(): Promise<McpReferenceTra
     { ...validInput, requestId: "req_mcp_x402_bypass", rawSiblingDispatchRef: "sibling:mcp:x402" },
     {
       runtimeClient: bypassRuntime.client,
-      trustedMaxAtomicAmountPerCall: MCP_REFERENCE_TRUSTED_MAX_ATOMIC_AMOUNT,
+      ...referenceTrustedProposalOptions(),
     },
   );
 

@@ -70,6 +70,12 @@ describe("root package exports", () => {
       "CredentialResolutionEvidenceSchema",
       "CredentialResolutionRedactionStatusSchema",
       "CredentialResolutionResultClassSchema",
+      "DelegatedAuthorityBindingSchema",
+      "DelegatedAuthorityGrantStatusSchema",
+      "DelegatedAuthorityKindSchema",
+      "DelegatedAuthorityRefSchema",
+      "DelegatedAuthorityStatusTransitionSchema",
+      "DelegatedAuthorityTerminalGrantStatusSchema",
       "DigestSchema",
       "DownstreamDiagnosticsRedactionPostureSchema",
       "DownstreamOutcomeStatusSchema",
@@ -112,6 +118,11 @@ describe("root package exports", () => {
       "IdempotencyLedgerStateSchema",
       "IdempotencyRecoveryDispositionSchema",
       "IdempotencyRecoveryProjectionSchema",
+      "InstallSetupAuthorityBoundarySchema",
+      "InstallSetupRecordRefsSchema",
+      "InstallSetupRefusedResultSchema",
+      "InstallSetupRegisteredResultSchema",
+      "InstallSetupResultSchema",
       "IntentCompilationRecordSchema",
       "IsoDateSchema",
       "IsolationStateSchema",
@@ -158,7 +169,9 @@ describe("root package exports", () => {
       "RecoveryRecommendedPathSchema",
       "RefusalPhaseSchema",
       "RefusalSchema",
+      "RegisterDelegatedAuthorityRefInputSchema",
       "RegisterGatewayCredentialRefInputSchema",
+      "RegisterInstallProposalCompiledRecordsInputSchema",
       "RequiredProtectedPathStateSchema",
       "ResolveRecoveryTerminalConflictInputSchema",
       "ResourceRefSchema",
@@ -178,6 +191,7 @@ describe("root package exports", () => {
       "ToolCallDraftStateSchema",
       "ToolCapabilitySchema",
       "TransitionCommitStateSchema",
+      "TransitionDelegatedAuthorityStatusInputSchema",
       "TransitionErrorEnvelopeSchema",
       "TransitionErrorResponseSchema",
       "TransitionErrorRetryabilitySchema",
@@ -205,6 +219,36 @@ describe("root package exports", () => {
     expect(exportNames).not.toContain("D1ProtocolStore");
     expect(exportNames).not.toContain("buildEventChain");
     expect(exportNames).not.toContain("experimentalRunPackageInstallGateway");
+  });
+
+  it("keeps adapter authoring helpers on an explicit adapter SDK subpath", async () => {
+    const root = await import("../../src");
+    const adapterSdk = await import("../../src/adapter-sdk");
+    const exportNames = Object.keys(adapterSdk).sort();
+
+    expect(Object.keys(root)).not.toContain("defineProtectedActionAdapterPack");
+    expect(Object.keys(root)).not.toContain("projectAdapterSdkInstallProposalReport");
+    expect(exportNames).toEqual([
+      "AdapterSdkAuthorityBoundarySchema",
+      "AdapterSdkBindingStatusSchema",
+      "AdapterSdkConformanceExpectationSchema",
+      "AdapterSdkDefinitionInputSchema",
+      "AdapterSdkDefinitionIssueCodeSchema",
+      "AdapterSdkDefinitionReportSchema",
+      "AdapterSdkDefinitionSchema",
+      "AdapterSdkInstallCompilerContractSchema",
+      "AdapterSdkInstallProposalIssueCodeSchema",
+      "AdapterSdkInstallProposalReportSchema",
+      "AdapterSdkProtectedPathContractSchema",
+      "adapterSdkAuthorityBoundary",
+      "adapterSdkRequiredNonClaims",
+      "assertAdapterSdkInstallProposal",
+      "defineAdapterInstallCompiler",
+      "defineProtectedActionAdapterPack",
+      "projectAdapterSdkDefinitionReport",
+      "projectAdapterSdkInstallProposalReport",
+    ]);
+    expect(exportNames.join(" ")).not.toMatch(/GatewayCheck|Greenlight|Mutation|PolicyDecision|ReceiptExport/);
   });
 
   it("supports public import smoke for SDK, app, schemas, inputs, and verified gate helpers", async () => {
@@ -310,6 +354,61 @@ describe("root package exports", () => {
     expect(runtime.proposeRuntimeIngressActionContracts).toBeFunction();
   });
 
+  it("keeps the x402 protected tool on an explicit proposal/profile package surface", async () => {
+    const root = await import("../../src");
+    const x402Tool = await import("../../src/x402-protected-tool");
+    const exportNames = Object.keys(x402Tool).sort();
+
+    expect(Object.keys(root)).not.toContain("prepareProtectedX402ToolDispatch");
+    expect(Object.keys(root)).not.toContain("buildProtectedX402ToolHostProfile");
+    expect(exportNames).toEqual([
+      "CLAUDE_CODE_X402_PROTECTED_TOOL_ACTIVATION_VERSION",
+      "CODEX_X402_PROTECTED_TOOL_ACTIVATION_VERSION",
+      "ClaudeCodeX402ProtectedToolActivationArtifactSchema",
+      "ClaudeCodeX402ProtectedToolActivationInputSchema",
+      "CodexX402ProtectedToolActivationArtifactSchema",
+      "CodexX402ProtectedToolActivationInputSchema",
+      "GENERIC_MCP_X402_PROTECTED_TOOL_ACTIVATION_VERSION",
+      "GenericMcpX402ProtectedToolActivationArtifactSchema",
+      "GenericMcpX402ProtectedToolActivationInputSchema",
+      "HERMES_X402_PROTECTED_TOOL_ACTIVATION_VERSION",
+      "HermesX402ProtectedToolActivationArtifactSchema",
+      "HermesX402ProtectedToolActivationInputSchema",
+      "OPENCLAW_X402_PROTECTED_TOOL_ACTIVATION_VERSION",
+      "OpenClawX402ProtectedToolActivationArtifactSchema",
+      "OpenClawX402ProtectedToolActivationInputSchema",
+      "ProtectedX402ToolFacadeInputSchema",
+      "X402ProtectedToolGatewayReadinessSnapshotSchema",
+      "X402ProtectedToolHostBypassPostureSchema",
+      "X402ProtectedToolHostFamilySchema",
+      "X402ProtectedToolHostProfileAuthorityBoundarySchema",
+      "X402ProtectedToolHostProfileDescriptorSchema",
+      "X402ProtectedToolReadinessAuthorityBoundarySchema",
+      "X402ProtectedToolReadinessRawSiblingPostureSchema",
+      "X402ProtectedToolReadinessSnapshotSchema",
+      "X402_PROTECTED_TOOL_ACCEPTANCE_VERSION",
+      "X402_PROTECTED_TOOL_FACADE_VERSION",
+      "X402_PROTECTED_TOOL_NAME",
+      "X402_PROTECTED_TOOL_PROFILE_VERSION",
+      "X402_PROTECTED_TOOL_READINESS_VERSION",
+      "buildClaudeCodeX402ProtectedToolActivation",
+      "buildCodexX402ProtectedToolActivation",
+      "buildGenericMcpX402ProtectedToolActivation",
+      "buildHermesX402ProtectedToolActivation",
+      "buildOpenClawX402ProtectedToolActivation",
+      "buildProtectedX402ToolHostProfile",
+      "prepareProtectedX402ToolDispatch",
+      "x402ProtectedToolAcceptanceMatrix",
+      "x402ProtectedToolForbiddenProductionClaims",
+      "x402ProtectedToolHostProfileAuthorityBoundary",
+      "x402ProtectedToolReadinessAuthorityBoundary",
+      "x402ProtectedToolReleaseBlockers",
+    ]);
+    expect(exportNames.join(" ")).not.toMatch(
+      /PolicyDecision|Greenlight|GatewayCheck|ReceiptExport|AuthorityCertificateMint|PaymentPayload/,
+    );
+  });
+
   it("keeps role-scoped SDK clients on an explicit non-root package surface", async () => {
     const root = await import("../../src");
     const roleClients = await import("handshake-protocol-kernel/sdk/role-clients");
@@ -317,9 +416,21 @@ describe("root package exports", () => {
 
     expect(Object.keys(root)).not.toContain("RuntimeClient");
     expect(Object.keys(root)).not.toContain("EvidenceClient");
-    expect(exportNames).toEqual(["EvidenceClient", "HandshakeClientError", "RuntimeClient"]);
+    expect(Object.keys(root)).not.toContain("ControlPlaneClient");
+    expect(Object.keys(root)).not.toContain("GatewayClient");
+    expect(Object.keys(root)).not.toContain("InstallClient");
+    expect(Object.keys(root)).not.toContain("PolicyClient");
+    expect(exportNames).toEqual([
+      "ControlPlaneClient",
+      "EvidenceClient",
+      "GatewayClient",
+      "HandshakeClientError",
+      "InstallClient",
+      "PolicyClient",
+      "RuntimeClient",
+    ]);
     expect(exportNames).not.toContain("HandshakeClient");
-    expect(exportNames.join(" ")).not.toMatch(/Policy|Greenlight|Gateway|ReceiptExport|AuthorityCertificateMint/);
+    expect(exportNames.join(" ")).not.toMatch(/ReceiptExport|AuthorityCertificateMint|PaymentPayload/);
   });
 
   it("keeps CLI and MCP on explicit non-root package surfaces", async () => {

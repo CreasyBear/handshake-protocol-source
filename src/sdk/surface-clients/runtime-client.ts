@@ -11,6 +11,7 @@ import type {
   ProposeActionContractInput,
   TransitionToolCallDraftInput,
 } from "../../protocol/public/inputs";
+import type { RuntimeIngressProposalInput, RuntimeIngressResult } from "../../runtime";
 import type { HandshakeFetch } from "../client";
 import { RoleScopedTransport, type RoleScopedClientOptions } from "./transport";
 
@@ -25,6 +26,10 @@ export class RuntimeClient {
 
   createRuntimeExecution(input: CreateRuntimeExecutionInput): Promise<RuntimeExecutionRecord> {
     return this.transport.post("/v0.2/runtime-executions", input);
+  }
+
+  proposeRuntimeIngressActionContracts(input: RuntimeIngressProposalInput): Promise<RuntimeIngressResult> {
+    return this.transport.post("/v0.2/runtime-ingress/action-contracts", input);
   }
 
   createToolCallDraft(input: CreateToolCallDraftInput): Promise<ToolCallDraft> {

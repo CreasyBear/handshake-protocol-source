@@ -1,9 +1,9 @@
 {
   "name": "handshake-protocol-kernel",
-  "version": "0.2.5",
+  "version": "0.2.7",
   "description": "Protected action infrastructure for automated decision making: protocol kernel, CLI evidence views, and local MCP proposal/evidence server.",
   "license": "Apache-2.0",
-  "mcpName": "io.github.joelchan/handshake-protocol-kernel",
+  "mcpName": "io.github.CreasyBear/handshake-protocol-kernel",
   "keywords": [
     "agents",
     "automated-decision-making",
@@ -34,6 +34,11 @@
       "import": "./dist/conformance/index.mjs",
       "default": "./dist/conformance/index.mjs"
     },
+    "./adapter-sdk": {
+      "types": "./dist/adapter-sdk/index.d.ts",
+      "import": "./dist/adapter-sdk/index.mjs",
+      "default": "./dist/adapter-sdk/index.mjs"
+    },
     "./runtime": {
       "types": "./dist/runtime/index.d.ts",
       "import": "./dist/runtime/index.mjs",
@@ -54,6 +59,11 @@
       "import": "./dist/mcp/index.mjs",
       "default": "./dist/mcp/index.mjs"
     },
+    "./x402-protected-tool": {
+      "types": "./dist/x402-protected-tool/index.d.ts",
+      "import": "./dist/x402-protected-tool/index.mjs",
+      "default": "./dist/x402-protected-tool/index.mjs"
+    },
     "./experimental": {
       "types": "./dist/experimental.d.ts",
       "import": "./dist/experimental.mjs",
@@ -66,6 +76,7 @@
     "dist",
     "server.json",
     "README.md",
+    "CHANGELOG.md",
     "LICENSE",
     "NOTICE"
   ],
@@ -76,6 +87,8 @@
     "test": "bun test",
     "demo:self-hosted": "bun run ./examples/self-hosted-activation/run.ts",
     "demo:aps": "bun run ./examples/x402-protected-spend/run.ts",
+    "demo:adapter-sdk": "bun run ./examples/external-adapter-sdk/run.ts",
+    "demo:x402-tool-profiles": "bun run ./examples/x402-protected-tool-profiles/run.ts",
     "demo:mcp-transcript": "bun run ./examples/mcp-reference-transcript/run.ts",
     "build": "npm run build:types && npm run build:bundles",
     "build:types": "tsc -p tsconfig.build.json",
@@ -84,7 +97,7 @@
     "format:check": "prettier --check .",
     "lint": "eslint src test --max-warnings=0",
     "check:types": "tsc --noEmit --pretty false",
-    "pack:check": "npm run build && node scripts/check-package-surface.mjs && node scripts/check-published-entrypoints.mjs && node scripts/check-release-proof.mjs",
+    "pack:check": "npm run build && node scripts/check-package-surface.mjs && node scripts/check-published-entrypoints.mjs && node scripts/check-clean-installed-activation.mjs && node scripts/check-release-proof.mjs",
     "check:repo": "npm run check:types && npm run lint && npm run format:check && npm run test && npm run pack:check && git diff --check",
     "quality:architecture": "npm run test -- test/architecture/import-posture.test.ts test/architecture/naming-posture.test.ts test/architecture/package-surface.test.ts test/architecture/root-exports.test.ts test/architecture/surface-boundary-posture.test.ts test/architecture/cli-command-posture.test.ts test/architecture/mcp-surface-posture.test.ts test/conformance/protected-mutation-adapter-conformance.test.ts",
     "quality:claims": "npm run test -- test/architecture/active-vocabulary.test.ts test/architecture/claim-boundary.test.ts",

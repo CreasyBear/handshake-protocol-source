@@ -3,7 +3,11 @@ import { homedir } from "node:os";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { z } from "zod";
 import { digestCanonical } from "../../protocol/foundation/canonical";
-import { LocalX402InstallRecordSchema, LocalX402ProbeReportSchema } from "../x402/local-state";
+import {
+  LocalX402GatewayReadinessRecordSchema,
+  LocalX402InstallRecordSchema,
+  LocalX402ProbeReportSchema,
+} from "../x402/local-state";
 
 export const CLI_LOCAL_PROJECT_SCHEMA_VERSION = "handshake.cli.local-project.v1" as const;
 
@@ -19,6 +23,7 @@ const LocalProjectConfigSchema = z.strictObject({
   roleCredentialProfileRef: z.string().min(1).nullable(),
   x402InstallRef: z.string().min(1).optional(),
   x402ProbeReportRef: z.string().min(1).optional(),
+  x402GatewayReadinessRef: z.string().min(1).optional(),
 });
 
 export type LocalProjectConfig = z.infer<typeof LocalProjectConfigSchema>;
@@ -50,10 +55,14 @@ export type InitLocalProjectResult = {
 };
 
 export type DoctorReasonCode =
+  | "cli_gateway_custody_proof_stale"
+  | "cli_gateway_custody_proof_unverified"
   | "cli_gateway_posture_probe_failed"
   | "cli_gateway_posture_stale"
+  | "cli_gateway_readiness_stale"
   | "cli_install_not_configured"
   | "cli_install_not_ready"
+  | "cli_selected_payment_requirement_missing"
   | "cli_gateway_posture_unknown"
   | "cli_project_config_missing"
   | "cli_role_credential_profile_missing"
@@ -76,6 +85,7 @@ export type DoctorResult = {
   trustBundleRef: string | null;
   x402InstallRef: string | null;
   x402ProbeReportRef: string | null;
+  x402GatewayReadinessRef: string | null;
   checkedRoles: readonly CliRoleName[];
 };
 
@@ -90,6 +100,7 @@ export type RoleCredentialPosture = {
 export type LocalX402Health = {
   install: z.infer<typeof LocalX402InstallRecordSchema> | null;
   probes: z.infer<typeof LocalX402ProbeReportSchema> | null;
+  gatewayReadiness: z.infer<typeof LocalX402GatewayReadinessRecordSchema> | null;
   reasonCodes: DoctorReasonCode[];
 };
 
@@ -172,6 +183,7 @@ export async function doctorLocalProject(cwd: string): Promise<DoctorResult> {
       trustBundleRef: null,
       x402InstallRef: null,
       x402ProbeReportRef: null,
+      x402GatewayReadinessRef: null,
       checkedRoles: cliRoleNames,
     };
   }
@@ -204,6 +216,7 @@ export async function doctorLocalProject(cwd: string): Promise<DoctorResult> {
     trustBundleRef: config.trustBundleRef,
     x402InstallRef: config.x402InstallRef ?? null,
     x402ProbeReportRef: config.x402ProbeReportRef ?? null,
+    x402GatewayReadinessRef: config.x402GatewayReadinessRef ?? null,
     checkedRoles: cliRoleNames,
   };
 }
@@ -218,7 +231,7 @@ export async function readLocalProjectConfig(cwd: string): Promise<LocalProjectC
 
 export async function updateLocalProjectConfig(
   cwd: string,
-  updates: Partial<Pick<LocalProjectConfig, "x402InstallRef" | "x402ProbeReportRef">>,
+  updates: Partial<Pick<LocalProjectConfig, "x402InstallRef" | "x402ProbeReportRef" | "x402GatewayReadinessRef">>,
 ): Promise<LocalProjectConfig> {
   const config = { ...(await readLocalProjectConfig(cwd)), ...updates };
   const configRef = localProjectConfigRef(cwd);
@@ -227,13 +240,25 @@ export async function updateLocalProjectConfig(
   return config;
 }
 
-export async function readLocalX402Health(config: LocalProjectConfig, now = Date.now()): Promise<LocalX402Health> {
+export async function readLocalX402Health(
+  config: LocalProjectConfig,
+  now = Date.now(),
+  options: { requireTrustedGatewayReadiness?: boolean; readTrustedGatewayReadiness?: boolean } = {},
+): Promise<LocalX402Health> {
+  const requireTrustedGatewayReadiness = options.requireTrustedGatewayReadiness ?? true;
+  const readTrustedGatewayReadiness = options.readTrustedGatewayReadiness ?? true;
   const reasonCodes = new Set<DoctorReasonCode>();
   const install = await readLocalX402Install(config, reasonCodes);
   const probes = await readLocalX402Probes(config, reasonCodes, now);
+  const gatewayReadiness = readTrustedGatewayReadiness
+    ? await readLocalX402GatewayReadiness(config, install, probes, reasonCodes, now, {
+        reportMissing: requireTrustedGatewayReadiness,
+      })
+    : null;
   return {
     install,
     probes,
+    gatewayReadiness,
     reasonCodes: [...reasonCodes].sort(),
   };
 }
@@ -334,6 +359,9 @@ async function readLocalX402Install(
   try {
     const record = LocalX402InstallRecordSchema.parse(JSON.parse(await readFile(config.x402InstallRef, "utf8")));
     if (record.installStatus !== "ready_to_install") reasonCodes.add("cli_install_not_ready");
+    if (record.selectedPaymentRequirementDigest === null) {
+      reasonCodes.add("cli_selected_payment_requirement_missing");
+    }
     return record;
   } catch {
     reasonCodes.add("cli_install_not_configured");
@@ -354,11 +382,95 @@ async function readLocalX402Probes(
   try {
     const report = LocalX402ProbeReportSchema.parse(JSON.parse(await readFile(config.x402ProbeReportRef, "utf8")));
     if (!report.passed) reasonCodes.add("cli_gateway_posture_probe_failed");
-    if (!report.trustedReadiness) reasonCodes.add("cli_gateway_posture_unknown");
     if (Date.parse(report.expiresAt) <= now) reasonCodes.add("cli_gateway_posture_stale");
     return report;
   } catch {
     reasonCodes.add("cli_gateway_posture_unknown");
     return null;
+  }
+}
+
+async function readLocalX402GatewayReadiness(
+  config: LocalProjectConfig,
+  install: z.infer<typeof LocalX402InstallRecordSchema> | null,
+  probes: z.infer<typeof LocalX402ProbeReportSchema> | null,
+  reasonCodes: Set<DoctorReasonCode>,
+  now: number,
+  options: { reportMissing: boolean },
+): Promise<z.infer<typeof LocalX402GatewayReadinessRecordSchema> | null> {
+  if (!config.x402GatewayReadinessRef) {
+    if (options.reportMissing) reasonCodes.add("cli_gateway_posture_unknown");
+    return null;
+  }
+
+  try {
+    const record = LocalX402GatewayReadinessRecordSchema.parse(
+      JSON.parse(await readFile(config.x402GatewayReadinessRef, "utf8")),
+    );
+    if (record.projectId !== config.projectId) reasonCodes.add("cli_gateway_posture_unknown");
+    if (!install || !probes) return record;
+    if (record.installDigest !== install.installDigest) reasonCodes.add("cli_gateway_posture_unknown");
+    if (record.installProposalRef !== install.installProposalRef) reasonCodes.add("cli_gateway_posture_unknown");
+    if (record.paymentRequirementsDigest !== install.paymentRequirementsDigest) {
+      reasonCodes.add("cli_gateway_posture_unknown");
+    }
+    if (record.selectedPaymentRequirementDigest !== install.selectedPaymentRequirementDigest) {
+      reasonCodes.add("cli_gateway_posture_unknown");
+    }
+    if (record.probePostureDigest !== probes.postureDigest) reasonCodes.add("cli_gateway_posture_unknown");
+    validateProtectedReadinessSnapshotBinding(config, record, install, probes, reasonCodes);
+    if (Date.parse(record.expiresAt) <= now) reasonCodes.add("cli_gateway_readiness_stale");
+    if (Date.parse(record.gatewayCustodyProofExpiresAt) <= now) {
+      reasonCodes.add("cli_gateway_custody_proof_stale");
+    }
+    return record;
+  } catch {
+    reasonCodes.add("cli_gateway_posture_unknown");
+    return null;
+  }
+}
+
+function validateProtectedReadinessSnapshotBinding(
+  config: LocalProjectConfig,
+  record: z.infer<typeof LocalX402GatewayReadinessRecordSchema>,
+  install: z.infer<typeof LocalX402InstallRecordSchema>,
+  probes: z.infer<typeof LocalX402ProbeReportSchema>,
+  reasonCodes: Set<DoctorReasonCode>,
+): void {
+  const readiness = record.protectedToolReadiness;
+  const expectedPairs: Array<[unknown, unknown]> = [
+    [readiness.readinessStatus, "trusted_gateway_ready"],
+    [readiness.readinessScope, "pre_contract"],
+    [readiness.readinessProofLevel, "control_plane_registration"],
+    [readiness.trustedReadiness, true],
+    [readiness.requiredNextMechanism, "ready_for_runtime_facade"],
+    [readiness.gatewayReadinessRef, config.x402GatewayReadinessRef ?? null],
+    [readiness.readinessExpiresAt, record.expiresAt],
+    [readiness.installDigest, record.installDigest],
+    [readiness.installDigest, install.installDigest],
+    [readiness.probePostureDigest, record.probePostureDigest],
+    [readiness.probePostureDigest, probes.postureDigest],
+    [readiness.paymentRequirementsDigest, record.paymentRequirementsDigest],
+    [readiness.paymentRequirementsDigest, install.paymentRequirementsDigest],
+    [readiness.selectedPaymentRequirementDigest, record.selectedPaymentRequirementDigest],
+    [readiness.selectedPaymentRequirementDigest, install.selectedPaymentRequirementDigest],
+    [readiness.gatewayId, record.gatewayId],
+    [readiness.gatewayRegistrationRef, record.gatewayRegistrationRef],
+    [readiness.gatewayCredentialRefDigest, record.gatewayCredentialRefDigest],
+    [readiness.gatewayCredentialCustodyStatus, record.gatewayCredentialCustodyStatus],
+    [readiness.gatewayCustodyProofPacketRef, record.gatewayCustodyProofPacketRef],
+    [readiness.gatewayCustodyProofPacketDigest, record.gatewayCustodyProofPacketDigest],
+    [readiness.gatewayCustodyClaimLevel, record.gatewayCustodyClaimLevel],
+    [readiness.gatewayCustodyExternalVerificationStatus, record.gatewayCustodyExternalVerificationStatus],
+    [readiness.gatewayCustodyProofExpiresAt, record.gatewayCustodyProofExpiresAt],
+    [readiness.gatewayPosture, record.gatewayPosture],
+    [readiness.policyVersionRef, record.policyVersionRef],
+    [readiness.policyVersionDigest, record.policyVersionDigest],
+    [readiness.gatewayRegistryEntryRef, record.gatewayRegistryEntryRef],
+    [readiness.operatingEnvelopeRef, record.operatingEnvelopeRef],
+    [readiness.rawCredentialRefsIncluded, false],
+  ];
+  if (expectedPairs.some(([actual, expected]) => actual !== expected)) {
+    reasonCodes.add("cli_gateway_posture_unknown");
   }
 }

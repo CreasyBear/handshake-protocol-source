@@ -38,7 +38,7 @@ describe("package surface", () => {
     expect(pkg.description).toContain("Protected action infrastructure for automated decision making");
     expect(pkg.description).not.toMatch(/engineering agents/i);
     expect(pkg.keywords).toEqual(expect.arrayContaining(["protected-actions", "automated-decision-making"]));
-    expect(pkg.mcpName).toBe("io.github.joelchan/handshake-protocol-kernel");
+    expect(pkg.mcpName).toBe("io.github.CreasyBear/handshake-protocol-kernel");
     expect(pkg.types).toBe("./dist/index.d.ts");
     expect(pkg.bin).toEqual({
       handshake: "bin/handshake",
@@ -54,6 +54,11 @@ describe("package surface", () => {
       types: "./dist/conformance/index.d.ts",
       import: "./dist/conformance/index.mjs",
       default: "./dist/conformance/index.mjs",
+    });
+    expect(pkg.exports["./adapter-sdk"]).toEqual({
+      types: "./dist/adapter-sdk/index.d.ts",
+      import: "./dist/adapter-sdk/index.mjs",
+      default: "./dist/adapter-sdk/index.mjs",
     });
     expect(pkg.exports["./runtime"]).toEqual({
       types: "./dist/runtime/index.d.ts",
@@ -75,6 +80,11 @@ describe("package surface", () => {
       import: "./dist/mcp/index.mjs",
       default: "./dist/mcp/index.mjs",
     });
+    expect(pkg.exports["./x402-protected-tool"]).toEqual({
+      types: "./dist/x402-protected-tool/index.d.ts",
+      import: "./dist/x402-protected-tool/index.mjs",
+      default: "./dist/x402-protected-tool/index.mjs",
+    });
     expect(pkg.exports["./experimental"]).toEqual({
       types: "./dist/experimental.d.ts",
       import: "./dist/experimental.mjs",
@@ -84,7 +94,7 @@ describe("package surface", () => {
   });
 
   it("keeps packable files to runtime artifacts, metadata, README, and license notices", () => {
-    expect(pkg.files).toEqual(["bin", "dist", "server.json", "README.md", "LICENSE", "NOTICE"]);
+    expect(pkg.files).toEqual(["bin", "dist", "server.json", "README.md", "CHANGELOG.md", "LICENSE", "NOTICE"]);
     expect(pkg.files).not.toContain("src");
     expect(pkg.files).not.toContain("test");
     expect(pkg.files).not.toContain("examples");
@@ -102,8 +112,10 @@ describe("package surface", () => {
     expect(pkg.scripts["build:types"]).toBe("tsc -p tsconfig.build.json");
     expect(pkg.scripts["build:bundles"]).toBe("node scripts/build-package-bundles.mjs");
     expect(pkg.scripts["demo:self-hosted"]).toBe("bun run ./examples/self-hosted-activation/run.ts");
+    expect(pkg.scripts["demo:adapter-sdk"]).toBe("bun run ./examples/external-adapter-sdk/run.ts");
+    expect(pkg.scripts["demo:x402-tool-profiles"]).toBe("bun run ./examples/x402-protected-tool-profiles/run.ts");
     expect(pkg.scripts["pack:check"]).toBe(
-      "npm run build && node scripts/check-package-surface.mjs && node scripts/check-published-entrypoints.mjs && node scripts/check-release-proof.mjs",
+      "npm run build && node scripts/check-package-surface.mjs && node scripts/check-published-entrypoints.mjs && node scripts/check-clean-installed-activation.mjs && node scripts/check-release-proof.mjs",
     );
     expect(pkg.scripts["check:repo"]).toContain("npm run pack:check");
   });

@@ -7,6 +7,7 @@ import type { CandidateAction, IntentCompilationRecord } from "../intent-compila
 import { ProposeActionContractInputSchema, type ProposeActionContractInput } from "./types";
 import type { ProtocolRecorder } from "../../events/records";
 import { evaluateGatewayCredentialBindings } from "../credential-custody";
+import { evaluateDelegatedAuthorityBindings } from "../delegated-authority";
 import { loadRecoveryActionLinkage } from "../recovery";
 import type { RuntimeExecutionRecord } from "../runtime-evidence";
 import {
@@ -59,6 +60,7 @@ export async function proposeActionContract(
   await assertActionContractProposalContext(context);
   const buildPlan = await buildActionContractPlan(input, context);
   await assertGatewayCredentialBindings(store, buildPlan.contract);
+  await assertDelegatedAuthorityBindings(store, buildPlan.contract);
   const commitPlan = await buildActionContractCommitPlan(buildPlan);
   await commitActionContractPlan(recorder, commitPlan);
   return buildPlan.contract;
@@ -66,6 +68,13 @@ export async function proposeActionContract(
 
 async function assertGatewayCredentialBindings(store: ProtocolStore, contract: ActionContract): Promise<void> {
   const evaluation = await evaluateGatewayCredentialBindings(store, contract, contract.issuedAt);
+  if (!evaluation.ok) {
+    throw new HandshakeProtocolError(evaluation.reasonCode, evaluation.reason, 409);
+  }
+}
+
+async function assertDelegatedAuthorityBindings(store: ProtocolStore, contract: ActionContract): Promise<void> {
+  const evaluation = await evaluateDelegatedAuthorityBindings(store, contract, contract.issuedAt);
   if (!evaluation.ok) {
     throw new HandshakeProtocolError(evaluation.reasonCode, evaluation.reason, 409);
   }
@@ -140,6 +149,7 @@ async function assertActionContractProposalContext(context: ActionContractPropos
     parameters: candidate.parameters,
     secretRefs: candidate.secretRefs,
     gatewayCredentialRefs: candidate.gatewayCredentialRefs,
+    delegatedAuthorityRefs: candidate.delegatedAuthorityRefs,
   });
   if (recomputedParamsDigest !== candidate.paramsDigest) {
     throw new HandshakeProtocolError(

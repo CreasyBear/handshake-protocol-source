@@ -32,6 +32,13 @@ The gateway, not the runtime, is the enforcement point. The store is durable
 reconstruction truth. Runtime evidence and review artifacts are inputs, not
 authority.
 
+Product language should describe the buyer-facing outcome as a cleared
+protected-action event: one terminal Handshake event with reconstructable
+evidence. Architecture language should keep the split strict: the protocol
+kernel records authority-bearing transitions, while each product surface exposes
+proposal/evidence/readback without creating authority. An AuthorityCertificate is
+verifiable terminal evidence for one event. The certificate is terminal evidence, not permission, identity, settlement, hosted trust, or reusable auth.
+
 ## Local Establishment Boundary
 
 The current foundation is locally established for source and test
@@ -40,8 +47,9 @@ reference gateways, `x402_payment.exact` as one proof profile, local x402 paymen
 D1/HTTP establishment, local hostile x402 bypass/custody probe records,
 package-install supply-chain parameter binding, provider-neutral credential
 custody records, idempotency recovery projection, non-authority representation
-schemas, codemode/runtime generated-execution proposal paths, and public runtime
-ingress surfaces for local x402 payment and package-install dispatch boundaries.
+schemas, codemode/runtime generated-execution proposal paths, auth.md protected
+API call provenance/custody evidence, and public runtime ingress surfaces for
+local x402 payment and package-install dispatch boundaries.
 
 It is not an external establishment claim. Live provider custody, hosted
 operation, broad MCP/CLI/browser/shell/network runtime ingestion, independent
@@ -53,6 +61,13 @@ hosted verifier projections over configured local trust material are part of the
 source foundation. Current x402 spend enforcement is per-call only; aggregate
 payment-budget management is intentionally outside the current remit, and local
 spend-window fields are non-enforced metadata.
+
+Local/source-owned surfaces are validated for the protocol kernel and product
+surface boundary. Public npm `handshake-protocol-kernel@0.2.7`
+availability is verified by trusted-publish workflow, registry readback, npm
+signature metadata, provenance publication, and clean installed-artifact smoke;
+public npm availability does not create authority. MCP Registry discoverability
+remains a proof gap.
 
 ## Source Ownership
 

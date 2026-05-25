@@ -37,6 +37,7 @@ export async function createToolCallDraft(
       parameters: input.parameters,
       secretRefs: input.secretRefs,
       gatewayCredentialRefs: input.gatewayCredentialRefs,
+      delegatedAuthorityRefs: input.delegatedAuthorityRefs,
     }),
   };
   const draft = await buildToolCallDraft(context);
@@ -88,6 +89,7 @@ async function buildToolCallDraft(context: ToolCallDraftContext): Promise<ToolCa
     nonSecretParamsSummary: input.nonSecretParamsSummary,
     secretRefs: input.secretRefs,
     gatewayCredentialRefs: input.gatewayCredentialRefs,
+    delegatedAuthorityRefs: input.delegatedAuthorityRefs,
     paramsDigest,
     finalizedAt: null,
     expiresAt: input.expiresAt,
@@ -114,6 +116,7 @@ function toolCallDraftDigestMaterial(context: ToolCallDraftContext, toolCallDraf
     paramsDigest,
     nonSecretParamsSummary: input.nonSecretParamsSummary,
     gatewayCredentialRefs: input.gatewayCredentialRefs,
+    delegatedAuthorityRefs: input.delegatedAuthorityRefs,
     invalidReasonCodes: input.invalidReasonCodes,
     evidenceRefs: input.evidenceRefs,
     finalizedAt: null,
@@ -151,7 +154,13 @@ async function buildTransitionedToolCallDraft(
   const nonSecretParamsSummary = input.nonSecretParamsSummary ?? current.nonSecretParamsSummary;
   const secretRefs = input.secretRefs ?? current.secretRefs;
   const gatewayCredentialRefs = input.gatewayCredentialRefs ?? current.gatewayCredentialRefs;
-  const paramsDigest = await protectedActionParamsDigest({ parameters, secretRefs, gatewayCredentialRefs });
+  const delegatedAuthorityRefs = input.delegatedAuthorityRefs ?? current.delegatedAuthorityRefs;
+  const paramsDigest = await protectedActionParamsDigest({
+    parameters,
+    secretRefs,
+    gatewayCredentialRefs,
+    delegatedAuthorityRefs,
+  });
   const finalizedAt =
     input.nextDraftState === "finalized" ? (input.finalizedAt ?? nowIso()) : (input.finalizedAt ?? current.finalizedAt);
   const next = ToolCallDraftSchema.parse({
@@ -161,6 +170,7 @@ async function buildTransitionedToolCallDraft(
     nonSecretParamsSummary,
     secretRefs,
     gatewayCredentialRefs,
+    delegatedAuthorityRefs,
     paramsDigest,
     finalizedAt,
     expiresAt: input.expiresAt ?? current.expiresAt,
@@ -183,6 +193,7 @@ async function buildTransitionedToolCallDraft(
     paramsDigest: next.paramsDigest,
     nonSecretParamsSummary: next.nonSecretParamsSummary,
     gatewayCredentialRefs: next.gatewayCredentialRefs,
+    delegatedAuthorityRefs: next.delegatedAuthorityRefs,
     invalidReasonCodes: next.invalidReasonCodes,
     evidenceRefs: next.evidenceRefs,
     finalizedAt: next.finalizedAt,

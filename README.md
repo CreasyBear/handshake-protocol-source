@@ -1,306 +1,133 @@
 # Handshake Protocol Kernel
 
-Handshake is protected action infrastructure for automated decision making.
-The category is protected actions for automated decision making; engineering-agent workflows are an adoption and generated-execution stress context, not the product boundary.
+Handshake is protected action infrastructure for automated decision making. This
+package is the installable protocol kernel, CLI, SDK, and local MCP
+proposal/evidence server for reducing one consequential automated action to an
+exact contract before mutation. Vague intent and generated code are not authority. A protected path requires an
+exact action contract, policy decision, one-use greenlight or refusal, gateway
+check before mutation, and receipt, refusal, replay refusal, proof gap, or
+optional terminal AuthorityCertificate. Certificate is terminal evidence, not
+permission.
+protected actions for automated decision making.
+certificate is terminal evidence, not permission.
 
-Last canonical audit: 2026-05-24.
+Core terms: a `cleared protected-action event` is one terminal event with
+reconstructable evidence; the `protocol kernel` is the state machine and schema
+set; a `product surface` is CLI, MCP, SDK, docs, demo, or service readback that
+exposes proposal/evidence without creating authority. Public npm availability
+does not create authority. MCP Registry discoverability remains a proof gap
+until registry acceptance and lookup are verified.
 
-This checkout is the TypeScript protocol kernel for protected action control:
+Package: `handshake-protocol-kernel@0.2.7`. MCP name:
+`io.github.CreasyBear/handshake-protocol-kernel`. Runtime: Node.js `>=20`.
+License: Apache-2.0. Public repository form: package artifact repository, not
+source mirror. The public repo contains package artifacts and trusted-publish
+metadata only; it must not contain private source, tests, scripts, examples,
+docs, planning scratch, local artifacts, `node_modules`, or credential material.
+Public repository form: package artifact repository, not source mirror.
 
-```text
-vague principal intent
--> runtime execution evidence
--> generated execution graph
--> intent compilation record
--> candidate action
--> exact action contract
--> policy decision
--> one-use greenlight or refusal
--> gateway check before mutation
--> receipt, refusal, or proof gap
--> optional terminal AuthorityCertificate
-```
+`npm install handshake-protocol-kernel`. For one-shot checks:
+`npm exec --package handshake-protocol-kernel -- handshake schema` and
+`npm exec --package handshake-protocol-kernel -- handshake conformance
+x402-payment`. Binaries: `handshake` is the operator CLI; `handshake-mcp` is the
+local stdio MCP proposal/evidence server; `handshake-protocol-kernel` aliases
+the MCP server for package-name execution.
 
-The kernel does not claim hosted operation, provider-side enforcement, broad agent governance, or downstream business success. A path is protected only when the gateway owns the mutation credential and verifies the exact greenlight before mutation.
-
-Current local foundation status:
-
-- Source and tests cover the protected-action kernel chain, derived lifecycle evidence, idempotency ledger, redacted evidence projections including agent transaction envelopes, terminal AuthorityCertificate minting and offline pinned-key verification.
-- Hosted/read surfaces are non-authority: non-mutating hosted verifier metadata/key-set/JWKS/status/verify routes over configured local trust material, deployment-mode hosted admission config with read-entitlement split, raw-read posture gates, non-secret readiness reporting.
-- Adapter proof coverage includes package-install material adapter pack evidence/report projection with exact observed-parameter gate binding, a package-manager local host-specific bypass manifest/proof-packet/report for one named package-install wrapper and named raw sibling routes, and the narrow official x402 exact buyer-side proof path through D1/HTTP durable evidence.
-- x402 coverage is one official buyer-side `exact` per-call path with local/reference sandbox challenge/retry evidence and gateway-held `PaymentPayload` / `PAYMENT-SIGNATURE` creation after `VerifiedGatewayCheck`.
-- Package install is the first promoted non-payment adapter pack after x402 exact per-call, bounded to material evidence/proof-gap reporting and gateway observed-parameter validation.
-- Runtime ingress, MCP, and hosted verifier/admission/readiness routes are observer/compiler/proposal/evidence/read surfaces; public runtime ingress for local x402 payment and package-install dispatch boundaries does not create authority.
-- The local reference stack also includes a source-owned local MCP stdio proposal/evidence process proof and publishable Node-bundled CLI/MCP entrypoints with MCP Registry metadata.
-
-Current non-claims:
-
-- No adapter family defines the protocol.
-- This is local kernel foundation, not broad x402 compatibility, not live provider custody, hosted mutation authority, production hosted readiness, generic MCP/runtime control, host-wide containment, package-manager ecosystem protection, package safety proof, npm audit replacement, Bun provenance verification, external package-material attestation, cross-org AuthorityCertificate trust, remote JWKS trust fetching, live revocation authority, facilitator operation, seller middleware, unsupported x402 schemes, marketplace/certification, compliance-grade audit, or aggregate payment-budget management.
-- Current x402 spend enforcement is per-call only, and aggregate payment-budget management is intentionally outside the current remit.
-
-## Repo Truth
-
-- `AGENTS.md`: system doctrine and invariant language.
-- `QUALITY.md`: TypeScript quality, naming, and verification bar.
-- `STRUCTURE.md`: source/test/docs ownership map.
-- `docs/internal/decisions.md`: durable product and architecture decisions.
-- `docs/internal/protocol-definition.md`: canonical protocol definition and authority rule.
-- `docs/internal/protocol-kernel-architecture.md`: protocol kernel architecture and schema map.
-- `docs/internal/protocol-layman.md`: plain-English translation of the protocol.
-- `docs/internal/protocol-notes.md`: compact protocol notes for implementers.
-
-Files under `.planning/` are scratch. They are not repo truth.
-
-Each first-level `src/*` lane also has a `LANE.md` manifest. Those manifests are local ownership contracts; they do not supersede the canonical documents above.
-
-Operational enforcement surfaces:
-
-- `package.json`: canonical local command contract.
-- `.github/workflows/check.yml`: CI gate; it must run `npm run check:repo`.
-- `test/architecture/*`: repo-shape, naming, import, vocabulary, and export guards.
-- `src/*/LANE.md`: source-lane ownership contracts.
-
-## System Design Posture
-
-This repo treats platform aesthetics as system design clarity:
-
-- use case: convert automated-decision execution, including generated engineering-agent execution, into exact protected-action authority decisions;
-- constraints: generated code may branch, retry, overreach, or hide consequence inside tool calls;
-- high-level design: runtime evidence -> protocol kernel -> durable store -> HTTP transport -> gateway adapters;
-- tradeoff: consistency beats availability for authority-bearing transitions;
-- failure posture: refusals, isolation, replay refusal, and proof gaps are product outcomes, not log noise.
-
-## Source Map
-
-```text
-src/
-  protocol/
-    kernel.ts
-    public/          public schemas, inputs, and transition guard exports
-    foundation/      canonicalization, ids, errors, reason codes, core schemas
-    events/          stream events, chains, and record commits
-    context/         transition request context records
-    navigation/      protocol transition metadata
-    evidence-projections/
-                     redacted diagnostic projections
-    store/           protocol store port
-    areas/           owned protocol primitives
-  install/           protected-action install proposal compiler
-  http/
-    app.ts
-    app-options.ts
-    admission/       caller custody and hosted admission seams
-    routes/          route metadata, dispatch, scope, response schemas
-    handlers/        evidence and internal read handlers
-    errors/          HTTP transition error envelopes and codes
-    openapi/         OpenAPI projection
-    navigation/      HTTP route navigation metadata
-    store/           store and kernel resolution
-  runtime/           generated-execution proposal helpers
-  adapters/          reference gateway fixtures
-  conformance/       reference conformance checks
-  storage/           D1, memory, KV, and store plumbing
-  sdk/               typed HTTP client
-  cli/               local evidence and command-manifest wrappers
-  mcp/               model-facing proposal/evidence schema and resource mappings
-  surfaces/          non-authority surface boundary manifests and shared outcomes
-  index.ts           curated package export surface
-  experimental.ts    explicit experimental reference gateway surface
-  worker.ts          Cloudflare Worker entrypoint
-```
-
-Other repo surfaces:
-
-```text
-migrations/          D1 schema for protocol storage
-wrangler.toml        Worker binding and deployment config
-.github/             CI bound to npm run check:repo
-```
-
-```text
-test/
-  architecture/      repo shape, naming, exports, vocabulary
-  protocol/          primitive and state-machine invariants
-  conformance/       reference conformance checks
-  http/              transport and D1-over-HTTP behavior
-  runtime/           generated-execution proposal helpers
-  mcp/               model-facing proposal/evidence surface contracts
-  adapters/          reference gateway fixtures
-  integration/       end-to-end protected action paths
-  support/           test fixtures and harnesses
-```
-
-## Commands
-
-Prerequisites: Bun `1.3.9` for local development/tests and Node.js for the packaged CLI/MCP entrypoints.
-
-First run:
+Installed x402 first-use ladder:
 
 ```bash
-bun install --frozen-lockfile
-npm run check:repo
+handshake init --cwd .
+handshake doctor --cwd .
+handshake install x402-payment ./install.x402-payment.json --record-local
+handshake probes x402-payment ./x402-posture.json --record-local
+handshake register x402-gateway-readiness ./x402-gateway-readiness.json --record-local
+handshake install health --cwd .
+handshake-mcp
 ```
 
-Self-hosted activation packet:
+These commands do not create policy decisions, greenlights, gateway checks,
+payment material, mutations, receipts, or certificates. They establish local
+proposal readiness only.
 
-```bash
-npm run demo:self-hosted
-```
-
-This writes the local activation packet to:
-
-```text
-examples/self-hosted-activation/output/latest.md
-examples/self-hosted-activation/output/latest.json
-```
-
-Inspect the packet for the x402 exact proposal path, policy decision, gateway
-check, replay refusal, proof-gap posture, CLI evidence readbacks, local terminal
-certificate verification, MCP reference transcript, and real local MCP stdio
-process proof. This is a self-hosted local packet only: not hosted operation,
-not provider/customer custody, not broad MCP/browser/shell/network/package
-manager protection, not aggregate payment-budget management, not WorkOS/auth.md
-attestation, not cross-org certificate trust, and not a clearing-house claim.
-
-Component x402 protected-action walkthrough:
-
-```bash
-npm run demo:aps
-```
-
-This writes the buyer-readable local x402 protected-spend report to:
-
-```text
-examples/x402-protected-spend/output/latest.md
-examples/x402-protected-spend/output/latest.json
-```
-
-Inspect the report for the local 402 challenge, exact runtime proposal, action
-contract, policy decision, gateway check, post-gate signed retry evidence,
-replay refusal, proof-gap posture, redacted evidence refs, and local terminal
-certificate verification. This is local/reference evidence only: not hosted
-operation, not broad x402 compatibility, not provider custody, not aggregate
-payment-budget management, not cross-org trust, and not a clearing-house claim.
-
-Role-scoped SDK activation imports:
+MCP: `server.json` declares the npm/stdio server. Host args:
+`["-y", "handshake-protocol-kernel"]`. The server exposes
+`handshake.actions.x402_payment.propose` plus read-only metadata, challenge,
+health, contract, receipt timeline, idempotency, and certificate-reference
+resources. MCP is proposal/evidence only; it does not evaluate policy, create
+greenlights, perform gateway checks, invoke signers, mutate, export receipts,
+provide hosted operation, or claim broad MCP protection.
 
 ```ts
-import { EvidenceClient, RuntimeClient } from "handshake-protocol-kernel/sdk/role-clients";
+import { HandshakeClient, verifiedGatewayCheckFromResult } from "handshake-protocol-kernel";
+import {
+  ControlPlaneClient,
+  EvidenceClient,
+  GatewayClient,
+  InstallClient,
+  PolicyClient,
+  RuntimeClient,
+} from "handshake-protocol-kernel/sdk/role-clients";
 ```
 
-Use this subpath for runtime proposal and redacted evidence readback. It is not
-an install client, gateway client, signer surface, policy evaluator, receipt
-exporter, or certificate minter. The package root still exposes the lower-level
-`HandshakeClient` for route parity and tests, but first-slice activation should
-not teach all-role or fallback-token usage.
+Use this subpath for install setup, delegated-authority lifecycle management,
+exact policy evaluation, runtime proposal, gateway-custody transition transport,
+and redacted evidence readback. The package root still exposes the lower-level
+`HandshakeClient`, but first-slice activation should teach role-scoped clients
+first. `InstallClient` performs one server-side setup commit, not hosted
+installation authority. `PolicyClient.evaluatePolicy()` evaluates one exact
+action contract; it cannot perform the gateway check or mutate.
 
-Packaged CLI and MCP entrypoints:
+Use `adapter-sdk` for third-party protected-action adapter packs and
+install-proposal shape review. It is definition-only: not an install client, not
+a gateway client, not a policy evaluator, not certification, and not a mutation
+runner.
 
-```bash
-npm run build
-node bin/handshake schema
-node bin/handshake-mcp
-```
+Current wedge: the first official wedge is a narrow official x402 exact buyer-side proof path:
+one official buyer-side `exact` per-call path for `x402_payment.exact`. Gateway
+payment material stays behind `VerifiedGatewayCheck`; consumed greenlights
+produce replay refusal; unknown downstream finality is a proof gap.
 
-After package installation, the human/operator CLI command is `handshake`.
-The local stdio MCP server command is `handshake-mcp`; the package-name bin
-`handshake-protocol-kernel` also points to the MCP server so MCP registry
-package installs have a server-shaped default executable. Both entrypoints run
-from bundled Node artifacts under `dist/`; they are not source-only Bun
-shortcuts.
+Source-owned coverage also includes package-install material adapter pack
+evidence/report projection, the first promoted non-payment adapter pack after
+x402 exact per-call, a package-manager local host-specific bypass
+manifest/proof-packet/report, public runtime ingress for local x402 payment and
+package-install dispatch boundaries, and source-owned local MCP stdio
+proposal/evidence process proof. Source-owned demos and schemas are the source
+of sample readback: `npm run demo:self-hosted` writes
+`examples/self-hosted-activation/output/latest.md` and is not hosted operation;
+it uses real local MCP stdio proposal/evidence proof;
+`npm run demo:aps` writes `examples/x402-protected-spend/output/latest.md` and
+is not hosted operation, not broad x402 compatibility; `npm run
+demo:adapter-sdk` writes `examples/external-adapter-sdk/output/latest.md` and is
+not policy evaluation, not gateway check, not mutation.
+source-owned demos and schemas drive sample readback.
+`npm run demo:adapter-sdk`.
 
-Public npm package contents are intentionally slim. The package includes only
-`bin/`, bundled/generated `dist/` artifacts, `server.json`, `README.md`,
-`LICENSE`, and `NOTICE`. It does not ship `src/`, tests, examples, scripts,
-`.planning/`, repo-internal docs, or local quality/structure manifests. The
-repo remains the source-of-truth workbench; the npm package is the installable
-runtime, CLI, MCP metadata, and typed import surface.
+No adapter family defines the protocol. This package is not broad x402
+compatibility, not live provider custody, hosted mutation authority, production
+hosted readiness, generic MCP/runtime control, host-wide containment,
+package-manager ecosystem protection, package safety proof, npm audit
+replacement, Bun provenance verification, external package-material attestation,
+cross-org AuthorityCertificate trust, remote JWKS trust fetching, live
+revocation authority, facilitator operation, seller middleware, unsupported x402
+schemes, marketplace certification, or compliance-grade audit. Aggregate
+payment-budget management is intentionally outside the current remit.
 
-The package is licensed under Apache-2.0. The license covers the distributed
-software package; it does not create any hosted enforcement, provider custody,
-marketplace certification, trust service, or trademark grant beyond the
-license terms.
+Trusted Publishing: MCP Registry discoverability is now the remaining distribution launch blocker.
+`0.2.7` npm availability is verified by registry readback, npm signature
+metadata, GitHub Actions provenance publication, and clean installed-artifact
+smoke. Public npm availability still does not create authority.
 
-MCP Registry publication metadata:
+Trusted Publishing workflow input: `expected_version = 0.2.7`. Release proof
+states: `ready_to_publish` means package shape and local gates passed;
+`actually_published` means npm publish and installed-artifact readback passed
+for the exact version; `registry_discoverable` means MCP Registry acceptance and
+lookup have been verified. MCP Registry discoverability is separate from npm
+publication.
+MCP Registry discoverability is separate from npm publication.
 
-```text
-server.json
-package.json#mcpName
-```
-
-`server.json` describes one npm/stdio MCP package named
-`io.github.joelchan/handshake-protocol-kernel` and must stay synchronized with
-`package.json#mcpName`, `name`, and `version`. Registry publication still
-requires npm authentication and MCP Registry namespace authentication. The MCP
-server remains proposal/evidence only: not policy, not greenlight, not gateway
-check, not mutation, not receipt export, not authority-certificate minting, not
-hosted operation, and not provider custody.
-
-Public release proof states are source-owned and separate:
-
-- `ready_to_publish`: local pack shape, metadata sync, CLI/MCP smoke, account
-  namespace posture, provenance posture, license posture, package-surface
-  allowlist, and authority-boundary checks have evidence.
-- `actually_published`: npm publish has occurred for the exact package/version
-  and a clean installed-artifact smoke has passed.
-- `registry_discoverable`: MCP Registry metadata has been accepted and
-  discoverability has been verified.
-
-These states are tracked by `PackageReleaseProof`. Publication distributes the
-Apache-2.0 package artifacts, proposal/evidence/read surfaces, and metadata
-only; it does not create authority, policy decisions, greenlights, gateway
-checks, mutations, custody, hosted operation, marketplace certification,
-settlement, payment management, trust, or host-wide enforcement. Missing
-account, 2FA, provenance, license, package-surface, publish, or registry
-evidence is a proof gap, not release success.
-
-Model-facing MCP reference transcript:
-
-```bash
-npm run demo:mcp-transcript
-```
-
-This writes the source-owned MCP proposal/evidence transcript to:
-
-```text
-examples/mcp-reference-transcript/output/latest.md
-examples/mcp-reference-transcript/output/latest.json
-```
-
-Inspect the transcript for metadata read, valid proposal, evidence readback,
-stale metadata, tools-list change, install-not-ready, gateway-offline,
-amount/params mismatch, replay refusal, raw sibling-shaped input, and proof-gap
-cases. The self-hosted packet also starts the local stdio MCP process and exercises it
-through the official MCP client SDK. MCP remains proposal/evidence posture only:
-not policy, not greenlight, not gateway check, not mutation, not hosted
-operation, and not provider custody.
-
-| Command                       | Purpose                                                                             |
-| ----------------------------- | ----------------------------------------------------------------------------------- |
-| `npm run check:repo`          | Full local and CI gate: types, lint, format, Bun tests, pack check, whitespace diff |
-| `npm run demo:self-hosted`    | Self-hosted activation packet                                                       |
-| `npm run demo:aps`            | Local x402 protected-spend authority proof report                                   |
-| `npm run demo:mcp-transcript` | Source-owned MCP x402 proposal/evidence transcript                                  |
-| `npm run check:types`         | CI-stable no-pretty TypeScript gate                                                 |
-| `npm run typecheck`           | Interactive TypeScript alias                                                        |
-| `npm run lint`                | ESLint over `src` and `test` with zero warnings                                     |
-| `npm run format:check`        | Prettier check                                                                      |
-| `npm run test`                | All Bun tests                                                                       |
-| `npm run build`               | Declaration build plus Node bundles for public imports and CLI/MCP bins             |
-| `npm run pack:check`          | Dry-run package, package surface, and published entrypoint smoke check              |
-| `npm run dev`                 | Wrangler Worker dev after local D1/KV bindings are configured                       |
-
-Focused gates:
-
-```bash
-npm run quality:architecture
-npm run quality:storage
-npm run quality:claims
-```
-
-CI runs `npm run check:repo` from `.github/workflows/check.yml`.
-
-## Working Rule
-
-Do not broaden claims when moving files. Renames are allowed when they improve ownership clarity, but they must preserve protocol behavior, root export curation, and existing invariant tests.
+Reason-code runbook: stale metadata or readiness -> reload evidence. Unsafe input, amount overrun,
+dynamic argument, changed observed parameters, or consumed greenlight replay ->
+create new contract. Raw sibling path reachable -> stop and record bypass proof.
+Credential or delegated authority isolated -> keep future attempts blocked.
+Downstream finality unknown -> proof gap, not success.

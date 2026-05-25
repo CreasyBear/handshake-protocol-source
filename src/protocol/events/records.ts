@@ -21,6 +21,7 @@ import { getObjectId } from "../areas/object-registry";
 const MAX_STREAM_COMMIT_RETRIES = 3;
 
 export type CommitRecordsOptions = {
+  recordConflictMode?: "replace" | "absent_or_same";
   greenlightIssuanceClaims?: GreenlightIssuanceClaim[];
   idempotencyLedgerReservationEntries?: IdempotencyLedgerIndexEntry[];
   idempotencyLedgerIndexEntries?: IdempotencyLedgerIndexEntry[];
@@ -87,6 +88,13 @@ export class ProtocolRecorder {
         409,
       );
     }
+    if (result.status === "record_digest_conflict") {
+      throw new HandshakeProtocolError(
+        "bootstrap_record_digest_conflict",
+        "Protocol commit cannot replace an existing record with a different canonical digest.",
+        409,
+      );
+    }
     throw new HandshakeProtocolError("ambiguous_commit", "Protocol commit ended in an unknown state.", 500);
   }
 
@@ -94,7 +102,11 @@ export class ProtocolRecorder {
     protocolRecords: ProtocolRecord[],
     eventDescriptors: EventDescriptor[],
     options: CommitRecordsOptions = {},
-  ): Promise<{ status: "committed"; events: ContractStreamEvent[] } | { status: "idempotency_ledger_conflict" }> {
+  ): Promise<
+    | { status: "committed"; events: ContractStreamEvent[] }
+    | { status: "idempotency_ledger_conflict" }
+    | { status: "record_digest_conflict" }
+  > {
     const { records: protocolRecordsWithContext, eventDescriptors: eventDescriptorsWithContext } =
       await this.withTransitionRequestContext(protocolRecords, eventDescriptors);
     const records = await Promise.all(protocolRecordsWithContext.map((record) => this.buildRecord(record)));
@@ -104,6 +116,9 @@ export class ProtocolRecorder {
       if (commitResult === "committed") return { status: "committed", events };
       if (commitResult === "idempotency_ledger_conflict") {
         return { status: "idempotency_ledger_conflict" };
+      }
+      if (commitResult === "record_digest_conflict") {
+        return { status: "record_digest_conflict" };
       }
       if (commitResult === "greenlight_issuance_conflict") {
         throw new HandshakeProtocolError(

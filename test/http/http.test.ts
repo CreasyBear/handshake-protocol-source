@@ -19,6 +19,7 @@ import {
 } from "../../src/protocol/public/schemas";
 import { HandshakeClient } from "../../src/sdk/client";
 import type { HandshakeClientError } from "../../src/sdk/client";
+import { InstallClient, RuntimeClient } from "../../src/sdk/surface-clients";
 import { InMemoryProtocolStore } from "../../src/storage/memory";
 import type {
   AuthorityCertificateSignerInput,
@@ -30,6 +31,7 @@ import {
   makeKernelFixture,
   makePackageInstallCandidate,
   proposalInputForCompilation,
+  registerFixtureObjects,
   recordSafeBypassProbes,
   recordUnknownDownstreamProofGap,
 } from "../support/fixtures";
@@ -45,6 +47,7 @@ import {
   runtimeExecutionBody,
   staticHostedVerifier,
 } from "../support/http-protocol-fixtures";
+import { packageInstallRuntimeConfig } from "../support/package-install-flow";
 
 const ED25519_ALGORITHM = { name: "Ed25519" } as Algorithm;
 
@@ -332,6 +335,133 @@ describe("Hono protocol surface", () => {
     expect(await response.json()).toMatchObject({
       error: { code: "durable_store_unavailable" },
     });
+  });
+
+  it("proposes runtime ingress action contracts through the role-scoped HTTP surface without authority", async () => {
+    const fixture = makeKernelFixture();
+    await registerFixtureObjects(fixture);
+    const app = createApp({ store: fixture.store, callerAuthTokens: TEST_CALLER_AUTH_TOKENS });
+    const fetchImpl = async (input: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]) => {
+      const url = new URL(String(input), "http://handshake.test");
+      return app.request(`${url.pathname}${url.search}`, init);
+    };
+    const runtimeClient = new RuntimeClient(
+      "http://handshake.test",
+      {
+        roleCredential: TEST_CALLER_AUTH_TOKENS.runtime_evidence,
+        requestIdentityFactory: () => "runtime-ingress-http-request",
+      },
+      fetchImpl,
+    );
+
+    const result = await runtimeClient.proposeRuntimeIngressActionContracts({
+      tenantId: "tenant_demo",
+      organizationId: "org_demo",
+      config: { packageInstall: packageInstallRuntimeConfig(fixture) },
+      dispatchBlock: {
+        principalIntentRef: "intent:http-runtime-ingress-install-hono",
+        generatedCodeOrSpecRef: "runtime:http-dispatch-block-supported",
+        dispatchBoundaryRef: "dispatch-boundary:http-runtime-tool-dispatch",
+        dispatches: [
+          {
+            dispatchKind: "wrapped_package_install",
+            dispatchRef: "dispatch:http-package-install:1",
+            package: "hono",
+            versionRange: "^4.12.19",
+          },
+        ],
+      },
+    });
+
+    expect(result.outcome).toBe("action_contracts_proposed");
+    expect(result.responsePosture).toMatchObject({
+      authorityCreated: false,
+      greenlightCreated: false,
+      gatewayCheckPerformed: false,
+      mutationAttempted: false,
+      receiptExportCreated: false,
+      authorityCertificateMinted: false,
+      nextAction: "read_evidence",
+    });
+    expect(result.generatedExecutionGraph.coverageStatus).toBe("fully_covered_no_unsupported_nodes");
+    const proposal = result.proposals[0];
+    if (!proposal || proposal.outcome !== "action_contract_proposed") throw new Error("expected contract proposal");
+    expect(proposal.actionContract.resourceRef).toBe("npm:hono");
+    expect(await fixture.store.listRecordsByType("runtime_execution")).toHaveLength(1);
+    expect(await fixture.store.listRecordsByType("generated_execution_graph")).toHaveLength(1);
+    expect(await fixture.store.listRecordsByType("tool_call_draft")).toHaveLength(1);
+    expect(await fixture.store.listRecordsByType("intent_compilation")).toHaveLength(1);
+    expect(await fixture.store.listRecordsByType("action_contract")).toHaveLength(1);
+    expect(await fixture.store.listRecordsByType("policy_decision")).toHaveLength(0);
+    expect(await fixture.store.listRecordsByType("greenlight")).toHaveLength(0);
+    expect(await fixture.store.listRecordsByType("gateway_check_attempt")).toHaveLength(0);
+    expect(await fixture.store.listRecordsByType("mutation_attempt")).toHaveLength(0);
+    expect(await fixture.store.listRecordsByType("receipt")).toHaveLength(0);
+    expect(await fixture.store.listRecordsByType("authority_certificate")).toHaveLength(0);
+  });
+
+  it("registers install proposal compiled records through one control-plane HTTP transition", async () => {
+    const fixture = makeKernelFixture();
+    const app = createApp({ store: fixture.store, callerAuthTokens: TEST_CALLER_AUTH_TOKENS });
+    const fetchImpl = async (input: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]) => {
+      const url = new URL(String(input), "http://handshake.test");
+      return app.request(`${url.pathname}${url.search}`, init);
+    };
+    const installClient = new InstallClient(
+      "http://handshake.test",
+      {
+        roleCredential: TEST_CALLER_AUTH_TOKENS.control_plane,
+        requestIdentityFactory: () => "install-http-request",
+      },
+      fetchImpl,
+    );
+
+    const result = await installClient.registerInstallProposalCompiledRecords({
+      installProposalId: "install_http_package_fixture",
+      schemaVersion: PROTOCOL_VERSION,
+      tenantId: "tenant_demo",
+      organizationId: "org_demo",
+      createdAt: "2026-05-24T00:00:00.000Z",
+      adapterPackId: "adapter_pack_package_install_material",
+      adapterPackVersion: "0.1.0",
+      actionFamily: "package.install",
+      protectedSurfaceKind: "package_manager",
+      resourceRef: "npm:hono",
+      status: "ready_to_install",
+      humanSummary: "Package install setup fixture.",
+      refusalReasonCodes: [],
+      compiledRecords: {
+        toolCapability: fixture.tool,
+        actionType: fixture.actionType,
+        gatewayRegistryEntry: fixture.gateway,
+        operatingEnvelope: fixture.envelope,
+      },
+      policyPackRef: "policy:package-install-material:v1",
+      policyPackVersion: "v1",
+      bypassProbePlan: [
+        {
+          probeKind: "raw_sibling_blocking",
+          requiredSourceAuthority: "gateway_probe",
+          mustPassBeforeGatewayCheckedPosture: true,
+        },
+      ],
+      receiptExpectationRefs: ["receipt:package-install-material"],
+      installDigest: `sha256:${"c".repeat(64)}`,
+    });
+
+    expect(result).toMatchObject({
+      outcome: "compiled_records_registered",
+      commitAtomicity: "server_store_commit",
+      authorityCreated: false,
+      greenlightCreated: false,
+      gatewayCheckPerformed: false,
+      mutationAttempted: false,
+    });
+    expect(await fixture.store.getRecord("tool_capability", fixture.tool.toolCapabilityId)).not.toBeNull();
+    expect(await fixture.store.listRecordsByType<ContractStreamEvent>("contract_stream_event")).toHaveLength(1);
+    expect(await fixture.store.listRecordsByType("greenlight")).toHaveLength(0);
+    expect(await fixture.store.listRecordsByType("gateway_check_attempt")).toHaveLength(0);
+    expect(await fixture.store.listRecordsByType("mutation_attempt")).toHaveLength(0);
   });
 
   it("requires transition caller auth before parsing state-changing request bodies", async () => {

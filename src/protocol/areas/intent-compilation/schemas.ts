@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { GeneratedExecutionCoverageStatusSchema } from "../generated-execution-graph/schemas";
 import { GatewayCredentialBindingSchema } from "../credential-custody/schemas";
+import { DelegatedAuthorityBindingSchema } from "../delegated-authority/schemas";
 import {
   ClearingEvidenceRefsSchema,
   DigestSchema,
@@ -42,6 +43,7 @@ export const CandidateActionSchema = z.strictObject({
   nonSecretParamsSummary: z.record(z.string(), JsonValueSchema),
   secretRefs: z.record(z.string(), z.string().min(1)).default({}),
   gatewayCredentialRefs: z.array(GatewayCredentialBindingSchema).default([]),
+  delegatedAuthorityRefs: z.array(DelegatedAuthorityBindingSchema).default([]),
   purposeCode: z.string().min(1),
   expectedSideEffectCodes: z.array(z.string().min(1)),
   evidenceRefs: z.array(z.string()).default([]),

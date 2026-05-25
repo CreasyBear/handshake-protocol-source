@@ -165,6 +165,7 @@ async function buildGeneratedExecutionNode(
     parameters: candidate.parameters,
     secretRefs: candidate.secretRefs,
     gatewayCredentialRefs: candidate.gatewayCredentialRefs,
+    delegatedAuthorityRefs: candidate.delegatedAuthorityRefs,
   });
   const nodeGatewayBindingDigest = await digestCanonical({
     actionClass: candidate.actionClass,

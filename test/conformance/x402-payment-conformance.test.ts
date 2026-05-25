@@ -43,11 +43,18 @@ describe("x402 payment install conformance", () => {
       signerCustodyStatus: "agent_exposed",
       rawPrivateKeyEnvStatus: "present",
       directCoreClientSigningStatus: "present",
+      directX402ClientStatus: "present",
       paidFetchClientStatus: "present",
       paidAxiosClientStatus: "absent",
+      packageScriptPaymentStatus: "present",
+      browserSidePaymentStatus: "present",
+      rawNetworkPaymentStatus: "present",
       rawPaymentSignatureHeaderStatus: "present",
+      rawPaymentSignatureInjectionStatus: "present",
       siblingX402WrapperStatus: "present",
-      mcpDirectPaymentStatus: "blocked",
+      mcpDirectPaymentStatus: "present",
+      unmanagedMcpServerStatus: "present",
+      unmanagedToolPacketStatus: "present",
       tokenPassthroughStatus: "blocked",
       wrapperDriftStatus: "absent",
       failureClosedStatus: "passed",
@@ -55,12 +62,20 @@ describe("x402 payment install conformance", () => {
 
     expect(result.passed).toBe(false);
     expect(result.reasonCodes).toEqual([
+      "x402_browser_side_payment_not_blocked",
       "x402_direct_core_signing_not_blocked",
+      "x402_direct_x402_client_not_blocked",
+      "x402_mcp_direct_payment_not_blocked",
+      "x402_package_script_payment_not_blocked",
       "x402_paid_fetch_client_not_blocked",
+      "x402_raw_network_payment_not_blocked",
       "x402_raw_payment_signature_header_not_blocked",
+      "x402_raw_payment_signature_injection_not_blocked",
       "x402_raw_private_key_env_not_absent",
       "x402_sibling_wrapper_not_blocked",
       "x402_signer_not_gateway_held",
+      "x402_unmanaged_mcp_server_not_blocked",
+      "x402_unmanaged_tool_packet_not_blocked",
     ]);
   });
 
@@ -122,6 +137,16 @@ describe("x402 first-wedge evidence taxonomy", () => {
     expect(classifyX402FirstWedgeEvidenceLabel("payment_payload_created")).toMatchObject({
       authorityCreated: false,
       evidenceRole: "gateway_held_payment_credential",
+      settlementFinality: "not_settlement_finality",
+    });
+    expect(classifyX402FirstWedgeEvidenceLabel("gateway_credential_resolution")).toMatchObject({
+      authorityCreated: false,
+      evidenceRole: "gateway_credential_resolution",
+      settlementFinality: "not_settlement_finality",
+    });
+    expect(classifyX402FirstWedgeEvidenceLabel("gateway_signer_invocation")).toMatchObject({
+      authorityCreated: false,
+      evidenceRole: "gateway_signer_invocation",
       settlementFinality: "not_settlement_finality",
     });
     expect(classifyX402FirstWedgeEvidenceLabel("downstream_reconciliation_recorded")).toMatchObject({

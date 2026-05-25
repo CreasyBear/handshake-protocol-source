@@ -15,6 +15,7 @@ import { actionContractIdsForRecord } from "../../protocol/store/action-contract
 
 type ProtocolCommitStatementOptions = Pick<
   ProtocolCommit,
+  | "recordConflictMode"
   | "greenlightIssuanceClaims"
   | "idempotencyLedgerReservationEntries"
   | "idempotencyLedgerIndexEntries"
@@ -63,7 +64,7 @@ export class D1ProtocolStatements {
       statements.push(this.receiptMutationAttemptIndexStatement(entry));
     }
     for (const record of records) {
-      statements.push(...this.recordReplacementStatements(record));
+      statements.push(...this.recordReplacementStatements(record, options.recordConflictMode ?? "replace"));
     }
     for (const event of events) {
       statements.push(this.streamEventStatement(event));
@@ -84,9 +85,12 @@ export class D1ProtocolStatements {
     return statements;
   }
 
-  recordReplacementStatements(record: StoredProtocolRecord): D1PreparedStatement[] {
+  recordReplacementStatements(
+    record: StoredProtocolRecord,
+    conflictMode: "replace" | "absent_or_same" = "replace",
+  ): D1PreparedStatement[] {
     return [
-      this.recordStatement(record),
+      this.recordStatement(record, conflictMode),
       this.recordActionContractRefDeleteStatement(record),
       ...this.recordActionContractRefStatements(record),
     ];
@@ -165,12 +169,47 @@ export class D1ProtocolStatements {
       .bind(entry.mutationAttemptId, entry.receiptId, entry.tenantId, entry.organizationId, entry.createdAt);
   }
 
-  recordStatement(record: StoredProtocolRecord): D1PreparedStatement {
+  recordStatement(
+    record: StoredProtocolRecord,
+    conflictMode: "replace" | "absent_or_same" = "replace",
+  ): D1PreparedStatement {
+    if (conflictMode === "absent_or_same") return this.recordAbsentOrSameStatement(record);
     return this.db
       .prepare(
         `INSERT OR REPLACE INTO protocol_records
           (object_id, object_type, tenant_id, organization_id, schema_version, canonical_digest, payload_json, created_at, source_event_id)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .bind(
+        record.objectId,
+        record.objectType,
+        record.tenantId,
+        record.organizationId,
+        record.schemaVersion,
+        record.canonicalDigest,
+        JSON.stringify(record.payload),
+        record.createdAt,
+        record.sourceEventId,
+      );
+  }
+
+  recordAbsentOrSameStatement(record: StoredProtocolRecord): D1PreparedStatement {
+    return this.db
+      .prepare(
+        `INSERT INTO protocol_records
+          (object_id, object_type, tenant_id, organization_id, schema_version, canonical_digest, payload_json, created_at, source_event_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT(object_type, object_id) DO UPDATE SET
+           tenant_id = excluded.tenant_id,
+           organization_id = excluded.organization_id,
+           schema_version = excluded.schema_version,
+           canonical_digest = CASE
+             WHEN protocol_records.canonical_digest = excluded.canonical_digest THEN excluded.canonical_digest
+             ELSE NULL
+           END,
+           payload_json = excluded.payload_json,
+           created_at = excluded.created_at,
+           source_event_id = excluded.source_event_id`,
       )
       .bind(
         record.objectId,

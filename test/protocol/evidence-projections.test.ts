@@ -302,9 +302,14 @@ describe("protocol evidence projections", () => {
     expect(projection.surfaceOperationReconciliationRef).toBe(reconciliation.reconciliation.reconciliationId);
     expect(projection.surfaceOperationEvidenceLabels).toEqual([
       "local_gateway_check",
+      "gateway_signer_invocation",
       "payment_payload_created",
       "downstream_reconciliation_recorded",
       "payment_response_received",
+    ]);
+    expect(projection.signerInvocationEvidenceRefs).toEqual([
+      "evidence:x402-official-payment-signature:redaction",
+      "credential:x402-payment-signature:redaction",
     ]);
     for (const ref of safeRefs) expect(projection.surfaceOperationEvidenceRefs).toContain(ref);
     for (const ref of rawCredentialRefs) expect(JSON.stringify(projection)).not.toContain(ref);

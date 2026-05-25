@@ -34,28 +34,53 @@ const x402ProbeSpecs: X402ProbeSpec[] = [
         ["raw_private_key_env", posture.rawPrivateKeyEnvStatus === "absent", posture.rawPrivateKeyEnvStatus],
         [
           "direct_core_client_signing",
-          ["blocked", "absent"].includes(posture.directCoreClientSigningStatus),
-          posture.directCoreClientSigningStatus,
+          blockedOrAbsent(posture.directCoreClientSigningStatus),
+          statusLabel(posture.directCoreClientSigningStatus),
+        ],
+        [
+          "direct_x402_client",
+          blockedOrAbsent(posture.directX402ClientStatus),
+          statusLabel(posture.directX402ClientStatus),
         ],
         [
           "paid_fetch_client",
-          ["blocked", "absent"].includes(posture.paidFetchClientStatus),
-          posture.paidFetchClientStatus,
+          blockedOrAbsent(posture.paidFetchClientStatus),
+          statusLabel(posture.paidFetchClientStatus),
         ],
         [
           "paid_axios_client",
-          ["blocked", "absent"].includes(posture.paidAxiosClientStatus),
-          posture.paidAxiosClientStatus,
+          blockedOrAbsent(posture.paidAxiosClientStatus),
+          statusLabel(posture.paidAxiosClientStatus),
+        ],
+        [
+          "package_script_payment",
+          blockedOrAbsent(posture.packageScriptPaymentStatus),
+          statusLabel(posture.packageScriptPaymentStatus),
+        ],
+        [
+          "browser_side_payment",
+          blockedOrAbsent(posture.browserSidePaymentStatus),
+          statusLabel(posture.browserSidePaymentStatus),
+        ],
+        [
+          "raw_network_payment",
+          blockedOrAbsent(posture.rawNetworkPaymentStatus),
+          statusLabel(posture.rawNetworkPaymentStatus),
         ],
         [
           "raw_payment_signature_header",
-          ["blocked", "absent"].includes(posture.rawPaymentSignatureHeaderStatus),
-          posture.rawPaymentSignatureHeaderStatus,
+          blockedOrAbsent(posture.rawPaymentSignatureHeaderStatus),
+          statusLabel(posture.rawPaymentSignatureHeaderStatus),
+        ],
+        [
+          "raw_payment_signature_injection",
+          blockedOrAbsent(posture.rawPaymentSignatureInjectionStatus),
+          statusLabel(posture.rawPaymentSignatureInjectionStatus),
         ],
         [
           "sibling_x402_wrapper",
-          ["blocked", "absent"].includes(posture.siblingX402WrapperStatus),
-          posture.siblingX402WrapperStatus,
+          blockedOrAbsent(posture.siblingX402WrapperStatus),
+          statusLabel(posture.siblingX402WrapperStatus),
         ],
       ] as const;
       const failedDetails = checks
@@ -68,9 +93,14 @@ const x402ProbeSpecs: X402ProbeSpec[] = [
             ? [
                 "raw_private_key_env_absent",
                 "direct_core_client_signing_blocked",
+                "direct_x402_client_absent",
                 "paid_fetch_client_blocked",
                 "paid_axios_client_absent",
+                "package_script_payment_absent",
+                "browser_side_payment_absent",
+                "raw_network_payment_absent",
                 "raw_payment_signature_header_blocked",
+                "raw_payment_signature_injection_absent",
                 "sibling_x402_wrapper_blocked",
               ]
             : failedDetails,
@@ -80,13 +110,20 @@ const x402ProbeSpecs: X402ProbeSpec[] = [
   {
     probeKind: "mcp_direct_call_blocking",
     evaluate(posture) {
+      const checks = [
+        ["mcp_direct_payment", statusLabel(posture.mcpDirectPaymentStatus)],
+        ["unmanaged_mcp_server", statusLabel(posture.unmanagedMcpServerStatus)],
+        ["unmanaged_tool_packet", statusLabel(posture.unmanagedToolPacketStatus)],
+      ] as const;
+      const failedDetails = checks
+        .filter(([, status]) => !blockedOrAbsent(status))
+        .map(([name, status]) => `${name}_${status}_reachable`);
       return {
-        passed: ["blocked", "absent"].includes(posture.mcpDirectPaymentStatus),
-        evidenceDetails: [
-          ["blocked", "absent"].includes(posture.mcpDirectPaymentStatus)
-            ? "mcp_direct_payment_blocked"
-            : "mcp_direct_payment_reachable",
-        ],
+        passed: failedDetails.length === 0,
+        evidenceDetails:
+          failedDetails.length === 0
+            ? ["mcp_direct_payment_blocked", "unmanaged_mcp_server_absent", "unmanaged_tool_packet_absent"]
+            : failedDetails,
       };
     },
   },
@@ -140,4 +177,12 @@ export function x402PaymentHostileBypassProbeExecutors(surface: X402PaymentHosti
       };
     },
   }));
+}
+
+function blockedOrAbsent(status: string | undefined): boolean {
+  return status === undefined || status === "blocked" || status === "absent";
+}
+
+function statusLabel(status: string | undefined): string {
+  return status ?? "absent";
 }

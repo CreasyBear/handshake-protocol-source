@@ -8,8 +8,14 @@ import { protocolObjectRegistry, protocolObjectTypes } from "../../src/protocol/
 
 describe("protocol navigation", () => {
   it("keeps HTTP transition navigation derived from protocol transitions and route metadata", () => {
-    const routeIds = transitionRouteDefinitions.map((route) => String(route.routeId)).sort();
-    const httpIds = httpTransitionNavigation.map((entry) => String(entry.routeId)).sort();
+    const routeIds = transitionRouteDefinitions
+      .filter((route) => route.routeId !== "proposeRuntimeIngressActionContracts")
+      .map((route) => String(route.routeId))
+      .sort();
+    const httpIds = httpTransitionNavigation
+      .filter((entry) => entry.routeId !== "proposeRuntimeIngressActionContracts")
+      .map((entry) => String(entry.routeId))
+      .sort();
     const protocolHttpIds = protocolNavigation
       .filter(
         (entry) =>
@@ -23,6 +29,27 @@ describe("protocol navigation", () => {
 
     for (const route of transitionRouteDefinitions) {
       const entry = httpTransitionNavigation.find((candidate) => candidate.routeId === route.routeId);
+      if (route.routeId === "proposeRuntimeIngressActionContracts") {
+        expect(entry).toMatchObject({
+          routeId: route.routeId,
+          transitionId: "proposeRuntimeIngressActionContracts",
+          method: "POST",
+          path: route.path,
+          role: route.role,
+          kernelMethod: "composite_runtime_ingress_proposal",
+          phase: "runtime_evidence",
+          authorityBoundary: "runtime ingress proposal evidence only",
+        });
+        expect(entry?.recordsWritten).toEqual([
+          "runtime_execution",
+          "generated_execution_graph",
+          "tool_call_draft",
+          "intent_compilation",
+          "action_contract",
+          "contract_stream_event",
+        ]);
+        continue;
+      }
       const protocol = protocolNavigationByTransitionId[route.routeId];
       expect(entry).toMatchObject({
         routeId: route.routeId,

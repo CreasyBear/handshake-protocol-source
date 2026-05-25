@@ -20,6 +20,13 @@ issue a one-use `Greenlight`; requires a pre-mutation `GatewayCheck`; and
 records the result as `Receipt`, `Refusal`, `ProofGap`, isolation, or recovery
 evidence.
 
+Product language may call that terminal outcome a cleared protected-action event:
+one specific Handshake event with reconstructable evidence that a service can
+accept, refuse, or treat as a proof gap. That product phrase does not change the
+protocol rule. A product surface can expose proposal, evidence, and readback; it
+does not create authority unless the protocol kernel and gateway path below have
+created it.
+
 ## Primitive
 
 Every consequential mutation attempt must be reduced to an exact, inspectable,
@@ -173,6 +180,12 @@ transaction envelope, envelope digest, artifact digest list, and verification
 policy plus visible certificate annotations. It excludes only signatures and
 the derived signing-input digest.
 
+The certificate is terminal evidence, not permission, identity, settlement,
+hosted trust, or reusable auth. A service can use it during an event only by
+verifying pinned trust material and checking the terminal kind, action class,
+resource, signer roles, gateway admission, and status that its own policy
+requires.
+
 `verifyAuthorityCertificate()` verifies the exported certificate with pinned
 trust material and no protocol-store dependency. Production verification rejects
 HMAC and propose-time `contractSignature` as portable authority. The verifier
@@ -223,17 +236,22 @@ as one proof profile, reference package-install, repo-write, and preview-deploy
 gateways, memory/D1 stores, redacted projections including agent transaction
 envelopes, local payment D1/HTTP harness coverage, hostile local payment
 bypass/custody probes, package-install supply-chain parameter binding,
-codemode/runtime generated-execution proposal paths, internal non-authority
-representation contracts, public runtime ingress surfaces for local x402 payment
-and package-install dispatch boundaries, and provider-neutral gateway credential
-ref/resolution evidence records. It enforces x402 per-call spend only. It does
-not prove live provider custody, live vault-provider operation, broad
-MCP/CLI/browser/shell/network runtime interception, hosted operation, external
-package-material verification, aggregate payment-budget management, cross-org
-AuthorityCertificate trust, remote JWKS trust fetching, live revocation
-authority, or hosted mutation authority. The local source foundation does
-include AuthorityCertificate minting, offline pinned-key verification, and
-non-mutating hosted verifier projections over configured local trust material.
+codemode/runtime generated-execution proposal paths, auth.md protected API call
+provenance/custody evidence, internal non-authority representation contracts,
+public runtime ingress surfaces for local x402 payment and package-install
+dispatch boundaries, and provider-neutral gateway credential ref/resolution
+evidence records. It enforces x402 per-call spend only. It does not prove live
+provider custody, live vault-provider operation, broad MCP/CLI/browser/shell/network
+runtime interception, hosted operation, external package-material verification,
+aggregate payment-budget management, cross-org AuthorityCertificate trust,
+remote JWKS trust fetching, live revocation authority, or hosted mutation
+authority. The local source foundation does include AuthorityCertificate
+minting, offline pinned-key verification, non-mutating hosted verifier
+projections over configured local trust material, and public npm
+`handshake-protocol-kernel@0.2.7` availability verified by trusted-publish
+workflow, registry readback, npm signature metadata, provenance publication, and
+clean installed-artifact smoke. Public npm availability does not create
+authority. MCP Registry discoverability remains a proof gap.
 
 ## Extension Boundary
 

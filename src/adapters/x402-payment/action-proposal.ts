@@ -1,5 +1,7 @@
 import { z } from "zod";
 import type { ActionContract, ProposeActionContractInput } from "../../protocol/areas/action-contract";
+import { DelegatedAuthorityBindingSchema } from "../../protocol/areas/delegated-authority";
+import { GatewayCredentialBindingSchema } from "../../protocol/areas/credential-custody";
 import type { CompileIntentInput, IntentCompilationRecord } from "../../protocol/areas/intent-compilation";
 import { digestCanonical } from "../../protocol/foundation/canonical";
 import { DigestSchema } from "../../protocol/foundation/schema-core";
@@ -83,10 +85,16 @@ export const X402PaymentRuntimeConfigSchema = z.strictObject({
   toolCatalogRef: z.string().min(1),
   actionCatalogRef: z.string().min(1),
   gatewayRegistryRef: z.string().min(1),
+  gatewayReadinessRef: z.string().min(1),
+  gatewayReadinessDigest: DigestSchema,
+  policyVersionRef: z.string().min(1),
+  policyVersionDigest: DigestSchema,
   toolCapabilityId: z.string().min(1),
   actionTypeId: z.string().min(1),
   gatewayRegistryEntryId: z.string().min(1),
   gatewayId: z.string().min(1),
+  gatewayCredentialBinding: GatewayCredentialBindingSchema,
+  delegatedAuthorityBinding: DelegatedAuthorityBindingSchema,
   maxAtomicAmountPerCall: AtomicAmountSchema,
   contractExpiresAt: z.string().datetime({ offset: true }),
   signingSecret: z.string().min(1).optional(),
@@ -276,6 +284,12 @@ async function buildX402PaymentCompileIntentInputUnchecked(
     facilitatorRef: attempt.facilitatorRef,
     sdkPackageVersions: attempt.sdkPackageVersions,
     extensionKeys: attempt.extensionKeys,
+    gatewayCredentialRefId: runtimeConfig.gatewayCredentialBinding.gatewayCredentialRefId,
+    gatewayCredentialRefDigest: runtimeConfig.gatewayCredentialBinding.gatewayCredentialRefDigest,
+    gatewayReadinessRef: runtimeConfig.gatewayReadinessRef,
+    gatewayReadinessDigest: runtimeConfig.gatewayReadinessDigest,
+    policyVersionRef: runtimeConfig.policyVersionRef,
+    policyVersionDigest: runtimeConfig.policyVersionDigest,
   };
   const idempotencyDigest = paymentIdentifierDigest
     ? await digestCanonical({ paymentIdentifierDigest, idempotencyScope: "x402_payment_identifier" })
@@ -304,6 +318,9 @@ async function buildX402PaymentCompileIntentInputUnchecked(
         maxTimeoutSeconds: attempt.maxTimeoutSeconds,
         sdkPackageVersions: attempt.sdkPackageVersions,
         extensionKeys: attempt.extensionKeys,
+        gatewayCredentialRefDigest: runtimeConfig.gatewayCredentialBinding.gatewayCredentialRefDigest,
+        gatewayReadinessDigest: runtimeConfig.gatewayReadinessDigest,
+        policyVersionDigest: runtimeConfig.policyVersionDigest,
         sequenceNumber: attempt.sequenceNumber,
       });
   const paymentRequiredEvidenceRef =
@@ -327,8 +344,19 @@ async function buildX402PaymentCompileIntentInputUnchecked(
     generatedExecutionNodeId: attempt.generatedExecutionNodeId,
     toolCallDraftId: attempt.toolCallDraftId,
     generatedCodeOrSpecRefs: [attempt.generatedCodeOrSpecRef],
-    declaredAssumptions: ["x402 payment attempt provided explicit endpoint, payee, network, token, and amount"],
-    requiredEvidenceRefs: [paymentRequiredEvidenceRef],
+    declaredAssumptions: [
+      "x402 payment attempt provided explicit endpoint, payee, network, token, and amount",
+      "x402 wallet signer custody is represented by a bound gateway credential ref",
+      "x402 delegated spend authority is represented by a bound principal authority ref",
+      "x402 runtime config supplied trusted readiness and policy-version digests",
+    ],
+    requiredEvidenceRefs: unique([
+      paymentRequiredEvidenceRef,
+      runtimeConfig.gatewayReadinessRef,
+      runtimeConfig.policyVersionRef,
+      ...runtimeConfig.gatewayCredentialBinding.evidenceExpectationRefs,
+      ...runtimeConfig.delegatedAuthorityBinding.evidenceExpectationRefs,
+    ]),
     candidate: {
       toolCapabilityId: runtimeConfig.toolCapabilityId,
       actionTypeId: runtimeConfig.actionTypeId,
@@ -342,9 +370,17 @@ async function buildX402PaymentCompileIntentInputUnchecked(
       parameters,
       nonSecretParamsSummary: parameters,
       secretRefs: {},
+      gatewayCredentialRefs: [runtimeConfig.gatewayCredentialBinding],
+      delegatedAuthorityRefs: [runtimeConfig.delegatedAuthorityBinding],
       purposeCode: "x402_paid_request",
       expectedSideEffectCodes: ["x402_payment_signature_created"],
-      evidenceRefs: [paymentRequiredEvidenceRef],
+      evidenceRefs: unique([
+        paymentRequiredEvidenceRef,
+        runtimeConfig.gatewayReadinessRef,
+        runtimeConfig.policyVersionRef,
+        ...runtimeConfig.gatewayCredentialBinding.evidenceExpectationRefs,
+        ...runtimeConfig.delegatedAuthorityBinding.evidenceExpectationRefs,
+      ]),
       bounds: {
         endpointDomain,
         payee: attempt.payee,
@@ -353,6 +389,8 @@ async function buildX402PaymentCompileIntentInputUnchecked(
         token: attempt.token,
         asset: attempt.asset,
         maxAtomicAmountPerCall: runtimeConfig.maxAtomicAmountPerCall,
+        gatewayReadinessDigest: runtimeConfig.gatewayReadinessDigest,
+        policyVersionDigest: runtimeConfig.policyVersionDigest,
       },
       idempotencyKey: paymentIdentifierDigest
         ? `x402-payment-id:${idempotencyDigest.slice("sha256:".length)}`
@@ -448,6 +486,10 @@ function requestBodyPostureFor(intendedRequest: X402PaymentRequiredEvidence["int
 
 function toJsonValue(value: unknown) {
   return JSON.parse(JSON.stringify(value));
+}
+
+function unique(values: string[]): string[] {
+  return [...new Set(values)];
 }
 
 function compareAtomic(left: string, right: string): number {

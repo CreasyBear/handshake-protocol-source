@@ -13,6 +13,7 @@ import {
   GatewayCredentialRefSchema,
   GatewayCustodyProofPacketSchema,
 } from "../credential-custody/schemas";
+import { DelegatedAuthorityRefSchema, DelegatedAuthorityStatusTransitionSchema } from "../delegated-authority/schemas";
 import { ContractStreamEventSchema } from "../../events/schemas";
 import { GatewayCheckAttemptSchema, MutationAttemptSchema } from "../gateway-gate/schemas";
 import { GeneratedExecutionGraphSchema } from "../generated-execution-graph/schemas";
@@ -87,6 +88,20 @@ export const protocolObjectRegistry = {
     "gateway_credential_ref",
     GatewayCredentialRefSchema,
     (record) => record.payload.gatewayCredentialRefId,
+    "transition_evidence",
+    "audit_read",
+  ),
+  delegated_authority_ref: entry(
+    "delegated_authority_ref",
+    DelegatedAuthorityRefSchema,
+    (record) => record.payload.delegatedAuthorityRefId,
+    "transition_evidence",
+    "audit_read",
+  ),
+  delegated_authority_status_transition: entry(
+    "delegated_authority_status_transition",
+    DelegatedAuthorityStatusTransitionSchema,
+    (record) => record.payload.delegatedAuthorityStatusTransitionId,
     "transition_evidence",
     "audit_read",
   ),
@@ -302,6 +317,9 @@ export function isolationScopeRefsForContract(contract: ActionContract): Isolati
     isolationScopeRef(contract, "gateway", contract.gatewayId),
     ...contract.gatewayCredentialRefs.map((ref) =>
       isolationScopeRef(contract, "credential_ref", ref.gatewayCredentialRefId),
+    ),
+    ...contract.delegatedAuthorityRefs.map((ref) =>
+      isolationScopeRef(contract, "authority_ref", ref.delegatedAuthorityRefId),
     ),
     isolationScopeRef(contract, "resource", contract.resourceRef),
   ]);

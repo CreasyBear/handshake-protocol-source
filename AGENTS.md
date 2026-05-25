@@ -143,6 +143,16 @@ Handshake is protected action infrastructure for automated decision making.
 
 Every consequential automated action becomes an inspectable action contract, receives an exact greenlight or refusal from policy, is enforced by a gateway check before mutation, and leaves a receipt, refusal, or proof gap that can be reconstructed.
 
+Builder-buyer language:
+
+Handshake helps a service accept, refuse, and reconstruct a cleared protected-action event.
+A cleared protected-action event is one specific terminal Handshake event with reconstructable evidence.
+The product surface is the CLI, MCP, SDK, docs, demo, or service-facing experience that exposes proposal, evidence, and readback without creating authority.
+The protocol kernel is the source-owned state machine and schema set that records exact contracts, policy decisions, one-use greenlights, gateway checks, receipts, refusals, proof gaps, isolation, and optional terminal certificates.
+An AuthorityCertificate is terminal evidence, not permission, identity, settlement, hosted trust, or reusable auth.
+Public npm availability does not create authority.
+MCP Registry discoverability remains a proof gap until registry acceptance and lookup are verified.
+
 The first official wedge is one buyer-side `x402_payment.exact` per-call protected action. Engineering-agent workflows remain an adoption and generated-execution stress context, not the product boundary.
 
 Adjacent proof contexts include preview deploys, package installs, CI and release changes, cloud configuration mutations, database or data-plane operations, and repository write operations with consequence outside the chat session.

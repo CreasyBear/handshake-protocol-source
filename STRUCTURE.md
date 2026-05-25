@@ -4,6 +4,21 @@ This repo is a TypeScript protocol kernel. The tree should be navigable by autho
 
 Last structural audit: 2026-05-19.
 
+## Product And Protocol Boundary
+
+The protocol kernel is the source-owned state machine and schemas for exact contracts, policy decisions, one-use greenlights, gateway checks, receipts, refusals, proof gaps, isolation, and terminal certificates.
+
+Product surfaces are the CLI, MCP, SDK, docs, demos, and service-facing readbacks that expose proposal/evidence/readback without creating authority. A cleared protected-action event is a specific terminal Handshake event with reconstructable evidence. The certificate is terminal evidence, not permission.
+
+Public npm availability does not create authority, and MCP Registry discoverability remains a proof gap until verified. `.planning/codebase/*` can inform source-map work, but tracked source, canonical docs, and current tests win when facts disagree.
+
+Production proof and expansion status are source-ledgered in
+`docs/internal/decisions.md`. A second action family is not execution-ready
+until it names its generated execution shape, protected path, gateway authority
+holder, credential holder, `CandidateAction`/refusal boundary, bypass posture,
+evidence path, proof-gap model, recovery/isolation path, non-claims, and
+required quality/package/full-repo gates.
+
 ## Ownership Rules
 
 | Path                  | Owns                                                                                                                 | Must Not Own                                                                                                      |
@@ -11,6 +26,7 @@ Last structural audit: 2026-05-19.
 | `src/protocol/`       | Protocol primitives, state transitions, canonicalization, events, store port, navigation, public schemas and inputs. | HTTP transport, storage implementations, runtime wrappers, gateway fixtures, client ergonomics, hosted operation. |
 | `src/http/`           | Hono/Worker app, admission, route metadata, handlers, OpenAPI, HTTP errors, store resolution.                        | Protocol meaning, policy interpretation, mutation authority.                                                      |
 | `src/runtime/`        | Generated-execution evidence and action proposal helpers.                                                            | Policy decisions, greenlights, gateway checks, receipts, mutation attempts.                                       |
+| `src/adapter-sdk/`    | Public adapter authoring definitions, install compiler contract refs, and install-proposal shape reports.            | Runtime ingress registration, gateway binding, policy evaluation, credential custody, receipt export, mutation.   |
 | `src/adapters/`       | Reference adapter profiles and gateway fixtures; mutation fixtures run only after a verified gateway check.          | Storage internals, runtime authority, provider-side claims, identity-provider claims.                             |
 | `src/conformance/`    | Reference checks for protocol and gateway posture.                                                                   | Hosted operation, standards claims, provider certification, mutation attempts.                                    |
 | `src/storage/`        | Atomic record commits, stream offsets, D1, memory fixtures, KV cache plumbing.                                       | Protocol meaning, route handling, SDK behavior.                                                                   |
@@ -54,6 +70,7 @@ src/
     repo-write/
     preview-deploy/
     codemode-multi-action/
+  adapter-sdk/
   adapters/
     auth-md/
     package-install/
@@ -150,6 +167,7 @@ These manifests are guardrails for extraction and review. They are not product c
 - HTTP route metadata, invokers, response schemas, and scope resolvers live under `src/http/routes/*`.
 - HTTP caller admission and request context construction live under `src/http/admission/*`.
 - Runtime proposal helpers use `action-proposal.ts`; the generated-program runner uses `generated-program-runner.ts`.
+- Adapter SDK definitions live under `src/adapter-sdk` and are exported only through the `./adapter-sdk` package subpath.
 - Storage implementations live under `src/storage/d1`, `src/storage/memory`, and `src/storage/kv`.
 - Conformance checks live under `src/conformance` and are exported only through the `./conformance` package subpath.
 

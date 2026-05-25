@@ -13,7 +13,11 @@ import type {
   ProtectedPathPosture,
   RecoveryRecommendation,
   ReceiptExport,
+  DelegatedAuthorityRef,
+  DelegatedAuthorityStatusTransition,
   GatewayRegistryEntry,
+  GatewayCredentialRef,
+  CredentialResolutionEvidence,
   GeneratedGraphEvidenceProjection,
   ReceiptTimelineProjection,
   ReviewArtifactRecord,
@@ -31,6 +35,10 @@ import type {
   CreateBreakerDecisionInput,
   CreateIsolationInput,
   CreateProtectedPathPostureInput,
+  RegisterDelegatedAuthorityRefInput,
+  RegisterGatewayCredentialRefInput,
+  RecordCredentialResolutionEvidenceInput,
+  TransitionDelegatedAuthorityStatusInput,
   CreateRecoveryRecommendationInput,
   CreateReceiptExportInput,
   CreateReviewArtifactInput,
@@ -147,6 +155,20 @@ export class HandshakeClient {
     return this.post("/v0.2/protected-path-postures", input, "gateway_custody");
   }
 
+  registerGatewayCredentialRef(input: RegisterGatewayCredentialRefInput): Promise<GatewayCredentialRef> {
+    return this.post("/v0.2/gateway-credential-refs", input, "gateway_custody");
+  }
+
+  registerDelegatedAuthorityRef(input: RegisterDelegatedAuthorityRefInput): Promise<DelegatedAuthorityRef> {
+    return this.post("/v0.2/delegated-authority-refs", input, "control_plane");
+  }
+
+  transitionDelegatedAuthorityStatus(
+    input: TransitionDelegatedAuthorityStatusInput,
+  ): Promise<DelegatedAuthorityStatusTransition> {
+    return this.post("/v0.2/delegated-authority-status-transitions", input, "control_plane");
+  }
+
   proposeActionContract(input: ProposeActionContractInput): Promise<ActionContract> {
     return this.post("/v0.2/action-contracts", input, "runtime_evidence");
   }
@@ -196,6 +218,12 @@ export class HandshakeClient {
 
   gatewayCheck(input: GatewayCheckInput): Promise<GatewayCheckResult> {
     return this.post("/v0.2/gateway-check-attempts", input, "gateway_custody");
+  }
+
+  recordCredentialResolutionEvidence(
+    input: RecordCredentialResolutionEvidenceInput,
+  ): Promise<CredentialResolutionEvidence> {
+    return this.post("/v0.2/credential-resolution-evidence", input, "gateway_custody");
   }
 
   reconcileSurfaceOperation(input: ReconcileSurfaceOperationInput): Promise<SurfaceOperationReconciliationResult> {

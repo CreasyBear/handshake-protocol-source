@@ -1,8 +1,12 @@
 import { describe, expect, it } from "bun:test";
 import {
+  buildX402DelegatedSpendAuthorityRefInput,
+  buildX402WalletGatewayCredentialRefInput,
   compileX402InstallProposal,
   type X402InstallProposal,
   type X402InstallProposalInput,
+  x402DelegatedSpendAuthorityBindingFor,
+  x402WalletGatewayCredentialBindingFor,
 } from "../../src/adapters/x402-payment/install-proposal";
 import {
   buildX402PaymentAttemptFromRequiredEvidence,
@@ -24,6 +28,8 @@ import type { ProofGap } from "../../src/protocol/areas/proof-gap";
 import { HandshakeKernel } from "../../src/protocol/kernel";
 import { digestCanonical } from "../../src/protocol/foundation/canonical";
 import { nowIso } from "../../src/protocol/foundation/ids";
+import type { GatewayCredentialRef } from "../../src/protocol/areas/credential-custody";
+import type { DelegatedAuthorityRef } from "../../src/protocol/areas/delegated-authority";
 import { requiredGatewayCheckedBypassProbeKinds } from "../../src/protocol/public/schemas";
 import { InMemoryProtocolStore } from "../../src/storage/memory";
 import { futureIso } from "../support/fixtures";
@@ -94,6 +100,9 @@ const officialPaymentRequired = {
   },
 } as const;
 
+const x402CredentialRefs = new WeakMap<X402InstallProposal, GatewayCredentialRef>();
+const x402AuthorityRefs = new WeakMap<X402InstallProposal, DelegatedAuthorityRef>();
+
 describe("x402 wallet gateway adapter", () => {
   it("creates a fake payment signature only after a verified gateway check", async () => {
     const fixture = await greenlitX402Contract();
@@ -128,14 +137,61 @@ describe("x402 wallet gateway adapter", () => {
       idempotencyKey: fixture.contract.idempotencyKey,
       surfaceOperationRef: result.gatewayCheck.mutationAttempt.surfaceOperationRef,
     });
+    expect(surface.signedCommands()[0]?.credentialResolutionEvidence).toMatchObject({
+      actionContractId: fixture.contract.actionContractId,
+      greenlightId: fixture.greenlight.greenlightId,
+      gateAttemptId: result.gatewayCheck.gateAttempt.gateAttemptId,
+      gatewayCredentialRefId: (fixture.contract.parameters as X402PaymentParameters).gatewayCredentialRefId,
+      gatewayCredentialRefDigest: (fixture.contract.parameters as X402PaymentParameters).gatewayCredentialRefDigest,
+      resultClass: "used_by_gateway",
+      credentialMaterialIncluded: false,
+    });
+    expect(surface.signedCommands()[0]?.credentialUseRef).toBe(
+      `gateway-credential-use:x402:${result.gatewayCheck.gateAttempt.gateAttemptId}`,
+    );
     expect(result.signatureEvidence).toMatchObject({
       paymentSignatureHeaderName: "PAYMENT-SIGNATURE",
       paymentPayloadShape: "local_fixture_payment_signature",
       credentialMaterialPosture: "local_fixture",
     });
     expect(result.signatureEvidence?.paymentSignatureHeaderRef).toStartWith("credential:x402-local-fixture-signature:");
+    expect(result.credentialResolutionEvidence?.credentialResolutionEvidenceId).toBe(
+      surface.signedCommands()[0]?.credentialResolutionEvidence.credentialResolutionEvidenceId,
+    );
+    expect(result.reconciliation?.evidenceRefs).toContain(
+      `credential_resolution_evidence:${result.credentialResolutionEvidence?.credentialResolutionEvidenceId}`,
+    );
     expect(result.reconciliation?.observedDownstreamStatus).toBe("succeeded");
+    expect(await fixture.store.listRecordsByType("credential_resolution_evidence")).toHaveLength(1);
     expect(await fixture.store.listRecordsByType("proof_gap")).toHaveLength(0);
+  });
+
+  it("does not invoke the signer when post-gate credential resolution evidence cannot be recorded", async () => {
+    const fixture = await greenlitX402Contract();
+    const surface = fakeSigningSurface("succeeded");
+
+    const result = await runX402WalletGateway({
+      protocol: {
+        gatewayCheck: (input) => fixture.kernel.gatewayCheck(input),
+        recordCredentialResolutionEvidence: async () => {
+          throw new Error("vault resolution unavailable");
+        },
+        reconcileSurfaceOperation: (input) => fixture.kernel.reconcileSurfaceOperation(input),
+      },
+      surface,
+      actionContractId: fixture.contract.actionContractId,
+      greenlightId: fixture.greenlight.greenlightId,
+      observedParameters: fixture.contract.parameters as X402PaymentParameters,
+      surfaceOperationRef: "surface-op:x402-credential-resolution-failure",
+    });
+
+    expect(result.outcome).toBe("payment_signature_failed");
+    expect(result.gatewayCheck.gateAttempt.gateDecision).toBe("passed");
+    expect(result.credentialResolutionEvidence).toBeNull();
+    expect(result.signatureEvidence).toBeNull();
+    expect(surface.signatureCount()).toBe(0);
+    expect(surface.signedCommands()).toEqual([]);
+    expect(await fixture.store.listRecordsByType("credential_resolution_evidence")).toHaveLength(0);
   });
 
   it("refuses changed observed parameters before signing", async () => {
@@ -472,6 +528,45 @@ describe("x402 wallet gateway adapter", () => {
     expect(result.signatureEvidence).toBeNull();
   });
 
+  it("refuses credential-ref isolation before x402 wallet signing", async () => {
+    const fixture = await greenlitOfficialX402Contract();
+    const signer = trackedOfficialSigner();
+    const credentialBinding = fixture.contract.gatewayCredentialRefs[0];
+    if (!credentialBinding) throw new Error("expected x402 wallet credential binding");
+    await fixture.kernel.createIsolationState({
+      tenantId: fixture.proposal.tenantId,
+      organizationId: fixture.proposal.organizationId,
+      scopeType: "credential_ref",
+      scopeId: credentialBinding.gatewayCredentialRefId,
+      state: "quarantined",
+      reasonCode: "credential_resolution_isolation_blocked",
+      reasonSummary: "x402 wallet signer credential ref is quarantined after custody drift evidence.",
+      sourceDecisionRef: "test:x402-wallet-credential-quarantine",
+    });
+    const surface = createOfficialExactX402SigningSurface({
+      signer: signer.surfaceSigner,
+      paymentRequired: officialPaymentRequired,
+      selectedPaymentRequirementIndex: fixture.evidence.selectedPaymentRequirementIndex,
+      selectedPaymentRequirementDigest: fixture.evidence.selectedPaymentRequirementDigest,
+      downstreamPaymentStatus: "unknown",
+    });
+
+    const result = await runX402WalletGateway({
+      protocol: fixture.kernel,
+      surface,
+      actionContractId: fixture.contract.actionContractId,
+      greenlightId: fixture.greenlight.greenlightId,
+      observedParameters: fixture.contract.parameters as X402PaymentParameters,
+      surfaceOperationRef: "surface-op:x402-official-credential-isolated",
+    });
+
+    expect(result.outcome).toBe("gateway_check_refused");
+    expect(result.gatewayCheck.gateAttempt.gateDecisionReasonCode).toBe("current_isolation_quarantined");
+    expect(result.gatewayCheck.mutationAttempt).toBeNull();
+    expect(result.signatureEvidence).toBeNull();
+    expect(signer.signatureCount()).toBe(0);
+  });
+
   it("refuses external sandbox posture before invoking the official signer", async () => {
     const fixture = await greenlitOfficialX402Contract();
     const signer = trackedOfficialSigner();
@@ -698,27 +793,11 @@ async function greenlitX402Contract() {
   await kernel.putCatalogObject({ objectType: "action_type", payload: records.actionType });
   await kernel.putCatalogObject({ objectType: "gateway_registry_entry", payload: records.gatewayRegistryEntry });
   await kernel.putCatalogObject({ objectType: "operating_envelope", payload: records.operatingEnvelope });
+  await registerX402WalletCredentialRef(kernel, proposal, records);
+  await registerX402DelegatedAuthorityRef(kernel, proposal, records);
   const runtimeResult = await proposeX402PaymentActionContract(
     kernel,
-    {
-      tenantId: proposal.tenantId,
-      organizationId: proposal.organizationId,
-      principalId: records.operatingEnvelope.principalId,
-      agentId: records.operatingEnvelope.agentId,
-      runId: "run_x402_demo",
-      runtimeAdapterId: records.toolCapability.runtimeAdapterId,
-      operatingEnvelopeId: records.operatingEnvelope.envelopeId,
-      toolCatalogRef: `${records.toolCapability.toolCatalogId}@${records.toolCapability.toolCatalogVersion}`,
-      actionCatalogRef: `${records.actionType.actionCatalogId}@${records.actionType.actionCatalogVersion}`,
-      gatewayRegistryRef: `gateway_registry@${records.gatewayRegistryEntry.gatewayRegistryVersion}`,
-      toolCapabilityId: records.toolCapability.toolCapabilityId,
-      actionTypeId: records.actionType.actionTypeId,
-      gatewayRegistryEntryId: records.gatewayRegistryEntry.gatewayRegistryEntryId,
-      gatewayId: records.gatewayRegistryEntry.gatewayId,
-      maxAtomicAmountPerCall: proposal.spendBounds.maxAtomicAmountPerCall,
-      contractExpiresAt: futureIso(),
-      signingSecret: "test-secret",
-    },
+    x402RuntimeConfig(proposal, records, "run_x402_demo"),
     {
       principalIntentRef: "intent:fetch paid context",
       generatedCodeOrSpecRef: "code:x402-fetch-wrapper",
@@ -762,27 +841,11 @@ async function greenlitOfficialX402Contract(options: { paymentIdentifier?: strin
   await kernel.putCatalogObject({ objectType: "action_type", payload: records.actionType });
   await kernel.putCatalogObject({ objectType: "gateway_registry_entry", payload: records.gatewayRegistryEntry });
   await kernel.putCatalogObject({ objectType: "operating_envelope", payload: records.operatingEnvelope });
+  await registerX402WalletCredentialRef(kernel, proposal, records);
+  await registerX402DelegatedAuthorityRef(kernel, proposal, records);
   const runtimeResult = await proposeX402PaymentActionContract(
     kernel,
-    {
-      tenantId: proposal.tenantId,
-      organizationId: proposal.organizationId,
-      principalId: records.operatingEnvelope.principalId,
-      agentId: records.operatingEnvelope.agentId,
-      runId: "run_x402_official",
-      runtimeAdapterId: records.toolCapability.runtimeAdapterId,
-      operatingEnvelopeId: records.operatingEnvelope.envelopeId,
-      toolCatalogRef: `${records.toolCapability.toolCatalogId}@${records.toolCapability.toolCatalogVersion}`,
-      actionCatalogRef: `${records.actionType.actionCatalogId}@${records.actionType.actionCatalogVersion}`,
-      gatewayRegistryRef: `gateway_registry@${records.gatewayRegistryEntry.gatewayRegistryVersion}`,
-      toolCapabilityId: records.toolCapability.toolCapabilityId,
-      actionTypeId: records.actionType.actionTypeId,
-      gatewayRegistryEntryId: records.gatewayRegistryEntry.gatewayRegistryEntryId,
-      gatewayId: records.gatewayRegistryEntry.gatewayId,
-      maxAtomicAmountPerCall: proposal.spendBounds.maxAtomicAmountPerCall,
-      contractExpiresAt: futureIso(),
-      signingSecret: "test-secret",
-    },
+    x402RuntimeConfig(proposal, records, "run_x402_official"),
     await buildX402PaymentAttemptFromRequiredEvidence({
       evidence,
       principalIntentRef: "intent:fetch paid context",
@@ -844,9 +907,69 @@ async function recordGatewayCheckedPosture(
   });
 }
 
+async function registerX402WalletCredentialRef(
+  kernel: HandshakeKernel,
+  proposal: X402InstallProposal,
+  records: NonNullable<X402InstallProposal["compiledRecords"]>,
+): Promise<GatewayCredentialRef> {
+  const credentialRef = await kernel.registerGatewayCredentialRef(
+    await buildX402WalletGatewayCredentialRefInput(proposal, records),
+  );
+  x402CredentialRefs.set(proposal, credentialRef);
+  return credentialRef;
+}
+
+async function registerX402DelegatedAuthorityRef(
+  kernel: HandshakeKernel,
+  proposal: X402InstallProposal,
+  records: NonNullable<X402InstallProposal["compiledRecords"]>,
+): Promise<DelegatedAuthorityRef> {
+  const authorityRef = await kernel.registerDelegatedAuthorityRef(
+    await buildX402DelegatedSpendAuthorityRefInput(proposal, records),
+  );
+  x402AuthorityRefs.set(proposal, authorityRef);
+  return authorityRef;
+}
+
 function requireCompiledRecords(proposal: X402InstallProposal): NonNullable<X402InstallProposal["compiledRecords"]> {
   if (!proposal.compiledRecords) throw new Error("expected installable proposal");
   return proposal.compiledRecords;
+}
+
+function x402RuntimeConfig(
+  proposal: X402InstallProposal,
+  records: NonNullable<X402InstallProposal["compiledRecords"]>,
+  runId: string,
+) {
+  const credentialRef = x402CredentialRefs.get(proposal);
+  if (!credentialRef) throw new Error("expected registered x402 wallet credential ref");
+  const authorityRef = x402AuthorityRefs.get(proposal);
+  if (!authorityRef) throw new Error("expected registered x402 delegated authority ref");
+  return {
+    tenantId: proposal.tenantId,
+    organizationId: proposal.organizationId,
+    principalId: records.operatingEnvelope.principalId,
+    agentId: records.operatingEnvelope.agentId,
+    runId,
+    runtimeAdapterId: records.toolCapability.runtimeAdapterId,
+    operatingEnvelopeId: records.operatingEnvelope.envelopeId,
+    toolCatalogRef: `${records.toolCapability.toolCatalogId}@${records.toolCapability.toolCatalogVersion}`,
+    actionCatalogRef: `${records.actionType.actionCatalogId}@${records.actionType.actionCatalogVersion}`,
+    gatewayRegistryRef: `gateway_registry@${records.gatewayRegistryEntry.gatewayRegistryVersion}`,
+    gatewayReadinessRef: "handshake://local/x402/gateway-readiness.json",
+    gatewayReadinessDigest: digest,
+    policyVersionRef: `${proposal.policyPackRef}@${proposal.policyPackVersion}`,
+    policyVersionDigest: digest,
+    toolCapabilityId: records.toolCapability.toolCapabilityId,
+    actionTypeId: records.actionType.actionTypeId,
+    gatewayRegistryEntryId: records.gatewayRegistryEntry.gatewayRegistryEntryId,
+    gatewayId: records.gatewayRegistryEntry.gatewayId,
+    gatewayCredentialBinding: x402WalletGatewayCredentialBindingFor(credentialRef),
+    delegatedAuthorityBinding: x402DelegatedSpendAuthorityBindingFor(authorityRef),
+    maxAtomicAmountPerCall: proposal.spendBounds.maxAtomicAmountPerCall,
+    contractExpiresAt: futureIso(),
+    signingSecret: "test-secret",
+  };
 }
 
 function validInstallInput(): X402InstallProposalInput {

@@ -30,7 +30,9 @@ export type McpStdioProcessProofRow = {
 export type McpStdioProcessProof = {
   readonly schemaVersion: typeof MCP_STDIO_PROCESS_PROOF_VERSION;
   readonly transport: "stdio";
-  readonly serverEntrypoint: "src/mcp/stdio/entry.ts";
+  readonly serverEntrypoint: string;
+  readonly serverCommand: string;
+  readonly serverArgs: readonly string[];
   readonly processTimeoutMs: number;
   readonly sdkPosture: {
     readonly clientPackage: "@modelcontextprotocol/client";
@@ -69,10 +71,12 @@ export async function runMcpStdioProcessProof(
   options: RunMcpStdioProcessProofOptions = {},
 ): Promise<McpStdioProcessProof> {
   const timeoutMs = options.timeoutMs ?? 8_000;
+  const serverCommand = options.command ?? process.execPath;
+  const serverArgs = [...(options.args ?? ["run", "./src/mcp/stdio/entry.ts"])];
   const client = new Client({ name: "handshake-self-hosted-local-proof", version: "0.1.0" });
   const transport = new StdioClientTransport({
-    command: options.command ?? process.execPath,
-    args: [...(options.args ?? ["run", "./src/mcp/stdio/entry.ts"])],
+    command: serverCommand,
+    args: serverArgs,
     cwd: options.cwd ?? process.cwd(),
     stderr: "pipe",
   });
@@ -108,7 +112,9 @@ export async function runMcpStdioProcessProof(
     return {
       schemaVersion: MCP_STDIO_PROCESS_PROOF_VERSION,
       transport: "stdio",
-      serverEntrypoint: "src/mcp/stdio/entry.ts",
+      serverEntrypoint: options.args?.[0] ?? "src/mcp/stdio/entry.ts",
+      serverCommand,
+      serverArgs,
       processTimeoutMs: timeoutMs,
       sdkPosture: {
         clientPackage: "@modelcontextprotocol/client",

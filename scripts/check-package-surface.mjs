@@ -9,21 +9,28 @@ const requiredFiles = [
   "bin/handshake",
   "bin/handshake-mcp",
   "README.md",
+  "CHANGELOG.md",
   "dist/index.mjs",
   "dist/conformance/index.mjs",
+  "dist/adapter-sdk/index.mjs",
+  "dist/surfaces/index.mjs",
   "dist/runtime/index.mjs",
   "dist/sdk/surface-clients/index.mjs",
   "dist/cli/index.mjs",
   "dist/mcp/index.mjs",
+  "dist/x402-protected-tool/index.mjs",
   "dist/experimental.mjs",
   "dist/bin/handshake.mjs",
   "dist/bin/handshake-mcp.mjs",
   "dist/index.d.ts",
   "dist/conformance/index.d.ts",
+  "dist/adapter-sdk/index.d.ts",
+  "dist/surfaces/index.d.ts",
   "dist/runtime/index.d.ts",
   "dist/sdk/surface-clients/index.d.ts",
   "dist/cli/index.d.ts",
   "dist/mcp/index.d.ts",
+  "dist/x402-protected-tool/index.d.ts",
   "dist/experimental.d.ts",
 ];
 
@@ -54,7 +61,7 @@ const forbiddenPathFragments = [
   ".github/",
 ];
 
-const allowedExactFiles = new Set(["package.json", "server.json", "LICENSE", "NOTICE", "README.md"]);
+const allowedExactFiles = new Set(["package.json", "server.json", "LICENSE", "NOTICE", "README.md", "CHANGELOG.md"]);
 const allowedPathPrefixes = ["bin/", "dist/"];
 
 const pack = spawnSync("npm", ["pack", "--dry-run", "--json"], {

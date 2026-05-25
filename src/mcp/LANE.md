@@ -6,7 +6,7 @@ The MCP lane is owned by surface code. It may expose model-facing proposal and e
 
 ## Current proof claim
 
-This lane defines a source-owned MCP catalog, strict `x402_payment.exact` proposal schema, structured non-authority outcomes, read-only evidence resource mapping, and a local stdio process harness exercised through the official MCP TypeScript SDK. It does not evaluate policy, create greenlights, perform gateway checks, sign payments, execute mutations, export receipts, read raw records, or mint authority certificates.
+This lane defines a source-owned MCP catalog, strict `x402_payment.exact` proposal schema, trusted runtime-side readiness/policy binding for contract formation, structured non-authority outcomes, read-only evidence resource mapping, and a local stdio process harness exercised through the official MCP TypeScript SDK. It does not evaluate policy, create greenlights, perform gateway checks, sign payments, execute mutations, export receipts, read raw records, or mint authority certificates.
 
 ## Use cases
 
@@ -20,6 +20,7 @@ This lane defines a source-owned MCP catalog, strict `x402_payment.exact` propos
 ## Constraints and assumptions
 
 - The model-facing process receives runtime/evidence custody only.
+- The model-facing input cannot supply readiness or policy-version digests; those bindings must come from the trusted runtime-side options before an action contract can be proposed.
 - Gateway custody, control-plane install, signer material, mutation execution, and terminal certificate minting live outside MCP.
 - Generated execution graph creation remains kernel-only in this checkout; MCP records that posture instead of creating a new HTTP authority path.
 - The first public proposal tool is `handshake.actions.x402_payment.propose`.
