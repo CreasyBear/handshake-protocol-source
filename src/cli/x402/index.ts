@@ -98,6 +98,7 @@ export async function installX402PaymentCommand(input: { cwd: string; inputValue
     evidenceRefs: [recordedRef].filter((ref): ref is string => typeof ref === "string"),
     warnings: [
       "Compiled local x402 posture only; trusted readiness requires control-plane install registration and gateway posture evidence.",
+      "Trusted readiness is pre-contract service context only; it is not ServiceWorkflowAdmission, ServiceWorkflowHandle, policy, greenlight, gateway check, or mutation authority.",
       "No greenlight, signer use, gateway check, or mutation was performed.",
     ],
     result: {
@@ -123,6 +124,7 @@ export async function probesX402PaymentCommand(input: { cwd: string; postureValu
     evidenceRefs: [recordedRef].filter((ref): ref is string => typeof ref === "string"),
     warnings: [
       "Probe report classifies caller-supplied gateway posture evidence; it is not provider certification, authority, or execution proof.",
+      "Probe evidence is pre-contract service context only; it is not ServiceWorkflowAdmission, ServiceWorkflowHandle, policy, greenlight, gateway check, or mutation authority.",
     ],
     result: {
       ...report,
@@ -154,6 +156,7 @@ export async function registerX402GatewayReadinessCommand(input: {
     ),
     warnings: [
       "Trusted readiness binds pre-contract install, probe, gateway, policy, and credential posture only.",
+      "Trusted readiness is pre-contract service context only; it is not ServiceWorkflowAdmission, ServiceWorkflowHandle, policy, greenlight, gateway check, or mutation authority.",
       "No greenlight, signer use, gateway check, payment payload, or mutation was performed.",
     ],
     result: outcome.record

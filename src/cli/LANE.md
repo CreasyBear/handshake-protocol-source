@@ -12,6 +12,10 @@ The first CLI slice can inspect a local APS report, verify a supplied terminal c
 
 Let an operator or operator automation inspect local/reference evidence with machine-readable JSON while preserving custody separation from runtime, gateway, and protocol authority.
 
+Service workflow evidence may be displayed as admission/readback context. A
+`ServiceWorkflowHandle` never makes a CLI command agent-safe, retry-safe, or
+authorized to run protected work.
+
 ## Constraints and assumptions
 
 The CLI is not an agent hot path. Runtime proposal belongs to SDK/MCP, gateway checks belong to gateway custody, and policy decisions remain kernel/control-plane authority. First-slice CLI commands are evidence or posture commands only.
@@ -51,3 +55,8 @@ Extract after command metadata, JSON envelope, redaction posture, evidence wrapp
 ## Scope boundary
 
 The CLI may render local evidence and verify supplied terminal certificates. It must not evaluate policy, mint greenlights, perform gateway checks, start protected mutation processes, export raw receipts, or infer authorization from command success.
+
+It must also not infer authorization from `Passport`,
+`ServiceWorkflowAdmission`, or `ServiceWorkflowHandle` records. Those records
+can help an operator find evidence and proof gaps; protected action clearance
+still requires a fresh exact action contract.

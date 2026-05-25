@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { digestMcp, type McpJsonValue } from "./digest";
 import { MCP_SCHEMA_VERSION } from "./output";
+import { mcpServiceWorkflowBoundary } from "./catalog";
 
 export const McpResourceReadSchema = z.strictObject({
   schemaVersion: z.literal(MCP_SCHEMA_VERSION),
@@ -102,6 +103,7 @@ async function readPayload(parsed: ParsedMcpResourceUri, evidenceClient: McpEvid
         resourceVersion: "mcp-metadata.v1",
         actionClass: parsed.actionClass,
         proposalTool: "handshake.actions.x402_payment.propose",
+        serviceWorkflowBoundary: mcpServiceWorkflowBoundary,
         authorityCreated: false,
         gatewayCheckPerformed: false,
         mutationAttempted: false,

@@ -197,7 +197,10 @@ export function cliCommandErrorOutput(input: {
     retryability: "retryable_after_fix",
     commitState: "not_started",
     redactionProfileRef: "cli-error:v1-redacted",
-    warnings: ["Command failed before any authority, gateway check, signer use, or protected mutation."],
+    warnings: [
+      "Command failed before any authority, gateway check, signer use, or protected mutation.",
+      "No ServiceWorkflowAdmission, ServiceWorkflowHandle, clearance, policy decision, greenlight, gateway check, signer use, or protected mutation was created.",
+    ],
     result: {
       errorCode: input.errorCode,
       message: input.message,

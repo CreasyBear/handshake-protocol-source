@@ -12,6 +12,10 @@ Client ergonomics for invoking the reference HTTP surface. The SDK does not prov
 
 Let callers invoke public transition routes, route role-scoped tokens, parse typed success/error responses, and read redacted diagnostic evidence projections.
 
+Service workflow admission and handle records may guide request construction
+and readback. They are not SDK credentials, role tokens, policy decisions,
+greenlights, gateway checks, retries, or mutation permissions.
+
 ## Constraints and assumptions
 
 The client is outside the authority boundary. It may submit evidence or requests, but server-side protocol and gateway checks decide whether consequence can proceed.
@@ -90,6 +94,11 @@ action-contracts through `runtime_evidence` custody. Those methods produce
 proposal records or compiler refusals only. They do not evaluate policy,
 greenlight, gateway-check, mutate, export receipts, mint certificates, recover,
 install, isolate, or sign.
+
+If a caller starts from a `ServiceWorkflowHandle`, `RuntimeClient` still must
+produce a fresh exact action-contract proposal. The handle can contribute
+context and evidence refs only; it cannot satisfy policy, gateway, signer, or
+receipt requirements.
 
 `ControlPlaneClient` may register delegated authority refs and record terminal
 delegated authority status transitions through `control_plane` custody. Those

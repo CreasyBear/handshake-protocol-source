@@ -1,7 +1,8 @@
 import { describe, expect, it } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { cliCommandManifest } from "../../src/cli/command-manifest";
+import { cliCommandManifest, cliSchemaOutput, cliServiceWorkflowPosture } from "../../src/cli/command-manifest";
+import { cliNonClaims } from "../../src/cli/output";
 
 const forbiddenCommandTerms = [
   "run",
@@ -102,6 +103,9 @@ describe("CLI command posture", () => {
     for (const field of requiredNonAuthorityFields) {
       expect(source).toContain(field);
     }
+    expect(cliNonClaims).toContain("service workflow admission or handle authority");
+    expect(cliCommandManifest.every((command) => command.nonGoals.includes("workflow handle authority"))).toBe(true);
+    expect(cliSchemaOutput().every((command) => command.workflowPosture === cliServiceWorkflowPosture)).toBe(true);
   });
 });
 

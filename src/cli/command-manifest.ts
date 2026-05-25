@@ -21,6 +21,9 @@ export type CliCommandManifestEntry = {
   readonly nonGoals: readonly string[];
 };
 
+export const cliServiceWorkflowPosture =
+  "CLI surface only: local setup, readiness, and evidence readback; does not create ServiceWorkflowAdmission, ServiceWorkflowHandle, clearance, policy decision, greenlight, gateway check, mutation, receipt export, or certificate." as const;
+
 const sharedNonGoals = [
   "policy evaluation",
   "gateway check",
@@ -28,6 +31,7 @@ const sharedNonGoals = [
   "credential custody",
   "raw record access",
   "process startup",
+  "workflow handle authority",
 ] as const;
 
 export const cliCommandManifest = [
@@ -249,5 +253,7 @@ export function cliSchemaOutput() {
     outputSchema: command.outputSchema,
     agentSafe: command.agentSafe,
     redactionPosture: command.redactionPosture,
+    nonGoals: command.nonGoals,
+    workflowPosture: cliServiceWorkflowPosture,
   }));
 }

@@ -62,6 +62,11 @@ handshake install health --cwd .
 handshake-mcp
 ```
 
+In service-workflow terms, these CLI commands prepare local/readiness evidence
+before any fresh `ServiceWorkflowAdmission`, `ServiceWorkflowHandle`, or
+Request Clearance; they do not create admission, handle, clearance, or outcome
+authority.
+
 These commands do not create policy decisions, greenlights, gateway checks,
 payment material, mutations, receipts, or certificates. They establish local
 proposal readiness only.

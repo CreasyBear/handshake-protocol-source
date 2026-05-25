@@ -117,8 +117,8 @@ describe("CLI evidence surface", () => {
       command: "schema",
       result: {
         commands: [
-          { id: "schema", agentSafe: true },
-          { id: "init", agentSafe: false },
+          { id: "schema", agentSafe: true, nonGoals: expect.arrayContaining(["workflow handle authority"]) },
+          { id: "init", agentSafe: false, workflowPosture: expect.stringContaining("does not create") },
           { id: "doctor", agentSafe: true },
           { id: "evidence.aps-report", agentSafe: true },
           { id: "evidence.contract-view", agentSafe: true },
@@ -165,6 +165,10 @@ describe("CLI evidence surface", () => {
       nextAction: "run_schema",
       retryability: "retryable_after_fix",
       commitState: "not_started",
+      warnings: [
+        "Command failed before any authority, gateway check, signer use, or protected mutation.",
+        "No ServiceWorkflowAdmission, ServiceWorkflowHandle, clearance, policy decision, greenlight, gateway check, signer use, or protected mutation was created.",
+      ],
       result: {
         errorCode: "cli_command_unsupported",
         message: "Unsupported command.",
