@@ -3,13 +3,14 @@
 Handshake is protected action infrastructure for automated decision making. This
 package is the installable protocol kernel, CLI, SDK, and local MCP
 proposal/evidence server for reducing one consequential automated action to an
-exact contract before mutation. Vague intent and generated code are not authority. A protected path requires an
+exact contract before mutation. Vague intent and generated code are not
+authority. A protected path requires an
 exact action contract, policy decision, one-use greenlight or refusal, gateway
 check before mutation, and receipt, refusal, replay refusal, proof gap, or
 optional terminal AuthorityCertificate. Certificate is terminal evidence, not
 permission.
-protected actions for automated decision making.
-certificate is terminal evidence, not permission.
+
+Category: protected actions for automated decision making; certificate is terminal evidence, not permission.
 
 Core terms: a `cleared protected-action event` is one terminal event with
 reconstructable evidence; the `protocol kernel` is the state machine and schema
@@ -20,11 +21,10 @@ until registry acceptance and lookup are verified.
 
 Package: `handshake-protocol-kernel@0.2.7`. MCP name:
 `io.github.CreasyBear/handshake-protocol-kernel`. Runtime: Node.js `>=20`.
-License: Apache-2.0. Public repository form: package artifact repository, not
-source mirror. The public repo contains package artifacts and trusted-publish
-metadata only; it must not contain private source, tests, scripts, examples,
-docs, planning scratch, local artifacts, `node_modules`, or credential material.
-Public repository form: package artifact repository, not source mirror.
+License: Apache-2.0. Published package repository form: package artifact repository, not source mirror.
+The published package repo contains package artifacts and trusted-publish
+metadata only; it must not contain source, tests, scripts, examples, docs,
+planning scratch, local artifacts, `node_modules`, or credential material.
 
 `npm install handshake-protocol-kernel`. For one-shot checks:
 `npm exec --package handshake-protocol-kernel -- handshake schema` and
@@ -92,16 +92,14 @@ evidence/report projection, the first promoted non-payment adapter pack after
 x402 exact per-call, a package-manager local host-specific bypass
 manifest/proof-packet/report, public runtime ingress for local x402 payment and
 package-install dispatch boundaries, and source-owned local MCP stdio
-proposal/evidence process proof. Source-owned demos and schemas are the source
-of sample readback: `npm run demo:self-hosted` writes
+proposal/evidence process proof. The source-owned demos and schemas drive
+sample readback: `npm run demo:self-hosted` writes
 `examples/self-hosted-activation/output/latest.md` and is not hosted operation;
 it uses real local MCP stdio proposal/evidence proof;
 `npm run demo:aps` writes `examples/x402-protected-spend/output/latest.md` and
-is not hosted operation, not broad x402 compatibility; `npm run
-demo:adapter-sdk` writes `examples/external-adapter-sdk/output/latest.md` and is
-not policy evaluation, not gateway check, not mutation.
-source-owned demos and schemas drive sample readback.
-`npm run demo:adapter-sdk`.
+is not hosted operation, not broad x402 compatibility; `npm run demo:adapter-sdk`
+writes `examples/external-adapter-sdk/output/latest.md` and is not policy evaluation,
+not gateway check, not mutation.
 
 No adapter family defines the protocol. This package is not broad x402
 compatibility, not live provider custody, hosted mutation authority, production
@@ -113,7 +111,8 @@ revocation authority, facilitator operation, seller middleware, unsupported x402
 schemes, marketplace certification, or compliance-grade audit. Aggregate
 payment-budget management is intentionally outside the current remit.
 
-Trusted Publishing: MCP Registry discoverability is now the remaining distribution launch blocker.
+Trusted Publishing: MCP Registry discoverability is now the remaining
+distribution launch blocker.
 `0.2.7` npm availability is verified by registry readback, npm signature
 metadata, GitHub Actions provenance publication, and clean installed-artifact
 smoke. Public npm availability still does not create authority.
@@ -122,12 +121,10 @@ Trusted Publishing workflow input: `expected_version = 0.2.7`. Release proof
 states: `ready_to_publish` means package shape and local gates passed;
 `actually_published` means npm publish and installed-artifact readback passed
 for the exact version; `registry_discoverable` means MCP Registry acceptance and
-lookup have been verified. MCP Registry discoverability is separate from npm
-publication.
-MCP Registry discoverability is separate from npm publication.
+lookup have been verified. MCP Registry discoverability is separate from npm publication.
 
-Reason-code runbook: stale metadata or readiness -> reload evidence. Unsafe input, amount overrun,
-dynamic argument, changed observed parameters, or consumed greenlight replay ->
-create new contract. Raw sibling path reachable -> stop and record bypass proof.
-Credential or delegated authority isolated -> keep future attempts blocked.
-Downstream finality unknown -> proof gap, not success.
+Reason-code runbook: stale metadata or readiness -> reload evidence. Unsafe
+input, amount overrun, dynamic argument, changed observed parameters, or
+consumed greenlight replay -> create new contract. Raw sibling path reachable ->
+stop and record bypass proof. Credential or delegated authority isolated -> keep
+future attempts blocked. Downstream finality unknown -> proof gap, not success.

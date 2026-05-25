@@ -609,3 +609,29 @@ CI must run the same command through `.github/workflows/check.yml`.
 Source names must describe owned protocol concepts, not buckets. The repo bans source path segments such as `utils`, `helpers`, `common`, `misc`, `stuff`, `manager`, and `service` unless `STRUCTURE.md` explicitly creates an exception.
 
 Internal planning-stage labels must not appear in repo-facing scripts, CI names, README sections, source paths, tests, or exported symbols.
+
+## Repository And Release Administration
+
+Handshake has two repository boundaries for release administration:
+
+- `CreasyBear/handshake-protocol-source` is the full source workbench. It owns
+  source code, tests, internal docs, release projection scripts, source tags,
+  and the source CI gate. Its workflow runs `npm run check:repo`. It must not
+  contain npm Trusted Publishing authority.
+- `CreasyBear/handshake-protocol-kernel` is the published package artifact
+  repository. It owns the projected npm package boundary: `bin/`, `dist/`,
+  `README.md`, `CHANGELOG.md`, `LICENSE`, `NOTICE`, `package.json`,
+  `server.json`, `.handshake-release-repository-manifest.json`, and
+  `.github/workflows/trusted-publish.yml`. It is the only repository boundary
+  that may hold npm Trusted Publishing.
+
+Source tags identify the source state that generated a release. Artifact tags
+identify the exact package-artifact repository state used for npm distribution.
+The two tags may point at different commits because their repository boundaries
+are intentionally different.
+
+Repository visibility is an administrative setting, not an authority boundary.
+A public source repository would expose source; it still would not create
+policy decisions, greenlights, gateway checks, mutations, certificates, hosted
+operation, or MCP Registry discoverability. Public npm availability remains
+distribution only and does not create authority.

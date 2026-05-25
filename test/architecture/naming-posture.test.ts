@@ -163,6 +163,8 @@ describe("repo naming posture", () => {
 
     expect(workflow).toContain("name: check");
     expect(workflow).toContain("npm run check:repo");
+    expect(workflow).not.toContain("trusted-publish");
+    expect(workflow).not.toContain("npm publish");
   });
 
   it("keeps CI actions pinned to immutable commit SHAs", () => {

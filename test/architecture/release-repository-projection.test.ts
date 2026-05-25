@@ -60,6 +60,15 @@ describe("release repository projection", () => {
       expect(paths.has("server.json")).toBe(true);
       expect(paths.has(".github/workflows/trusted-publish.yml")).toBe(true);
 
+      const workflow = readFileSync(join(releaseRoot, ".github/workflows/trusted-publish.yml"), "utf8");
+      expect(workflow).toContain("actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4");
+      expect(workflow).toContain("actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6");
+      expect(workflow).toContain("npm publish --provenance --access public");
+      const floatingActions = Array.from(workflow.matchAll(/uses:\s*([^\s#]+)/g))
+        .map((match) => match[1] ?? "")
+        .filter((action) => !/@[0-9a-f]{40}$/.test(action));
+      expect(floatingActions).toEqual([]);
+
       expect(existsSync(join(releaseRoot, "src"))).toBe(false);
       expect(existsSync(join(releaseRoot, "test"))).toBe(false);
       expect(existsSync(join(releaseRoot, "scripts"))).toBe(false);
