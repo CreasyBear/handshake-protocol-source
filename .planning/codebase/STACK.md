@@ -1,170 +1,114 @@
 # Technology Stack
 
-**Analysis Date:** 2026-05-25
+**Analysis Date:** 2026-05-26
 
-## Protocol Kernel Shape
+## Source Stamp
 
-**Current package:**
-- `handshake-protocol-kernel@0.2.7` in `package.json`.
-- MCP package name is `io.github.CreasyBear/handshake-protocol-kernel` in `package.json` and `server.json`.
-- Runtime requirement is Node.js `>=20` in `package.json`; the current local shell reports `node --version` as `v25.2.1`.
-
-**Kernel boundary:**
-- The source-owned protocol kernel lives under `src/protocol/`. Its transition facade is `src/protocol/kernel.ts`.
-- The kernel records exact contracts, policy decisions, one-use greenlights, gateway checks, receipts, refusals, proof gaps, isolation, recovery, review binding, generated-execution evidence, delegated-authority evidence, gateway-credential evidence, and terminal `AuthorityCertificate` evidence.
-- Product surfaces live outside protocol meaning: `src/cli/`, `src/mcp/`, `src/sdk/`, `src/runtime/`, `src/adapters/`, `src/x402-protected-tool/`, and `examples/`. These surfaces may expose proposal, readiness, redacted readback, demos, or host activation artifacts, but they must not create authority unless they call the protocol and gateway path.
-
-**Authority sequence:**
-- Runtime or generated execution evidence is recorded by `src/protocol/areas/runtime-evidence/`, `src/protocol/areas/generated-execution-graph/`, and `src/protocol/areas/tool-call-draft/`.
-- Intent compilation and exact contract proposal live in `src/protocol/areas/intent-compilation/` and `src/protocol/areas/action-contract/`.
-- Policy and one-use greenlights live in `src/protocol/areas/policy-greenlight/`.
-- Gateway enforcement lives in `src/protocol/areas/gateway-gate/`; mutation-capable reference adapters use `verifiedGatewayCheckFromResult()` from `src/protocol/areas/gateway-gate/`.
-- Reconstruction lives in `src/protocol/events/`, `src/protocol/evidence-projections/`, `src/protocol/areas/receipt-export/`, `src/protocol/areas/proof-gap/`, and `src/protocol/areas/authority-certificate/`.
-
-**Passport / admission / service gateway / principal-agent link:**
-- There is no standalone `Passport` primitive in tracked source. Do not add one unless it reduces ambiguity more than the current typed records.
-- HTTP caller admission is transport custody in `src/http/admission/`; it authenticates transition callers and read entitlements, not protected-action authority.
-- The protected-action principal-agent link is `principalId`, `agentId`, and evidence-only `participantIdentityBindings` on `OperatingEnvelopeSchema` in `src/protocol/areas/catalog-envelope/schemas.ts`, then copied into `ActionContractSchema` in `src/protocol/areas/action-contract/schemas.ts`.
-- Attempt authority is represented by `DelegatedAuthorityRefSchema` in `src/protocol/areas/delegated-authority/schemas.ts`; it records principal/agent/runtime/envelope/gateway scoped bounds and can be revoked or expired into isolation, but it is not a greenlight.
-- Service gateway authority is represented by `GatewayRegistryEntrySchema` in `src/protocol/areas/catalog-envelope/schemas.ts`, `GatewayCredentialRefSchema` and `GatewayCustodyProofPacketSchema` in `src/protocol/areas/credential-custody/schemas.ts`, and the final `gatewayCheck()` transition in `src/protocol/kernel.ts`.
+- Current source stamp: `git rev-parse --short HEAD` returned `4946237`.
+- Current checkout is dirty: `git status --short` reports source, test, docs, package, and `.planning/` changes. This map reflects the current working tree, not only the committed tree.
+- Source truth for stack claims is `package.json`, `README.md`, `QUALITY.md`, `STRUCTURE.md`, `server.json`, `wrangler.toml`, `.github/workflows/check.yml`, `src/**`, `test/**`, `scripts/**`, and `docs/internal/**`.
+- `.planning/**` is scratch coordination per `.planning/STATE.md`; do not treat older `.planning/codebase/*.md` as canonical when source files disagree.
 
 ## Languages
 
 **Primary:**
-- TypeScript 6.0.3 - All source, tests, examples, protocol schemas, HTTP routes, SDK clients, CLI, MCP server, adapters, and storage implementations under `src/`, `test/`, and `examples/`.
+- TypeScript 6.0.3 - Strict ESM source, tests, examples, and declaration output. Core source lives under `src/**/*.ts`, tests under `test/**/*.test.ts`, demos under `examples/**/run.ts`, and declaration emit is configured by `tsconfig.build.json`.
 
 **Secondary:**
-- JavaScript ESM - Build and package verification scripts under `scripts/`, including `scripts/build-package-bundles.mjs`, `scripts/check-package-surface.mjs`, `scripts/check-published-entrypoints.mjs`, and `scripts/check-release-proof.mjs`.
-- SQL - Cloudflare D1 schema in `migrations/0001_protocol_kernel.sql`.
-- Markdown - Canonical repo docs in `README.md`, `AGENTS.md`, `QUALITY.md`, `STRUCTURE.md`, and `docs/internal/*.md`; example docs under `examples/*/README.md`.
-- TOML/JSON/YAML - Worker config in `wrangler.toml`, package metadata in `package.json`, MCP Registry metadata in `server.json`, TypeScript config in `tsconfig.json`, formatting/lint config in `.prettierrc.json` and `eslint.config.js`, and CI in `.github/workflows/check.yml`.
+- JavaScript - Node-side release, package, build, and posture scripts live in `scripts/*.mjs` and `scripts/*.js`; executable package stubs live in `bin/handshake` and `bin/handshake-mcp`.
+- SQL - Cloudflare D1/SQLite-compatible durable storage schema lives in `migrations/0001_protocol_kernel.sql`.
+- Markdown - Repo-facing source docs live in `README.md`, `QUALITY.md`, `STRUCTURE.md`, `AGENTS.md`, and `docs/internal/*.md`.
+- JSON/TOML/YAML - Package and runtime metadata live in `package.json`, `server.json`, `tsconfig.json`, `tsconfig.build.json`, `.prettierrc.json`, `wrangler.toml`, and `.github/workflows/check.yml`.
 
 ## Runtime
 
 **Environment:**
-- Node.js `>=20` - Required by `package.json#engines`; Node ESM bundles are executed by `bin/handshake` and `bin/handshake-mcp`.
-- Bun `1.3.9` - Declared in `package.json#packageManager`, present in `bun.lock`, used by `.github/workflows/check.yml`, used for tests and bundling.
-- Cloudflare Workers - Worker entrypoint is `src/worker.ts`; `wrangler.toml` points `main` to that file.
+- Node.js `>=20` - Declared in `package.json#engines`; package binaries `bin/handshake` and `bin/handshake-mcp` are Node executable stubs importing built ESM entrypoints from `dist/bin/*.mjs`.
+- Bun 1.3.9 - Declared in `package.json#packageManager`, present in `bun.lock`, used by `package.json#scripts.test`, `scripts/build-package-bundles.mjs`, and CI in `.github/workflows/check.yml`.
+- Cloudflare Workers - HTTP runtime target configured by `wrangler.toml`; Worker entrypoint is `src/worker.ts`; bindings are typed in `src/http/app-options.ts`.
+- ES modules - `package.json` sets `"type": "module"` and package exports point to `dist/**/*.mjs`.
 
 **Package Manager:**
-- Bun `1.3.9` - Primary install/test package manager.
-- npm `11.7.0` observed locally - Used by `package.json#scripts` and package checks such as `npm pack --dry-run --json`.
-- Lockfile: `bun.lock` present.
+- Bun 1.3.9 - Source package manager and lockfile owner. CI runs `bun install --frozen-lockfile` in `.github/workflows/check.yml`.
+- npm CLI - Used as script runner in `package.json#scripts` and by package/release scripts such as `scripts/check-release-admin.js`, `scripts/check-package-surface.mjs`, and `scripts/check-npm-maintainer-posture.mjs`.
+- Lockfile: present as `bun.lock`.
+- Not detected at root: `package-lock.json`, `pnpm-lock.yaml`, `yarn.lock`, `bun.lockb`.
 
 ## Frameworks
 
 **Core:**
-- `hono` ^4.12.19 - HTTP/Worker app and route dispatch in `src/http/app.ts`.
-- Cloudflare Workers + Wrangler ^4.92.0 - Deployment/runtime target configured by `wrangler.toml`; Worker/D1/KV types supplied by `@cloudflare/workers-types`.
-- `zod` ^4.4.3 - Runtime validation and schema backbone across `src/protocol/**`, `src/http/**`, `src/runtime/**`, `src/adapters/**`, `src/cli/**`, `src/mcp/**`, and `src/x402-protected-tool/**`.
-- MCP TypeScript SDK 2.0.0-alpha.2 - Local stdio MCP server/client proof in `src/mcp/stdio/server.ts`, `src/mcp/stdio/process-proof.ts`, and `scripts/check-published-entrypoints.mjs`.
-- x402 SDK 2.12.0 - Official buyer-side exact payment evidence/signing path in `src/adapters/x402-payment/upstream-evidence.ts`, `src/adapters/x402-payment/action-proposal.ts`, and `src/adapters/x402-payment/wallet-gateway.ts`.
+- Hono `^4.12.19` - HTTP router/app framework in `src/http/app.ts`, exported through `src/index.ts`, and served by `src/worker.ts`.
+- Zod `^4.4.3` - Runtime schema layer across protocol, HTTP, adapters, CLI, MCP, SDK, hosted admission, and product-surface code. Representative paths: `src/protocol/foundation/schema-core.ts`, `src/protocol/public/schemas.ts`, `src/http/routes/transition-response-schemas.ts`, `src/mcp/x402-proposal.ts`, and `src/hosted-admission/hosted-admission-config.ts`.
+- Cloudflare Workers APIs - D1 and KV binding types come from `@cloudflare/workers-types`; source uses them in `src/http/app-options.ts`, `src/http/store/resolution.ts`, `src/storage/d1/index.ts`, and `src/storage/kv/index.ts`.
+- x402 SDK `2.12.0` - Official buyer-side exact payment evidence and signing helpers use `@x402/core` and `@x402/evm` in `src/adapters/x402-payment/upstream-evidence.ts`, `src/adapters/x402-payment/wallet-gateway.ts`, and `src/adapters/x402-payment/sandbox-http.ts`.
+- Model Context Protocol SDK `^2.0.0-alpha.2` - Local stdio proposal/evidence server uses `@modelcontextprotocol/server` in `src/mcp/stdio/server.ts`; process and published-entrypoint checks use `@modelcontextprotocol/client` in `src/mcp/stdio/process-proof.ts` and `scripts/check-published-entrypoints.mjs`.
 
 **Testing:**
-- Bun test - Test runner via `package.json#scripts.test`.
-- TypeScript compiler - Type gate via `npm run check:types` and `npm run typecheck`.
-- Architecture and claim tests - Focused repo-boundary tests under `test/architecture/`.
+- Bun test - `package.json#scripts.test` runs `bun test`; test files under `test/**` import `describe`, `it`, and `expect` from `bun:test`.
+- Bun SQLite - D1 HTTP harness tests use `bun:sqlite` in `test/support/d1-http-harness.ts`.
+- Architecture/product/integration gates - `package.json` defines `quality:architecture`, `quality:claims`, and `quality:storage`, backed by `test/architecture/**`, `test/product/**`, `test/integration/**`, `test/protocol/**`, and `test/storage/**`.
 
 **Build/Dev:**
-- TypeScript declarations - `npm run build:types` runs `tsc -p tsconfig.build.json`.
-- Bun bundler - `scripts/build-package-bundles.mjs` bundles package entrypoints and bins into `dist/`.
-- ESLint 10.4.0 + `typescript-eslint` 8.59.4 - Linting configured by `eslint.config.js`.
-- Prettier 3.8.3 - Formatting configured by `.prettierrc.json`.
-- Wrangler - `npm run dev` runs `wrangler dev`.
+- TypeScript compiler `^6.0.3` - `npm run build:types` runs `tsc -p tsconfig.build.json`; `npm run check:types` runs `tsc --noEmit --pretty false`.
+- Bun bundler - `scripts/build-package-bundles.mjs` runs `bun build --target=node --format=esm` for package subpaths and CLI/MCP binaries.
+- Wrangler `^4.92.0` - `package.json#scripts.dev` runs `wrangler dev`; `wrangler.toml` points to `src/worker.ts` and declares D1/KV bindings.
+- ESLint `^10.4.0` plus `typescript-eslint ^8.59.4` - Configured by `eslint.config.js` for `src/**/*.ts` and `test/**/*.ts`.
+- Prettier `^3.8.3` - Configured by `.prettierrc.json`; `package.json#scripts.format:check` checks the repo.
+- GitHub Actions - `.github/workflows/check.yml` runs Bun install and `npm run check:repo` on `push` and `pull_request`.
 
 ## Key Dependencies
 
 **Critical:**
-- `zod` ^4.4.3 - Defines strict protocol, adapter, MCP, CLI, hosted admission, and evidence schemas.
-- `hono` ^4.12.19 - Owns HTTP routing for `/health`, `/openapi.json`, transition routes, evidence routes, hosted readiness, verifier routes, and internal record reads in `src/http/app.ts`.
-- `@x402/core` 2.12.0 - Validates `PaymentRequired` and `PaymentPayload` evidence in `src/adapters/x402-payment/upstream-evidence.ts` and `src/adapters/x402-payment/wallet-gateway.ts`.
-- `@x402/evm` 2.12.0 - Provides `ExactEvmScheme` and `ClientEvmSigner` for gateway-held exact EVM signing in `src/adapters/x402-payment/wallet-gateway.ts`.
-- `@modelcontextprotocol/server` 2.0.0-alpha.2 - Builds `handshake-mcp` local stdio server in `src/mcp/stdio/server.ts`.
-- `@modelcontextprotocol/client` 2.0.0-alpha.2 - Verifies the local MCP process in `src/mcp/stdio/process-proof.ts` and `scripts/check-published-entrypoints.mjs`.
+- `zod` `^4.4.3` - Defines source-owned protocol, adapter, HTTP, MCP, CLI, SDK, and hosted admission schemas in `src/protocol/**`, `src/adapters/**`, `src/http/**`, `src/mcp/**`, `src/cli/**`, `src/sdk/**`, and `src/hosted-admission/**`.
+- `hono` `^4.12.19` - Owns HTTP routing, middleware, errors, request parsing, and response handling in `src/http/app.ts` and `src/http/handlers/**`.
+- `@x402/core` `2.12.0` - Validates x402 `PaymentRequired` / `PaymentPayload` shapes and creates official x402 clients in `src/adapters/x402-payment/upstream-evidence.ts` and `src/adapters/x402-payment/wallet-gateway.ts`.
+- `@x402/evm` `2.12.0` - Provides `ExactEvmScheme` and `ClientEvmSigner` for gateway-held exact payment signing in `src/adapters/x402-payment/wallet-gateway.ts`.
+- `@modelcontextprotocol/server` `^2.0.0-alpha.2` - Implements local MCP stdio resources and the `handshake.actions.x402_payment.propose` tool in `src/mcp/stdio/server.ts`.
+- `@modelcontextprotocol/client` `^2.0.0-alpha.2` - Used for MCP stdio process proof and package entrypoint smoke checks in `src/mcp/stdio/process-proof.ts` and `scripts/check-published-entrypoints.mjs`.
 
 **Infrastructure:**
-- `@cloudflare/workers-types` ^4.20260517.1 - Worker, D1, and KV TypeScript bindings used by `src/http/app-options.ts`, `src/storage/d1/index.ts`, and `src/storage/kv/index.ts`.
-- `wrangler` ^4.92.0 - Cloudflare Worker local development and deployment CLI.
-- `typescript` ^6.0.3 - Strict source checking with `noUncheckedIndexedAccess` and `exactOptionalPropertyTypes` in `tsconfig.json`.
-- `eslint` ^10.4.0 and `typescript-eslint` ^8.59.4 - Type import, unused variable, and console discipline in `eslint.config.js`.
-- `prettier` ^3.8.3 - Formatting for source, docs, and generated example outputs.
-- `@x402/fetch` 2.12.0 - Dev/test fixture dependency used by `test/conformance/x402-upstream-exact-fixtures.test.ts`.
-- `@types/bun` ^1.3.14 - Bun type support for tests, scripts, and examples.
-- `@cfworker/json-schema` ^4.1.1 - Listed in `package.json`; no active source import detected under `src/`, `test/`, `scripts/`, or `examples/`.
+- `@cloudflare/workers-types` `^4.20260517.1` - Provides Cloudflare Worker, D1, and KV types used by `src/http/app-options.ts`, `src/storage/d1/index.ts`, and `src/storage/kv/index.ts`.
+- `@types/bun` `^1.3.14` - Supports Bun globals/APIs used by tests and examples such as `examples/service-workflow-admission/run.ts`, `examples/x402-protected-spend/run.ts`, and `test/support/d1-http-harness.ts`.
+- `@x402/fetch` `2.12.0` - Dev dependency used for upstream x402 fixture parity in `test/conformance/x402-upstream-exact-fixtures.test.ts`.
+- `@cfworker/json-schema` `^4.1.1` - Declared in `package.json`; no direct import was detected under `src/`, `test/`, `examples/`, or `scripts/` during this remap.
+- `typescript`, `eslint`, `typescript-eslint`, `prettier`, and `wrangler` - Source quality, type checking, formatting, package bundling, and Cloudflare Worker tooling in `package.json`, `tsconfig.json`, `eslint.config.js`, `.prettierrc.json`, and `wrangler.toml`.
 
 ## Configuration
 
 **Environment:**
-- Worker D1 binding `DB` and KV binding `CACHE` are declared in `wrangler.toml`.
-- Local bearer transition admission reads `HANDSHAKE_CONTROL_PLANE_TOKEN`, `HANDSHAKE_RUNTIME_EVIDENCE_TOKEN`, `HANDSHAKE_GATEWAY_CUSTODY_TOKEN`, and `HANDSHAKE_REVIEW_CUSTODY_TOKEN` in `src/http/admission/caller-auth.ts`.
-- Hosted admission is configured through `AppOptions.authMode`, `AppOptions.hostedAdmissionConfig`, and `AppOptions.hostedCallerVerifier` in `src/http/app-options.ts`; provider strategy values are schema-only in `src/http/admission/hosted-admission-config.ts`.
-- CLI local project state uses `.handshake/project.json` and external local state refs managed by `src/cli/local-project/index.ts`.
-- `.env`, `.env.local`, `.env.*.local`, `.dev.vars`, `*.pem`, and `*.key` are ignored by `.gitignore`. No `.env*` file contents were read.
+- HTTP role custody uses explicit bearer token bindings named `HANDSHAKE_CONTROL_PLANE_TOKEN`, `HANDSHAKE_RUNTIME_EVIDENCE_TOKEN`, `HANDSHAKE_GATEWAY_CUSTODY_TOKEN`, and `HANDSHAKE_REVIEW_CUSTODY_TOKEN` in `src/http/admission/caller-auth.ts`.
+- Cloudflare durable protocol storage uses D1 binding `DB`, declared in `wrangler.toml` and consumed by `src/http/store/resolution.ts` and `src/storage/d1/index.ts`.
+- Cloudflare optional cache uses KV binding `CACHE`, declared in `wrangler.toml` and consumed by `src/storage/kv/index.ts` and `src/http/handlers/hosted-readiness.ts`.
+- Hosted admission configuration is injected via `AppOptions.hostedAdmissionConfig` in `src/http/app-options.ts` and validated by `src/hosted-admission/hosted-admission-config.ts`; production provider secret names are declared by config, not hardcoded.
+- Hosted identity adapters implement `HostedVerifierAdapter` in `src/hosted-admission/hosted-verifier-adapter.ts`; no Clerk, OAuth/OIDC, or Cloudflare Access SDK dependency is bundled in `package.json`.
+- CLI local state uses `.handshake/project.json` and falls back to `XDG_STATE_HOME` or `~/.local/state/handshake` in `src/cli/local-project/index.ts`.
+- No root `.env*` file was detected. `.gitignore` excludes `.dev.vars`, `.env`, `.env.local`, and `.env.*.local`; if present, these files must be listed only and never read.
 
 **Build:**
-- `tsconfig.json` targets `ES2022`, uses `module: ESNext`, `moduleResolution: Bundler`, `lib: ["ES2022", "WebWorker"]`, strict checking, Worker/Bun types, and `outDir: dist`.
-- `tsconfig.build.json` emits declarations only from `src/` into `dist/`.
-- `scripts/build-package-bundles.mjs` bundles package entrypoints: `src/index.ts`, `src/conformance/index.ts`, `src/adapter-sdk/index.ts`, `src/surfaces/index.ts`, `src/runtime/index.ts`, `src/sdk/surface-clients/index.ts`, `src/cli/index.ts`, `src/mcp/index.ts`, `src/x402-protected-tool/index.ts`, `src/experimental.ts`, `src/cli/main.ts`, and `src/mcp/stdio/entry.ts`.
-- `eslint.config.js` ignores `dist/**`, `coverage/**`, `node_modules/**`, and `docs/internal/archive/**`; it enforces consistent type imports, unused-var cleanup, and no `console` except `warn` and `error`.
-- `.prettierrc.json` sets `printWidth: 120`, semicolons, double quotes, and trailing commas.
-
-## Package Surface
-
-**npm package:**
-- Package name/version: `handshake-protocol-kernel` `0.2.7` in `package.json`.
-- License: Apache-2.0 in `package.json`, with package files `LICENSE` and `NOTICE`.
-- Published allowlist is `bin`, `dist`, `server.json`, `README.md`, `CHANGELOG.md`, `LICENSE`, and `NOTICE` in `package.json#files`.
-- `scripts/check-package-surface.mjs` rejects packaged `.planning/`, `.agents/`, `skills-lock.json`, `src/`, `test/`, `scripts/`, `examples/`, `migrations/`, `docs/internal/`, old docs trees, root canon files such as `AGENTS.md`, `QUALITY.md`, `STRUCTURE.md`, and `bun.lock`.
-
-**Exports:**
-- `.` -> root protocol/HTTP/SDK curated API from `src/index.ts`.
-- `./conformance` -> reference conformance checks from `src/conformance/index.ts`.
-- `./adapter-sdk` -> definition-only adapter pack surface from `src/adapter-sdk/index.ts`.
-- `./runtime` -> proposal-only runtime ingress surface from `src/runtime/index.ts`.
-- `./sdk/role-clients` -> role-scoped clients from `src/sdk/surface-clients/index.ts`.
-- `./cli` -> CLI helper surface from `src/cli/index.ts`.
-- `./mcp` -> MCP catalog/resource/proposal surface from `src/mcp/index.ts`.
-- `./x402-protected-tool` -> normal-agent-tool facade, readiness, host profile, and activation artifacts from `src/x402-protected-tool/index.ts`.
-- `./experimental` -> explicit reference adapter exports from `src/experimental.ts`.
-
-**Bins:**
-- `handshake` -> `bin/handshake` -> `dist/bin/handshake.mjs`; local operator/evidence CLI.
-- `handshake-mcp` -> `bin/handshake-mcp` -> `dist/bin/handshake-mcp.mjs`; local stdio MCP proposal/evidence server.
-- `handshake-protocol-kernel` -> `bin/handshake-mcp`; package-name execution alias for MCP hosts.
-
-## Protocol Product Surfaces
-
-**CLI:**
-- Command manifest lives in `src/cli/command-manifest.ts`.
-- Active commands include `schema`, `init`, `doctor`, `evidence aps-report`, `evidence contract-view`, `evidence receipt-timeline`, `cert verify`, `support bundle`, `install x402-payment`, `probes x402-payment`, `register x402-gateway-readiness`, `install health`, and `conformance x402-payment`.
-- CLI output is evidence/readiness only. It does not evaluate policy, issue greenlights, perform gateway checks, use signers, mutate protected surfaces, export receipts as authority, or mint terminal certificates.
-
-**MCP:**
-- MCP catalog lives in `src/mcp/catalog.ts`.
-- The only proposal tool is `handshake.actions.x402_payment.propose`.
-- Read-only resources use `handshake://metadata/*`, `handshake://challenges/*`, `handshake://evidence/*`, `handshake://health/*`, and `handshake://certificates/*` in `src/mcp/resources.ts`.
-- MCP proposal handling in `src/mcp/x402-proposal.ts` can create runtime evidence, tool-call drafts, intent compilations, and proposed action contracts through a runtime client. It does not evaluate policy, greenlight, gateway-check, mutate, export receipts, mint certificates, or carry credential material.
-
-**SDK:**
-- Low-level `HandshakeClient` lives in `src/sdk/client.ts`.
-- Role-scoped activation clients live under `src/sdk/surface-clients/`: `InstallClient`, `RuntimeClient`, `ControlPlaneClient`, `PolicyClient`, `GatewayClient`, and `EvidenceClient`.
-- Use role-scoped clients for activation code because each class carries one custody role. Avoid teaching new activation paths with the multi-role `HandshakeClient` token map unless the test specifically needs route parity.
+- Package identity, subpath exports, binaries, files allowlist, scripts, dependency versions, and MCP package identity live in `package.json`.
+- Source/test TypeScript options live in `tsconfig.json`; declaration-only build options live in `tsconfig.build.json`.
+- Bundle entrypoint mapping lives in `scripts/build-package-bundles.mjs`.
+- Cloudflare Worker development/deployment config lives in `wrangler.toml`; Worker entry delegates to the Hono app in `src/worker.ts`.
+- MCP Registry/package metadata lives in `server.json`.
+- CI config lives in `.github/workflows/check.yml`.
 
 ## Platform Requirements
 
 **Development:**
-- Install dependencies with `bun install --frozen-lockfile`; `.github/workflows/check.yml` uses that command.
-- Main repo gate is `npm run check:repo`, which runs `npm run check:types`, `npm run lint`, `npm run format:check`, `npm run test`, `npm run pack:check`, and `git diff --check`.
-- Focused gates are `npm run quality:architecture`, `npm run quality:claims`, and `npm run quality:storage`.
-- Demo generation commands are `npm run demo:self-hosted`, `npm run demo:aps`, `npm run demo:adapter-sdk`, `npm run demo:x402-tool-profiles`, and `npm run demo:mcp-transcript`.
+- Install dependencies with Bun using `bun.lock`; CI uses `bun install --frozen-lockfile` in `.github/workflows/check.yml`.
+- Run all tests with `npm run test` or `bun test` from `package.json`.
+- Run the full repo gate with `npm run check:repo` from `package.json`; it builds, typechecks, lints, format-checks, runs tests, verifies package surface, checks release/package posture, and runs `git diff --check`.
+- Run the HTTP Worker locally with `npm run dev` (`wrangler dev`) when exercising `src/worker.ts` and `src/http/app.ts`.
+- Use `npm run demo:x402-tool-profiles`, `npm run demo:aps`, `npm run demo:self-hosted`, `npm run demo:adapter-sdk`, and `npm run demo:service-workflow-admission` from `package.json` for source-owned demo outputs under `examples/**/output/`.
 
 **Production:**
-- HTTP service target is Cloudflare Workers through `src/worker.ts` and `wrangler.toml`.
-- Durable reconstruction store is Cloudflare D1 through `src/storage/d1/index.ts` and `migrations/0001_protocol_kernel.sql`.
-- KV is cache posture only through `src/storage/kv/index.ts`; it is not durable protocol truth.
-- Public package consumers use Node ESM bundles under `dist/` and executable wrappers under `bin/`.
-- Public npm availability, MCP Registry metadata, host profiles, and install health do not create authority. The gateway check remains the final enforcement point before consequence.
+- Package version in the current dirty checkout is `handshake-protocol-kernel@0.2.8` in `package.json` and `server.json`.
+- `README.md` states public npm `0.2.7` is historical provenance only; current local `0.2.8` still needs publish/readback proof before claiming current-surface npm publication.
+- Published package files are limited by `package.json#files` to `bin`, `dist`, `server.json`, `README.md`, `CHANGELOG.md`, `LICENSE`, and `NOTICE`; `scripts/check-package-surface.mjs` and `scripts/check-published-entrypoints.mjs` enforce this boundary.
+- Local MCP distribution is stdio-based through `bin/handshake-mcp`, `dist/bin/handshake-mcp.mjs`, `src/mcp/stdio/server.ts`, and `server.json`; MCP is proposal/evidence only.
+- HTTP deployment target is Cloudflare Workers with D1 as durable protocol record storage and KV as non-authoritative cache, configured by `wrangler.toml`, `src/http/store/resolution.ts`, `src/storage/d1/index.ts`, and `src/storage/kv/index.ts`.
+- Release administration is script-gated and non-authoritative: `scripts/check-release-admin.js`, `scripts/check-release-proof.mjs`, `scripts/check-npm-maintainer-posture.mjs`, and `scripts/check-distribution-provenance.mjs` verify package/artifact/readback posture without creating policy decisions, greenlights, gateway checks, or protected mutations.
 
 ---
 
-*Stack analysis: 2026-05-25*
+*Stack analysis: 2026-05-26*

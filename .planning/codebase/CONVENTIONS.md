@@ -1,177 +1,127 @@
 # Coding Conventions
 
-**Analysis Date:** 2026-05-25
+**Analysis Date:** 2026-05-26
 
 ## Naming Patterns
 
 **Files:**
-- Use kebab-case files named by owned protocol concepts: `src/protocol/areas/action-contract/transitions.ts`, `src/protocol/areas/gateway-gate/artifacts.ts`, `src/runtime/package-install/action-proposal.ts`.
-- Use `index.ts` as the public face for multi-file folders. `test/architecture/naming-posture.test.ts` enforces this for source folders with more than three TypeScript files.
-- Keep protocol primitives under `src/protocol/areas/<concept>/`. Do not add root-level compatibility shims such as `src/protocol/policy.ts`; `test/architecture/import-posture.test.ts` asserts removed shim paths stay absent.
-- Do not create bucket directories named `utils`, `helpers`, `common`, `misc`, `stuff`, `manager`, or `service` under `src/**`; `test/architecture/naming-posture.test.ts` fails on those path segments.
-- Every first-level source lane needs a `LANE.md` or `README.md` with ownership fields. Existing lanes include `src/protocol/LANE.md`, `src/runtime/LANE.md`, `src/mcp/LANE.md`, `src/sdk/LANE.md`, `src/cli/LANE.md`, `src/surfaces/LANE.md`, and `src/conformance/LANE.md`.
-- Tests live in domain folders under `test/`: `test/protocol/`, `test/runtime/`, `test/adapters/`, `test/http/`, `test/architecture/`, `test/mcp/`, `test/cli/`, `test/product/`, `test/conformance/`, `test/integration/`, `test/sdk/`, and `test/adapter-sdk/`. Do not add loose root `test/*.test.ts` files.
+- Use lowercase kebab-case for owned source concepts: `src/runtime/package-install/action-proposal.ts`, `src/protocol/areas/action-contract/contract-record.ts`, `src/http/routes/transition-route-registry.ts`.
+- Keep protocol primitives under `src/protocol/areas/<concept>/`: `src/protocol/areas/action-contract`, `src/protocol/areas/policy-greenlight`, `src/protocol/areas/negotiation`.
+- Use `index.ts` as the public face for multi-file modules: `src/protocol/areas/action-contract/index.ts`, `src/sdk/surface-clients/index.ts`, `src/http/routes/index.ts`.
+- Use lane manifests for first-level source ownership: `src/protocol/LANE.md`, `src/http/LANE.md`, `src/install/LANE.md`, `src/x402-protected-tool/LANE.md`.
+- Do not add bucket directories named `utils`, `helpers`, `common`, `misc`, `stuff`, `manager`, or `service` under `src/**`; `test/architecture/naming-posture.test.ts` enforces this.
+- Keep tests under a domain directory with `.test.ts` suffix: `test/protocol/kernel-policy-gateway.test.ts`, `test/http/http.test.ts`, `test/adapters/x402-wallet-gateway.test.ts`. Root `test/*.test.ts` files are banned by `test/architecture/naming-posture.test.ts`.
 
 **Functions:**
-- Use camelCase for functions and methods: `proposeActionContract()` in `src/protocol/areas/action-contract/transitions.ts`, `evaluatePolicy()` in `src/protocol/areas/policy-greenlight/transitions.ts`, `gatewayCheck()` in `src/protocol/areas/gateway-gate/transitions.ts`.
-- Protocol write functions should make the write explicit with verbs such as `record*`, `persist*`, `commit*`, `consume*`, `mark*`, or `activate*`. Examples include `recordCredentialResolutionEvidence()` in `src/protocol/kernel.ts` and `commitGatewayCheckPlan()` in `src/protocol/areas/gateway-gate/transitions.ts`.
-- Read and derivation functions should use `get*`, `list*`, `derive*`, `build*`, `format*`, `resolve*`, or `project*`. Examples include `deriveGatewayConstraintEvaluation()` in `src/protocol/areas/gateway-gate/transitions.ts`, `buildPolicyInput()` in `src/protocol/areas/policy-greenlight/transitions.ts`, and `projectProtectedActionMetadata()` in `src/protocol/areas/protected-action-representation/projections.ts`.
-- Avoid vague protocol mutation verbs such as `handle*`, `process*`, `do*`, and `run*` inside `src/protocol/**`. Runtime and adapter runner entrypoints may use `run*`, such as `runX402WalletGateway()` in `src/adapters/x402-payment/wallet-gateway.ts`.
-- Avoid overclaiming function names such as `ensureSafe*`, `guarantee*`, `proveExecution*`, `trustedAgent*`, and `secureApproval*`; `test/architecture/naming-posture.test.ts` enforces this in source.
+- Use camelCase exported functions with explicit protocol verbs: `proposeActionContract` in `src/protocol/areas/action-contract/transitions.ts`, `evaluatePolicy` in `src/protocol/areas/policy-greenlight/transitions.ts`, `proposeRuntimeIngressActionContracts` in `src/runtime/ingress/index.ts`.
+- Use durable write verbs when a function records state: `recordCredentialResolutionEvidence` in `src/protocol/kernel.ts`, `commitProtocolRecords` in `src/storage/memory/index.ts`, `consumeGreenlight` in `src/storage/memory/index.ts`.
+- Use read and derivation verbs for pure projection or lookup work: `getCurrentIdempotencyLedgerEntry` in `src/storage/memory/index.ts`, `derivePolicyConstraintEvaluation` and `buildPolicyInput` in `src/protocol/areas/policy-greenlight/transitions.ts`.
+- Avoid vague protocol mutation names in protocol modules. `test/architecture/naming-posture.test.ts` rejects `handle*`, `process*`, `do*`, and `run*` patterns under `src/protocol`.
+- Public runners may use `run*` only where runner semantics are explicit, such as `runCliCommand` in `src/cli/main.ts`, `runX402WalletGateway` in `src/adapters/x402-payment/wallet-gateway.ts`, and example `run.ts` files under `examples/**`.
+- Avoid overclaiming names such as `ensureSafe*`, `guarantee*`, `proveExecution*`, `trustedAgent*`, and `secureApproval*`; `test/architecture/naming-posture.test.ts` enforces this in `src/**`.
 
 **Variables:**
-- Use camelCase for local variables and object members. Use precise suffixes for authority-bearing refs and digests: `actionContractId`, `greenlightId`, `candidateDigest`, `gatewayRegistryDigest`, `policyInputDigest`.
-- Use uppercase constants for version and fixed-registry values: `PROTOCOL_VERSION` in `src/protocol/foundation/schema-core.ts`, `CANONICALIZER_VERSION` in `src/protocol/foundation/canonical.ts`, and `MAX_STREAM_COMMIT_RETRIES` in `src/protocol/areas/gateway-gate/transitions.ts`.
-- Use explicit non-authority booleans on projection and surface outputs: `authorityCreated`, `greenlightCreated`, `gatewayCheckPerformed`, `mutationAttempted`, `rawInternalRecordIncluded`, `credentialMaterialIncluded`, `receiptExportCreated`, and `authorityCertificateMinted`.
+- Use camelCase for local values and object fields: `policyInputDigest`, `gatewayCredentialBindingEvaluation`, and `protectedPathPosture` in `src/protocol/areas/policy-greenlight/transitions.ts`.
+- Use UPPER_SNAKE_CASE for stable exported constants where they are global protocol headers or versions: `PROTOCOL_VERSION` in `src/protocol/foundation/schema-core.ts`, `CANONICALIZER_VERSION` in `src/protocol/foundation/canonical.ts`.
+- Use explicit non-authority flags on product, runtime, CLI, and MCP projections: `authorityCreated`, `greenlightCreated`, `gatewayCheckPerformed`, `mutationAttempted`, `credentialMaterialIncluded`, `authorityCertificateMinted`.
+- Use `as const` and `satisfies` to lock literal surfaces without widening: `TEST_CALLER_AUTH_TOKENS` in `test/http/http.test.ts`, `expectedIdByType` in `test/protocol/negotiation-object-registry.test.ts`.
+- Use fixture names that state authority posture: `createGreenlitContract`, `recordSafeBypassProbes`, and `makePackageInstallCandidate` in `test/support/fixtures.ts`.
 
 **Types:**
-- Use PascalCase for TypeScript types and classes: `HandshakeKernel` in `src/protocol/kernel.ts`, `ActionContract` in `src/protocol/areas/action-contract/schemas.ts`, `GatewayCheckResult` in `src/protocol/areas/gateway-gate/artifacts.ts`.
-- Pair Zod schemas with inferred types using the `FooSchema` / `type Foo = z.infer<typeof FooSchema>` pattern. Examples: `ActionContractSchema` and `ActionContract` in `src/protocol/areas/action-contract/schemas.ts`; `GatewayCheckAttemptSchema` and `GatewayCheckAttempt` in `src/protocol/areas/gateway-gate/schemas.ts`.
-- Public transition inputs use named input schemas: `ProposeActionContractInputSchema`, `EvaluatePolicyInputSchema`, `GatewayCheckInputSchema`, `CreateRuntimeExecutionInputSchema`.
-- Literal registries use readonly arrays with `as const`, then derive union types from them. Examples: `surfaceIds`, `surfaceRouteFamilies`, and `surfaceAuthorityPostures` in `src/surfaces/boundary-manifest.ts`.
+- Use PascalCase type names and schema names ending in `Schema`: `ActionContractSchema` and `ActionContract` in `src/protocol/areas/action-contract/schemas.ts`, `NegotiationSessionSchema` and `NegotiationSession` in `src/protocol/areas/negotiation/schemas.ts`.
+- Derive runtime-validated types from Zod schemas with `z.infer` for stored records and `z.input` for caller input shapes: `RuntimeIngressProposalInput` in `src/runtime/ingress/index.ts`, `TransitionErrorEnvelope` in `src/http/errors/transition-error-envelope.ts`.
+- Model transition results as discriminated unions or explicit outcome records: `RuntimeIngressActionProposal` in `src/runtime/ingress/index.ts`, `PolicyEvaluationResponse` in `src/protocol/areas/policy-greenlight/transitions.ts`.
+- Keep protocol object names exact where they represent primitives: `ActionContract`, `PolicyDecision`, `Greenlight`, `GatewayCheck`, `Receipt`, `Refusal`, `ProofGap`, and `IsolationState` are named in `QUALITY.md`.
 
 ## Code Style
 
 **Formatting:**
-- Use Prettier from `.prettierrc.json`: `printWidth: 120`, semicolons enabled, double quotes, trailing commas.
-- Use `.editorconfig`: UTF-8, LF endings, two-space indentation, final newline, trimmed trailing whitespace except Markdown.
-- TypeScript is strict. `tsconfig.json` enables `strict`, `noUncheckedIndexedAccess`, and `exactOptionalPropertyTypes`. Treat optional values and array indexing as explicit proof obligations.
+- Use Prettier from `.prettierrc.json`: `printWidth: 120`, semicolons enabled, double quotes, trailing commas enabled.
+- Use `.editorconfig`: UTF-8, LF endings, two-space indentation, final newline, and trimmed trailing whitespace for code.
+- Keep Markdown trailing whitespace behavior from `.editorconfig`; `.md` files do not trim trailing whitespace.
+- Format the full tree with `npm run format` and check it with `npm run format:check` from `package.json`.
+- TypeScript is strict. `tsconfig.json` enables `strict`, `noUncheckedIndexedAccess`, and `exactOptionalPropertyTypes`; treat optional values and indexed reads as proof obligations.
 
 **Linting:**
-- ESLint config is `eslint.config.js` with `typescript-eslint` recommended rules.
-- Use type-only imports where possible; `@typescript-eslint/consistent-type-imports` is an error and uses separate type imports.
-- Unused variables are errors unless prefixed with `_`.
-- `console` is an error except `console.warn` and `console.error`; use structured protocol records, receipts, refusals, proof gaps, or CLI JSON instead of incidental logs.
-
-**Quality gates:**
-- Full closeout gate: `npm run check:repo`.
-- Focused claim gate: `npm run quality:claims`.
-- Focused architecture gate: `npm run quality:architecture`.
-- Focused storage/kernel gate: `npm run quality:storage`.
-- Package gate: `npm run pack:check`.
-- Base local checks: `npm run check:types`, `npm run lint`, `npm run format:check`, `npm run test`, and `git diff --check`.
+- Use ESLint 10 with `typescript-eslint` recommended config from `eslint.config.js`.
+- Lint only `src/**/*.ts` and `test/**/*.ts` with `npm run lint`; `dist/**`, `coverage/**`, `node_modules/**`, and `docs/internal/archive/**` are ignored in `eslint.config.js`.
+- Enforce separate type imports through `@typescript-eslint/consistent-type-imports` in `eslint.config.js`.
+- Treat unused values as errors unless they are intentionally prefixed with `_`; this is configured in `eslint.config.js`.
+- Do not use `console` in source or tests except `console.warn` and `console.error`; this is enforced by `eslint.config.js`.
 
 ## Import Organization
 
 **Order:**
-1. External packages and Node builtins: `zod`, `bun:test`, `node:fs`, `node:path`, `@x402/*`.
-2. Source value imports from the nearest owning module or public index.
-3. Source type imports using `import type`.
-4. Test support imports from `test/support/*`.
+1. Import external packages and Node built-ins first: `zod`, `hono`, `bun:test`, `node:fs`, `node:path`.
+2. Import source value modules by relative path from the current lane: `src/http/app.ts` imports protocol, storage, route, and handler modules by relative paths.
+3. Import source types with `import type`; ESLint requires separate type imports. Examples: `src/protocol/kernel.ts`, `src/runtime/ingress/index.ts`.
+4. Import local sibling files last: protocol area transition files import `./schemas`, `./inputs`, `./guards`, or `./types` after cross-area dependencies.
+5. In tests, import `bun:test` first, then source under `../../src`, then support helpers under `../support`. Examples: `test/protocol/kernel-policy-gateway.test.ts`, `test/runtime/runtime-ingress.test.ts`.
 
 **Path Aliases:**
-- No TypeScript path aliases are configured in `tsconfig.json`. Use relative imports.
-- Protocol modules should import other protocol areas through public area indexes where possible, such as `../policy-greenlight` rather than internal transition files. `test/architecture/import-posture.test.ts` enforces public-index imports between protocol areas.
-
-**Layer constraints:**
-- `src/protocol/**` must not import `src/http/**`, `src/storage/**`, `src/runtime/**`, `src/sdk/**`, or adapter fixtures. Use the `ProtocolStore` port in `src/protocol/store/port.ts`.
-- `src/http/**` owns transport, route metadata, handlers, errors, admission, and store resolution; it must not define protocol meaning. `test/architecture/import-posture.test.ts` keeps route registry metadata separate from invokers and response schemas.
-- `src/runtime/**` is proposal-only. `test/architecture/import-posture.test.ts` checks `src/runtime/ingress/registry.ts` for `authorityPosture: "proposal_only"`, `compileInputAuthority: "candidate_only"`, and `rawBypassPosture: "bypass_evidence_only"`.
-- `src/mcp/**` is proposal/evidence only. `test/architecture/mcp-surface-posture.test.ts` forbids imports of `protocol/kernel`, policy/gateway internals, adapters, storage, experimental surfaces, and `sdk/client`.
-- Official x402 signer and paid-client imports are allowed only in `src/adapters/x402-payment/wallet-gateway.ts`; `test/architecture/import-posture.test.ts` forbids `@x402/core/client`, `@x402/fetch`, `@x402/axios`, and `@x402/evm*` elsewhere in `src/**`.
+- No TypeScript path aliases are configured in `tsconfig.json`; use relative imports inside `src` and `test`.
+- Package self-imports are used only where package subpath behavior is under test, such as `handshake-protocol-kernel/sdk/role-clients` in `test/sdk/role-clients.test.ts`.
+- Public package surfaces are curated through `src/index.ts`, `src/adapter-sdk/index.ts`, `src/conformance/index.ts`, `src/runtime/index.ts`, `src/mcp/index.ts`, `src/x402-protected-tool/index.ts`, and `src/hosted-admission/index.ts`.
+- Import posture is test-enforced by `test/architecture/import-posture.test.ts`: protocol cannot import storage adapters, HTTP/SDK cannot import protocol area internals, storage cannot import primitive behavior modules, and area-to-area imports stay on public `index.ts` faces.
+- Official x402 signer and paid-client imports stay inside `src/adapters/x402-payment/wallet-gateway.ts`; `test/architecture/import-posture.test.ts` forbids `@x402/core/client`, `@x402/fetch`, `@x402/axios`, and `@x402/evm*` elsewhere in `src/**`.
 
 ## Error Handling
 
 **Patterns:**
-- Validate public transition inputs with Zod at the boundary. Examples: `ProposeActionContractInputSchema.parse()` in `src/protocol/areas/action-contract/transitions.ts`, `EvaluatePolicyInputSchema.parse()` in `src/protocol/areas/policy-greenlight/transitions.ts`, and `GatewayCheckInputSchema.parse()` in `src/protocol/areas/gateway-gate/transitions.ts`.
-- Throw `HandshakeProtocolError` from `src/protocol/foundation/errors.ts` with stable `code`, message, HTTP-like `status`, and optional metadata for retryability, commit state, proof refs, and refusal refs.
-- Use `HandshakeAmbiguousCommitError` for ambiguous transition commits; it sets retryability to `ambiguous` and commit state to `unknown`.
-- HTTP error responses go through `transitionErrorResult()` and `TransitionErrorResponseSchema` in `src/http/errors/transition-error-envelope.ts`. Do not return ad hoc error JSON from handlers.
-- Record refusals and proof gaps instead of smoothing missing evidence. `test/protocol/kernel-policy-gateway.test.ts`, `test/protocol/evidence-projections.test.ts`, and `test/adapters/x402-wallet-gateway.test.ts` assert refusal/proof-gap outcomes at the authority boundary.
-- Test helpers may throw plain `Error` for impossible fixture states, such as `requireCandidateDigest()` in `test/support/fixtures.ts`. Production protocol code should prefer typed `HandshakeProtocolError`.
+- Parse external or boundary input with Zod before transition logic runs. Examples: `EvaluatePolicyInputSchema.parse` in `src/protocol/areas/policy-greenlight/transitions.ts`, `RuntimeIngressDispatchBlockSchema.parse` in `src/runtime/ingress/index.ts`, `TransitionErrorResponseSchema.parse` in `src/http/errors/transition-error-envelope.ts`.
+- Use `HandshakeProtocolError` for protocol and HTTP transition failures that need a stable code, status, retryability, commit state, proof ref, or refusal ref. Definition: `src/protocol/foundation/errors.ts`.
+- Use guard functions returning `TransitionGuardResult` for invariant checks that should become structured transition errors. Examples: `guardPolicyEvaluation` in `src/protocol/areas/policy-greenlight/guards.ts`, `guardCatalogRegistration` in `src/protocol/areas/catalog-envelope`.
+- Return structured refusals, proof gaps, and non-authority outcomes instead of generic success/failure booleans. Examples: `PolicyEvaluationResponse` in `src/protocol/areas/policy-greenlight/transitions.ts`, `RuntimeIngressResponsePosture` in `src/runtime/ingress/index.ts`.
+- Convert protocol errors to HTTP error envelopes at the transport edge. `src/http/app.ts` uses `transitionErrorResult`; `src/sdk/surface-clients/transport.ts` converts failed responses into `HandshakeClientError`.
+- Use generic `Error` for impossible internal/test fixture assertions and external adapter fixture failures only when no protocol envelope is being emitted. Examples: fixture assertions in `test/support/fixtures.ts` and `test/protocol/model-based-invariants.test.ts`.
+- Preserve ambiguous commit as an explicit error state. `HandshakeAmbiguousCommitError` in `src/protocol/foundation/errors.ts` carries `retryability: "ambiguous"` and `commitState: "unknown"`.
 
 ## Logging
 
-**Framework:** console is restricted by `eslint.config.js`.
+**Framework:** console
 
 **Patterns:**
+- Do not add ordinary `console.log` calls to `src` or `test`; `eslint.config.js` rejects console usage except `warn` and `error`.
 - Do not use logs as protocol evidence. Durable evidence lives in protocol records, stream events, receipts, refusals, proof gaps, and redacted projections.
-- CLI and surface outputs must carry explicit non-authority flags. `test/architecture/cli-command-posture.test.ts` requires every CLI JSON output to include fields such as `authorityCreated`, `greenlightCreated`, `gatewayCheckPerformed`, and `mutationAttempted`.
-- Surface helpers should return schema-validated objects. `surfaceOutcomeBase()` in `src/surfaces/outcome.ts` always sets authority-related fields to `false` or `null`.
+- CLI and demo output should flow through explicit output/rendering modules or process stdout behavior rather than incidental logging. Relevant files: `src/cli/main.ts`, `src/cli/command-manifest.ts`, `examples/service-workflow-admission/run.ts`.
+- Tests assert serialized output and generated artifacts directly instead of depending on console logs. Examples: `test/cli/cli-evidence.test.ts`, `test/product/external-adapter-sdk-demo.test.ts`, `test/product/service-workflow-admission.test.ts`.
 
 ## Comments
 
 **When to Comment:**
-- Prefer schemas, precise names, `LANE.md` files, and tests over explanatory comments.
-- Add comments only when a complex transition or evidence boundary is not obvious from function names and types.
-- Use lane manifests for durable ownership notes. Each first-level `src/*/LANE.md` states authority owner, proof claim, use cases, constraints, allowed imports, forbidden imports, guarding tests, and scope boundary.
+- Keep comments sparse and tied to boundary or type-level intent. Use names, schemas, lane manifests, and tests as the primary documentation mechanism.
+- Use comments for intentional compile-time negative tests with `@ts-expect-error`, as in `test/sdk/role-clients.test.ts`.
+- Avoid TODO/FIXME/HACK/XXX comments in active source and tests; no matches were detected under `src` or `test`.
 
 **JSDoc/TSDoc:**
-- Not broadly used. Do not introduce large docblocks as a substitute for typed schemas or tests.
-- Public behavior should be encoded in `src/protocol/public/*`, package exports in `src/index.ts`, package subpaths in `package.json`, and executable tests under `test/**`.
+- Not a primary convention. Public meaning is expressed through Zod schemas, exported TypeScript types, lane manifests such as `src/protocol/LANE.md`, and architecture tests such as `test/architecture/root-exports.test.ts`.
 
 ## Function Design
 
-**Size:** Transition functions may orchestrate several steps, but keep phase helpers small and named by their role. The dominant pattern is parse -> load context -> derive constraints -> build plan -> commit plan -> return typed response.
+**Size:** Prefer orchestration functions that delegate into named context/build/commit helpers for transitions. Examples: `evaluatePolicy` in `src/protocol/areas/policy-greenlight/transitions.ts`, `proposeRuntimeIngressActionContracts` in `src/runtime/ingress/index.ts`.
 
-**Parameters:** Public and protocol transition functions should take one object input type, not positional argument clusters. Examples include `EvaluatePolicyInput`, `GatewayCheckInput`, `CreateRuntimeExecutionInput`, and `ProposeActionContractInput`.
+**Parameters:** Use object parameters for public transition inputs and complex helper calls. Examples: `CompileIntentInput` in `src/protocol/public/inputs.ts`, `EvaluatePolicyInput` in `src/protocol/areas/policy-greenlight/inputs.ts`, `RuntimeIngressDispatchBlock` in `src/runtime/ingress/index.ts`.
 
-**Return Values:** Return schema-shaped records or explicit outcome objects. Authority-bearing responses must distinguish policy decisions, one-use greenlights, gateway checks, mutation attempts, refusals, receipts, and proof gaps.
+**Return Values:** Return typed records or discriminated results with explicit authority flags. Examples: `PolicyEvaluationResponse` in `src/protocol/areas/policy-greenlight/transitions.ts`, `RuntimeIngressResult` in `src/runtime/ingress/index.ts`, CLI output in `src/cli/main.ts`.
 
-**Transition pattern:**
-```typescript
-export async function evaluatePolicy(
-  store: ProtocolStore,
-  recorder: ProtocolRecorder,
-  inputValue: EvaluatePolicyInput,
-): Promise<PolicyEvaluationResponse> {
-  const input = EvaluatePolicyInputSchema.parse(inputValue);
-  const context = await getPolicyEvaluationContext(recorder, input);
-  assertTransition(guardPolicyEvaluation(context.contract, context.envelope));
-  const constraints = await derivePolicyConstraintEvaluation(store, context);
-  // build, commit, then return explicit authority/non-authority posture
-}
-```
+**Async:** Use `async` for store-backed transitions, digest calculation, gateway checks, HTTP handling, and process proofs. Examples: `digestCanonical` in `src/protocol/foundation/canonical.ts`, `createRuntimeIngressEvidence` in `src/runtime/ingress/index.ts`, `createGeneratedGraphEvidenceFixture` in `test/support/http-protocol-fixtures.ts`.
 
-Use this shape when adding new kernel transitions under `src/protocol/areas/*`.
+**Validation:** Validate before building authority-bearing objects. Examples: `derivePolicyConstraintEvaluation` in `src/protocol/areas/policy-greenlight/transitions.ts` collects isolation, sequence, posture, idempotency, credential, and delegated-authority state before policy decision construction; `runX402WalletGateway` tests in `test/adapters/x402-wallet-gateway.test.ts` assert signing happens only after a verified gateway check.
 
 ## Module Design
 
-**Exports:** 
-- Keep package root exports curated in `src/index.ts`. `test/architecture/root-exports.test.ts` asserts the exact root export list and keeps internals such as `HandshakeKernel`, `ProtocolRecorder`, `InMemoryProtocolStore`, and `D1ProtocolStore` off the root surface.
-- Public subpaths are declared in `package.json`: `.`, `./conformance`, `./adapter-sdk`, `./runtime`, `./sdk/role-clients`, `./cli`, `./mcp`, `./x402-protected-tool`, and `./experimental`.
-- Adapter authoring helpers belong on `src/adapter-sdk/index.ts`; runtime ingress belongs on `src/runtime/index.ts`; conformance checks belong on `src/conformance/index.ts`.
+**Exports:** Export stable package surfaces deliberately. `src/index.ts` exposes HTTP app creation, public schemas/inputs, selected evidence/navigation helpers, and SDK client types; `test/architecture/root-exports.test.ts` enforces the exact root export list.
 
-**Barrel Files:** 
-- Use local `index.ts` files as intentional public faces, not dumping grounds.
-- `src/protocol/public/schemas.ts` and `src/protocol/public/inputs.ts` are aggregators only; `test/architecture/import-posture.test.ts` fails if they contain lines other than `export * from ...`.
-- Area `types.ts` files are local-only faces. `test/architecture/import-posture.test.ts` restricts them to allowed schema/input exports.
+**Barrel Files:** Use `index.ts` barrels as ownership faces, not uncontrolled dumping grounds. Examples: `src/protocol/areas/action-contract/index.ts`, `src/protocol/areas/negotiation/index.ts`, `src/http/routes/index.ts`.
 
-## Authority-Language Rules
+**Area Modules:** Keep protocol primitive code under `src/protocol/areas/*` with local `schemas.ts`, `inputs.ts`, `types.ts`, `transitions.ts`, `guards.ts`, and `index.ts` faces where applicable. Examples: `src/protocol/areas/gateway-gate`, `src/protocol/areas/policy-greenlight`, `src/protocol/areas/receipt-export`.
 
-Use the exact product/protocol vocabulary from `QUALITY.md`, `STRUCTURE.md`, `AGENTS.md`, `docs/internal/decisions.md`, and `docs/internal/protocol-notes.md`.
+**Schema Modules:** Define Zod schemas beside their owned primitive and export derived TypeScript types from the same file. Examples: `src/protocol/areas/action-contract/schemas.ts`, `src/protocol/areas/gateway-gate/schemas.ts`, `src/protocol/areas/negotiation/schemas.ts`.
 
-- Say `protected actions for automated decision making`, not engineering-agent-only category language.
-- Say `cleared protected-action event` for one terminal event with reconstructable evidence.
-- Say `protocol kernel` for source-owned state machine and schemas.
-- Say `product surface` for CLI, MCP, SDK, docs, demo, or readback surfaces that expose proposal/evidence/readback without creating authority.
-- Say `AuthorityCertificate` is terminal evidence, not permission, identity, settlement, hosted trust, or reusable auth.
-- Say public npm availability and MCP Registry discoverability are distribution facts, not authority.
-- Say missing provider custody, hosted operation, settlement/finality, aggregate spend, host-wide containment, and broad x402 compatibility are proof gaps, outside claims, or cut lines until source and gates change.
+**Schema-Only Evidence Areas:** For evidence-only areas that must not create authority, follow the negotiation pattern from commit `4946237`: `src/protocol/areas/negotiation/index.ts` exports only `./schemas` and `./inputs`; `src/protocol/areas/negotiation` has no `transitions.ts`; `src/index.ts` does not export negotiation; downstream product/runtime surfaces do not import negotiation. `test/architecture/negotiation-no-authority-surface.test.ts` enforces the guard.
 
-The claim-boundary gate is executable in `test/architecture/claim-boundary.test.ts`; update that test when simplifying canonical language so the simplification keeps the invariant rather than weakening it.
-
-## Projection Vs Authority
-
-Projection code must expose readback without becoming authority.
-
-- Projection helpers use `project*` names and return non-authority fields. Examples: `projectProtectedActionMetadata()` and `projectProtectedActionChallengeFromRefusal()` in `src/protocol/areas/protected-action-representation/projections.ts`.
-- Surface outputs in `src/surfaces/outcome.ts` set `authorityCreated`, `greenlightCreated`, `gatewayCheckPerformed`, `mutationAttempted`, `credentialMaterialIncluded`, `rawInternalRecordIncluded`, `receiptExportCreated`, and `authorityCertificateMinted` to `false`.
-- `src/surfaces/boundary-manifest.ts` declares `authorityPosture`, `allowedRouteFamilies`, `forbiddenRouteFamilies`, forbidden credential shapes, forbidden output fields, and claim-boundary labels for each product surface.
-- `test/architecture/surface-boundary-posture.test.ts`, `test/architecture/cli-command-posture.test.ts`, and `test/architecture/mcp-surface-posture.test.ts` enforce that SDK, CLI, MCP, and x402 protected-tool surfaces do not import or expose authority internals.
-
-Do not simplify kernel language by merging projection, evidence, policy, gateway, and mutation terms. Use shorter words only when the state boundary remains explicit.
-
-## Simplification Rules
-
-When simplifying confusing kernel language:
-
-- Preserve the chain: exact contract -> policy decision -> one-use greenlight or refusal -> gateway check -> receipt/refusal/proof gap.
-- Prefer shorter nouns already accepted in `QUALITY.md`: `ActionContract`, `PolicyDecision`, `Greenlight`, `GatewayCheck`, `Receipt`, `Refusal`, `ProofGap`, and `IsolationState`.
-- Do not rename a projection to imply enforcement. A `project*` function cannot evaluate policy, create a greenlight, perform a gateway check, mutate, or mint terminal evidence.
-- Do not remove non-claim fields from public outputs; they are part of the boundary contract.
-- Update canonical docs and their tests together: `QUALITY.md`, `STRUCTURE.md`, `docs/internal/decisions.md`, `docs/internal/protocol-notes.md`, `test/architecture/claim-boundary.test.ts`, `test/architecture/active-vocabulary.test.ts`, and `test/architecture/naming-posture.test.ts`.
+**Boundary Tests:** Treat architecture and naming tests as part of module design. `test/architecture/import-posture.test.ts`, `test/architecture/naming-posture.test.ts`, `test/architecture/package-surface.test.ts`, `test/architecture/root-exports.test.ts`, and `test/architecture/negotiation-no-authority-surface.test.ts` define what future modules may import, name, export, and claim.
 
 ---
 
-*Convention analysis: 2026-05-25*
+*Convention analysis: 2026-05-26*

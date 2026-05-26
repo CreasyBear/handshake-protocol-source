@@ -1,287 +1,260 @@
 # Codebase Concerns
 
-**Analysis Date:** 2026-05-25
-
-## Map Scope
-
-- This document treats `.planning/` as scratch context. Canonical repo truth lives in tracked source and docs such as `AGENTS.md`, `README.md`, `QUALITY.md`, `STRUCTURE.md`, `docs/internal/decisions.md`, and `docs/internal/protocol-notes.md`.
-- No `TODO`, `FIXME`, `HACK`, or `XXX` markers are detected in tracked source, tests, or canonical docs under `src/`, `test/`, `tests/`, `docs/`, `README.md`, `QUALITY.md`, `STRUCTURE.md`, or `AGENTS.md`.
-- No source-owned `Passport`, `PrincipalAgentLink`, or standalone service-gateway kernel object is detected. The source model already carries principal/agent identity evidence, delegated attempt authority, gateway registry binding, credential custody, HTTP admission evidence, and gateway checks.
-- Existing service gateway references are fixture or endpoint refs, not a kernel object: `test/support/auth-md-flow.ts`, `test/adapters/auth-md-gateway.test.ts`, and `test/adapters/auth-md-adapter.test.ts`.
-
-## Protocol / Kernel Simplification Risks
-
-**Passport/admission/service-gateway/principal-agent object pressure:**
-- Issue: Adding a new kernel object named `Passport`, `Admission`, `ServiceGateway`, or `PrincipalAgentLink` duplicates existing protocol responsibilities instead of clarifying authority.
-- Files: `src/protocol/areas/catalog-envelope/schemas.ts`, `src/protocol/areas/delegated-authority/schemas.ts`, `src/protocol/areas/delegated-authority/transitions.ts`, `src/http/admission/hosted-caller-identity.ts`, `src/http/admission/request-context.ts`, `src/protocol/areas/object-registry/schemas.ts`.
-- Impact: A second object can blur whether authority comes from identity evidence, route admission, delegated authority, gateway custody, or the verified gateway check. That creates ambient permission language around a chain that is meant to stay exact and one-use.
-- Fix approach: Reuse the existing primitives. Put principal/agent identity evidence in `ParticipantIdentityBinding` on `OperatingEnvelope`; put scoped attempt authority in `DelegatedAuthorityRef`; put service mutation custody in `GatewayRegistryEntry` and `GatewayCredentialRef`; put transport caller evidence in `TransitionCallerIdentity` and `transition_request_context`; put any "passport" view in a projection or packet under `src/surfaces/` or `src/adapters/`, not a new `src/protocol/areas/` object.
-
-**Kernel object registry expansion is high-friction by design:**
-- Issue: New protocol object types require schema ownership, registry posture, navigation, route roles, storage, export/read posture, evidence projection, claim tests, and migration decisions.
-- Files: `src/protocol/areas/object-registry/schemas.ts`, `src/protocol/areas/object-registry/index.ts`, `src/protocol/navigation.ts`, `src/http/routes/transition-route-registry.ts`, `src/http/routes/evidence-read-route-registry.ts`, `src/storage/d1/index.ts`, `migrations/0001_protocol_kernel.sql`.
-- Impact: A new object that only renames an existing relation increases protocol surface without increasing enforceable control. The likely debt is inconsistent read posture, incomplete isolation scope refs, missing D1 indexes, root export confusion, and product language overclaim.
-- Fix approach: Add a kernel object only when it records a distinct terminal or state-transition event that cannot be represented by the existing protocol areas. Otherwise, add a typed projection, proof packet, or adapter profile.
-
-**Principal-agent link already has an evidence-only shape:**
-- Issue: A standalone principal-agent link object is redundant with the envelope identity-binding and delegated-authority model.
-- Files: `src/protocol/areas/catalog-envelope/schemas.ts`, `test/protocol/participant-identity-binding.test.ts`, `src/protocol/areas/delegated-authority/schemas.ts`, `src/protocol/areas/delegated-authority/transitions.ts`.
-- Impact: If the link object reads as permission, it violates the boundary that principal/agent identity is evidence and that delegated authority authorizes only attempts, not mutation.
-- Fix approach: Keep participant identity bindings evidence-only and canonicalized into the envelope digest. Use `DelegatedAuthorityRef` for scoped principal-agent-runtime-envelope-gateway attempt authority, with `greenlightCreated: false` and `mutationAuthorityCreated: false`.
-
-**Service gateway is an adapter/gateway role, not a protocol role:**
-- Issue: "Service gateway" can be modeled as gateway custody or a protected API adapter, but making it a kernel object creates overlap with gateway registry, credential custody, and gateway check semantics.
-- Files: `src/protocol/areas/catalog-envelope/schemas.ts`, `src/protocol/areas/credential-custody/schemas.ts`, `src/adapters/auth-md/gateway.ts`, `src/adapters/x402-payment/wallet-gateway.ts`, `src/http/routes/transition-route-registry.ts`.
-- Impact: A service-gateway object can launder operational integration into authority. The authority boundary remains `gatewayCheck`, not service discovery, admission, endpoint registration, or credential provenance.
-- Fix approach: Keep service-specific behavior in adapter packages such as `src/adapters/auth-md/` and `src/adapters/x402-payment/`. Promote only generic evidence or terminal protocol state to `src/protocol/areas/`.
-
-## Product-Language Confusion
-
-**"Admission" is overloaded across product, HTTP, gateway, and surface packets:**
-- Issue: Admission means expansion admission in `docs/internal/decisions.md`, hosted route admission in `src/http/admission/index.ts`, gateway-admission status in receipt export schemas, and auth.md+x402 admission packets in product surfaces.
-- Files: `docs/internal/decisions.md`, `src/http/admission/index.ts`, `src/http/admission/hosted-admission-config.ts`, `src/protocol/areas/receipt-export/schemas.ts`, `src/surfaces/proof-packets.ts`, `src/surfaces/product-launch-gate-resolution.ts`.
-- Impact: The word can make read admission, readiness, or a launch packet sound like execution authority. That is advisory, not Handshake, unless the chain reaches exact contract, policy, one-use greenlight, gateway check, and receipt/refusal/proof gap.
-- Fix approach: Use narrower names in new work: `route admission`, `expansion evidence packet`, `gateway check posture`, or `launch gate packet`. Avoid standalone `Admission` as a kernel noun.
-
-**auth.md + x402 interlock surfaces are evidence, not composite execution:**
-- Issue: The interlock packet verifies structural conditions and proof gaps, but it does not make auth.md credential issuance or x402 payment signing a composite live authority path.
-- Files: `src/adapters/auth-md-x402-interlock/packet.ts`, `test/architecture/auth-md-x402-interlock-packet.test.ts`, `src/surfaces/proof-packets.ts`, `src/surfaces/product-launch-gate-resolution.ts`, `docs/internal/decisions.md`.
-- Impact: Naming it as admission can imply the service call is already cleared. The packet is a launch/evidence surface; authority remains per protected API call and per x402 exact payment action.
-- Fix approach: Keep `readyForCompositeExecution: false` as a hard non-claim until the composite path has exact action contracts, policy decisions, one-use greenlights, verified gateway checks, credential/payment evidence, receipts, refusals, and proof gaps.
-
-**Certificate/passport language risks permission drift:**
-- Issue: `AuthorityCertificate` is terminal evidence, but passport-style naming can suggest reusable entry permission.
-- Files: `README.md`, `QUALITY.md`, `docs/internal/decisions.md`, `src/protocol/areas/authority-certificate/schemas.ts`, `src/protocol/areas/authority-certificate/transitions.ts`.
-- Impact: A certificate or passport label can be mistaken for identity, permission, settlement, hosted trust, or reusable auth. That is ambient authority wearing a badge if it authorizes later calls.
-- Fix approach: Use `certificate` only for terminal evidence and use `proof packet` for reviewable surface state. Do not create reusable passport credentials inside the kernel.
+**Analysis Date:** 2026-05-26
 
 ## Tech Debt
 
-**Exact protected-action policy is triggered by parameter keys:**
-- Issue: `exactProtectedActionPolicyApplies` identifies exact protected-action policy by checking parameter keys such as `gatewayReadinessRef`, `gatewayReadinessDigest`, `policyVersionRef`, `policyVersionDigest`, and `paymentRequirementsDigest`.
-- Files: `src/protocol/areas/policy-greenlight/transitions.ts`, `test/protocol/policy-greenlight.test.ts`, `test/protocol/x402-payment-contract.test.ts`.
-- Impact: A new action family can accidentally enter this branch by using similar keys, or miss the branch by expressing equivalent evidence under different keys. That makes expansion brittle and can produce inconsistent refusal/greenlight behavior.
-- Fix approach: Bind protected-action policy evaluation to explicit action type or policy-pack capability under `src/protocol/areas/policy-greenlight/`, not incidental parameter names.
+**Authority and proof posture are concentrated in large orchestration files:**
+- Issue: Several files carry many authority-boundary responsibilities at once: schema normalization, policy posture, proof projection, readback validation, and reason-code construction.
+- Files: `src/mcp/x402-proposal.ts`, `src/runtime/ingress/index.ts`, `src/protocol/areas/policy-greenlight/transitions.ts`, `src/protocol/areas/gateway-gate/transitions.ts`, `src/adapters/x402-payment/protected-tool-profile/index.ts`, `src/surfaces/boundary-manifest.ts`, `src/surfaces/proof-packets/product-completion.ts`, `src/protocol/evidence-projections/projections.ts`
+- Impact: Small changes in these modules can accidentally widen authority, weaken refusal semantics, or turn a proof-gap/readback surface into an implied control surface.
+- Fix approach: Extract narrow helpers only around already-tested invariants. Keep source-owned tests in `test/protocol/kernel-policy-gateway.test.ts`, `test/runtime/runtime-ingress.test.ts`, `test/adapters/x402-wallet-gateway.test.ts`, and `test/architecture/surface-boundary-posture.test.ts` as the refactor guard.
 
-**D1 conflict classification depends on database error text:**
-- Issue: D1 conflict handling classifies failures by matching substrings from SQLite/D1 error messages and by intentionally forcing a `NOT NULL` constraint in mismatch cases.
-- Files: `src/storage/d1/index.ts`, `src/storage/d1/statements.ts`, `migrations/0001_protocol_kernel.sql`, `test/protocol/protocol-store-atomicity-contract.test.ts`, `test/http/d1-http.test.ts`.
-- Impact: D1 or SQLite message drift can turn a structured idempotency or one-use-greenlight refusal into an unclassified storage error.
-- Fix approach: Prefer deterministic post-failure readbacks and table-specific invariant checks for conflict classification. Keep the current atomicity tests as the minimum regression net.
+**Product completion is encoded as proof constants plus scripts:**
+- Issue: Launch and product-completion state is represented through source constants and script-read proof packets rather than a single source-owned terminal state machine.
+- Files: `src/surfaces/product-launch-gate-resolution.ts`, `src/surfaces/proof-packets/product-completion.ts`, `scripts/check-product-completion.mjs`, `scripts/check-distribution-provenance.mjs`, `scripts/check-live-x402-paid-retry.mjs`, `scripts/check-host-generated-code-containment.mjs`, `test/architecture/product-launch-gate-resolution.test.ts`
+- Impact: Product claims can drift when script inputs, generated proof packets, and source constants disagree. The code has guardrails, but the mechanism is still projection-heavy.
+- Fix approach: Treat these outputs as evidence/readback only. Do not add new product authority claims without source constants, proof packet validation, and architecture tests in `test/architecture/product-launch-gate-resolution.test.ts`.
 
-**Surface-boundary posture is enforced by string scans:**
-- Issue: The boundary manifest and architecture tests check imports, forbidden terms, and credential shapes through source text patterns.
-- Files: `src/surfaces/boundary-manifest.ts`, `test/architecture/surface-boundary-posture.test.ts`, `test/architecture/claim-boundary.test.ts`.
-- Impact: String scans can miss dynamic imports, re-export indirection, alias changes, generated code paths, or semantic authority drift. They are claim guardrails, not a runtime enforcement boundary.
-- Fix approach: Continue using the tests for product-language discipline, but keep real authority in HTTP route roles, protocol transitions, gateway checks, and storage invariants.
+**Surface boundary enforcement is partly manual and regex-based:**
+- Issue: The package/product boundary is encoded in a hand-maintained manifest and architecture tests that scan source text for imports, forbidden language, and exported surfaces.
+- Files: `src/surfaces/boundary-manifest.ts`, `test/architecture/surface-boundary-posture.test.ts`, `test/architecture/claim-boundary.test.ts`, `test/architecture/active-vocabulary.test.ts`, `package.json`
+- Impact: Static `from` import scans and vocabulary scans can miss dynamic `import()`, generated export paths, or authority leakage expressed through new terminology.
+- Fix approach: Keep the manifest small and explicit. Add an AST-based dependency graph check before allowing new public subpaths, source roots, or generated package artifacts.
 
-**Large projection/profile files concentrate unrelated risk:**
-- Issue: Several files mix schema projection, claim language, evidence transformation, and product gate posture in large modules.
-- Files: `src/surfaces/proof-packets.ts`, `src/adapters/auth-md/profiles.ts`, `src/cli/x402/index.ts`, `src/mcp/x402-proposal.ts`, `src/protocol/evidence-projections/projections.ts`, `src/protocol/areas/policy-greenlight/transitions.ts`.
-- Impact: Small copy or schema changes can silently alter product claims, packet readiness, and protocol evidence shape in the same edit. Review burden is high.
-- Fix approach: Split by owned concern when edits touch these files: schemas, builders, product-gate verdicts, and text projections. Do not combine behavior changes with language cleanup.
+**A2A-style negotiation is evidence-only but has no transition layer:**
+- Issue: The negotiation area models external protocol evidence, offers, decisions, linked agreements, obligations, and agreement status transitions as schemas and registered objects only.
+- Files: `src/protocol/areas/negotiation/LANE.md`, `src/protocol/areas/negotiation/schemas.ts`, `src/protocol/areas/negotiation/inputs.ts`, `src/protocol/areas/negotiation/index.ts`, `src/protocol/events/schemas.ts`, `src/protocol/areas/object-registry/index.ts`, `test/protocol/negotiation-schemas.test.ts`, `test/architecture/negotiation-no-authority-surface.test.ts`
+- Impact: The current lane is correctly non-authority, but it does not enforce lifecycle ordering, referential integrity, or readback consistency between a negotiation decision and later protected action evidence.
+- Fix approach: Keep `src/protocol/areas/negotiation/` free of policy, gateway, receipt, and authority-certificate imports. Add transition/readback code only if it records evidence and preserves `evidencePosture: "imported_evidence_only"` for A2A references.
 
-**Role clients and root exports are deliberately narrow but easy to blur:**
-- Issue: The package exposes curated root exports plus deeper role clients and adapter/runtime subpaths. A convenience export can accidentally imply broader authority or make a proposal-only surface look executable.
-- Files: `src/index.ts`, `src/sdk/role-clients/index.ts`, `src/sdk/LANE.md`, `test/architecture/root-exports.test.ts`, `README.md`.
-- Impact: Import ergonomics can turn package availability into perceived authority, especially around MCP, runtime ingress, and role clients.
-- Fix approach: Keep authority-sensitive helpers behind explicit subpaths and preserve `test/architecture/root-exports.test.ts` as a gate for new exports.
+**Runtime ingress caps generated execution blocks at local schema limits:**
+- Issue: Runtime ingress accepts at most 32 observed dispatches per block and uses bounded evidence lists, but generated-code programs can branch, loop, retry, and dynamically construct calls beyond a single bounded block.
+- Files: `src/runtime/ingress/schemas.ts`, `src/runtime/ingress/index.ts`, `src/runtime/codemode-multi-action/generated-program-runner.ts`, `src/runtime/codemode-multi-action/generated-graph-evidence.ts`, `test/runtime/runtime-ingress.test.ts`
+- Impact: Over-limit or truncated execution graphs become proof-gap/refusal evidence. They are not complete host containment proof or full generated-program authority analysis.
+- Fix approach: Preserve `truncationStatus`, `unobservedRegionRefs`, and refusal reason codes whenever accepting larger host transcripts or multi-block generated execution evidence.
 
 ## Known Bugs
 
-**No reproducible source bug detected in the concern scan:**
-- Symptoms: No concrete tracked-source bug is identified by `TODO`/`FIXME` markers or by the targeted passport/admission/service-gateway/principal-agent search.
-- Files: `src/`, `test/`, `docs/internal/decisions.md`, `docs/internal/protocol-notes.md`.
-- Trigger: Not applicable.
-- Workaround: Treat documented proof gaps and cut lines as product boundaries, not hidden bugs.
+**Current distribution launch gate is blocked:**
+- Symptoms: Source-owned launch state records current local metadata as `handshake-protocol-kernel@0.2.8`, while public npm latest evidence is `0.2.7`, missing current exports, and MCP Registry lookup/search is not accepted or discoverable.
+- Files: `src/surfaces/product-launch-gate-resolution.ts`, `src/surfaces/proof-packets/product-completion.ts`, `scripts/check-distribution-provenance.mjs`, `test/architecture/product-launch-gate-resolution.test.ts`, `README.md`, `docs/internal/decisions.md`, `package.json`, `server.json`
+- Trigger: Any product claim that treats public npm or MCP Registry as current 0.2.8 distribution proof.
+- Workaround: Claim only historical 0.2.7 distribution evidence. Keep 0.2.8 publication and MCP Registry discoverability as proof gaps until official readback matches `package.json` and `server.json`.
 
-**Live/provider x402 execution is intentionally refused:**
-- Symptoms: Non-reference provider environments are rejected before x402 signing.
-- Files: `src/adapters/x402-payment/wallet-gateway.ts`, `test/adapters/x402-wallet-gateway.test.ts`, `docs/internal/decisions.md`, `README.md`.
-- Trigger: Use of a provider environment posture other than `local_reference_sandbox`.
-- Workaround: Keep live/provider x402 claims out of docs and demos until provider custody, facilitator behavior, gateway installation, and settlement evidence are proven.
+**Live external x402 proof is blocked by missing funded signer and signed retry evidence:**
+- Symptoms: The live provider gate remains `resolved_blocked` with `funded_customer_gateway_signer_missing` and `live_signed_retry_not_exercised`.
+- Files: `src/surfaces/product-launch-gate-resolution.ts`, `src/surfaces/proof-packets/product-completion.ts`, `scripts/check-live-x402-paid-retry.mjs`, `test/architecture/product-launch-gate-resolution.test.ts`, `src/adapters/x402-payment/wallet-gateway.ts`
+- Trigger: Any claim that the package has completed live external x402 paid execution or customer gateway custody.
+- Workaround: Use local/reference x402 proof only. Treat external sandbox/live readiness as custody/readiness evidence until a customer-held funded signer and terminal signed retry proof exist.
+
+**Codex host activation can be misread as host containment:**
+- Symptoms: Codex activation records one default raw sibling probe as `detected` and can still yield host-specific activation readiness, while product completion requires raw sibling refusal in a live host containment transcript before the containment gate can pass.
+- Files: `src/adapters/x402-payment/protected-tool-profile/codex-activation.ts`, `src/adapters/protected-path-probes/host-fixture.ts`, `src/surfaces/proof-packets/product-completion.ts`, `scripts/check-host-generated-code-containment.mjs`, `test/adapters/x402-protected-tool-codex-activation.test.ts`, `docs/internal/decisions.md`
+- Trigger: A consumer treats `host_specific_ready` activation evidence as proof that raw shell, browser, direct MCP, network, package-manager, signer, or sibling SDK paths are blocked.
+- Workaround: Keep activation and containment separate. Host containment requires the structured transcript path consumed by `scripts/check-host-generated-code-containment.mjs`.
 
 ## Security Considerations
 
-**Hosted admission verifier is a seam, not a production auth system:**
-- Risk: A weak `HostedCallerVerifier` can return a validly shaped `TransitionCallerIdentity` for the wrong caller, tenant, org, project, role, or scope.
-- Files: `src/http/admission/index.ts`, `src/http/admission/hosted-caller-identity.ts`, `src/http/admission/hosted-admission-config.ts`, `src/http/LANE.md`, `test/http/http.test.ts`.
-- Current mitigation: Hosted admission validates identity shape, freshness, roles, hosted read scopes, route scope, and request context evidence. The hosted config explicitly reports no hosted mutation authority, no payment management, no settlement authority, and no provider custody.
-- Recommendations: Treat provider verification, org auth, service credential issuance, and hosted operation as deployment-specific security work outside the kernel. Keep hosted operation in proof-gap language until a concrete verifier implementation and threat model exist.
+**Hosted raw record reads depend on a configured audit sink in promoted modes:**
+- Risk: Raw record read admission requires roles, scopes, purpose, expiry, and raw-read posture, but durable audit persistence is delegated through `hostedRawReadAuditSink`.
+- Files: `src/http/handlers/internal-record-read.ts`, `src/http/handlers/raw-read-audit.ts`, `src/http/admission/hosted-admission-config.ts`, `src/http/app-options.ts`, `test/http/http.test.ts`
+- Current mitigation: Preview/production hosted raw reads fail closed with `hosted_raw_read_audit_sink_required` when raw reads are gated or allowed and no sink is configured.
+- Recommendations: Add a source-owned durable audit sink implementation or D1 audit table before scaling hosted raw reads beyond controlled deployments.
 
-**Static bearer role tokens are reference transport credentials:**
-- Risk: `CallerAuthTokens` can be mistaken for production organization authentication.
-- Files: `src/http/admission/caller-auth.ts`, `src/sdk/client.ts`, `src/sdk/surface-clients/transport.ts`, `src/sdk/LANE.md`, `README.md`.
-- Current mitigation: Tokens are role-scoped and constant-time compared; hosted caller identity is modeled separately.
-- Recommendations: Use static tokens only for local/reference deployments. Production paths need a hosted verifier with tenant/org/project/role/scope evidence.
+**Project and workspace raw-read hiding relies on optional payload fields:**
+- Risk: Hosted record scope checks always compare tenant/org metadata, but project and workspace checks only apply when `projectId` and `workspaceId` exist on the record payload.
+- Files: `src/http/handlers/hosted-record-scope.ts`, `src/http/handlers/internal-record-read.ts`, `src/protocol/store/port.ts`, `test/http/http.test.ts`
+- Current mitigation: Cross-tenant and cross-organization reads are hidden as not found, and project/workspace reads are hidden when payload fields are present.
+- Recommendations: Promote project/workspace scope into `StoredProtocolRecord` metadata or a dedicated index before relying on hosted raw read isolation for multi-project tenants.
 
-**Credential redaction is heuristic in adapter profiles:**
-- Risk: auth.md credential material detection relies on structured schemas plus regex/base64 heuristics that can miss provider-specific secret formats.
-- Files: `src/adapters/auth-md/profiles.ts`, `src/adapters/auth-md/gateway.ts`, `src/protocol/areas/credential-custody/schemas.ts`, `docs/internal/protocol-notes.md`.
-- Current mitigation: Evidence schemas reject raw credential material and keep `GatewayCredentialRef` opaque. Gateway adapters record credential resolution after verified gateway checks.
-- Recommendations: Add provider-specific credential fixtures, fuzzing, and negative tests before any live credential custody claim.
+**Self-hosted transition custody uses static bearer tokens:**
+- Risk: Self-hosted callers are admitted by per-role bearer tokens and constant-time comparison. Token rotation, issuance provenance, and revocation are outside the protocol kernel.
+- Files: `src/http/admission/caller-auth.ts`, `src/http/admission/index.ts`, `test/support/d1-http-harness.ts`, `README.md`
+- Current mitigation: Hosted mode has a verifier-adapter path, and self-hosted mode is explicit about custody being local configuration.
+- Recommendations: Do not treat self-hosted bearer token possession as principal identity. Use hosted verifier evidence or an external gateway-controlled admission layer for promoted deployments.
 
-**Runtime ingress is caller-observed evidence, not host containment:**
-- Risk: Raw or sibling tool paths can bypass runtime ingress, especially browser-side tools, shell commands, package managers, or direct network calls outside a wrapper.
-- Files: `src/runtime/ingress/schemas.ts`, `src/runtime/ingress/index.ts`, `src/runtime/LANE.md`, `docs/internal/protocol-notes.md`.
-- Current mitigation: Runtime ingress records wrapped/raw-sibling/ambiguous posture and emits proposals only. It does not create policy, greenlights, gateway checks, or receipts.
-- Recommendations: Do not claim broad runtime interception or sandbox containment. For each runtime integration, document raw bypass posture and prove the protected mutation must pass through the gateway.
+**Signing and payment material remain narrow but high blast radius:**
+- Risk: Wallet payment payload/signature creation and authority-certificate signing handle sensitive signing material. These paths must not leak raw keys, payment payloads, or signatures into package roots, logs, or readback surfaces.
+- Files: `src/adapters/x402-payment/wallet-gateway.ts`, `src/protocol/areas/authority-certificate/inputs.ts`, `src/protocol/areas/authority-certificate/signing.ts`, `test/adapters/x402-wallet-gateway.test.ts`, `test/protocol/authority-certificate.test.ts`
+- Current mitigation: Payment payload/signature creation occurs after a verified gateway check, and certificate signing is terminal evidence rather than permission.
+- Recommendations: Keep these modules out of broad exports. Add redaction tests whenever a new readback, proof packet, CLI command, or MCP resource touches these paths.
 
-**MCP surfaces are proposal/evidence only:**
-- Risk: Registry availability or MCP tool exposure can be misread as executable protection.
-- Files: `src/mcp/server.ts`, `src/mcp/x402-proposal.ts`, `server.json`, `README.md`, `test/architecture/root-exports.test.ts`.
-- Current mitigation: README and claim-boundary tests state MCP has no policy decisions, greenlights, gateway checks, signers, mutations, receipt export, hosted operation, or broad protection.
-- Recommendations: Keep MCP Registry discoverability as a proof gap until acceptance and lookup are verified, and keep MCP authority claims out of package surfaces.
+**Negotiation records are audit-readable transition evidence:**
+- Risk: Negotiation objects, including A2A imported evidence refs and agreement obligation bindings, are registered as `transition_evidence` with `audit_read`. Misusing those records as authorization would turn evidence into permission.
+- Files: `src/protocol/areas/negotiation/schemas.ts`, `src/protocol/areas/object-registry/index.ts`, `test/protocol/negotiation-object-registry.test.ts`, `test/protocol/negotiation-schemas.test.ts`, `test/architecture/negotiation-no-authority-surface.test.ts`
+- Current mitigation: Schemas reject authority-shaped obligation refs and external protocol evidence postures such as authorization, identity proof, execution proof, settlement, payment, receipt, or certificate.
+- Recommendations: Any A2A importer or readback surface must preserve imported-evidence-only language and must never populate greenlight, gateway-check, receipt, signer, or payment fields from negotiation records.
 
 ## Performance Bottlenecks
 
-**In-memory store uses scans and is not a scaling store:**
-- Problem: The local store keeps protocol records in memory and resolves many queries by iterating maps or arrays.
-- Files: `src/storage/memory/index.ts`, `test/protocol/protocol-store-atomicity-contract.test.ts`.
-- Cause: It is designed as local/test/reference storage, not tenant-scale persistence.
-- Improvement path: Keep production-facing performance claims on D1 or a real durable store, not `createInMemoryProtocolStore`.
+**D1 record listing is unpaginated for common read paths:**
+- Problem: D1 store methods list records by type or action contract without cursor pagination and JSON-parse every returned row.
+- Files: `src/storage/d1/index.ts`, `src/protocol/store/port.ts`, `migrations/0001_protocol_kernel.sql`, `test/protocol/protocol-store-atomicity-contract.test.ts`
+- Cause: The protocol store API is optimized for reconstructable proof tests and small evidence sets.
+- Improvement path: Add cursor/limit arguments to list methods before high-volume hosted readback, tenant export, or audit search.
 
-**Evidence projection and proof packet construction parse large JSON records:**
-- Problem: Projection paths fetch protocol records and reconstruct evidence views in process.
-- Files: `src/protocol/evidence-projections/projections.ts`, `src/surfaces/proof-packets.ts`, `src/storage/d1/index.ts`.
-- Cause: Projection code favors reconstructability and schema validation over precomputed read models.
-- Improvement path: Add explicit read models or indexed projection tables only after profiling real tenant workloads. Do not make projection caches authority-bearing.
+**Memory store scans are fixture-grade:**
+- Problem: The in-memory store uses maps, arrays, structured cloning, and local scans for indexes that D1 stores in tables.
+- Files: `src/storage/memory/index.ts`, `src/protocol/store/port.ts`, `test/protocol/model-based-invariants.test.ts`, `test/protocol/protocol-store-atomicity-contract.test.ts`
+- Cause: The memory store is a deterministic test/reference implementation, not a production index.
+- Improvement path: Keep production hosted paths on D1-compatible storage. Do not use `createInMemoryProtocolStore` as a scalability signal.
 
-**Runtime ingress has bounded dispatch but no broader throughput model:**
-- Problem: Dispatch proposal input is capped and validated, but runtime ingestion is not modeled as high-volume event streaming.
-- Files: `src/runtime/ingress/schemas.ts`, `src/runtime/ingress/index.ts`.
-- Cause: The runtime path is a proposal compiler for known dispatch families, not a host-wide telemetry pipeline.
-- Improvement path: Keep the cap as a safety control. Add backpressure and event-stream storage only when a concrete runtime integration requires it.
+**Repository quality gates are broad and script-heavy:**
+- Problem: The main gate builds, typechecks, lints, formats, tests, packs, and checks diffs; product-proof scripts then require built `dist` artifacts and optional external readbacks.
+- Files: `package.json`, `scripts/check-product-completion.mjs`, `scripts/check-distribution-provenance.mjs`, `scripts/check-package-surface.mjs`, `scripts/build-package-bundles.mjs`
+- Cause: Product truth is intentionally source-owned and evidence-heavy, so local verification pays full repo cost.
+- Improvement path: Keep `npm run check:repo` as the closeout bar, but add focused preflight scripts for mapper/planner tasks that do not need package build or live distribution proof.
+
+**Large tests slow targeted review:**
+- Problem: Several tests exceed 800 lines and bundle many cases into single files.
+- Files: `test/architecture/proof-packets.test.ts`, `test/http/http.test.ts`, `test/http/d1-http.test.ts`, `test/runtime/runtime-ingress.test.ts`, `test/adapters/x402-wallet-gateway.test.ts`, `test/protocol/kernel-policy-gateway.test.ts`, `test/integration/x402-d1-http.test.ts`
+- Cause: Invariant coverage is centralized around broad protocol stories.
+- Improvement path: Split new cases by invariant boundary, not by feature label. Keep high-level regression tests, but add smaller files for new authority, hosted, negotiation, or x402 payment concerns.
 
 ## Fragile Areas
 
-**Gateway check consumption and idempotency are correctness-critical:**
-- Files: `src/protocol/areas/gateway-gate/transitions.ts`, `src/protocol/areas/gateway-gate/gateway-policy.ts`, `src/storage/d1/index.ts`, `migrations/0001_protocol_kernel.sql`, `test/protocol/protocol-store-atomicity-contract.test.ts`.
-- Why fragile: The one-use greenlight invariant depends on exact digest checks, gateway-policy drift checks, idempotency ledger entries, and durable consumption records staying aligned.
-- Safe modification: Change gateway consumption, idempotency, or D1 statements only with atomicity tests and replay/refusal tests. Do not loosen digest comparisons to improve ergonomics.
-- Test coverage: Strong local and D1 tests exist, but conflict classification remains tied to D1 error behavior.
+**D1 conflict classification depends on provider error text:**
+- Files: `src/storage/d1/index.ts`, `test/protocol/protocol-store-atomicity-contract.test.ts`, `test/integration/x402-d1-http.test.ts`
+- Why fragile: Atomicity and idempotency paths classify some conflicts from D1 error messages and constraint behavior. Provider wording or driver behavior can change.
+- Safe modification: Add tests against the exact D1 adapter behavior before changing schema constraints, unique indexes, or conflict handling.
+- Test coverage: `test/protocol/protocol-store-atomicity-contract.test.ts` covers the store contract, but remote/provider drift still needs integration proof.
 
-**Policy evaluation mixes generic and family-specific checks:**
-- Files: `src/protocol/areas/policy-greenlight/transitions.ts`, `src/protocol/areas/action-contract/schemas.ts`, `src/protocol/areas/delegated-authority/transitions.ts`.
-- Why fragile: Policy checks cover isolation, protected path, sequence deps, gateway credential refs, delegated authority refs, x402-like exact payment parameters, and action-specific matching in one transition area.
-- Safe modification: Add explicit evaluators per protected action family while keeping all evaluators under the policy-greenlight transition boundary.
-- Test coverage: x402 and delegated-authority tests cover current behavior, but a new action family needs negative tests for accidental policy-branch entry.
+**Boundary checks can miss non-static import paths:**
+- Files: `src/surfaces/boundary-manifest.ts`, `test/architecture/surface-boundary-posture.test.ts`, `test/architecture/root-exports.test.ts`, `test/architecture/package-surface.test.ts`
+- Why fragile: Current architecture tests primarily inspect static source text and package export metadata.
+- Safe modification: When adding a subpath export, generated bundle, or runtime adapter, update `src/surfaces/boundary-manifest.ts`, `package.json`, and package-surface tests in the same change.
+- Test coverage: Static tests are strong for known roots and forbidden fragments, but dynamic imports and generated artifacts need additional build-output checks.
 
-**auth.md adapter profiles contain secret-redaction and provenance logic together:**
-- Files: `src/adapters/auth-md/profiles.ts`, `src/adapters/auth-md/gateway.ts`, `test/adapters/auth-md-adapter.test.ts`, `test/adapters/auth-md-gateway.test.ts`.
-- Why fragile: Credential provenance, identity assertions, lifecycle evidence, gateway intake, and secret-redaction checks share one profile module.
-- Safe modification: Keep raw credential rejection tests green for every profile edit. Split helper modules before adding provider-specific credential formats.
-- Test coverage: Good reference tests exist; provider-specific fuzzing and live provider fixtures are gaps.
+**A2A negotiation records can be overread by downstream consumers:**
+- Files: `src/protocol/areas/negotiation/LANE.md`, `src/protocol/areas/negotiation/schemas.ts`, `src/protocol/events/schemas.ts`, `test/protocol/negotiation-events.test.ts`, `test/architecture/negotiation-no-authority-surface.test.ts`
+- Why fragile: Terms such as offer, decision, agreement, obligation, and status transition look authority-shaped to product consumers even though the lane is evidence-only.
+- Safe modification: Keep event names `*_recorded`, keep object registry export posture as `transition_evidence`, and reject authority-shaped fields at schema boundaries.
+- Test coverage: Tests cover non-authority surface posture and schema rejection. They do not prove imported A2A object refs correspond to retrievable source evidence.
 
-**Surface packets can harden or distort product truth:**
-- Files: `src/surfaces/proof-packets.ts`, `src/surfaces/product-launch-gate-resolution.ts`, `test/architecture/claim-boundary.test.ts`.
-- Why fragile: These files turn protocol evidence into product-facing claims. A field rename can imply a stronger boundary than the kernel enforces.
-- Safe modification: Update product packets with claim-boundary tests and canonical docs in the same review.
-- Test coverage: Claim-boundary tests are broad, but they remain text and schema checks rather than formal product-proof validation.
+**Readiness names can be stronger than the authority they represent:**
+- Files: `src/adapters/x402-payment/protected-tool-readiness/index.ts`, `src/adapters/x402-payment/protected-tool-facade/index.ts`, `src/x402-protected-tool/index.ts`, `test/adapters/x402-hosted-custody-readiness.test.ts`, `test/runtime/x402-protected-tool-facade.test.ts`
+- Why fragile: `external_custody_ready`, `host_specific_ready`, and package-readiness outputs are easy to confuse with execution authority.
+- Safe modification: Preserve authority-boundary fields and non-claims whenever exposing readiness objects through CLI, MCP, docs, or package subpaths.
+- Test coverage: Existing tests assert readiness is pre-contract evidence, but external consumers can still overclaim if examples or docs drop the boundary language.
+
+**Proof scripts depend on built package artifacts:**
+- Files: `scripts/check-product-completion.mjs`, `scripts/check-package-surface.mjs`, `scripts/check-published-entrypoints.mjs`, `scripts/build-package-bundles.mjs`, `package.json`
+- Why fragile: Scripts that inspect `dist/` can report stale package shape if source changes without a fresh build.
+- Safe modification: Run `npm run build` or the full `npm run check:repo` before treating package-surface or product-completion output as current.
+- Test coverage: Package-surface scripts and architecture tests guard the expected shape, but stale local `dist/` state is still an operator hazard.
 
 ## Scaling Limits
 
-**Per-call spend is modeled; aggregate spend is not enforced:**
-- Current capacity: `DelegatedAuthorityRef` supports per-action atomic limits such as `maxAtomicAmountPerAction`, and policy inputs include per-call amount checks.
-- Limit: The kernel does not enforce aggregate budget depletion, rolling spend windows, or multi-call balance reservation.
-- Scaling path: Add budget ledger semantics only as a new explicit protocol area or transition, with one-use reservation/consumption/refund evidence. Do not overload `DelegatedAuthorityRef` into aggregate spend.
+**Per-call x402 spend is bounded; aggregate spend is not enforced:**
+- Current capacity: The first wedge enforces one exact `x402_payment.exact` per-call protected action with amount, selected payment requirement, gateway credential, delegated authority, and one-use greenlight bindings.
+- Limit: There is no source-owned aggregate spend window, budget ledger, merchant risk policy, or multi-call allowance policy in the kernel.
+- Scaling path: Add aggregate spend as a separate protected action or policy ledger. Do not reuse one greenlight across calls.
+- Files: `src/protocol/areas/policy-greenlight/transitions.ts`, `src/protocol/areas/gateway-gate/gateway-policy.ts`, `src/adapters/x402-payment/action-proposal.ts`, `test/protocol/kernel-policy-gateway.test.ts`
 
-**One official x402 buyer-side exact action is the live proof lane:**
-- Current capacity: The official wedge is one buyer-side `x402_payment.exact` per-call protected action.
-- Limit: Broad x402 compatibility, seller/facilitator finality, provider custody, settlement proof, and cross-merchant payment management are proof gaps.
-- Scaling path: Expand by adding action-specific contracts and gateway checks, not by broadening the meaning of the existing x402 contract.
+**Hosted operation is read/admission posture, not hosted mutation authority:**
+- Current capacity: Hosted readiness reports admission and redacted/raw evidence read posture, D1/KV presence, verifier strategy, and unsupported capabilities.
+- Limit: Hosted mode does not create provider custody, settlement authority, payment management, or hosted mutation authority.
+- Scaling path: Introduce explicit hosted mutation contracts and gateway-held custody proof before adding hosted execution claims.
+- Files: `src/http/handlers/hosted-readiness.ts`, `src/http/admission/hosted-admission-config.ts`, `src/hosted-admission/hosted-verifier-adapter.ts`, `test/http/http.test.ts`, `README.md`
 
-**Hosted operation is read/admission evidence, not provider enforcement:**
-- Current capacity: Hosted admission config and caller identity model route and scope transition/read access.
-- Limit: The kernel does not prove production hosted mutation authority, customer gateway installation, provider-side enforcement, or org-wide identity governance.
-- Scaling path: Add deployment-specific verifier and gateway-install evidence before claiming hosted operation.
+**Generated execution evidence is bounded by observed dispatch capture:**
+- Current capacity: Runtime ingress handles bounded dispatch blocks, candidate/refusal classification, generated graph evidence, and reason codes.
+- Limit: Unobserved code regions, dynamic tool construction, raw sibling routes, and over-limit blocks remain proof gaps or refusals, not complete generated-program containment.
+- Scaling path: Add host-native dispatch interception and transcript ingestion before claiming broad codemode protection.
+- Files: `src/runtime/ingress/schemas.ts`, `src/runtime/ingress/index.ts`, `src/runtime/codemode-multi-action/generated-program-runner.ts`, `src/runtime/codemode-multi-action/generated-graph-evidence.ts`, `test/runtime/runtime-ingress.test.ts`
 
-**Protocol object count is already broad:**
-- Current capacity: The object registry includes catalog, envelope, delegated authority, credential custody, runtime evidence, intent compilation, action contract, policy, review, gateway gate, mutation, receipt, recovery, certificate, and stream-event objects.
-- Limit: Adding synonyms rather than distinct state transitions increases cognitive load and migration cost.
-- Scaling path: Prefer projections and packets for new views; promote to protocol object only for new enforceable state.
+**Negotiation evidence has no durable cross-object lifecycle index:**
+- Current capacity: Negotiation objects are registered and events can record sessions, offers, decisions, linked agreements, obligations, and status transitions.
+- Limit: The kernel does not enforce status transition ordering, obligation satisfaction, A2A object availability, or agreement-to-action trace closure.
+- Scaling path: Add evidence-only transitions and indexes before building A2A importers, readbacks, or reconciliation tools.
+- Files: `src/protocol/areas/negotiation/schemas.ts`, `src/protocol/events/schemas.ts`, `src/protocol/areas/object-registry/index.ts`, `migrations/0001_protocol_kernel.sql`, `test/protocol/negotiation-events.test.ts`
 
 ## Dependencies at Risk
 
-**MCP alpha packages:**
-- Risk: `@modelcontextprotocol/client` and `@modelcontextprotocol/server` are alpha-version dependencies.
-- Impact: API or protocol drift can break MCP proposal/evidence tooling.
-- Migration plan: Keep MCP under proposal/evidence-only subpaths and preserve smoke tests around `src/mcp/` before broadening docs or exports.
+**MCP packages are alpha:**
+- Risk: `@modelcontextprotocol/client` and `@modelcontextprotocol/server` are pinned to `^2.0.0-alpha.2`.
+- Impact: SDK surface drift can break MCP proposal/evidence server behavior, package smoke tests, or external discovery scripts.
+- Migration plan: Keep MCP usage behind `src/mcp/` and package smoke tests in `scripts/check-package-surface.mjs`; do not let MCP behavior become authority.
+- Files: `package.json`, `src/mcp/x402-proposal.ts`, `src/mcp/server.ts`, `scripts/check-package-surface.mjs`
 
-**x402 SDK packages:**
-- Risk: `@x402/core`, `@x402/evm`, and `@x402/fetch` are external protocol SDK dependencies.
-- Impact: Exact payment schema, signature generation, selected payment requirement handling, or provider behavior can drift from local assumptions.
-- Migration plan: Keep x402 signing behind `src/adapters/x402-payment/wallet-gateway.ts` and conformance tests. Treat live provider behavior as unproven until tested against real providers.
+**x402 SDK behavior is authority-adjacent:**
+- Risk: `@x402/core` and `@x402/fetch` at `2.12.0` define payment payload/signature construction behavior for the buyer-side exact action.
+- Impact: SDK drift can change payment material shape, header expectations, or official payment-required parsing.
+- Migration plan: Keep SDK calls inside wallet/readiness adapter modules and rerun `test/adapters/x402-wallet-gateway.test.ts`, `test/adapters/x402-payment-action-proposal.test.ts`, and `test/integration/x402-d1-http.test.ts` for upgrades.
+- Files: `package.json`, `src/adapters/x402-payment/wallet-gateway.ts`, `src/adapters/x402-payment/action-proposal.ts`, `src/adapters/x402-payment/protected-tool-readiness/index.ts`
 
-**Cloudflare D1/Wrangler behavior:**
-- Risk: D1 SQL constraints, conflict messages, and Worker runtime behavior are external to the TypeScript kernel.
-- Impact: Storage atomicity can fail noisily or classify errors incorrectly if runtime messages change.
-- Migration plan: Prefer durable invariant readbacks over message parsing, and keep D1 tests in `test/http/d1-http.test.ts` and `test/integration/x402-d1-http.test.ts`.
+**Cloudflare D1/KV behavior is part of reconstruction reliability:**
+- Risk: Hosted storage uses D1 for structured evidence and KV as a non-authoritative cache.
+- Impact: D1 constraint semantics, error messages, or KV expiration behavior can affect atomicity, isolation cache freshness, and readback reliability.
+- Migration plan: Treat `src/storage/d1/index.ts` as the production storage contract and keep KV limited to cache posture.
+- Files: `package.json`, `src/storage/d1/index.ts`, `src/storage/kv/index.ts`, `migrations/0001_protocol_kernel.sql`, `test/http/d1-http.test.ts`
 
-**Bun/TypeScript pre-release stack:**
-- Risk: The repo targets Bun and TypeScript 6-era tooling.
-- Impact: Build, typecheck, and module-resolution behavior can drift under dependency upgrades.
-- Migration plan: Keep `bun.lock`, `tsconfig.json`, `package.json`, and repo gates aligned; run `npm run check:repo` for release-sensitive edits.
+**Bun test and Node runtime surfaces both matter:**
+- Risk: Tests run under Bun while package scripts, bins, and consumer smoke paths run as Node ESM bundles.
+- Impact: A path can pass Bun tests and still fail after bundling or under installed-package Node execution.
+- Migration plan: Keep package-surface and installed-artifact checks in the closeout gate when changing exports, bins, MCP server entrypoints, or build output.
+- Files: `package.json`, `scripts/build-package-bundles.mjs`, `scripts/check-package-surface.mjs`, `scripts/check-published-entrypoints.mjs`, `test/product/hosted-package-consumer.test.ts`
 
 ## Missing Critical Features
 
-**Provider-grade auth.md credential custody:**
-- Problem: auth.md credential provenance and redacted gateway intake exist as reference evidence, not provider-grade secret lifecycle proof.
-- Blocks: Live protected API custody claims and broad service-gateway claims.
-- Files: `src/adapters/auth-md/profiles.ts`, `src/adapters/auth-md/gateway.ts`, `docs/internal/protocol-notes.md`, `docs/internal/decisions.md`.
+**Current 0.2.8 public publication and MCP Registry discoverability:**
+- Problem: Source metadata targets `handshake-protocol-kernel@0.2.8`, but source-owned launch state keeps current publication and MCP Registry acceptance as blockers.
+- Blocks: Current-surface distribution claim, MCP discovery claim, and product-completion closeout.
+- Files: `package.json`, `server.json`, `src/surfaces/product-launch-gate-resolution.ts`, `scripts/check-distribution-provenance.mjs`, `README.md`, `docs/internal/decisions.md`
 
-**Composite auth.md + x402 execution:**
-- Problem: The interlock packet is a non-authority readiness/evidence surface; composite paid credentialed API calls are not a finished official execution lane.
-- Blocks: Claims that auth.md identity/credential issuance plus x402 payment are cleared as one composite service gateway event.
-- Files: `src/adapters/auth-md-x402-interlock/packet.ts`, `src/surfaces/product-launch-gate-resolution.ts`, `test/architecture/auth-md-x402-interlock-packet.test.ts`.
+**Customer-held live x402 execution proof:**
+- Problem: The repo has local/reference and readiness proof paths, but lacks funded customer gateway signer proof and live signed retry evidence.
+- Blocks: Live external provider x402 proof and customer gateway custody claim.
+- Files: `src/surfaces/product-launch-gate-resolution.ts`, `scripts/check-live-x402-paid-retry.mjs`, `src/adapters/x402-payment/wallet-gateway.ts`, `test/adapters/x402-hosted-custody-readiness.test.ts`
 
-**Hosted operation proof:**
-- Problem: Hosted route admission and readiness exist, but production hosted mutation authority and provider/customer gateway installation are proof gaps.
-- Blocks: SaaS-style hosted trust claims.
-- Files: `src/http/admission/hosted-admission-config.ts`, `src/http/admission/index.ts`, `docs/internal/decisions.md`, `README.md`.
+**Source-owned hosted raw-read audit storage:**
+- Problem: Hosted raw-read auditing is represented by an application-provided sink, not a protocol-owned durable table in the migration.
+- Blocks: Strong hosted raw-read reconstruction guarantees without deployment-specific audit wiring.
+- Files: `src/http/handlers/raw-read-audit.ts`, `src/http/handlers/internal-record-read.ts`, `src/http/app-options.ts`, `migrations/0001_protocol_kernel.sql`
 
-**Aggregate budget management:**
-- Problem: Per-call spend controls exist, but no aggregate spend ledger or reservation lifecycle exists.
-- Blocks: Customer budget products and multi-call payment limits.
-- Files: `src/protocol/areas/delegated-authority/schemas.ts`, `src/protocol/areas/delegated-authority/transitions.ts`, `src/protocol/areas/policy-greenlight/transitions.ts`.
+**A2A negotiation importer/readback lane:**
+- Problem: Negotiation schemas support A2A-style imported evidence refs, but there is no importer, retriever, status transition API, or readback projection that proves the external evidence exists and stays non-authority.
+- Blocks: Safe A2A negotiation evidence use in downstream protected-action context.
+- Files: `src/protocol/areas/negotiation/schemas.ts`, `src/protocol/areas/negotiation/LANE.md`, `test/protocol/negotiation-schemas.test.ts`, `test/architecture/negotiation-no-authority-surface.test.ts`
 
-**Broad runtime interception:**
-- Problem: Runtime ingress supports selected dispatch families and bypass posture evidence; it does not intercept all generated code, browser-side tools, shells, package managers, or network clients.
-- Blocks: Claims of host-wide agent containment.
-- Files: `src/runtime/ingress/schemas.ts`, `src/runtime/ingress/index.ts`, `src/runtime/LANE.md`.
+**Host-native generated-code containment:**
+- Problem: Current containment proof is transcript/readback based and explicitly refuses host-wide containment claims.
+- Blocks: Claims that Handshake controls arbitrary raw shell, browser, direct MCP, network, package-manager, signer, or sibling SDK routes in a host.
+- Files: `scripts/check-host-generated-code-containment.mjs`, `scripts/build-host-generated-code-containment-transcript.mjs`, `src/surfaces/proof-packets/product-completion.ts`, `docs/internal/decisions.md`
 
 ## Test Coverage Gaps
 
-**New passport/admission/service-gateway language:**
-- What's not tested: No test enforces that `Passport`, standalone `Admission`, `ServiceGateway`, or `PrincipalAgentLink` remains out of the kernel as an authority-bearing object.
-- Files: `test/architecture/claim-boundary.test.ts`, `test/architecture/root-exports.test.ts`, `test/protocol/participant-identity-binding.test.ts`, `src/protocol/areas/object-registry/schemas.ts`.
-- Risk: A future object or export can introduce permission semantics outside exact contract and gateway check.
-- Priority: High.
+**Negotiation lifecycle and A2A object availability:**
+- What's not tested: Status transition ordering, linked agreement lifecycle closure, obligation satisfaction, duplicate/refused transition behavior, and retrievable external A2A object refs.
+- Files: `src/protocol/areas/negotiation/schemas.ts`, `src/protocol/events/schemas.ts`, `test/protocol/negotiation-schemas.test.ts`, `test/protocol/negotiation-events.test.ts`
+- Risk: Downstream readbacks can present a coherent-looking negotiation chain whose external evidence is missing, stale, or not linked to later protected action evidence.
+- Priority: High
 
-**Provider-specific credential redaction and custody:**
-- What's not tested: Broad provider credential formats, malformed auth.md credentials, and fuzzed encoded secret shapes.
-- Files: `src/adapters/auth-md/profiles.ts`, `test/adapters/auth-md-adapter.test.ts`, `test/adapters/auth-md-gateway.test.ts`.
-- Risk: Secret material can enter evidence or receipts if new formats bypass heuristics.
-- Priority: High.
+**Dynamic import and generated bundle boundary leakage:**
+- What's not tested: AST-level dynamic imports, generated bundle dependency graphs, and package artifact imports beyond explicit package-surface scripts.
+- Files: `src/surfaces/boundary-manifest.ts`, `test/architecture/surface-boundary-posture.test.ts`, `scripts/build-package-bundles.mjs`, `scripts/check-package-surface.mjs`
+- Risk: A public surface can acquire hidden authority-adjacent imports without being caught by string-based source scans.
+- Priority: High
 
-**Live x402 provider/facilitator behavior:**
-- What's not tested: Real provider payment requirements, facilitator responses, settlement/finality evidence, and provider custody outside local reference sandbox.
-- Files: `src/adapters/x402-payment/wallet-gateway.ts`, `test/adapters/x402-wallet-gateway.test.ts`, `test/integration/x402-d1-http.test.ts`.
-- Risk: Local exact-payment proof can be mistaken for live payment finality.
-- Priority: High.
+**Remote D1/provider drift under contention:**
+- What's not tested: Live remote D1 constraint wording, provider-specific retry behavior under high contention, and migration drift outside the local harness.
+- Files: `src/storage/d1/index.ts`, `migrations/0001_protocol_kernel.sql`, `test/http/d1-http.test.ts`, `test/integration/x402-d1-http.test.ts`
+- Risk: One-use greenlight consumption, idempotency, and receipt indexing can degrade if provider conflict behavior differs from local test assumptions.
+- Priority: Medium
 
-**Semantic boundary enforcement for surfaces:**
-- What's not tested: AST-level import restrictions, dynamic imports, generated code, and semantic authority claims in surfaces.
-- Files: `src/surfaces/boundary-manifest.ts`, `test/architecture/surface-boundary-posture.test.ts`, `test/architecture/claim-boundary.test.ts`.
-- Risk: A surface can import or imply authority through a path that string scans miss.
-- Priority: Medium.
+**Hosted raw-read audit persistence implementations:**
+- What's not tested: A production-grade durable audit sink implementation, audit retention/export policy, and raw-read audit search/readback.
+- Files: `src/http/handlers/raw-read-audit.ts`, `src/http/handlers/internal-record-read.ts`, `src/http/app-options.ts`, `test/http/http.test.ts`
+- Risk: Hosted deployments can satisfy fail-closed sink wiring while still producing audit records that are hard to reconstruct or export.
+- Priority: Medium
 
-**Policy evaluator expansion:**
-- What's not tested: Negative cases for new protected-action families that share parameter names with x402-like exact protected actions.
-- Files: `src/protocol/areas/policy-greenlight/transitions.ts`, `test/protocol/policy-greenlight.test.ts`.
-- Risk: Expansion paths can receive wrong policy behavior without obvious type errors.
-- Priority: Medium.
+**Live host containment evidence:**
+- What's not tested: A real host adapter transcript proving dispatch interception, raw sibling refusal, dynamic-tool refusal, and truncated-graph refusal for the named host.
+- Files: `scripts/check-host-generated-code-containment.mjs`, `scripts/build-host-generated-code-containment-transcript.mjs`, `src/surfaces/proof-packets/product-completion.ts`, `test/adapters/x402-protected-tool-codex-activation.test.ts`
+- Risk: Local activation/readiness evidence can be mistaken for containment without live host transcript proof.
+- Priority: High
 
 ---
 
-*Concerns audit: 2026-05-25*
+*Concerns audit: 2026-05-26*
