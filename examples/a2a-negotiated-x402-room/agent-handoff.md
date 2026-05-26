@@ -2,7 +2,7 @@
 
 ## Objective
 
-Inspect A2A protected-action readback for act_11ca5b1d-1dbd-414b-902b-3f9df130464d without creating authority.
+Inspect A2A protected-action readback for act_00000000-0000-4000-8000-000000000008 without creating authority.
 
 ## Runtime Profile
 

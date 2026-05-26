@@ -6,13 +6,13 @@ A negotiated agreement was linked to one exact protected action; authority came 
 
 - Agreement evidence linked_agreement_demo is recorded with status active.
 - Obligation binding agreement_obligation_binding_demo pins the exact action contract digest.
-- Policy created one-use greenlight grn_73191483-4b1c-4f59-b99d-b9bc78cfd90d.
-- Gateway check gat_af6fa61b-9347-471a-a6f3-f3274e6954d8 is recorded before mutation evidence.
+- Policy created one-use greenlight grn_00000000-0000-4000-8000-000000000020.
+- Gateway check gat_00000000-0000-4000-8000-00000000004a is recorded before mutation evidence.
 
 ## Unknown
 
 - Downstream business finality is unknown.
-- Proof gaps remain: gap_fb70fe61-8855-461e-876c-3e956043537c.
+- Proof gaps remain: gap_00000000-0000-4000-8000-000000000040.
 - Payment signature material is redacted from the readback.
 
 ## Next Actions

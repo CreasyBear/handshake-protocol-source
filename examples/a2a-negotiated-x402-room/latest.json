@@ -1,10 +1,10 @@
 {
-  "generatedAt": "2026-05-26T03:41:04.187Z",
+  "generatedAt": "2026-05-26T00:00:00.000Z",
   "fixtureKind": "a2a_negotiated_x402_room",
   "contract": {
-    "actionContractId": "act_11ca5b1d-1dbd-414b-902b-3f9df130464d",
-    "actionContractDigest": "sha256:fdb6808823abb9d96aa2854f6a25f5bcd6a6fef58c21dd6cab5d4b7a25c60442",
-    "paramsDigest": "sha256:b8f5a039f3555c7088fa95fa645770b03b3f0365f348831365586f2281767e85",
+    "actionContractId": "act_00000000-0000-4000-8000-000000000008",
+    "actionContractDigest": "sha256:c3d84e6eb55bf70b9b6dcbb432fdfe8731fe8e25e15f5f35b6b4c4fb3cc75c14",
+    "paramsDigest": "sha256:a00d76dbe83b6608ca9a779042166aed82bb6a30e0b6600a1c7b1737eec4493b",
     "actionClass": "x402_payment.exact",
     "resourceRef": "x402:base-sepolia:0xpayee:https://api.example.com/mcp/premium-context",
     "clearingEvidenceRefs": {
@@ -23,7 +23,7 @@
   "policy": {
     "decision": "greenlight",
     "decisionReasonCode": "policy_passed",
-    "greenlightId": "grn_73191483-4b1c-4f59-b99d-b9bc78cfd90d",
+    "greenlightId": "grn_00000000-0000-4000-8000-000000000020",
     "greenlightMaxUses": 1
   },
   "gateway": {
@@ -36,9 +36,9 @@
   },
   "supportPacket": {
     "packetKind": "a2a_negotiation_support_packet",
-    "actionContractId": "act_11ca5b1d-1dbd-414b-902b-3f9df130464d",
-    "actionContractDigest": "sha256:fdb6808823abb9d96aa2854f6a25f5bcd6a6fef58c21dd6cab5d4b7a25c60442",
-    "paramsDigest": "sha256:b8f5a039f3555c7088fa95fa645770b03b3f0365f348831365586f2281767e85",
+    "actionContractId": "act_00000000-0000-4000-8000-000000000008",
+    "actionContractDigest": "sha256:c3d84e6eb55bf70b9b6dcbb432fdfe8731fe8e25e15f5f35b6b4c4fb3cc75c14",
+    "paramsDigest": "sha256:a00d76dbe83b6608ca9a779042166aed82bb6a30e0b6600a1c7b1737eec4493b",
     "actionClass": "x402_payment.exact",
     "resourceRef": "x402:base-sepolia:0xpayee:https://api.example.com/mcp/premium-context",
     "agreement": {
@@ -52,8 +52,8 @@
     "obligationBinding": {
       "agreementObligationBindingId": "agreement_obligation_binding_demo",
       "obligationRef": "obligation:x402-exact-call",
-      "actionContractDigest": "sha256:fdb6808823abb9d96aa2854f6a25f5bcd6a6fef58c21dd6cab5d4b7a25c60442",
-      "paramsDigest": "sha256:b8f5a039f3555c7088fa95fa645770b03b3f0365f348831365586f2281767e85",
+      "actionContractDigest": "sha256:c3d84e6eb55bf70b9b6dcbb432fdfe8731fe8e25e15f5f35b6b4c4fb3cc75c14",
+      "paramsDigest": "sha256:a00d76dbe83b6608ca9a779042166aed82bb6a30e0b6600a1c7b1737eec4493b",
       "counterpartyRef": "agent:seller"
     },
     "negotiation": {
@@ -67,15 +67,15 @@
       "assemblyStatus": "assembled",
       "assemblyReasonCode": null,
       "assemblyReason": null,
-      "policyDecisionId": "pol_dfa2cd46-2716-4258-8d81-e9ca9c853521",
+      "policyDecisionId": "pol_00000000-0000-4000-8000-00000000001f",
       "policyDecision": "greenlight",
-      "greenlightId": "grn_73191483-4b1c-4f59-b99d-b9bc78cfd90d",
-      "gatewayCheckAttemptId": "gat_af6fa61b-9347-471a-a6f3-f3274e6954d8",
-      "mutationAttemptId": "mut_3256ceb1-5fdb-455d-8927-c39341363427",
-      "receiptId": "rcp_c443d446-b6aa-4bbc-a73d-ba996c116062",
+      "greenlightId": "grn_00000000-0000-4000-8000-000000000020",
+      "gatewayCheckAttemptId": "gat_00000000-0000-4000-8000-00000000004a",
+      "mutationAttemptId": "mut_00000000-0000-4000-8000-00000000002d",
+      "receiptId": "rcp_00000000-0000-4000-8000-00000000004b",
       "downstreamFinalityStatus": "unknown",
-      "proofGapIds": ["gap_fb70fe61-8855-461e-876c-3e956043537c"],
-      "refusalIds": ["ref_f43eba17c0c3509e9e18a635e205524cbc2cfe6784cb98c2"]
+      "proofGapIds": ["gap_00000000-0000-4000-8000-000000000040"],
+      "refusalIds": ["ref_5e2f7ad3fd8fa3f6bf9fb415b10b5485025435321ab3cc1c"]
     },
     "authorityBoundary": {
       "agreementAcceptanceCreatedAuthority": false,
@@ -96,9 +96,9 @@
     "readbackKind": "a2a_negotiation_product_readback",
     "schemaVersion": "a2a.negotiation.readback.v1",
     "status": "gateway_checked_downstream_unknown",
-    "actionContractId": "act_11ca5b1d-1dbd-414b-902b-3f9df130464d",
-    "actionContractDigest": "sha256:fdb6808823abb9d96aa2854f6a25f5bcd6a6fef58c21dd6cab5d4b7a25c60442",
-    "paramsDigest": "sha256:b8f5a039f3555c7088fa95fa645770b03b3f0365f348831365586f2281767e85",
+    "actionContractId": "act_00000000-0000-4000-8000-000000000008",
+    "actionContractDigest": "sha256:c3d84e6eb55bf70b9b6dcbb432fdfe8731fe8e25e15f5f35b6b4c4fb3cc75c14",
+    "paramsDigest": "sha256:a00d76dbe83b6608ca9a779042166aed82bb6a30e0b6600a1c7b1737eec4493b",
     "actionClass": "x402_payment.exact",
     "resourceRef": "x402:base-sepolia:0xpayee:https://api.example.com/mcp/premium-context",
     "negotiatedEvidence": {
@@ -109,12 +109,12 @@
       "evidencePosture": "local_evidence_only"
     },
     "protectedAction": {
-      "policyDecisionId": "pol_dfa2cd46-2716-4258-8d81-e9ca9c853521",
+      "policyDecisionId": "pol_00000000-0000-4000-8000-00000000001f",
       "policyDecision": "greenlight",
-      "greenlightId": "grn_73191483-4b1c-4f59-b99d-b9bc78cfd90d",
-      "gatewayCheckAttemptId": "gat_af6fa61b-9347-471a-a6f3-f3274e6954d8",
-      "mutationAttemptId": "mut_3256ceb1-5fdb-455d-8927-c39341363427",
-      "receiptId": "rcp_c443d446-b6aa-4bbc-a73d-ba996c116062",
+      "greenlightId": "grn_00000000-0000-4000-8000-000000000020",
+      "gatewayCheckAttemptId": "gat_00000000-0000-4000-8000-00000000004a",
+      "mutationAttemptId": "mut_00000000-0000-4000-8000-00000000002d",
+      "receiptId": "rcp_00000000-0000-4000-8000-00000000004b",
       "downstreamFinalityStatus": "unknown"
     },
     "developerExperience": {
@@ -169,12 +169,12 @@
       "verified": [
         "Agreement evidence linked_agreement_demo is recorded with status active.",
         "Obligation binding agreement_obligation_binding_demo pins the exact action contract digest.",
-        "Policy created one-use greenlight grn_73191483-4b1c-4f59-b99d-b9bc78cfd90d.",
-        "Gateway check gat_af6fa61b-9347-471a-a6f3-f3274e6954d8 is recorded before mutation evidence."
+        "Policy created one-use greenlight grn_00000000-0000-4000-8000-000000000020.",
+        "Gateway check gat_00000000-0000-4000-8000-00000000004a is recorded before mutation evidence."
       ],
       "unknown": [
         "Downstream business finality is unknown.",
-        "Proof gaps remain: gap_fb70fe61-8855-461e-876c-3e956043537c.",
+        "Proof gaps remain: gap_00000000-0000-4000-8000-000000000040.",
         "Payment signature material is redacted from the readback."
       ],
       "nextActions": [

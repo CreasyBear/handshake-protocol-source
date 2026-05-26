@@ -18,7 +18,7 @@ import type { ActionContract } from "../../src/protocol/areas/action-contract";
 import type { GatewayCredentialRef } from "../../src/protocol/areas/credential-custody";
 import type { DelegatedAuthorityRef } from "../../src/protocol/areas/delegated-authority";
 import { digestCanonical } from "../../src/protocol/foundation/canonical";
-import { nowIso } from "../../src/protocol/foundation/ids";
+import { nowIso, withProtocolIdSource } from "../../src/protocol/foundation/ids";
 import { HandshakeKernel } from "../../src/protocol/kernel";
 import { requiredGatewayCheckedBypassProbeKinds } from "../../src/protocol/public/schemas";
 import { InMemoryProtocolStore } from "../../src/storage/memory";
@@ -36,11 +36,16 @@ const digest = `sha256:${"c".repeat(64)}` as const;
 const selectedPaymentRequirementDigest = `sha256:${"b".repeat(64)}` as const;
 const obligationRef = "obligation:x402-exact-call";
 const counterpartyRef = "agent:seller";
+export const localReferenceGeneratedAt = "2026-05-26T00:00:00.000Z";
 
 const x402CredentialRefs = new WeakMap<X402InstallProposal, GatewayCredentialRef>();
 const x402AuthorityRefs = new WeakMap<X402InstallProposal, DelegatedAuthorityRef>();
 
 export async function createNegotiatedX402Greenlight() {
+  return withLocalReferenceProtocolIds(createNegotiatedX402GreenlightUnchecked);
+}
+
+async function createNegotiatedX402GreenlightUnchecked() {
   const store = new InMemoryProtocolStore();
   const kernel = new HandshakeKernel(store);
   const proposal = await compileX402InstallProposal(validInstallInput());
@@ -94,25 +99,27 @@ export async function createNegotiatedX402Greenlight() {
 }
 
 export async function runNegotiatedX402Room() {
-  const fixture = await createNegotiatedX402Greenlight();
-  const gatewayResult = await runX402WalletGateway({
-    protocol: fixture.kernel,
-    surface: fixture.surface,
-    actionContractId: fixture.contract.actionContractId,
-    greenlightId: fixture.greenlight.greenlightId,
-    observedParameters: fixture.contract.parameters as X402PaymentParameters,
-    surfaceOperationRef: "surface-op:x402-a2a:first",
+  return withLocalReferenceProtocolIds(async () => {
+    const fixture = await createNegotiatedX402GreenlightUnchecked();
+    const gatewayResult = await runX402WalletGateway({
+      protocol: fixture.kernel,
+      surface: fixture.surface,
+      actionContractId: fixture.contract.actionContractId,
+      greenlightId: fixture.greenlight.greenlightId,
+      observedParameters: fixture.contract.parameters as X402PaymentParameters,
+      surfaceOperationRef: "surface-op:x402-a2a:first",
+    });
+    const replay = await runX402WalletGateway({
+      protocol: fixture.kernel,
+      surface: fixture.surface,
+      actionContractId: fixture.contract.actionContractId,
+      greenlightId: fixture.greenlight.greenlightId,
+      observedParameters: fixture.contract.parameters as X402PaymentParameters,
+      surfaceOperationRef: "surface-op:x402-a2a:replay",
+    });
+    const supportPacket = await buildA2ANegotiationSupportPacket(fixture.store, fixture.contract.actionContractId);
+    return { ...fixture, gatewayResult, replay, supportPacket };
   });
-  const replay = await runX402WalletGateway({
-    protocol: fixture.kernel,
-    surface: fixture.surface,
-    actionContractId: fixture.contract.actionContractId,
-    greenlightId: fixture.greenlight.greenlightId,
-    observedParameters: fixture.contract.parameters as X402PaymentParameters,
-    surfaceOperationRef: "surface-op:x402-a2a:replay",
-  });
-  const supportPacket = await buildA2ANegotiationSupportPacket(fixture.store, fixture.contract.actionContractId);
-  return { ...fixture, gatewayResult, replay, supportPacket };
 }
 
 export function changedAmountParameters(parameters: X402PaymentParameters): X402PaymentParameters {
@@ -355,4 +362,25 @@ function validInstallInput(): X402InstallProposalInput {
       expiresAt: futureIso(),
     },
   };
+}
+
+function withLocalReferenceProtocolIds<T>(run: () => T): T {
+  let sequence = 0;
+  return withProtocolIdSource(
+    {
+      createId(prefix) {
+        sequence += 1;
+        return `${prefix}_${deterministicUuid(sequence)}`;
+      },
+      nowIso() {
+        return localReferenceGeneratedAt;
+      },
+    },
+    run,
+  );
+}
+
+function deterministicUuid(sequence: number): string {
+  const tail = sequence.toString(16).padStart(12, "0");
+  return `00000000-0000-4000-8000-${tail}`;
 }

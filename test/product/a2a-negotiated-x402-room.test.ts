@@ -14,6 +14,7 @@ import {
   createNegotiatedX402Greenlight,
   runNegotiatedX402Room,
 } from "../../examples/a2a-negotiated-x402-room/local-reference-room";
+import { buildA2ANegotiatedX402RoomOutput } from "../../examples/a2a-negotiated-x402-room/generate";
 
 describe("A2A negotiated x402 room", () => {
   it("runs the full room without treating agreement acceptance as authority", async () => {
@@ -193,5 +194,14 @@ describe("A2A negotiated x402 room", () => {
     expect(evaluation).toMatch(/\|\s*AX\s*\|\s*9\.2\/10\s*\|/);
     expect(evaluation).toMatch(/\|\s*CX\s*\|\s*9\.1\/10\s*\|/);
     expect(evaluation).toContain("This slice is a product-grade readback and handoff path");
+  });
+
+  it("keeps the developer onboarding output deterministic", async () => {
+    const first = await buildA2ANegotiatedX402RoomOutput();
+    const second = await buildA2ANegotiatedX402RoomOutput();
+
+    expect(second).toEqual(first);
+    expect(first.generatedAt).toBe("2026-05-26T00:00:00.000Z");
+    expect(first.contract.actionContractId).toBe("act_00000000-0000-4000-8000-000000000008");
   });
 });
