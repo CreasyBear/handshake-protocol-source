@@ -67,15 +67,24 @@ export const ExternalProtocolEvidenceRefSchema = z.strictObject({
 });
 export type ExternalProtocolEvidenceRef = z.infer<typeof ExternalProtocolEvidenceRefSchema>;
 
-const OfferVersionRefSchema = IdSchema.refine((value) => !["latest", "current", "unspecified"].includes(value), {
-  message: "decisions must bind to a specific offer version",
-});
+const forbiddenOfferVersionAliases = ["latest", "current", "unspecified"] as const;
+const OfferVersionRefSchema = IdSchema.refine(
+  (value) => {
+    const normalized = value.toLowerCase();
+    return !forbiddenOfferVersionAliases.some((alias) => normalized.includes(alias));
+  },
+  {
+    message: "offer version refs must bind to a specific offer version",
+  },
+);
 
 const disallowedObligationRefPattern = new RegExp(
   [
     "greenlight",
     "gateway[_:-]?check",
+    "gate[_:-]?attempt",
     "mutation[_:-]?attempt",
+    "policy[_:-]?decision",
     "receipt",
     "authority[_:-]?certificate",
     "settlement",
@@ -94,19 +103,38 @@ const EvidenceRefSchema = z.strictObject({
   digest: DigestSchema.nullable().default(null),
 });
 
+const NonAuthorityContextRefSchema = ResourceRefSchema.refine((value) => !disallowedObligationRefPattern.test(value), {
+  message: "negotiation context ref cannot point at a control or terminal artifact",
+});
+
 export const NegotiationSessionSchema = ProtocolBaseSchema.extend({
   negotiationSessionId: IdSchema,
   negotiationSessionDigest: DigestSchema,
   subjectResourceRef: ResourceRefSchema,
-  subjectProtectedActionContextRefs: z.array(ResourceRefSchema).default([]),
+  subjectProtectedActionContextRefs: z.array(NonAuthorityContextRefSchema).default([]),
   runtimePosture: z.enum(["declared_runtime_context", "observed_runtime_evidence", "proof_gap_recorded"]),
-  parties: z.array(NegotiationPartyBindingSchema).min(1),
+  parties: z.array(NegotiationPartyBindingSchema).min(2),
   generatedCodeOrSpecRefs: z.array(ResourceRefSchema).default([]),
   declaredAssumptions: z.array(z.string().min(1).max(500)).default([]),
   uncertaintyMarkers: z.array(z.string().min(1).max(500)).default([]),
   externalProtocolEvidenceRefs: z.array(ExternalProtocolEvidenceRefSchema).default([]),
   clearingEvidenceRefs: ClearingEvidenceRefsSchema,
   expiresAt: IsoDateSchema.nullable().default(null),
+}).superRefine((value, ctx) => {
+  if (!value.parties.some((party) => party.partyRole === "initiator")) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "negotiation sessions require an initiator party",
+      path: ["parties"],
+    });
+  }
+  if (!value.parties.some((party) => party.partyRole === "counterparty")) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "negotiation sessions require a counterparty party",
+      path: ["parties"],
+    });
+  }
 });
 export type NegotiationSession = z.infer<typeof NegotiationSessionSchema>;
 
@@ -143,6 +171,21 @@ export const NegotiationDecisionSchema = ProtocolBaseSchema.extend({
   proofGapRefs: z.array(ResourceRefSchema).default([]),
   counterOfferVersionId: OfferVersionRefSchema.nullable().default(null),
   decisionDigest: DigestSchema,
+}).superRefine((value, ctx) => {
+  if (value.decision === "counter" && value.counterOfferVersionId === null) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "counter decisions require a specific counter offer version",
+      path: ["counterOfferVersionId"],
+    });
+  }
+  if (value.decision !== "counter" && value.counterOfferVersionId !== null) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "only counter decisions may reference a counter offer version",
+      path: ["counterOfferVersionId"],
+    });
+  }
 });
 export type NegotiationDecision = z.infer<typeof NegotiationDecisionSchema>;
 
@@ -186,6 +229,14 @@ export const AgreementStatusTransitionSchema = ProtocolBaseSchema.extend({
   evidenceRefs: z.array(ResourceRefSchema).default([]),
   proofGapRefs: z.array(ResourceRefSchema).default([]),
   transitionDigest: DigestSchema,
+}).superRefine((value, ctx) => {
+  if (value.fromStatus === value.toStatus) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "agreement status transitions must change status",
+      path: ["toStatus"],
+    });
+  }
 });
 export type AgreementStatusTransition = z.infer<typeof AgreementStatusTransitionSchema>;
 

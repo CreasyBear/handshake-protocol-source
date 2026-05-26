@@ -53,6 +53,18 @@ describe("negotiation evidence schemas", () => {
     expect(NegotiationPartyBindingSchema.safeParse({ ...party, proofGapRefs: [] }).success).toBe(false);
   });
 
+  it("requires sessions to carry both initiator and counterparty evidence", () => {
+    expect(
+      NegotiationSessionSchema.safeParse({ ...validSession(), parties: [validSession().parties[0]] }).success,
+    ).toBe(false);
+    expect(
+      NegotiationSessionSchema.safeParse({
+        ...validSession(),
+        parties: [validSession().parties[0], { ...validSession().parties[1], partyRole: "observer" }],
+      }).success,
+    ).toBe(false);
+  });
+
   it("rejects raw transcript or raw-readable term fields on negotiation sessions", () => {
     expect(
       NegotiationSessionSchema.safeParse({
@@ -61,6 +73,18 @@ describe("negotiation evidence schemas", () => {
       }).success,
     ).toBe(false);
   });
+
+  it.each(["greenlight:demo", "gate_attempt:demo", "gateway_check:demo", "receipt:demo", "policy_decision:demo"])(
+    "rejects authority-shaped protected-action context refs: %s",
+    (contextRef) => {
+      expect(
+        NegotiationSessionSchema.safeParse({
+          ...validSession(),
+          subjectProtectedActionContextRefs: [contextRef],
+        }).success,
+      ).toBe(false);
+    },
+  );
 
   it("parses offers only when content digests have refs or proof-gap refs", () => {
     expect(NegotiationOfferSchema.parse(validOffer())).toMatchObject({
@@ -113,6 +137,51 @@ describe("negotiation evidence schemas", () => {
     ).toBe(false);
   });
 
+  it.each(["latest", "Latest", "offer:latest", "offer_current", "offer-unspecified"])(
+    "rejects non-specific offer version refs: %s",
+    (offerVersionRef) => {
+      expect(
+        NegotiationDecisionSchema.safeParse({
+          ...validDecision(),
+          decidedOfferVersionId: offerVersionRef,
+        }).success,
+      ).toBe(false);
+      expect(
+        NegotiationOfferSchema.safeParse({
+          ...validOffer(),
+          offerVersionId: offerVersionRef,
+        }).success,
+      ).toBe(false);
+      expect(
+        LinkedAgreementSchema.safeParse({
+          ...validAgreement(),
+          acceptedOfferVersionId: offerVersionRef,
+        }).success,
+      ).toBe(false);
+    },
+  );
+
+  it("requires counter decisions to bind a specific counter-offer version", () => {
+    expect(NegotiationDecisionSchema.safeParse({ ...validDecision(), decision: "counter" }).success).toBe(false);
+    expect(
+      NegotiationDecisionSchema.parse({
+        ...validDecision(),
+        decision: "counter",
+        counterOfferVersionId: "offer_version_2",
+      }),
+    ).toMatchObject({
+      decision: "counter",
+      counterOfferVersionId: "offer_version_2",
+    });
+    expect(
+      NegotiationDecisionSchema.safeParse({
+        ...validDecision(),
+        decision: "accept",
+        counterOfferVersionId: "offer_version_2",
+      }).success,
+    ).toBe(false);
+  });
+
   it("parses linked agreement evidence without accepting receipt or certificate fields", () => {
     expect(LinkedAgreementSchema.parse(validAgreement())).toMatchObject({
       linkedAgreementId: "linked_agreement_demo",
@@ -150,7 +219,9 @@ describe("negotiation evidence schemas", () => {
   it.each([
     "greenlight",
     "gateway_check",
+    "gate_attempt",
     "mutation_attempt",
+    "policy_decision",
     "receipt",
     "authority_certificate",
     "settlement",
@@ -161,9 +232,15 @@ describe("negotiation evidence schemas", () => {
     expect(
       AgreementObligationBindingSchema.safeParse({
         ...validObligationBinding(),
+        obligationRef: `${forbiddenKind}:demo`,
+      }).success,
+    ).toBe(false);
+    expect(
+      AgreementObligationBindingSchema.safeParse({
+        ...validObligationBinding(),
         localProtectedActionEvidenceRefs: [
           {
-            refKind: forbiddenKind,
+            refKind: "action_contract",
             ref: `${forbiddenKind}:demo`,
             digest,
           },
@@ -178,6 +255,12 @@ describe("negotiation evidence schemas", () => {
       fromStatus: "active",
       toStatus: "disputed",
     });
+    expect(
+      AgreementStatusTransitionSchema.safeParse({
+        ...validStatusTransition(),
+        toStatus: validStatusTransition().fromStatus,
+      }).success,
+    ).toBe(false);
   });
 
   it("keeps external protocol refs digest-bound and imported evidence only", () => {
