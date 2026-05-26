@@ -21,6 +21,14 @@ import { IdempotencyLedgerEntrySchema } from "../idempotency-ledger/schemas";
 import { BypassProbeSchema } from "../bypass-probe/schemas";
 import { ToolCallDraftSchema } from "../tool-call-draft/schemas";
 import { IntentCompilationRecordSchema } from "../intent-compilation/schemas";
+import {
+  AgreementObligationBindingSchema,
+  AgreementStatusTransitionSchema,
+  LinkedAgreementSchema,
+  NegotiationDecisionSchema,
+  NegotiationOfferSchema,
+  NegotiationSessionSchema,
+} from "../negotiation/schemas";
 import { BreakerDecisionSchema, IsolationStateSchema, type IsolationState } from "../isolation-breaker/schemas";
 import {
   ProtectedSurfaceOperationClaimSchema,
@@ -172,6 +180,48 @@ export const protocolObjectRegistry = {
     "intent_compilation",
     IntentCompilationRecordSchema,
     (record) => record.payload.intentCompilationId,
+    "transition_evidence",
+    "audit_read",
+  ),
+  negotiation_session: entry(
+    "negotiation_session",
+    NegotiationSessionSchema,
+    (record) => record.payload.negotiationSessionId,
+    "transition_evidence",
+    "audit_read",
+  ),
+  negotiation_offer: entry(
+    "negotiation_offer",
+    NegotiationOfferSchema,
+    (record) => record.payload.negotiationOfferId,
+    "transition_evidence",
+    "audit_read",
+  ),
+  negotiation_decision: entry(
+    "negotiation_decision",
+    NegotiationDecisionSchema,
+    (record) => record.payload.negotiationDecisionId,
+    "transition_evidence",
+    "audit_read",
+  ),
+  linked_agreement: entry(
+    "linked_agreement",
+    LinkedAgreementSchema,
+    (record) => record.payload.linkedAgreementId,
+    "transition_evidence",
+    "audit_read",
+  ),
+  agreement_obligation_binding: entry(
+    "agreement_obligation_binding",
+    AgreementObligationBindingSchema,
+    (record) => record.payload.agreementObligationBindingId,
+    "transition_evidence",
+    "audit_read",
+  ),
+  agreement_status_transition: entry(
+    "agreement_status_transition",
+    AgreementStatusTransitionSchema,
+    (record) => record.payload.agreementStatusTransitionId,
     "transition_evidence",
     "audit_read",
   ),
