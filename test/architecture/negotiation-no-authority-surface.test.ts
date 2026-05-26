@@ -36,8 +36,8 @@ describe("negotiation area authority surface", () => {
     expect(violations).toEqual([]);
   });
 
-  it("does not add negotiation transition functions or a transition module", () => {
-    expect(existsSync(join(negotiationRoot, "transitions.ts"))).toBe(false);
+  it("exposes only recorded-evidence negotiation transition functions", () => {
+    expect(existsSync(join(negotiationRoot, "transitions.ts"))).toBe(true);
 
     const exportedFunctions: string[] = [];
     for (const file of walkTs(negotiationRoot)) {
@@ -48,7 +48,16 @@ describe("negotiation area authority surface", () => {
       }
     }
 
-    expect(exportedFunctions).toEqual([]);
+    expect(exportedFunctions.sort()).toEqual([
+      "src/protocol/areas/negotiation/policy.ts:evaluateAgreementObligationPolicy",
+      "src/protocol/areas/negotiation/transitions.ts:currentAgreementStatus",
+      "src/protocol/areas/negotiation/transitions.ts:recordAgreementObligationBinding",
+      "src/protocol/areas/negotiation/transitions.ts:recordLinkedAgreement",
+      "src/protocol/areas/negotiation/transitions.ts:recordNegotiationDecision",
+      "src/protocol/areas/negotiation/transitions.ts:recordNegotiationOffer",
+      "src/protocol/areas/negotiation/transitions.ts:recordNegotiationSession",
+      "src/protocol/areas/negotiation/transitions.ts:transitionAgreementStatus",
+    ]);
   });
 
   it("keeps negotiation out of the package root for this phase", () => {

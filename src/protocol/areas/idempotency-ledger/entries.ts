@@ -56,6 +56,9 @@ export async function buildIdempotencyLedgerReservation(input: {
   policyDecision: PolicyDecision;
   greenlight: Greenlight;
   now: string;
+  ledgerKeyDigest?: `sha256:${string}`;
+  idempotencyKey?: string;
+  evidenceRefs?: string[];
 }): Promise<IdempotencyLedgerEntry> {
   const { contract, policyDecision, greenlight, now } = input;
   return buildIdempotencyLedgerEntry({
@@ -63,12 +66,12 @@ export async function buildIdempotencyLedgerReservation(input: {
     organizationId: contract.organizationId,
     createdAt: now,
     idempotencyLedgerEntryId: createId("idl"),
-    ledgerKeyDigest: await idempotencyLedgerKeyDigest(idempotencyLedgerKey(contract)),
+    ledgerKeyDigest: input.ledgerKeyDigest ?? (await idempotencyLedgerKeyDigest(idempotencyLedgerKey(contract))),
     gatewayId: contract.gatewayId,
     protectedSurfaceKind: contract.protectedSurfaceKind,
     actionClass: contract.actionClass,
     resourceRef: contract.resourceRef,
-    idempotencyKey: contract.idempotencyKey,
+    idempotencyKey: input.idempotencyKey ?? contract.idempotencyKey,
     paramsDigest: contract.paramsDigest,
     actionContractId: contract.actionContractId,
     policyDecisionId: policyDecision.policyDecisionId,
@@ -82,6 +85,7 @@ export async function buildIdempotencyLedgerReservation(input: {
       protocolObjectRef("action_contract", contract.actionContractId),
       protocolObjectRef("policy_decision", policyDecision.policyDecisionId),
       protocolObjectRef("greenlight", greenlight.greenlightId),
+      ...(input.evidenceRefs ?? []),
     ],
     firstReservedAt: now,
     updatedAt: now,

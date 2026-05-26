@@ -1,0 +1,95 @@
+{
+  "generatedAt": "2026-05-26T02:56:20.995Z",
+  "fixtureKind": "a2a_negotiated_x402_room",
+  "contract": {
+    "actionContractId": "act_d8f1fe92-3b71-4170-9703-022f7e797977",
+    "actionContractDigest": "sha256:ae040b6921766928b09607cba72570010f769d0377213969c741f376d75b3ede",
+    "paramsDigest": "sha256:ad9a5dc544d359aeb171db4dc75a7ea98326765858574a755c050ebead3b8413",
+    "actionClass": "x402_payment.exact",
+    "resourceRef": "x402:base-sepolia:0xpayee:https://api.example.com/mcp/premium-context",
+    "clearingEvidenceRefs": {
+      "obligationRef": "obligation:x402-exact-call",
+      "counterpartyRef": "agent:seller"
+    }
+  },
+  "authorityBoundary": {
+    "acceptedAgreementCreatedPolicyDecision": false,
+    "acceptedAgreementCreatedGreenlight": false,
+    "acceptedAgreementPerformedGatewayCheck": false,
+    "acceptedAgreementAttemptedMutation": false,
+    "signerInvokedBeforeGatewayCheck": false,
+    "gatewayCheckRemainsFinalEnforcementPoint": true
+  },
+  "policy": {
+    "decision": "greenlight",
+    "decisionReasonCode": "policy_passed",
+    "greenlightId": "grn_3b9cd60f-dade-4db7-8f23-6e788d63b5bc",
+    "greenlightMaxUses": 1
+  },
+  "gateway": {
+    "firstOutcome": "payment_signature_proof_gap",
+    "firstGateDecision": "passed",
+    "firstMutationAttempted": true,
+    "replayOutcome": "gateway_check_refused",
+    "replayReasonCode": "already_consumed",
+    "signerInvocationCount": 1
+  },
+  "supportPacket": {
+    "packetKind": "a2a_negotiation_support_packet",
+    "actionContractId": "act_d8f1fe92-3b71-4170-9703-022f7e797977",
+    "actionContractDigest": "sha256:ae040b6921766928b09607cba72570010f769d0377213969c741f376d75b3ede",
+    "paramsDigest": "sha256:ad9a5dc544d359aeb171db4dc75a7ea98326765858574a755c050ebead3b8413",
+    "actionClass": "x402_payment.exact",
+    "resourceRef": "x402:base-sepolia:0xpayee:https://api.example.com/mcp/premium-context",
+    "agreement": {
+      "linkedAgreementId": "linked_agreement_demo",
+      "agreementDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "agreementStatus": "active",
+      "obligationRef": "obligation:x402-exact-call",
+      "counterpartyRef": "agent:seller",
+      "evidencePosture": "local_evidence_only"
+    },
+    "obligationBinding": {
+      "agreementObligationBindingId": "agreement_obligation_binding_demo",
+      "obligationRef": "obligation:x402-exact-call",
+      "actionContractDigest": "sha256:ae040b6921766928b09607cba72570010f769d0377213969c741f376d75b3ede",
+      "paramsDigest": "sha256:ad9a5dc544d359aeb171db4dc75a7ea98326765858574a755c050ebead3b8413",
+      "counterpartyRef": "agent:seller"
+    },
+    "negotiation": {
+      "negotiationSessionId": "negotiation_session_demo",
+      "acceptedOfferVersionId": "offer_version_1",
+      "acceptedNegotiationDecisionId": "negotiation_decision_accept_v1",
+      "acceptedOfferContentDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "partyRefs": ["agent:buyer", "agent:seller"]
+    },
+    "lifecycle": {
+      "assemblyStatus": "assembled",
+      "assemblyReasonCode": null,
+      "assemblyReason": null,
+      "policyDecisionId": "pol_152fd0d9-6ff3-47d3-a5af-f8da67f41379",
+      "policyDecision": "greenlight",
+      "greenlightId": "grn_3b9cd60f-dade-4db7-8f23-6e788d63b5bc",
+      "gatewayCheckAttemptId": "gat_eca052e0-9c7d-4ccb-b37c-8ddfd24e722e",
+      "mutationAttemptId": "mut_714fa094-c531-4eda-b879-29bbcd3725a5",
+      "receiptId": "rcp_a3b0ac29-cd51-4000-b8fc-b789daf90a18",
+      "downstreamFinalityStatus": "unknown",
+      "proofGapIds": ["gap_59093024-7f9b-43d7-9c68-c048cd97e96f"],
+      "refusalIds": ["ref_248010ff71fba79e7fbe92d9fd51863a509c116efd99a8c7"]
+    },
+    "authorityBoundary": {
+      "agreementAcceptanceCreatedAuthority": false,
+      "obligationBindingCreatedAuthority": false,
+      "policyMayCreateOneUseGreenlight": true,
+      "gatewayCheckRemainsFinalEnforcementPoint": true,
+      "downstreamSuccessClaimedByAgreement": false
+    },
+    "redaction": {
+      "rawTranscriptIncluded": false,
+      "rawOfferTermsIncluded": false,
+      "paymentPayloadIncluded": false,
+      "paymentSignatureIncluded": false,
+      "credentialMaterialIncluded": false
+    }
+  }
+}

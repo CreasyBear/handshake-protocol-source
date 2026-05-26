@@ -9,6 +9,7 @@ import {
   idempotencyLedgerKey,
   idempotencyLedgerKeyDigest,
   type IdempotencyLedgerEntry,
+  type IdempotencyLedgerKey,
 } from "../idempotency-ledger";
 import { EvaluatePolicyInputSchema, type EvaluatePolicyInput } from "./types";
 import {
@@ -24,6 +25,7 @@ import {
 } from "../protected-path-posture";
 import { evaluateGatewayCredentialBindings, type GatewayCredentialBindingEvaluation } from "../credential-custody";
 import { evaluateDelegatedAuthorityBindings, type DelegatedAuthorityBindingEvaluation } from "../delegated-authority";
+import { evaluateAgreementObligationPolicy, type AgreementObligationPolicyEvaluation } from "../negotiation";
 import type { ProtectedPathPosture } from "../protected-path-posture";
 import type { ProtocolRecorder } from "../../events/records";
 import type { ReviewDecision } from "../review-binding";
@@ -34,7 +36,7 @@ import {
 } from "./sequence-dependencies";
 import { type Greenlight, type PolicyDecision } from "./types";
 import type { JsonValue } from "./types";
-import { guardGreenlightIssuance, guardPolicyEvaluation } from "./guards";
+import { guardPolicyEvaluation } from "./guards";
 import type { TransitionGuardResult } from "../../foundation/transition-guards";
 import type { ProtocolStore, StoredProtocolRecord } from "../../store/port";
 import { isolationScopeRefsForContract } from "../object-registry";
@@ -58,9 +60,13 @@ type PolicyConstraintEvaluation = PolicyEvaluationContext & {
   sequenceDependencyStates: SequenceDependencyState[];
   protectedPathPosture: StoredProtocolRecord<ProtectedPathPosture> | null;
   idempotencyLedgerEntry: StoredProtocolRecord<IdempotencyLedgerEntry> | null;
+  idempotencyLedgerKey: IdempotencyLedgerKey;
+  idempotencyLedgerKeyDigest: `sha256:${string}`;
+  idempotencyLedgerEvidenceRefs: string[];
   protectedPathEvaluation: ReturnType<typeof evaluateRequiredProtectedPathPosture>;
   gatewayCredentialBindingEvaluation: GatewayCredentialBindingEvaluation;
   delegatedAuthorityBindingEvaluation: DelegatedAuthorityBindingEvaluation;
+  agreementObligationEvaluation: AgreementObligationPolicyEvaluation;
   policyInput: {
     contractDigest: string;
     envelopeId: string;
@@ -72,6 +78,7 @@ type PolicyConstraintEvaluation = PolicyEvaluationContext & {
     credentialCustodyStatus: ActionContract["credentialCustodyStatus"];
     gatewayCredentialRefs: GatewayCredentialBindingEvaluation["policyInput"];
     delegatedAuthorityRefs: DelegatedAuthorityBindingEvaluation["policyInput"];
+    agreementObligation: AgreementObligationPolicyEvaluation["policyInput"];
     protectedPathPosture: ReturnType<typeof protectedPathPolicyInput>;
     idempotencyLedger: {
       ledgerKeyDigest: `sha256:${string}`;
@@ -97,6 +104,7 @@ type ExactProtectedActionPolicyInput = {
   gatewayReadinessRef: string | null;
   gatewayReadinessDigest: string | null;
   paymentRequirementsDigest: string | null;
+  selectedPaymentRequirementIndex: number | null;
   selectedPaymentRequirementDigest: string | null;
   atomicAmount: string | null;
   maxAtomicAmountPerCall: string | null;
@@ -148,15 +156,18 @@ export async function evaluatePolicy(
         policyDecision: decision,
         greenlight,
         now: context.now,
+        ledgerKeyDigest: constraints.idempotencyLedgerKeyDigest,
+        idempotencyKey: constraints.idempotencyLedgerKey.idempotencyKey,
+        evidenceRefs: constraints.idempotencyLedgerEvidenceRefs,
       })
     : null;
   const plan = { ...constraints, decisionValue, decision, greenlight, idempotencyLedgerEntry };
-  if (greenlight) {
-    await assertGreenlightIssuable(store, context.contract);
-  }
   const commitResult = await commitPolicyEvaluation(recorder, plan);
   if (commitResult.status === "idempotency_ledger_conflict") {
     return commitIdempotencyConflictRefusal(store, recorder, constraints);
+  }
+  if (commitResult.status === "greenlight_issuance_conflict") {
+    return commitGreenlightIssuanceConflictRefusal(recorder, constraints);
   }
   return policyEvaluationResponse(decision, greenlight, commitResult.refusal, commitResult.proofGap);
 }
@@ -192,8 +203,6 @@ async function derivePolicyConstraintEvaluation(
   const isolationStates = await store.listIsolationStates(isolationScopeRefsForContract(context.contract));
   const sequenceDependencyStates = await loadSequenceDependencyStates(store, context.contract);
   const protectedPathPosture = await loadCurrentPostureForContract(store, context.contract);
-  const ledgerKeyDigest = await idempotencyLedgerKeyDigest(idempotencyLedgerKey(context.contract));
-  const idempotencyLedgerEntry = await store.getCurrentIdempotencyLedgerEntry(ledgerKeyDigest);
   const protectedPathEvaluation = evaluateRequiredProtectedPathPosture({
     contract: context.contract,
     gateway: context.contract,
@@ -210,15 +219,19 @@ async function derivePolicyConstraintEvaluation(
     context.contract,
     context.now,
   );
+  const agreementObligationEvaluation = await evaluateAgreementObligationPolicy(store, context.contract, context.now);
+  const authorityLedger = await effectiveAuthorityLedger(context.contract, agreementObligationEvaluation);
+  const idempotencyLedgerEntry = await store.getCurrentIdempotencyLedgerEntry(authorityLedger.ledgerKeyDigest);
   const policyInput = buildPolicyInput(
     context,
     isolationStates,
     sequenceDependencyStates,
     protectedPathPosture,
-    ledgerKeyDigest,
+    authorityLedger.ledgerKeyDigest,
     idempotencyLedgerEntry,
     gatewayCredentialBindingEvaluation,
     delegatedAuthorityBindingEvaluation,
+    agreementObligationEvaluation,
   );
   const policyInputDigest = await digestCanonical(policyInput);
   return {
@@ -227,9 +240,13 @@ async function derivePolicyConstraintEvaluation(
     sequenceDependencyStates,
     protectedPathPosture,
     idempotencyLedgerEntry,
+    idempotencyLedgerKey: authorityLedger.key,
+    idempotencyLedgerKeyDigest: authorityLedger.ledgerKeyDigest,
+    idempotencyLedgerEvidenceRefs: authorityLedger.evidenceRefs,
     protectedPathEvaluation,
     gatewayCredentialBindingEvaluation,
     delegatedAuthorityBindingEvaluation,
+    agreementObligationEvaluation,
     policyInput,
     policyInputDigest,
     isolationSnapshot: isolationSnapshotRef(isolationStates),
@@ -245,6 +262,7 @@ function buildPolicyInput(
   idempotencyLedgerEntry: StoredProtocolRecord<IdempotencyLedgerEntry> | null,
   gatewayCredentialBindingEvaluation: GatewayCredentialBindingEvaluation,
   delegatedAuthorityBindingEvaluation: DelegatedAuthorityBindingEvaluation,
+  agreementObligationEvaluation: AgreementObligationPolicyEvaluation,
 ): PolicyConstraintEvaluation["policyInput"] {
   return {
     contractDigest: context.contract.actionContractDigest,
@@ -257,6 +275,7 @@ function buildPolicyInput(
     credentialCustodyStatus: context.contract.credentialCustodyStatus,
     gatewayCredentialRefs: gatewayCredentialBindingEvaluation.policyInput,
     delegatedAuthorityRefs: delegatedAuthorityBindingEvaluation.policyInput,
+    agreementObligation: agreementObligationEvaluation.policyInput,
     protectedPathPosture: protectedPathPolicyInput(protectedPathPosture, context.now),
     idempotencyLedger: {
       ledgerKeyDigest,
@@ -286,6 +305,7 @@ async function resolvePolicyDecisionValue(
   decisionValue = applyProtectedPathPolicy(decisionValue, constraints);
   decisionValue = applyDelegatedAuthorityPolicy(decisionValue, constraints);
   decisionValue = applyGatewayCredentialRefPolicy(decisionValue, constraints);
+  decisionValue = applyAgreementObligationPolicy(decisionValue, constraints);
   decisionValue = applyExactProtectedActionPolicy(decisionValue, constraints);
   decisionValue = applyIdempotencyLedgerPolicy(decisionValue, constraints);
   if (decisionValue.decision === "review_required" && constraints.input.reviewDecisionId) {
@@ -315,6 +335,7 @@ async function resolvePolicyDecisionValue(
     decisionValue = applyProtectedPathPolicy(decisionValue, constraints);
     decisionValue = applyDelegatedAuthorityPolicy(decisionValue, constraints);
     decisionValue = applyGatewayCredentialRefPolicy(decisionValue, constraints);
+    decisionValue = applyAgreementObligationPolicy(decisionValue, constraints);
     decisionValue = applyExactProtectedActionPolicy(decisionValue, constraints);
     decisionValue = applyIdempotencyLedgerPolicy(decisionValue, constraints);
   }
@@ -334,8 +355,7 @@ async function commitIdempotencyConflictRefusal(
   recorder: ProtocolRecorder,
   constraints: PolicyConstraintEvaluation,
 ): Promise<PolicyEvaluationResponse> {
-  const ledgerKeyDigest = await idempotencyLedgerKeyDigest(idempotencyLedgerKey(constraints.contract));
-  const current = await store.getCurrentIdempotencyLedgerEntry(ledgerKeyDigest);
+  const current = await store.getCurrentIdempotencyLedgerEntry(constraints.idempotencyLedgerKeyDigest);
   const decisionValue = current
     ? idempotencyConflictDecisionValue(constraints.contract, current.payload)
     : {
@@ -363,6 +383,44 @@ async function commitIdempotencyConflictRefusal(
     throw new HandshakeProtocolError(
       "idempotency_refusal_commit_conflict",
       "Idempotency conflict refusal could not be committed.",
+      409,
+      {
+        retryability: "retryable",
+        commitState: "not_committed",
+      },
+    );
+  }
+  return policyEvaluationResponse(decision, null, commitResult.refusal, commitResult.proofGap);
+}
+
+async function commitGreenlightIssuanceConflictRefusal(
+  recorder: ProtocolRecorder,
+  constraints: PolicyConstraintEvaluation,
+): Promise<PolicyEvaluationResponse> {
+  const decision = await buildPolicyDecision(
+    constraints.input,
+    constraints.contract,
+    constraints.envelope,
+    {
+      decision: "refuse",
+      reasonCode: "idempotency_duplicate_authority",
+      reason: "A greenlight issuance claim already exists for this action contract; fresh authority is refused.",
+      matchedRuleIds: ["greenlight_issuance_duplicate_authority"],
+    },
+    constraints.policyInputDigest,
+    constraints.isolationSnapshot,
+    constraints.now,
+  );
+  const commitResult = await commitPolicyEvaluation(recorder, {
+    ...constraints,
+    decision,
+    greenlight: null,
+    idempotencyLedgerEntry: null,
+  });
+  if (commitResult.status !== "committed") {
+    throw new HandshakeProtocolError(
+      "greenlight_issuance_refusal_commit_conflict",
+      "Greenlight issuance conflict refusal could not be committed.",
       409,
       {
         retryability: "retryable",
@@ -458,6 +516,60 @@ function applyDelegatedAuthorityPolicy(
   };
 }
 
+function applyAgreementObligationPolicy(
+  decisionValue: PolicyEvaluationResult,
+  constraints: PolicyConstraintEvaluation,
+): PolicyEvaluationResult {
+  if (decisionValue.decision !== "greenlight" || constraints.agreementObligationEvaluation.ok) {
+    return decisionValue;
+  }
+  return {
+    decision: constraints.agreementObligationEvaluation.decision,
+    reasonCode: requirePolicyFailureValue(constraints.agreementObligationEvaluation.reasonCode),
+    reason: requirePolicyFailureValue(constraints.agreementObligationEvaluation.reason),
+    matchedRuleIds: ["agreement_obligation_binding_required"],
+  };
+}
+
+async function effectiveAuthorityLedger(
+  contract: ActionContract,
+  agreementObligationEvaluation: AgreementObligationPolicyEvaluation,
+): Promise<{ key: IdempotencyLedgerKey; ledgerKeyDigest: `sha256:${string}`; evidenceRefs: string[] }> {
+  const key = idempotencyLedgerKey(contract);
+  const input = agreementObligationEvaluation.policyInput;
+  if (
+    agreementObligationEvaluation.ok &&
+    input.linkedAgreementId &&
+    input.agreementObligationBindingId &&
+    input.obligationRef &&
+    input.counterpartyRef
+  ) {
+    const obligationUseDigest = await digestCanonical({
+      scope: "agreement_obligation_single_use_v1",
+      tenantId: contract.tenantId,
+      organizationId: contract.organizationId,
+      gatewayId: contract.gatewayId,
+      actionClass: contract.actionClass,
+      linkedAgreementId: input.linkedAgreementId,
+      obligationRef: input.obligationRef,
+      counterpartyRef: input.counterpartyRef,
+    });
+    const scopedKey = {
+      ...key,
+      idempotencyKey: `agreement-obligation:${obligationUseDigest.slice("sha256:".length, "sha256:".length + 40)}`,
+    };
+    return {
+      key: scopedKey,
+      ledgerKeyDigest: await idempotencyLedgerKeyDigest(scopedKey),
+      evidenceRefs: [
+        protocolObjectRef("linked_agreement", input.linkedAgreementId),
+        protocolObjectRef("agreement_obligation_binding", input.agreementObligationBindingId),
+      ],
+    };
+  }
+  return { key, ledgerKeyDigest: await idempotencyLedgerKeyDigest(key), evidenceRefs: [] };
+}
+
 function applyExactProtectedActionPolicy(
   decisionValue: PolicyEvaluationResult,
   constraints: PolicyConstraintEvaluation,
@@ -538,6 +650,25 @@ function evaluateExactProtectedActionPolicyContract(
       reason: "Exact protected-action policy requires payment requirement evidence to be digest-bound.",
     };
   }
+  const selectedPaymentRequirementIndex = nonnegativeIntegerParameter(
+    contract.parameters,
+    "selectedPaymentRequirementIndex",
+  );
+  if (selectedPaymentRequirementIndex === null) {
+    return {
+      decision: "proof_gap",
+      reasonCode: "protected_action_policy_selected_payment_requirement_index_missing",
+      reason: "Exact protected-action policy requires the selected payment requirement index to be bound.",
+    };
+  }
+  const selectedPaymentRequirementDigest = digestParameter(contract.parameters, "selectedPaymentRequirementDigest");
+  if (!selectedPaymentRequirementDigest) {
+    return {
+      decision: "proof_gap",
+      reasonCode: "protected_action_policy_selected_payment_requirement_binding_missing",
+      reason: "Exact protected-action policy requires selected payment requirement evidence to be digest-bound.",
+    };
+  }
 
   const atomicAmount = atomicStringParameter(contract.parameters, "atomicAmount");
   const maxAtomicAmountPerCall = atomicStringParameter(contract.bounds, "maxAtomicAmountPerCall");
@@ -583,6 +714,7 @@ function exactProtectedActionPolicyInput(contract: ActionContract): ExactProtect
     gatewayReadinessRef: stringParameter(contract.parameters, "gatewayReadinessRef"),
     gatewayReadinessDigest: stringParameter(contract.parameters, "gatewayReadinessDigest"),
     paymentRequirementsDigest: stringParameter(contract.parameters, "paymentRequirementsDigest"),
+    selectedPaymentRequirementIndex: numberParameter(contract.parameters, "selectedPaymentRequirementIndex"),
     selectedPaymentRequirementDigest: stringParameter(contract.parameters, "selectedPaymentRequirementDigest"),
     atomicAmount: stringParameter(contract.parameters, "atomicAmount"),
     maxAtomicAmountPerCall: stringParameter(contract.bounds, "maxAtomicAmountPerCall"),
@@ -593,11 +725,14 @@ function exactProtectedActionPolicyInput(contract: ActionContract): ExactProtect
 
 function exactProtectedActionPolicyApplies(contract: ActionContract): boolean {
   return (
+    contract.actionClass === "x402_payment.exact" ||
     hasParameter(contract.parameters, "gatewayReadinessRef") ||
     hasParameter(contract.parameters, "gatewayReadinessDigest") ||
     hasParameter(contract.parameters, "policyVersionRef") ||
     hasParameter(contract.parameters, "policyVersionDigest") ||
-    hasParameter(contract.parameters, "paymentRequirementsDigest")
+    hasParameter(contract.parameters, "paymentRequirementsDigest") ||
+    hasParameter(contract.parameters, "selectedPaymentRequirementIndex") ||
+    hasParameter(contract.parameters, "selectedPaymentRequirementDigest")
   );
 }
 
@@ -615,6 +750,16 @@ function digestParameter(parameters: Record<string, JsonValue>, key: string): `s
   return value && /^sha256:[a-f0-9]{64}$/.test(value) ? (value as `sha256:${string}`) : null;
 }
 
+function numberParameter(parameters: Record<string, JsonValue>, key: string): number | null {
+  const value = parameters[key];
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function nonnegativeIntegerParameter(parameters: Record<string, JsonValue>, key: string): number | null {
+  const value = numberParameter(parameters, key);
+  return value !== null && Number.isInteger(value) && value >= 0 ? value : null;
+}
+
 function atomicStringParameter(parameters: Record<string, JsonValue>, key: string): string | null {
   const value = stringParameter(parameters, key);
   return value && /^(?:0|[1-9]\d*)$/.test(value) ? value : null;
@@ -626,17 +771,10 @@ function compareAtomic(left: string, right: string): number {
   return leftValue === rightValue ? 0 : leftValue > rightValue ? 1 : -1;
 }
 
-async function assertGreenlightIssuable(store: ProtocolStore, contract: ActionContract): Promise<void> {
-  const existingGreenlights = await store.listRecordsByType<Greenlight>("greenlight", {
-    tenantId: contract.tenantId,
-    organizationId: contract.organizationId,
-  });
-  assertTransition(
-    guardGreenlightIssuance(
-      contract,
-      existingGreenlights.map((record) => record.payload),
-    ),
-  );
+function requirePolicyFailureValue(value: string | null): string {
+  if (value === null)
+    throw new HandshakeProtocolError("agreement_obligation_binding_missing", "Policy failure missing reason.", 500);
+  return value;
 }
 
 function assertTransition(result: TransitionGuardResult): void {

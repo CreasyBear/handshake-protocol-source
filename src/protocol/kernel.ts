@@ -56,6 +56,22 @@ import {
 } from "./areas/isolation-breaker";
 import type { CreateBreakerDecisionInput, CreateIsolationInput, IsolationState } from "./areas/isolation-breaker";
 import { ProtocolRecordSchema, type ProtocolRecord } from "./areas/object-registry";
+import {
+  recordAgreementObligationBinding as recordAgreementObligationBindingTransition,
+  recordLinkedAgreement as recordLinkedAgreementTransition,
+  recordNegotiationDecision as recordNegotiationDecisionTransition,
+  recordNegotiationOffer as recordNegotiationOfferTransition,
+  recordNegotiationSession as recordNegotiationSessionTransition,
+  transitionAgreementStatus as transitionAgreementStatusTransition,
+} from "./areas/negotiation";
+import type {
+  AgreementObligationBinding,
+  AgreementStatusTransition,
+  LinkedAgreement,
+  NegotiationDecision,
+  NegotiationOffer,
+  NegotiationSession,
+} from "./areas/negotiation";
 import { evaluatePolicy as evaluatePolicyTransition } from "./areas/policy-greenlight";
 import type { EvaluatePolicyInput, PolicyEvaluationResponse } from "./areas/policy-greenlight";
 import { createProtectedPathPosture as createProtectedPathPostureTransition } from "./areas/protected-path-posture";
@@ -159,6 +175,30 @@ export class HandshakeKernel {
 
   proposeActionContract(input: ProposeActionContractInput): Promise<ActionContract> {
     return proposeActionContractTransition(this.store, this.recorder, input);
+  }
+
+  recordNegotiationSession(input: NegotiationSession): Promise<NegotiationSession> {
+    return recordNegotiationSessionTransition(this.recorder, input);
+  }
+
+  recordNegotiationOffer(input: NegotiationOffer): Promise<NegotiationOffer> {
+    return recordNegotiationOfferTransition(this.store, this.recorder, input);
+  }
+
+  recordNegotiationDecision(input: NegotiationDecision): Promise<NegotiationDecision> {
+    return recordNegotiationDecisionTransition(this.store, this.recorder, input);
+  }
+
+  recordLinkedAgreement(input: LinkedAgreement): Promise<LinkedAgreement> {
+    return recordLinkedAgreementTransition(this.store, this.recorder, input);
+  }
+
+  recordAgreementObligationBinding(input: AgreementObligationBinding): Promise<AgreementObligationBinding> {
+    return recordAgreementObligationBindingTransition(this.store, this.recorder, input);
+  }
+
+  transitionAgreementStatus(input: AgreementStatusTransition): Promise<AgreementStatusTransition> {
+    return transitionAgreementStatusTransition(this.store, this.recorder, input);
   }
 
   registerGatewayCredentialRef(input: RegisterGatewayCredentialRefInput): Promise<GatewayCredentialRef> {

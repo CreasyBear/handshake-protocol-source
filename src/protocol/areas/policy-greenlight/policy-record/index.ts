@@ -38,6 +38,7 @@ export type PolicyCommitPlan = {
 
 export type PolicyCommitResult =
   | { status: "committed"; refusal: Refusal | null; proofGap: ProofGap | null }
+  | { status: "greenlight_issuance_conflict"; refusal: null; proofGap: null }
   | { status: "idempotency_ledger_conflict"; refusal: null; proofGap: null };
 
 export async function buildPolicyDecision(
@@ -90,6 +91,7 @@ export function buildGreenlight(
   now: string,
   protectedPathPosture: StoredProtocolRecord<ProtectedPathPosture> | null,
   idempotencyLedgerKeyDigest: `sha256:${string}`,
+  idempotencyKey = contract.idempotencyKey,
 ): Greenlight {
   return GreenlightSchema.parse({
     schemaVersion: PROTOCOL_VERSION,
@@ -119,7 +121,7 @@ export function buildGreenlight(
     delegatedAuthorityRefDigests: contract.delegatedAuthorityRefs.map((ref) => ref.delegatedAuthorityRefDigest),
     paramsDigest: contract.paramsDigest,
     contractDigest: contract.actionContractDigest,
-    idempotencyKey: contract.idempotencyKey,
+    idempotencyKey,
     idempotencyLedgerKeyDigest,
     maxUses: 1,
     issuedAt: now,

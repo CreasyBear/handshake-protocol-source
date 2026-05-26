@@ -17,6 +17,12 @@ export type KernelTransitionMethod =
   | "transitionToolCallDraft"
   | "createProtectedPathPosture"
   | "proposeActionContract"
+  | "recordNegotiationSession"
+  | "recordNegotiationOffer"
+  | "recordNegotiationDecision"
+  | "recordLinkedAgreement"
+  | "recordAgreementObligationBinding"
+  | "transitionAgreementStatus"
   | "createAuthorityCertificate"
   | "evaluatePolicy"
   | "createReviewArtifact"
@@ -49,6 +55,12 @@ export type ProtocolTransitionId =
   | "transitionToolCallDraft"
   | "createProtectedPathPosture"
   | "proposeActionContract"
+  | "recordNegotiationSession"
+  | "recordNegotiationOffer"
+  | "recordNegotiationDecision"
+  | "recordLinkedAgreement"
+  | "recordAgreementObligationBinding"
+  | "transitionAgreementStatus"
   | "createAuthorityCertificate"
   | "evaluatePolicy"
   | "createReviewArtifact"
@@ -72,6 +84,7 @@ export type ProtocolTransitionPhase =
   | "delegated_authority"
   | "protected_path_posture"
   | "action_contract"
+  | "negotiation"
   | "authority_certificate"
   | "policy"
   | "review"
@@ -267,6 +280,72 @@ export const protocolNavigation = [
     eventsEmitted: ["action_proposed", "recovery_status_changed", "proof_gap_recorded"],
     authorityBoundary: "proposed exact action only",
     evidenceObligation: "bind a contractable candidate or record refusal/proof-gap evidence",
+  },
+  {
+    transitionId: "recordNegotiationSession",
+    kernelMethod: "recordNegotiationSession",
+    phase: "negotiation",
+    outcomeClasses: ["recorded", "conflict"],
+    recordsWritten: ["negotiation_session", "contract_stream_event"],
+    eventsEmitted: ["negotiation_session_recorded"],
+    authorityBoundary: "negotiation context evidence only",
+    evidenceObligation:
+      "record parties, runtime posture, assumptions, uncertainty, and imported protocol evidence without issuing policy, greenlight, gate, mutation, receipt, or certificate authority",
+  },
+  {
+    transitionId: "recordNegotiationOffer",
+    kernelMethod: "recordNegotiationOffer",
+    phase: "negotiation",
+    outcomeClasses: ["recorded", "conflict"],
+    recordsWritten: ["negotiation_offer", "contract_stream_event"],
+    eventsEmitted: ["negotiation_offer_recorded"],
+    authorityBoundary: "offer evidence only",
+    evidenceObligation:
+      "record a specific offer version and reconstruction refs without turning accepted terms into protected-action authority",
+  },
+  {
+    transitionId: "recordNegotiationDecision",
+    kernelMethod: "recordNegotiationDecision",
+    phase: "negotiation",
+    outcomeClasses: ["recorded", "conflict"],
+    recordsWritten: ["negotiation_decision", "contract_stream_event"],
+    eventsEmitted: ["negotiation_decision_recorded"],
+    authorityBoundary: "decision evidence only",
+    evidenceObligation:
+      "record accept, reject, counter, withdraw, or expire against one current offer version without issuing an action contract or greenlight",
+  },
+  {
+    transitionId: "recordLinkedAgreement",
+    kernelMethod: "recordLinkedAgreement",
+    phase: "negotiation",
+    outcomeClasses: ["recorded", "conflict"],
+    recordsWritten: ["linked_agreement", "contract_stream_event"],
+    eventsEmitted: ["linked_agreement_recorded"],
+    authorityBoundary: "accepted agreement evidence only",
+    evidenceObligation:
+      "bind the accepted decision, offer digest, accepting party, and counterparty ref without authorizing any mutation",
+  },
+  {
+    transitionId: "recordAgreementObligationBinding",
+    kernelMethod: "recordAgreementObligationBinding",
+    phase: "negotiation",
+    outcomeClasses: ["recorded", "conflict"],
+    recordsWritten: ["agreement_obligation_binding", "contract_stream_event"],
+    eventsEmitted: ["agreement_obligation_binding_recorded"],
+    authorityBoundary: "obligation-to-contract evidence only",
+    evidenceObligation:
+      "bind one active agreement obligation to one exact action contract digest, params digest, action type, resource, and counterparty before policy may consider it",
+  },
+  {
+    transitionId: "transitionAgreementStatus",
+    kernelMethod: "transitionAgreementStatus",
+    phase: "negotiation",
+    outcomeClasses: ["recorded", "conflict"],
+    recordsWritten: ["agreement_status_transition", "contract_stream_event"],
+    eventsEmitted: ["agreement_status_transition_recorded"],
+    authorityBoundary: "agreement lifecycle evidence only",
+    evidenceObligation:
+      "record withdrawal, dispute, expiry, supersession, or resolution so future policy can refuse stale agreement-backed contracts",
   },
   {
     transitionId: "createAuthorityCertificate",

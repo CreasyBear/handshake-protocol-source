@@ -405,8 +405,12 @@ function validAgreement() {
     ...base,
     linkedAgreementId: "linked_agreement_demo",
     negotiationSessionId: "negotiation_session_demo",
+    acceptedNegotiationDecisionId: "negotiation_decision_demo",
     acceptedOfferVersionId: "offer_version_1",
     acceptedOfferSequence: 1,
+    acceptedOfferContentDigest: digest,
+    acceptedByPartyId: "party_counterparty",
+    counterpartyRef: "agent:remote",
     agreementDigest: digest,
     agreementObjectRefs: ["object:agreement:v1"],
     agreementContentRefs: ["content:agreement:v1"],
@@ -414,6 +418,7 @@ function validAgreement() {
     agreementEvidencePosture: "local_evidence_only",
     clearingEvidenceRefs: { correlationRef: "agreement:demo" },
     externalProtocolEvidenceRefs: [validExternalRef()],
+    expiresAt: later,
   };
 }
 
@@ -425,6 +430,14 @@ function validObligationBinding() {
     negotiationSessionId: "negotiation_session_demo",
     obligationRef: "obligation:local-protected-action",
     obligationDigest: otherDigest,
+    actionContractId: "act_demo",
+    actionContractDigest: digest,
+    paramsDigest: digest,
+    actionTypeId: "atype_package_install",
+    actionClass: "package.install",
+    resourceRef: "npm:hono",
+    counterpartyRef: "agent:remote",
+    maxUses: 1,
     bindingPosture: "local_evidence_only",
     localProtectedActionEvidenceRefs: [
       {

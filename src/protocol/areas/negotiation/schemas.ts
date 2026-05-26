@@ -192,8 +192,12 @@ export type NegotiationDecision = z.infer<typeof NegotiationDecisionSchema>;
 export const LinkedAgreementSchema = ProtocolBaseSchema.extend({
   linkedAgreementId: IdSchema,
   negotiationSessionId: IdSchema,
+  acceptedNegotiationDecisionId: IdSchema,
   acceptedOfferVersionId: OfferVersionRefSchema,
   acceptedOfferSequence: z.number().int().positive(),
+  acceptedOfferContentDigest: DigestSchema,
+  acceptedByPartyId: IdSchema,
+  counterpartyRef: ResourceRefSchema,
   agreementDigest: DigestSchema,
   agreementObjectRefs: z.array(ResourceRefSchema).default([]),
   agreementContentRefs: z.array(ResourceRefSchema).default([]),
@@ -201,6 +205,7 @@ export const LinkedAgreementSchema = ProtocolBaseSchema.extend({
   agreementEvidencePosture: z.literal("local_evidence_only"),
   clearingEvidenceRefs: ClearingEvidenceRefsSchema,
   externalProtocolEvidenceRefs: z.array(ExternalProtocolEvidenceRefSchema).default([]),
+  expiresAt: IsoDateSchema.nullable().default(null),
 }).superRefine(requireReconstructionRefs("agreement"));
 export type LinkedAgreement = z.infer<typeof LinkedAgreementSchema>;
 
@@ -212,6 +217,14 @@ export const AgreementObligationBindingSchema = ProtocolBaseSchema.extend({
     message: "obligation ref cannot point at a control or terminal artifact",
   }),
   obligationDigest: DigestSchema.nullable().default(null),
+  actionContractId: IdSchema,
+  actionContractDigest: DigestSchema,
+  paramsDigest: DigestSchema,
+  actionTypeId: IdSchema,
+  actionClass: z.string().min(1),
+  resourceRef: ResourceRefSchema,
+  counterpartyRef: ResourceRefSchema,
+  maxUses: z.literal(1).default(1),
   bindingPosture: z.literal("local_evidence_only"),
   localProtectedActionEvidenceRefs: z.array(EvidenceRefSchema).min(1),
   evidenceRefs: z.array(ResourceRefSchema).default([]),

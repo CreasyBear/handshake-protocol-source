@@ -4,7 +4,7 @@ import { DelegatedAuthorityBindingSchema } from "../../protocol/areas/delegated-
 import { GatewayCredentialBindingSchema } from "../../protocol/areas/credential-custody";
 import type { CompileIntentInput, IntentCompilationRecord } from "../../protocol/areas/intent-compilation";
 import { digestCanonical } from "../../protocol/foundation/canonical";
-import { DigestSchema } from "../../protocol/foundation/schema-core";
+import { ClearingEvidenceRefsSchema, DigestSchema } from "../../protocol/foundation/schema-core";
 import { x402PaymentResourceRef } from "./install-proposal";
 import type { X402PaymentRequiredEvidence } from "./upstream-evidence";
 
@@ -56,6 +56,7 @@ export const X402PaymentAttemptSchema = z.strictObject({
   extensionKeys: z.array(z.string().min(1)).default([]),
   sequenceNumber: z.number().int().nonnegative().default(1),
   requiredPriorActionContractIds: z.array(z.string().min(1)).default([]),
+  clearingEvidenceRefs: ClearingEvidenceRefsSchema.default({}),
 });
 export type X402PaymentAttempt = z.input<typeof X402PaymentAttemptSchema>;
 
@@ -381,6 +382,7 @@ async function buildX402PaymentCompileIntentInputUnchecked(
         ...runtimeConfig.gatewayCredentialBinding.evidenceExpectationRefs,
         ...runtimeConfig.delegatedAuthorityBinding.evidenceExpectationRefs,
       ]),
+      clearingEvidenceRefs: attempt.clearingEvidenceRefs,
       bounds: {
         endpointDomain,
         payee: attempt.payee,

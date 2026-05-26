@@ -14,10 +14,7 @@ import { protocolObjectTypes } from "../../src/protocol/areas/object-registry";
 describe("foundation transition matrix", () => {
   it("covers every public transition route and invoker exactly once", () => {
     const navigationIds = protocolNavigation
-      .filter(
-        (entry) =>
-          entry.transitionId !== "createGeneratedExecutionGraph" && entry.transitionId !== "createAuthorityCertificate",
-      )
+      .filter((entry) => !kernelOnlyTransitionIds.has(entry.transitionId))
       .map((entry) => String(entry.transitionId))
       .sort();
     const routeIds = transitionRouteDefinitions.map((route) => String(route.routeId)).sort();
@@ -80,6 +77,12 @@ describe("foundation transition matrix", () => {
       "createToolCallDraft",
       "transitionToolCallDraft",
       "createProtectedPathPosture",
+      "recordNegotiationSession",
+      "recordNegotiationOffer",
+      "recordNegotiationDecision",
+      "recordLinkedAgreement",
+      "recordAgreementObligationBinding",
+      "transitionAgreementStatus",
       "createReviewArtifact",
       "createReviewDecision",
       "reconcileSurfaceOperation",
@@ -95,3 +98,14 @@ describe("foundation transition matrix", () => {
     }
   });
 });
+
+const kernelOnlyTransitionIds = new Set([
+  "createGeneratedExecutionGraph",
+  "createAuthorityCertificate",
+  "recordNegotiationSession",
+  "recordNegotiationOffer",
+  "recordNegotiationDecision",
+  "recordLinkedAgreement",
+  "recordAgreementObligationBinding",
+  "transitionAgreementStatus",
+]);
