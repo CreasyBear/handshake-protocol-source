@@ -1,10 +1,10 @@
 {
-  "generatedAt": "2026-05-26T02:56:20.995Z",
+  "generatedAt": "2026-05-26T03:41:04.187Z",
   "fixtureKind": "a2a_negotiated_x402_room",
   "contract": {
-    "actionContractId": "act_d8f1fe92-3b71-4170-9703-022f7e797977",
-    "actionContractDigest": "sha256:ae040b6921766928b09607cba72570010f769d0377213969c741f376d75b3ede",
-    "paramsDigest": "sha256:ad9a5dc544d359aeb171db4dc75a7ea98326765858574a755c050ebead3b8413",
+    "actionContractId": "act_11ca5b1d-1dbd-414b-902b-3f9df130464d",
+    "actionContractDigest": "sha256:fdb6808823abb9d96aa2854f6a25f5bcd6a6fef58c21dd6cab5d4b7a25c60442",
+    "paramsDigest": "sha256:b8f5a039f3555c7088fa95fa645770b03b3f0365f348831365586f2281767e85",
     "actionClass": "x402_payment.exact",
     "resourceRef": "x402:base-sepolia:0xpayee:https://api.example.com/mcp/premium-context",
     "clearingEvidenceRefs": {
@@ -23,7 +23,7 @@
   "policy": {
     "decision": "greenlight",
     "decisionReasonCode": "policy_passed",
-    "greenlightId": "grn_3b9cd60f-dade-4db7-8f23-6e788d63b5bc",
+    "greenlightId": "grn_73191483-4b1c-4f59-b99d-b9bc78cfd90d",
     "greenlightMaxUses": 1
   },
   "gateway": {
@@ -36,9 +36,9 @@
   },
   "supportPacket": {
     "packetKind": "a2a_negotiation_support_packet",
-    "actionContractId": "act_d8f1fe92-3b71-4170-9703-022f7e797977",
-    "actionContractDigest": "sha256:ae040b6921766928b09607cba72570010f769d0377213969c741f376d75b3ede",
-    "paramsDigest": "sha256:ad9a5dc544d359aeb171db4dc75a7ea98326765858574a755c050ebead3b8413",
+    "actionContractId": "act_11ca5b1d-1dbd-414b-902b-3f9df130464d",
+    "actionContractDigest": "sha256:fdb6808823abb9d96aa2854f6a25f5bcd6a6fef58c21dd6cab5d4b7a25c60442",
+    "paramsDigest": "sha256:b8f5a039f3555c7088fa95fa645770b03b3f0365f348831365586f2281767e85",
     "actionClass": "x402_payment.exact",
     "resourceRef": "x402:base-sepolia:0xpayee:https://api.example.com/mcp/premium-context",
     "agreement": {
@@ -52,8 +52,8 @@
     "obligationBinding": {
       "agreementObligationBindingId": "agreement_obligation_binding_demo",
       "obligationRef": "obligation:x402-exact-call",
-      "actionContractDigest": "sha256:ae040b6921766928b09607cba72570010f769d0377213969c741f376d75b3ede",
-      "paramsDigest": "sha256:ad9a5dc544d359aeb171db4dc75a7ea98326765858574a755c050ebead3b8413",
+      "actionContractDigest": "sha256:fdb6808823abb9d96aa2854f6a25f5bcd6a6fef58c21dd6cab5d4b7a25c60442",
+      "paramsDigest": "sha256:b8f5a039f3555c7088fa95fa645770b03b3f0365f348831365586f2281767e85",
       "counterpartyRef": "agent:seller"
     },
     "negotiation": {
@@ -67,15 +67,15 @@
       "assemblyStatus": "assembled",
       "assemblyReasonCode": null,
       "assemblyReason": null,
-      "policyDecisionId": "pol_152fd0d9-6ff3-47d3-a5af-f8da67f41379",
+      "policyDecisionId": "pol_dfa2cd46-2716-4258-8d81-e9ca9c853521",
       "policyDecision": "greenlight",
-      "greenlightId": "grn_3b9cd60f-dade-4db7-8f23-6e788d63b5bc",
-      "gatewayCheckAttemptId": "gat_eca052e0-9c7d-4ccb-b37c-8ddfd24e722e",
-      "mutationAttemptId": "mut_714fa094-c531-4eda-b879-29bbcd3725a5",
-      "receiptId": "rcp_a3b0ac29-cd51-4000-b8fc-b789daf90a18",
+      "greenlightId": "grn_73191483-4b1c-4f59-b99d-b9bc78cfd90d",
+      "gatewayCheckAttemptId": "gat_af6fa61b-9347-471a-a6f3-f3274e6954d8",
+      "mutationAttemptId": "mut_3256ceb1-5fdb-455d-8927-c39341363427",
+      "receiptId": "rcp_c443d446-b6aa-4bbc-a73d-ba996c116062",
       "downstreamFinalityStatus": "unknown",
-      "proofGapIds": ["gap_59093024-7f9b-43d7-9c68-c048cd97e96f"],
-      "refusalIds": ["ref_248010ff71fba79e7fbe92d9fd51863a509c116efd99a8c7"]
+      "proofGapIds": ["gap_fb70fe61-8855-461e-876c-3e956043537c"],
+      "refusalIds": ["ref_f43eba17c0c3509e9e18a635e205524cbc2cfe6784cb98c2"]
     },
     "authorityBoundary": {
       "agreementAcceptanceCreatedAuthority": false,
@@ -91,5 +91,121 @@
       "paymentSignatureIncluded": false,
       "credentialMaterialIncluded": false
     }
+  },
+  "productReadback": {
+    "readbackKind": "a2a_negotiation_product_readback",
+    "schemaVersion": "a2a.negotiation.readback.v1",
+    "status": "gateway_checked_downstream_unknown",
+    "actionContractId": "act_11ca5b1d-1dbd-414b-902b-3f9df130464d",
+    "actionContractDigest": "sha256:fdb6808823abb9d96aa2854f6a25f5bcd6a6fef58c21dd6cab5d4b7a25c60442",
+    "paramsDigest": "sha256:b8f5a039f3555c7088fa95fa645770b03b3f0365f348831365586f2281767e85",
+    "actionClass": "x402_payment.exact",
+    "resourceRef": "x402:base-sepolia:0xpayee:https://api.example.com/mcp/premium-context",
+    "negotiatedEvidence": {
+      "linkedAgreementId": "linked_agreement_demo",
+      "agreementStatus": "active",
+      "obligationRef": "obligation:x402-exact-call",
+      "counterpartyRef": "agent:seller",
+      "evidencePosture": "local_evidence_only"
+    },
+    "protectedAction": {
+      "policyDecisionId": "pol_dfa2cd46-2716-4258-8d81-e9ca9c853521",
+      "policyDecision": "greenlight",
+      "greenlightId": "grn_73191483-4b1c-4f59-b99d-b9bc78cfd90d",
+      "gatewayCheckAttemptId": "gat_af6fa61b-9347-471a-a6f3-f3274e6954d8",
+      "mutationAttemptId": "mut_3256ceb1-5fdb-455d-8927-c39341363427",
+      "receiptId": "rcp_c443d446-b6aa-4bbc-a73d-ba996c116062",
+      "downstreamFinalityStatus": "unknown"
+    },
+    "developerExperience": {
+      "targetTimeToHelloWorldMinutes": 5,
+      "runCommand": "bun examples/a2a-negotiated-x402-room/generate.ts",
+      "expectedOutputFiles": ["latest.json", "latest.md", "agent-handoff.md"],
+      "inspectFirst": [
+        "authorityBoundary.agreementAcceptanceCreatedAuthority",
+        "protectedAction.gatewayCheckAttemptId",
+        "protectedAction.downstreamFinalityStatus",
+        "customerExperience.nextActions"
+      ],
+      "failureModes": [
+        "missing agreement obligation binding becomes a proof gap",
+        "stale negotiation evidence is refused before greenlight",
+        "changed payment parameters are refused at the gateway before signer use",
+        "downstream finality unknown remains unknown, not success"
+      ]
+    },
+    "agentExperience": {
+      "runtimeProfiles": ["codex", "mcp", "x402", "generic"],
+      "sourceBoundary": [
+        "Use this readback packet as evidence only.",
+        "Do not infer authority from an accepted agreement.",
+        "Bind future mutations to a fresh exact ActionContract and gateway check."
+      ],
+      "toolContract": [
+        "Read support packet fields and public readback fields.",
+        "Do not request raw payment payloads, payment signatures, or credential material.",
+        "Do not call signer or mutation tools unless a verified gateway check is present."
+      ],
+      "stopConditions": [
+        "Stop on missing obligation binding.",
+        "Stop on agreement, params, selected payment requirement, endpoint, amount, or counterparty drift.",
+        "Stop on readback assembly failure.",
+        "Record downstream unknown as a proof gap or next action, not success."
+      ],
+      "recoveryPath": [
+        "Re-run the readback generator to refresh local evidence.",
+        "Inspect proofGapIds and refusalIds before retrying.",
+        "Create a new exact ActionContract for any new mutation attempt."
+      ],
+      "evalPath": [
+        "bun test test/product/a2a-negotiated-x402-room.test.ts",
+        "bun examples/a2a-negotiated-x402-room/generate.ts",
+        "npm run quality:claims",
+        "npm run quality:architecture"
+      ]
+    },
+    "customerExperience": {
+      "headline": "A negotiated agreement was linked to one exact protected action; authority came only from policy and gateway checks.",
+      "verified": [
+        "Agreement evidence linked_agreement_demo is recorded with status active.",
+        "Obligation binding agreement_obligation_binding_demo pins the exact action contract digest.",
+        "Policy created one-use greenlight grn_73191483-4b1c-4f59-b99d-b9bc78cfd90d.",
+        "Gateway check gat_af6fa61b-9347-471a-a6f3-f3274e6954d8 is recorded before mutation evidence."
+      ],
+      "unknown": [
+        "Downstream business finality is unknown.",
+        "Proof gaps remain: gap_fb70fe61-8855-461e-876c-3e956043537c.",
+        "Payment signature material is redacted from the readback."
+      ],
+      "nextActions": [
+        "Resolve or preserve proof gaps before claiming success.",
+        "Do not retry payment with the same greenlight."
+      ]
+    },
+    "authorityBoundary": {
+      "agreementAcceptanceCreatedAuthority": false,
+      "obligationBindingCreatedAuthority": false,
+      "policyMayCreateOneUseGreenlight": true,
+      "gatewayCheckRemainsFinalEnforcementPoint": true,
+      "downstreamSuccessClaimedByAgreement": false
+    },
+    "redaction": {
+      "rawTranscriptIncluded": false,
+      "rawOfferTermsIncluded": false,
+      "paymentPayloadIncluded": false,
+      "paymentSignatureIncluded": false,
+      "credentialMaterialIncluded": false
+    },
+    "nonClaims": [
+      "marketplace_operation",
+      "legal_contract_formation",
+      "escrow",
+      "settlement_finality",
+      "reputation",
+      "cross_org_trust",
+      "provider_custody",
+      "reusable_authority",
+      "native_host_containment"
+    ]
   }
 }

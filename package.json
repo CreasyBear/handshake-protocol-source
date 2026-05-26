@@ -49,6 +49,11 @@
       "import": "./dist/sdk/surface-clients/index.mjs",
       "default": "./dist/sdk/surface-clients/index.mjs"
     },
+    "./surfaces/a2a-negotiation-readback": {
+      "types": "./dist/surfaces/a2a-negotiation-readback/index.d.ts",
+      "import": "./dist/surfaces/a2a-negotiation-readback/index.mjs",
+      "default": "./dist/surfaces/a2a-negotiation-readback/index.mjs"
+    },
     "./cli": {
       "types": "./dist/cli/index.d.ts",
       "import": "./dist/cli/index.mjs",

@@ -1,11 +1,18 @@
 import { mkdir } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import { runNegotiatedX402Room } from "../../test/support/x402-negotiation-fixture";
+import {
+  projectA2ANegotiationProductReadback,
+  renderA2ANegotiationAgentHandoff,
+  renderA2ANegotiationCustomerReadback,
+} from "../../src/surfaces/a2a-negotiation-readback";
+import { runNegotiatedX402Room } from "./local-reference-room";
 
 const outputPath = join(import.meta.dir, "latest.json");
 const markdownOutputPath = join(import.meta.dir, "latest.md");
+const agentHandoffOutputPath = join(import.meta.dir, "agent-handoff.md");
 
 const room = await runNegotiatedX402Room();
+const productReadback = projectA2ANegotiationProductReadback(room.supportPacket);
 const output = {
   generatedAt: new Date().toISOString(),
   fixtureKind: "a2a_negotiated_x402_room",
@@ -40,26 +47,11 @@ const output = {
     signerInvocationCount: room.surface.signatureCount(),
   },
   supportPacket: room.supportPacket,
+  productReadback,
 };
 
 await mkdir(dirname(outputPath), { recursive: true });
 await Bun.write(outputPath, JSON.stringify(output, null, 2) + "\n");
-await Bun.write(
-  markdownOutputPath,
-  [
-    "# A2A Negotiated x402 Room",
-    "",
-    "This fixture is local/reference evidence only. It does not claim marketplace operation, legal contract formation, escrow, settlement finality, reputation, cross-org trust, provider custody, or reusable authority.",
-    "",
-    `- Action contract: ${room.contract.actionContractId}`,
-    `- Agreement created authority: ${output.authorityBoundary.acceptedAgreementCreatedGreenlight}`,
-    `- Policy decision: ${room.policy.decision.decision}`,
-    `- Greenlight max uses: ${room.greenlight.maxUses}`,
-    `- First gateway decision: ${room.gatewayResult.gatewayCheck.gateAttempt.gateDecision}`,
-    `- Replay refusal reason: ${room.replay.gatewayCheck.gateAttempt.gateDecisionReasonCode}`,
-    `- Signer invocation count: ${room.surface.signatureCount()}`,
-    `- Downstream finality: ${room.supportPacket.lifecycle.downstreamFinalityStatus ?? "unknown"}`,
-    "",
-  ].join("\n"),
-);
+await Bun.write(markdownOutputPath, renderA2ANegotiationCustomerReadback(productReadback));
+await Bun.write(agentHandoffOutputPath, renderA2ANegotiationAgentHandoff(productReadback));
 console.log(outputPath);

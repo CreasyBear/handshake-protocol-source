@@ -50,7 +50,9 @@ If a surface needs a new authority exception, the manifest must change first and
 
 ## Future package target
 
-Internal source package only until surface contracts are stable enough for a deliberate public subpath decision.
+Most surface contracts remain internal source package only. Public package
+subpaths require an explicit non-authority export decision and architecture
+tests that freeze the exported symbol set.
 
 ## Allowed imports
 
@@ -66,7 +68,14 @@ Protocol primitive internals, storage implementations, HTTP app internals, runti
 
 ## Public surface
 
-No root package export. Surface manifests are source-owned internal contracts until a public subpath is explicitly designed.
+No root package export and no broad `./surfaces` package export. The deliberate
+surface subpath is `handshake-protocol-kernel/surfaces/a2a-negotiation-readback`,
+which exposes read-only A2A negotiation product readback, customer/operator
+summary, and agent handoff projection helpers. It must not expose policy
+clients, gateway checks, greenlights, payment material, receipt export, mutation
+runners, signer calls, or hidden authority shortcuts. Shared manifests, proof
+packets, activation gates, and release proof records remain internal source
+contracts until separately promoted.
 
 ## Extraction trigger
 

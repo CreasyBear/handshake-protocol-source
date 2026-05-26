@@ -1,6 +1,11 @@
 import { describe, expect, it } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import {
+  projectA2ANegotiationProductReadback,
+  renderA2ANegotiationAgentHandoff,
+  renderA2ANegotiationCustomerReadback,
+} from "../../src/surfaces/a2a-negotiation-readback";
 import { runX402WalletGateway, type X402PaymentParameters } from "../../src/adapters/x402-payment/wallet-gateway";
 import {
   changedAmountParameters,
@@ -8,7 +13,7 @@ import {
   changedSelectedPaymentRequirementParameters,
   createNegotiatedX402Greenlight,
   runNegotiatedX402Room,
-} from "../support/x402-negotiation-fixture";
+} from "../../examples/a2a-negotiated-x402-room/local-reference-room";
 
 describe("A2A negotiated x402 room", () => {
   it("runs the full room without treating agreement acceptance as authority", async () => {
@@ -70,6 +75,36 @@ describe("A2A negotiated x402 room", () => {
     expect(supportJson).not.toContain("paymentPayloadDigest");
   });
 
+  it("projects DX, AX, and CX readback without creating authority claims", async () => {
+    const room = await runNegotiatedX402Room();
+    const readback = projectA2ANegotiationProductReadback(room.supportPacket);
+    const customerMarkdown = renderA2ANegotiationCustomerReadback(readback);
+    const agentHandoff = renderA2ANegotiationAgentHandoff(readback);
+
+    expect(readback.status).toBe("gateway_checked_downstream_unknown");
+    expect(readback.developerExperience).toMatchObject({
+      targetTimeToHelloWorldMinutes: 5,
+      runCommand: "bun examples/a2a-negotiated-x402-room/generate.ts",
+      expectedOutputFiles: ["latest.json", "latest.md", "agent-handoff.md"],
+    });
+    expect(readback.agentExperience.stopConditions).toContain("Stop on readback assembly failure.");
+    expect(readback.customerExperience.nextActions).toContain(
+      "Resolve or preserve proof gaps before claiming success.",
+    );
+    expect(readback.authorityBoundary).toMatchObject({
+      agreementAcceptanceCreatedAuthority: false,
+      obligationBindingCreatedAuthority: false,
+      gatewayCheckRemainsFinalEnforcementPoint: true,
+    });
+    for (const forbidden of ["PAYMENT-SIGNATURE", "paymentPayloadDigest", "credentialMaterialIncluded: true"]) {
+      expect(customerMarkdown).not.toContain(forbidden);
+      expect(agentHandoff).not.toContain(forbidden);
+    }
+    expect(agentHandoff).toContain("## Stop Conditions");
+    expect(agentHandoff).toContain("native_host_containment");
+    expect(customerMarkdown).toContain("Downstream business finality is unknown.");
+  });
+
   it("refuses changed amount, endpoint, and selected payment requirement at the gateway before signer use", async () => {
     const amountFixture = await createNegotiatedX402Greenlight();
     const amountResult = await runX402WalletGateway({
@@ -119,10 +154,22 @@ describe("A2A negotiated x402 room", () => {
   it("ships JSON and Markdown fixture outputs without product overclaims", () => {
     const json = JSON.parse(
       readFileSync(join(import.meta.dir, "../../examples/a2a-negotiated-x402-room/latest.json"), "utf8"),
-    ) as { fixtureKind: string; authorityBoundary: Record<string, unknown> };
+    ) as { fixtureKind: string; authorityBoundary: Record<string, unknown>; productReadback: Record<string, unknown> };
     const markdown = readFileSync(join(import.meta.dir, "../../examples/a2a-negotiated-x402-room/latest.md"), "utf8");
+    const agentHandoff = readFileSync(
+      join(import.meta.dir, "../../examples/a2a-negotiated-x402-room/agent-handoff.md"),
+      "utf8",
+    );
+    const evaluation = readFileSync(
+      join(import.meta.dir, "../../examples/a2a-negotiated-x402-room/evaluation.md"),
+      "utf8",
+    );
 
     expect(json.fixtureKind).toBe("a2a_negotiated_x402_room");
+    expect(json.productReadback).toMatchObject({
+      readbackKind: "a2a_negotiation_product_readback",
+      status: "gateway_checked_downstream_unknown",
+    });
     expect(json.authorityBoundary).toMatchObject({
       acceptedAgreementCreatedGreenlight: false,
       gatewayCheckRemainsFinalEnforcementPoint: true,
@@ -136,8 +183,15 @@ describe("A2A negotiated x402 room", () => {
       "cross-org trust",
       "provider custody",
       "reusable authority",
+      "native_host_containment",
     ]) {
       expect(markdown).toContain(forbidden);
+      expect(agentHandoff).toContain(forbidden);
+      expect(evaluation).toContain(forbidden);
     }
+    expect(evaluation).toMatch(/\|\s*DX\s*\|\s*9\.1\/10\s*\|/);
+    expect(evaluation).toMatch(/\|\s*AX\s*\|\s*9\.2\/10\s*\|/);
+    expect(evaluation).toMatch(/\|\s*CX\s*\|\s*9\.1\/10\s*\|/);
+    expect(evaluation).toContain("This slice is a product-grade readback and handoff path");
   });
 });

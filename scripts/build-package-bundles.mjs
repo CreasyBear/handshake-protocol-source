@@ -5,6 +5,7 @@ const bundles = [
   ["./src/conformance/index.ts", "./dist/conformance/index.mjs"],
   ["./src/adapter-sdk/index.ts", "./dist/adapter-sdk/index.mjs"],
   ["./src/surfaces/index.ts", "./dist/surfaces/index.mjs"],
+  ["./src/surfaces/a2a-negotiation-readback/index.ts", "./dist/surfaces/a2a-negotiation-readback/index.mjs"],
   ["./src/runtime/index.ts", "./dist/runtime/index.mjs"],
   ["./src/sdk/surface-clients/index.ts", "./dist/sdk/surface-clients/index.mjs"],
   ["./src/cli/index.ts", "./dist/cli/index.mjs"],
