@@ -893,9 +893,14 @@ describe("Hono protocol surface", () => {
       body: JSON.stringify({ invalid: true }),
     });
 
-    expect(response.status).toBe(412);
+    expect(response.status).toBe(409);
     expect(await response.json()).toMatchObject({
-      error: { code: "hosted_caller_identity_stale", commitState: "not_started" },
+      error: {
+        code: "hosted_caller_identity_stale",
+        commitState: "not_started",
+        failureClass: "stale_admission",
+        failurePhase: "admission",
+      },
     });
     expect(store.countRecordsOfType("runtime_execution")).toBe(0);
     expect(store.countRecordsOfType("transition_request_context")).toBe(0);
@@ -1742,6 +1747,9 @@ describe("Hono protocol surface", () => {
               requestIdentity: null,
               proofRef: null,
               refusalRef: null,
+              failureClass: "internal",
+              failurePhase: "readback",
+              problemType: null,
             },
           }),
           { status: 404 },
@@ -1769,6 +1777,9 @@ describe("Hono protocol surface", () => {
             requestIdentity: "sdk-request-id",
             proofRef: "gap_demo",
             refusalRef: null,
+            failureClass: "protected_action_refusal",
+            failurePhase: "transition",
+            problemType: null,
           },
         }),
         { status: 409 },
