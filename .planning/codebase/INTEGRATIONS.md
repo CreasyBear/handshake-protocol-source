@@ -1,165 +1,147 @@
 # External Integrations
 
-**Analysis Date:** 2026-05-26
-
-## Source Stamp
-
-- Current source stamp: `git rev-parse --short HEAD` returned `4946237`.
-- Current checkout is dirty: `git status --short` reports source, test, docs, package, and `.planning/` changes. This map reflects the current working tree.
-- Source-owned integration truth is in `package.json`, `README.md`, `server.json`, `wrangler.toml`, `.github/workflows/check.yml`, `src/**`, `test/**`, `scripts/**`, and `docs/internal/**`.
-- `.planning/**` remains scratch per `.planning/STATE.md`; use tracked source/docs/tests over older `.planning/codebase/*.md` when facts disagree.
+**Analysis Date:** 2026-05-28
 
 ## APIs & External Services
 
-**x402 protected payment evidence:**
-- x402 official SDK - Used for the narrow buyer-side `x402_payment.exact` per-call proof path, `PAYMENT-REQUIRED` evidence decoding, exact EVM payment payload creation, and `PAYMENT-SIGNATURE` evidence after a verified gateway check.
-  - SDK/Client: `@x402/core` and `@x402/evm` in `src/adapters/x402-payment/upstream-evidence.ts`, `src/adapters/x402-payment/wallet-gateway.ts`, and `src/adapters/x402-payment/sandbox-http.ts`; `@x402/fetch` appears in `test/conformance/x402-upstream-exact-fixtures.test.ts`.
-  - Auth: gateway-held signer object (`ClientEvmSigner`) and gateway credential refs are injected through `src/adapters/x402-payment/wallet-gateway.ts`; no source code reads an x402 private key environment variable as a required runtime config.
-  - Boundary: local/reference sandbox support lives in `src/adapters/x402-payment/sandbox-http.ts`; `README.md` and `docs/internal/decisions.md` cut broad x402 compatibility, facilitator operation, seller middleware, settlement finality, provider custody, and aggregate spend management from the current claim.
+**x402 payment (first product wedge):**
+- Protocol: x402 v2 with `exact` scheme only for the live wedge (`src/surfaces/proof-packets/live-x402/requirement.ts`, `src/adapters/x402-payment/wallet-gateway.ts`).
+- SDK: `@x402/core` (schemas, HTTP client), `@x402/evm` (EVM exact client signer hook).
+- Usage: parse 402 PAYMENT-REQUIRED, bind selected requirement to action contract, run gateway check before signer invocation; live readback proofs in `src/surfaces/proof-packets/live-x402/` and gate scripts `scripts/check-live-x402-paid-retry.mjs`, `scripts/check-live-x402-proof.mjs`.
+- Auth: customer gateway custody is evidence-only in proofs; live credentials are never persisted by Handshake surfaces (see README x402 ladder).
 
-**Model Context Protocol:**
-- Local MCP stdio proposal/evidence server - Exposes one protected proposal tool plus read-only metadata, contract, health, and receipt timeline resources.
-  - SDK/Client: `@modelcontextprotocol/server` in `src/mcp/stdio/server.ts`; `@modelcontextprotocol/client` in `src/mcp/stdio/process-proof.ts` and `scripts/check-published-entrypoints.mjs`.
-  - Auth: `server.json` declares npm/stdio transport and does not carry bearer tokens; MCP proposal does not evaluate policy, create greenlights, perform gateway checks, mutate, or export receipts.
-  - Tool surface: `handshake.actions.x402_payment.propose` is declared in `src/mcp/catalog.ts`, validated by `src/mcp/x402-proposal.ts`, implemented by `src/mcp/stdio/server.ts`, and packaged by `server.json`.
+**Model Context Protocol (local product surface):**
+- Registry metadata: `server.json` (schema `https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json`).
+- Transport: stdio via npm package `handshake-protocol-kernel` / bins `handshake-mcp`, `handshake-protocol-kernel`.
+- Implementation: `src/mcp/stdio/server.ts`, entry `src/mcp/stdio/entry.ts` → bundled `dist/bin/handshake-mcp.mjs`.
+- Tool surface: `handshake.actions.x402_payment.propose` and read-only resources (`src/mcp/catalog.ts`, `src/mcp/resources.ts`).
+- Client proof: `handshake mcp doctor --stdio` uses `@modelcontextprotocol/client` (`src/mcp/stdio/process-proof.ts`).
+- Auth: no hosted MCP authority; proposal/evidence only per `README.md` and `AGENTS.md` doctrine.
 
-**Cloudflare platform:**
-- Cloudflare Workers - HTTP deployment target for the Hono app.
-  - SDK/Client: Worker entry `src/worker.ts`, Hono app `src/http/app.ts`, binding types from `@cloudflare/workers-types`, config in `wrangler.toml`.
-  - Auth: role bearer tokens are read from Worker bindings in `src/http/admission/caller-auth.ts`.
-- Cloudflare D1 - Durable protocol record and reconstruction storage.
-  - Client: `D1ProtocolStore` in `src/storage/d1/index.ts`.
-  - Schema: `migrations/0001_protocol_kernel.sql`.
-  - Binding: `DB` in `wrangler.toml` and `src/http/app-options.ts`.
-- Cloudflare KV - Optional non-authoritative isolation cache.
-  - Client: `KvIsolationCache` in `src/storage/kv/index.ts`.
-  - Binding: `CACHE` in `wrangler.toml` and `src/http/app-options.ts`.
+**Hosted identity (adapter contract, not bundled IdP SDK):**
+- Provider kinds accepted by verifier adapters: `clerk`, `oauth_oidc`, `cloudflare_access`, `custom_jwt`, `service_credential`, `test_fixture`, `other` (`src/hosted-admission/hosted-caller-identity.ts`).
+- Integration pattern: implement `HostedVerifierAdapter` in `src/hosted-admission/hosted-verifier-adapter.ts`; consume via `createHostedCallerVerifierFromAdapter` exported from `handshake-protocol-kernel/hosted-admission`.
+- HTTP wiring: `authMode: "hosted"` on `createApp()` options (`src/http/app-options.ts`); hosted readiness handler `src/http/handlers/hosted-readiness.ts`.
+- Auth: redacted caller identity evidence only; provider sessions, raw claims persistence, and org/workspace IDs do not authorize protected actions (`README.md`, `src/hosted-admission/LANE.md`).
 
-**Hosted identity providers:**
-- Provider-neutral hosted caller evidence - Supports provider-shaped identity evidence without bundling provider-specific SDKs.
-  - SDK/Client: no Clerk, OAuth/OIDC, Cloudflare Access, or custom JWT SDK dependency is declared in `package.json`; adapters implement `HostedVerifierAdapter` in `src/hosted-admission/hosted-verifier-adapter.ts`.
-  - Auth: raw provider sessions, service credentials, claims, and membership proof must be consumed by server-side adapters and converted into redacted `TransitionCallerIdentity` evidence in `src/hosted-admission/hosted-caller-identity.ts`.
-  - Provider kinds: `clerk`, `oauth_oidc`, `cloudflare_access`, `custom_jwt`, `service_credential`, `test_fixture`, and `other` are schema values in `src/hosted-admission/hosted-caller-identity.ts`.
-  - Configuration: deployment mode, verifier strategy, secret names, public var names, read entitlements, raw-read posture, retention posture, export posture, D1, and KV are validated by `src/hosted-admission/hosted-admission-config.ts`.
+**auth.md protected API call (adjacent adapter profile):**
+- Profile: `auth_md_protected_api_call.exact.v0` in `src/adapters/auth-md/action-proposal.ts`.
+- Usage: OAuth/authorization-server metadata and gateway credential refs as provenance for protected HTTP API calls; interlock with x402 in `src/adapters/auth-md-x402-interlock/`.
+- Auth: registration and OAuth scopes are provenance only; Handshake policy + gateway check still required.
 
-**auth.md protected API call profile:**
-- OAuth protected-resource/authorization-server metadata profile - Used as an adjacent protected API call evidence path, not as current broad auth provider integration.
-  - SDK/Client: no external `auth.md` SDK dependency is declared in `package.json`; profile code is in `src/adapters/auth-md/profiles.ts`, proposal code in `src/adapters/auth-md/action-proposal.ts`, gateway execution boundary in `src/adapters/auth-md/gateway.ts`, and interlock packet code in `src/adapters/auth-md-x402-interlock/packet.ts`.
-  - Auth: gateway credential refs/digests are modeled in parameters; raw Authorization header material is refused or redacted by `src/adapters/auth-md/action-proposal.ts`, `src/adapters/auth-md/profiles.ts`, and `src/adapters/auth-md/gateway.ts`.
-
-**npm, MCP Registry, and release readback:**
-- npm registry - Used for package identity, publication posture, public readback, dist-signature/provenance evidence, and clean installed-artifact smoke checks.
-  - SDK/Client: npm CLI and package install calls in `scripts/check-package-surface.mjs`, `scripts/project-release-repository.js`, `scripts/check-release-admin.js`, and `scripts/check-clean-installed-activation.mjs`; public registry HTTP readback in `scripts/check-npm-maintainer-posture.mjs` and `scripts/check-distribution-provenance.mjs`.
-  - Auth: package publish credentials are not read by source scripts; remote readback uses public npm registry APIs such as `https://registry.npmjs.org/handshake-protocol-kernel/latest` in `scripts/check-distribution-provenance.mjs`.
-- MCP Registry - Used only for distribution discoverability readback.
-  - SDK/Client: HTTP fetch/curl readback in `scripts/check-distribution-provenance.mjs`; package metadata in `server.json`.
-  - Auth: no MCP Registry credential is read by source code; `README.md` states MCP Registry discoverability remains a proof gap until registry acceptance and lookup are verified.
-- GitHub Actions and git remotes - Used for CI and release-admin artifact posture.
-  - SDK/Client: CI workflow in `.github/workflows/check.yml`; release/artifact gates in `scripts/check-release-admin.js`, `scripts/check-release-proof.mjs`, `scripts/project-release-repository.js`, and `scripts/build-publish-handoff-packet.mjs`.
-  - Auth: GitHub Actions tokens and trusted-publish credentials are external to this checkout; source scripts inspect workflow shape, pinned actions, remote refs, package artifacts, and evidence packets, not secret values.
-
-**Engineering protected-action adapter surfaces:**
-- Package install, repo write, and preview deploy adapters - Source-owned reference adapter surfaces for conformance and expansion proof, not provider-specific production integrations.
-  - SDK/Client: package-install gateway in `src/adapters/package-install/gateway.ts`, repo-write gateway in `src/adapters/repo-write/gateway.ts`, preview-deploy gateway in `src/adapters/preview-deploy/gateway.ts`, runtime proposals under `src/runtime/**`, and conformance exports in `src/conformance/index.ts`.
-  - Auth: each mutation adapter requires `verifiedGatewayCheckFromResult` before invoking the injected downstream surface; downstream provider clients are supplied by host/test harnesses rather than bundled in this package.
+**Engineering-agent host runtimes (activation/readiness evidence, not enforcement):**
+- Host profiles and activation transcripts for Codex, Claude Code, Hermes, OpenClaw, generic MCP — `src/adapters/x402-payment/protected-tool-profile/`, proof packets `src/surfaces/proof-packets/codex-host-activation.ts`, scripts `scripts/check-codex-host-activation.mjs`, `scripts/install-codex-host-activation.mjs`.
+- CLI: `handshake host doctor --host <profile>` (`src/cli/host/doctor.ts`).
+- Integration: documents wrapper targets and raw sibling bypass posture; does not read or mutate live host config.
 
 ## Data Storage
 
 **Databases:**
-- Cloudflare D1 / SQLite-compatible protocol store
-  - Connection: Worker binding `DB` in `wrangler.toml` and `src/http/app-options.ts`.
-  - Client: `D1ProtocolStore` in `src/storage/d1/index.ts`.
-  - Schema: `migrations/0001_protocol_kernel.sql` creates `protocol_records`, `protocol_record_action_contract_refs`, `greenlight_consumptions`, `greenlight_issuances`, `idempotency_ledger_current`, `recovery_terminal_claims`, `protected_path_posture_current`, `isolation_state_current`, `protected_surface_operation_claim_current`, `receipt_by_mutation_attempt`, `stream_events`, and indexes.
-- In-memory protocol store
-  - Connection: explicit injection only, not production durable storage.
-  - Client: `InMemoryProtocolStore` in `src/storage/memory/index.ts`.
-  - Use: tests, examples, and explicit `allowEphemeralStore` paths in `src/http/app.ts`.
+- Cloudflare D1 (SQLite at edge)
+  - Binding: `DB` in `wrangler.toml`
+  - Client: `D1ProtocolStore` in `src/storage/d1/index.ts`
+  - Schema: `migrations/0001_protocol_kernel.sql`
+  - Resolution: `src/http/store/resolution.ts` requires D1 or injected ephemeral store for stateful HTTP routes.
 
-**File Storage:**
-- Local filesystem only for CLI state, demos, package projection, and release evidence.
-  - CLI project state: `.handshake/project.json` is read/written by `src/cli/local-project/index.ts` and declared by `src/cli/command-manifest.ts`.
-  - Demo outputs: `examples/self-hosted-activation/output/`, `examples/x402-protected-spend/output/`, `examples/service-workflow-admission/output/`, `examples/external-adapter-sdk/output/`, `examples/mcp-reference-transcript/output/`, and `examples/x402-protected-tool-profiles/output/`.
-  - Package/artifact projection: temporary filesystem work in `scripts/project-release-repository.js`, `scripts/check-release-admin.js`, `scripts/check-clean-installed-activation.mjs`, `scripts/build-product-closeout-bundle.mjs`, and `scripts/build-publish-handoff-packet.mjs`.
+**Ephemeral / test storage:**
+- `InMemoryProtocolStore` in `src/storage/memory/` — tests and `allowEphemeralStore` app option (`src/http/app.ts`).
 
 **Caching:**
-- Cloudflare KV optional cache
-  - Connection: Worker binding `CACHE` in `wrangler.toml`.
-  - Client: `KvIsolationCache` in `src/storage/kv/index.ts`.
-  - Authority: non-authoritative cache only; D1 remains the durable reconstruction store per `migrations/0001_protocol_kernel.sql` and `src/http/handlers/hosted-readiness.ts`.
-- Not detected: Redis, Memcached, browser storage, external object storage, or external queue service.
+- Cloudflare KV namespace `CACHE` — isolation state snapshot cache via `KvIsolationCache` in `src/storage/kv/index.ts`; optional; D1 remains authoritative for commits.
+
+**Local filesystem (CLI operator state, not protocol authority):**
+- Project marker: `.handshake/project.json` (`src/cli/local-project/index.ts`).
+- State dir: `$XDG_STATE_HOME/handshake` or `~/.local/state/handshake` for local x402 readiness/install artifacts.
+- Demo outputs: `examples/*/output/`, quickstart dossiers written by `handshake quickstart x402` / `handshake demo x402`.
 
 ## Authentication & Identity
 
-**Auth Provider:**
-- Local HTTP bearer-token custody
-  - Implementation: `src/http/admission/caller-auth.ts` maps transition roles to `HANDSHAKE_CONTROL_PLANE_TOKEN`, `HANDSHAKE_RUNTIME_EVIDENCE_TOKEN`, `HANDSHAKE_GATEWAY_CUSTODY_TOKEN`, and `HANDSHAKE_REVIEW_CUSTODY_TOKEN`.
-  - Use: `src/http/admission/index.ts` gates transition routes and evidence reads before invoking protocol transitions.
-- Hosted caller verifier adapter
-  - Implementation: `createHostedCallerVerifierFromAdapter` in `src/hosted-admission/hosted-verifier-adapter.ts` accepts server-side provider adapters and emits redacted hosted identity evidence through `src/hosted-admission/hosted-caller-identity.ts`.
-  - Providers: `clerk`, `oauth_oidc`, `cloudflare_access`, `custom_jwt`, `service_credential`, `test_fixture`, and `other` are schema-supported provider kinds; no provider SDK is bundled in `package.json`.
-- Authority certificate verifier
-  - Implementation: local pinned trust material is projected and verified by `src/http/handlers/verifier.ts` and `src/protocol/areas/authority-certificate/**`.
-  - Boundary: `/v0.2/verifier/metadata` in `src/http/handlers/verifier.ts` reports `remoteTrustFetchAllowed: false`; JWKS/key-set routes project local trust material from `AppOptions.authorityCertificateTrustMaterial`.
+**Worker transition custody (local/hosted HTTP):**
+- Role-scoped bearer tokens bound to Worker secrets or `CallerAuthTokens` in app options (`src/http/admission/caller-auth.ts`):
+  - `HANDSHAKE_CONTROL_PLANE_TOKEN`
+  - `HANDSHAKE_RUNTIME_EVIDENCE_TOKEN`
+  - `HANDSHAKE_GATEWAY_CUSTODY_TOKEN`
+  - `HANDSHAKE_REVIEW_CUSTODY_TOKEN`
+- Roles map in `src/hosted-admission/roles.ts`; admission orchestration in `src/http/admission/`.
+
+**Hosted caller verification:**
+- Custom adapter implements `verify()` returning redacted claims; fails closed on non-current membership (`src/hosted-admission/hosted-verifier-adapter.ts`).
+- Supported verification postures: `provider_sdk_verified`, `provider_jwks_verified`, `provider_webhook_verified`, `service_credential_verified`, `fixture_verified`, `custom_verified`.
+
+**Request context headers (non-auth):**
+- `x-handshake-protocol-version`, `x-handshake-request-identity`, `x-handshake-originating-identity` (`src/http/admission/request-context.ts`).
+
+**Authority certificate verifier (hosted read path):**
+- JWKS/metadata/status handlers in `src/http/handlers/verifier.ts` for terminal certificate verification material supplied via `AppOptions`.
 
 ## Monitoring & Observability
 
 **Error Tracking:**
-- None detected. `package.json` does not declare Sentry, OpenTelemetry, Datadog, Honeycomb, or similar observability packages.
+- Not detected (no Sentry/Datadog/etc. dependencies in `package.json`).
 
 **Logs:**
-- HTTP errors return structured protocol envelopes through `src/http/errors/transition-error-envelope.ts` and the `app.onError` handler in `src/http/app.ts`.
-- CLI and release scripts write process output/errors through Node/Bun process APIs in files such as `src/cli/main.ts`, `scripts/check-release-admin.js`, and `scripts/check-package-surface.mjs`.
-- ESLint permits only `console.warn` and `console.error` in `eslint.config.js`; no centralized logger framework is configured.
-- Evidence, refusal, proof-gap, receipt, idempotency, isolation, and audit records are protocol records in `src/protocol/store/port.ts`, `src/storage/d1/index.ts`, and `src/storage/memory/index.ts`, not a generic tracing backend.
+- Worker/CLI: structured JSON error envelopes via `transitionErrorResult` (`src/http/errors/transition-error-envelope.ts`); CLI commands generally JSON-first (`src/cli/output.ts`).
+- ESLint restricts `console` to warn/error in `src/` and `test/`.
+
+**Proof / release telemetry (repo-local, not SaaS):**
+- Proof packets under `src/surfaces/proof-packets/` (distribution, product completion, live x402, host activation, npm maintainer posture).
+- Gate scripts write or assert JSON proof artifacts (`scripts/check-product-completion.mjs`, `scripts/build-publish-handoff-packet.mjs`).
 
 ## CI/CD & Deployment
 
 **Hosting:**
-- npm package distribution for `handshake-protocol-kernel@0.2.8` is declared in `package.json` and `server.json`; `README.md` states public npm `0.2.7` is historical provenance only until current `0.2.8` publication/readback passes.
-- Local MCP stdio package surface is declared in `server.json`, implemented by `src/mcp/stdio/server.ts`, and exposed by `bin/handshake-mcp`.
-- Cloudflare Worker HTTP app is configured by `wrangler.toml` and `src/worker.ts`; no production deploy workflow beyond CI was detected in `.github/workflows/check.yml`.
+- Cloudflare Workers for HTTP protocol kernel API (`wrangler.toml`, `src/worker.ts`).
+- npm registry for installable package `handshake-protocol-kernel` (CLI, SDK, MCP stdio server).
 
 **CI Pipeline:**
-- GitHub Actions workflow `.github/workflows/check.yml`
-  - Trigger: `push` and `pull_request`.
-  - Permissions: `contents: read`.
-  - Toolchain: pinned `actions/checkout`, pinned `oven-sh/setup-bun`, Bun 1.3.9.
-  - Gate: `bun install --frozen-lockfile` followed by `npm run check:repo`.
-- Release/package gates are local/scripted:
-  - `package.json#scripts.pack:check` runs package surface, published entrypoint, clean installed activation, release proof, host-generated-code containment, live x402 paid retry posture, auth.md+x402 admission packet posture, product completion, and npm maintainer posture checks.
-  - `scripts/check-release-admin.js` runs clean-source, clean-clone, lockfile install, full repo gate, artifact projection, artifact boundary, smoke imports, smoke CLI, and optional remote readback.
+- GitHub Actions workflow `.github/workflows/check.yml` on push/PR.
+- Steps: checkout → `oven-sh/setup-bun@v2` (1.3.9) → `bun install --frozen-lockfile` → `npm run check:repo`.
+- `check:repo` chains build, typecheck, lint, prettier check, full test suite, and `pack:check` release surface proofs.
+
+**Release / distribution checks (Node scripts, not CI-only):**
+- `scripts/check-published-entrypoints.mjs`, `scripts/check-package-surface.mjs`, `scripts/check-release-proof.mjs`, `scripts/check-npm-maintainer-posture.mjs`, `scripts/check-clean-installed-activation.mjs`, `scripts/build-publish-handoff-packet.mjs`.
 
 ## Environment Configuration
 
-**Required env vars:**
-- `HANDSHAKE_CONTROL_PLANE_TOKEN` - Local HTTP control-plane transition bearer token in `src/http/admission/caller-auth.ts`.
-- `HANDSHAKE_RUNTIME_EVIDENCE_TOKEN` - Local HTTP runtime-evidence transition bearer token in `src/http/admission/caller-auth.ts`.
-- `HANDSHAKE_GATEWAY_CUSTODY_TOKEN` - Local HTTP gateway-custody transition bearer token in `src/http/admission/caller-auth.ts`.
-- `HANDSHAKE_REVIEW_CUSTODY_TOKEN` - Local HTTP review-custody/evidence-read bearer token in `src/http/admission/caller-auth.ts`.
-- `DB` - Cloudflare D1 Worker binding in `wrangler.toml` and `src/http/app-options.ts`.
-- `CACHE` - Optional Cloudflare KV Worker binding in `wrangler.toml` and `src/http/app-options.ts`.
-- Hosted mode secrets/public vars - Names are supplied by `HostedAdmissionConfig.secretNames` and `HostedAdmissionConfig.publicVarNames` in `src/hosted-admission/hosted-admission-config.ts`; source does not hardcode production provider secret names.
+**Worker bindings (configure in Cloudflare dashboard / Wrangler secrets, not in repo):**
+- `DB` — D1 database binding (required for durable hosted routes).
+- `CACHE` — KV namespace (optional isolation cache).
+- `HANDSHAKE_CONTROL_PLANE_TOKEN`, `HANDSHAKE_RUNTIME_EVIDENCE_TOKEN`, `HANDSHAKE_GATEWAY_CUSTODY_TOKEN`, `HANDSHAKE_REVIEW_CUSTODY_TOKEN` — transition route custody.
+- Hosted-mode secrets referenced in tests as patterns only (e.g. `HANDSHAKE_HOSTED_TEST_SECRET` in `test/http/http.test.ts`); treat as operator-supplied, never commit values.
+
+**Local / CLI (operator machine):**
+- Project cwd and `.handshake/` tree for install/probe/readiness JSON consumed by x402 CLI commands.
+- `XDG_STATE_HOME` overrides local state root for Handshake CLI artifacts.
+- Live x402 proof scripts accept `--input-file` evidence paths (`scripts/check-live-x402-paid-retry.mjs`); missing file → blocked proof status.
+
+**Package / MCP metadata (committed, non-secret):**
+- `package.json` version and `server.json` version must stay aligned for MCP Registry publication checks (`scripts/check-release-proof.mjs`).
 
 **Secrets location:**
-- Cloudflare Worker bindings/secrets or explicit `AppOptions` injection are the source-supported locations for HTTP tokens, hosted verifier config, trust material, D1, and KV in `src/http/app-options.ts`.
-- Local CLI state avoids token values according to `src/cli/command-manifest.ts` and writes external local posture refs through `src/cli/x402/local-state.ts`.
-- No root `.env*` file was detected. `.gitignore` excludes `.dev.vars`, `.env`, `.env.local`, and `.env.*.local`; if present, list only and never quote contents.
+- Cloudflare Worker secrets and local operator credential material stay outside the repo; `.env` may exist locally but must not be read or quoted in docs/commits.
 
 ## Webhooks & Callbacks
 
 **Incoming:**
-- No provider webhook route was detected in `src/http/app.ts`, `src/http/routes/transition-route-registry.ts`, or `src/http/routes/evidence-read-route-registry.ts`.
-- HTTP transition and evidence-read routes are registered from `src/http/routes/transition-route-registry.ts` and `src/http/routes/evidence-read-route-registry.ts`.
-- Additional readback/verifier routes live in `src/http/app.ts`: `/health`, `/openapi.json`, `/v0.2/hosted/readiness`, `/v0.2/verifier/metadata`, `/v0.2/verifier/key-set`, `/v0.2/verifier/jwks.json`, `/v0.2/verifier/status/:subjectKind/:subjectRef`, `/v0.2/verifier/authority-certificates/verify`, and `/v0.2/records/:objectType/:objectId`.
-- Hosted verifier schemas include `provider_webhook_verified` as an evidence posture in `src/hosted-admission/hosted-verifier-adapter.ts`, but source does not implement an incoming provider webhook endpoint.
+- HTTP transition and evidence-read routes on Worker app (`src/http/routes/transition-route-registry.ts`, `src/http/routes/evidence-read-route-registry.ts`).
+- OpenAPI document served from `src/http/openapi` (referenced in `src/http/app.ts`).
+- No generic public webhook receiver detected beyond protocol HTTP API.
 
 **Outgoing:**
-- Role-scoped SDK clients use `fetch` against configured Handshake base URLs in `src/sdk/surface-clients/transport.ts`; the lower-level `HandshakeClient` uses `fetch` in `src/sdk/client.ts`.
-- x402 gateway signing calls an injected `X402WalletSigningSurface` only after `VerifiedGatewayCheck` in `src/adapters/x402-payment/wallet-gateway.ts`; local downstream fixture behavior is in `src/adapters/x402-payment/sandbox-http.ts`.
-- auth.md protected API calls execute through an injected `AuthMdProtectedApiCallSurface` only after `VerifiedGatewayCheck` in `src/adapters/auth-md/gateway.ts`; no concrete outbound provider client is bundled.
-- Package install, preview deploy, and repo write adapters call injected downstream surfaces only after `VerifiedGatewayCheck` in `src/adapters/package-install/gateway.ts`, `src/adapters/preview-deploy/gateway.ts`, and `src/adapters/repo-write/gateway.ts`.
-- Release/readback scripts call public npm registry APIs, MCP Registry APIs, curl fallback, npm CLI, and optional remote git readback in `scripts/check-npm-maintainer-posture.mjs`, `scripts/check-distribution-provenance.mjs`, and `scripts/check-release-admin.js`.
+- x402 gateway HTTP retries via `@x402/core` client after verified gateway check (`src/adapters/x402-payment/wallet-gateway.ts`).
+- MCP stdio subprocess spawn for local doctor/proof flows only.
+- npm registry readback commands in release scripts (`npm view`, maintainer posture) — operator/CI invoked, not runtime hot path.
+
+## Integration Boundaries (prescriptive)
+
+When adding a new external integration:
+
+1. Place protocol meaning in `src/protocol/`; wire transport in `src/http/` or `src/adapters/`.
+2. Do not let provider SDKs, MCP tools, or CLI commands issue greenlights, gateway checks, or mutations.
+3. Record proof gaps explicitly in `src/surfaces/proof-packets/` rather than implying production operation.
+4. For identity, extend `HostedIdentityProviderKind` and adapter verification postures in `src/hosted-admission/` instead of importing authority into product surfaces.
+5. For payments, keep the wedge on `x402_payment.exact` until a second action family passes the expansion gates in `STRUCTURE.md` and `docs/internal/decisions.md`.
 
 ---
 
-*Integration audit: 2026-05-26*
+*Integration audit: 2026-05-28*

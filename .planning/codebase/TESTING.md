@@ -1,278 +1,305 @@
 # Testing Patterns
 
-**Analysis Date:** 2026-05-26
+**Analysis Date:** 2026-05-28
 
 ## Test Framework
 
 **Runner:**
-- Bun test runner via `bun test`.
-- Runtime/package manager version is pinned as `bun@1.3.9` in `package.json`; CI installs Bun 1.3.9 in `.github/workflows/check.yml`.
-- No `bunfig.toml`, `vitest.config.*`, or `jest.config.*` file is present.
+- Bun built-in test (`bun:test`) — no Jest or Vitest config present.
+- Config: implicit; `package.json` `"test": "bun test"`.
+- TypeScript for tests uses root `tsconfig.json` (`include`: `src`, `test`).
 
-**Assertion Library:**
-- Use `bun:test` for `describe`, `it`, and `expect`. Examples: `test/protocol/canonical.test.ts`, `test/http/http.test.ts`, `test/architecture/import-posture.test.ts`.
-- Use Bun-specific matchers where useful: `toBeString`, `toBeFunction`, `rejects.toThrow`, `toMatchObject`, `arrayContaining`, and `it.each` appear in tests such as `test/protocol/kernel-policy-gateway.test.ts`, `test/sdk/role-clients.test.ts`, and `test/protocol/negotiation-schemas.test.ts`.
+**Assertion library:**
+- Bun `expect` (Jest-compatible matchers: `toEqual`, `toMatchObject`, `toThrow`, `toContain`, `rejects`).
 
-**Run Commands:**
+**Run commands:**
+
 ```bash
-npm run test                 # Run all Bun tests through package script
-bun test                     # Run all tests directly
-npm run quality:architecture # Run architecture/import/export/naming/conformance gate slice
-npm run quality:claims       # Run public-claim and vocabulary boundary tests
-npm run quality:storage      # Run storage, transition, model, and receipt invariant slices
-npm run check:repo           # Full build, typecheck, lint, format, tests, package checks, and git diff whitespace check
+bun test                              # all tests
+npm test                              # alias via package.json
+npm run check:types                   # tsc --noEmit (types before/at CI)
+npm run lint                          # eslint src test --max-warnings=0
+npm run format:check                  # prettier --check .
+npm run check:repo                    # build + types + lint + format + test + pack:check + git diff --check
+```
+
+**Focused quality slices (`package.json`):**
+
+```bash
+npm run quality:architecture   # import/naming/surface/cli/mcp/conformance posture
+npm run quality:storage        # D1/http + kernel invariants + evidence projections
+npm run quality:claims         # active vocabulary + claim boundary
+npm run quality:tier3          # cross-cutting CLI/MCP/SDK/http/adapters slice
+```
+
+Local fast slice from `QUALITY.md`:
+
+```bash
+npm run check:types
+bun test
+git diff --check
 ```
 
 ## Test File Organization
 
 **Location:**
-- Tests live under `test/<domain>/*.test.ts`; 113 `.test.ts` files are present under `test`.
-- Shared test-only helpers live under `test/support`: `test/support/fixtures.ts`, `test/support/fault-injecting-protocol-store.ts`, `test/support/d1-http-harness.ts`, `test/support/transition-budget-recorder.ts`.
-- No root `test/*.test.ts` files are allowed. `test/architecture/naming-posture.test.ts` enforces this.
+- All tests live under `test/` in domain subfolders — never at `test/*.test.ts` root (enforced in `test/architecture/naming-posture.test.ts`).
 
-**Naming:**
-- Use `<subject>.test.ts` names inside the relevant domain: `test/protocol/kernel-policy-gateway.test.ts`, `test/runtime/codemode-multi-action-runtime.test.ts`, `test/product/external-adapter-sdk-demo.test.ts`.
-- Use architecture gate names for repo shape and claims: `test/architecture/import-posture.test.ts`, `test/architecture/root-exports.test.ts`, `test/architecture/package-surface.test.ts`, `test/architecture/claim-boundary.test.ts`.
-- Use schema/registry/event names for protocol evidence slices: `test/protocol/negotiation-schemas.test.ts`, `test/protocol/negotiation-object-registry.test.ts`, `test/protocol/negotiation-events.test.ts`.
+**Directory layout:**
 
-**Structure:**
 ```text
 test/
-  architecture/   # Static repo, import, naming, package, claim, CI, and authority-surface posture gates
-  protocol/       # Protocol state machine, schemas, canonicalization, policy, gateway, receipt, recovery invariants
-  http/           # Hono app, route/admission, hosted identity, D1-backed HTTP behavior
-  runtime/        # Generated execution proposal wrappers and runtime ingress
-  adapters/       # Reference gateway/adaptor behavior, x402/auth-md/package/repo/preview slices
-  conformance/    # Adapter conformance and upstream x402 shape checks
-  integration/    # Cross-lane flows over protocol, adapters, and D1/HTTP harnesses
-  product/        # Demo/readback outputs and package consumer proofs
-  sdk/            # Role-scoped SDK client behavior
-  cli/            # CLI projections and local readback commands
-  mcp/            # MCP schema/resource/proposal/stdio behavior
-  adapter-sdk/    # Adapter authoring SDK contract tests
-  storage/        # Storage cache behavior
-  support/        # Fixtures, fake stores, local D1 harness, flow builders
+  architecture/     # repo structure, imports, naming, claims, package surface
+  protocol/         # kernel transitions, schemas, invariants, negotiation
+  http/             # Hono app, D1 HTTP harness, hosted identity
+  cli/              # CLI command envelopes and evidence views
+  mcp/              # MCP catalog, schema contract, stdio process
+  adapters/         # gateway fixtures, x402/auth-md activation probes
+  runtime/          # generated-execution proposal helpers
+  integration/      # end-to-end flows across HTTP + adapters
+  product/          # product-surface slices (A2A, demos, acceptance)
+  conformance/      # reference posture checks for adapters/x402
+  sdk/              # HandshakeClient and role-scoped surface clients
+  storage/          # KV/isolation cache mechanics
+  adapter-sdk/      # public adapter SDK definitions
+  support/          # shared fixtures and harnesses (not test cases)
 ```
+
+**Naming:**
+- Files: `<area>-<subject>.test.ts` or `<subject>.test.ts` (e.g. `kernel-operation-lifecycle.test.ts`, `cli-evidence.test.ts`).
+- One primary `describe` per guarded boundary; multiple `it` cases per invariant.
+
+**Support code:**
+- Shared builders and harnesses live in `test/support/` — not counted as test files.
+- Key support modules: `fixtures.ts`, `d1-http-harness.ts`, `fault-injecting-protocol-store.ts`, `negotiation-fixtures.ts`, `http-protocol-fixtures.ts`, flow helpers (`package-install-flow.ts`, `auth-md-flow.ts`).
 
 ## Test Structure
 
-**Suite Organization:**
+**Suite organization:**
+
 ```typescript
 import { describe, expect, it } from "bun:test";
-import { NegotiationSessionSchema } from "../../src/protocol/areas/negotiation";
+import { makeKernelFixture, createGreenlitContract } from "../support/fixtures";
 
-describe("negotiation evidence schemas", () => {
-  it("parses a strict NegotiationSession with explicit party proof posture and imported external evidence", () => {
-    expect(NegotiationSessionSchema.parse(validSession())).toMatchObject({
-      negotiationSessionId: "negotiation_session_demo",
-      externalProtocolEvidenceRefs: [{ evidencePosture: "imported_evidence_only" }],
-    });
+describe("Handshake kernel invariants: operation lifecycle", () => {
+  it("keeps a passed gateway check pending until reconciliation records downstream finality", async () => {
+    const fixture = await createGreenlitContract();
+    const result = await fixture.kernel.gatewayCheck({ /* exact binding */ });
+    expect(result.gateAttempt.gateDecision).toBe("passed");
+    expect(result.receipt.finalityStatus).toBe("pending");
   });
 });
 ```
-Source pattern: `test/protocol/negotiation-schemas.test.ts`.
 
 **Patterns:**
-- Use `describe` blocks around the invariant surface, not only the implementation class. Examples: `"Handshake kernel invariants: policy and gateway"` in `test/protocol/kernel-policy-gateway.test.ts`, `"protocol module import posture"` in `test/architecture/import-posture.test.ts`.
-- Use test names that state the protected invariant or forbidden behavior: `test/runtime/codemode-multi-action-runtime.test.ts` checks that generated programs emit ordered contracts without policy or gateway authority.
-- Assert both positive state and absence of authority side effects. Examples: `test/runtime/runtime-ingress.test.ts` checks zero policy decisions, greenlights, gateway checks, and mutation attempts after runtime proposal.
-- Use exact record counts for protocol side effects when authority boundaries matter. Examples: `test/protocol/kernel-policy-gateway.test.ts`, `test/runtime/runtime-ingress.test.ts`.
-- Use `try/finally` when harnesses need cleanup. Example: `test/protocol/protocol-store-atomicity-contract.test.ts` disposes memory/D1 harnesses.
-- Use table tests with `it.each` for forbidden vocabularies, unsupported surfaces, and object-kind matrices. Examples: `test/protocol/negotiation-schemas.test.ts`, `test/conformance/x402-payment-conformance.test.ts`, `test/protocol/kernel-cross-scope-matrix.test.ts`.
+- No `beforeEach` / `afterEach` / `beforeAll` hooks in the suite — tests construct fixtures inline or via async helpers (`createGreenlitContract()`, `createD1HttpHarness()`).
+- Prefer `async` tests with `await` on kernel/HTTP calls.
+- Use `throw new Error("expected …")` for narrow guard clauses when narrowing nullable results after an action.
+- Architecture tests walk the filesystem with Node `fs` and aggregate violations into sorted arrays compared with `expect(violations).toEqual([])`.
+
+**Authority-boundary assertions (product/cli/mcp):**
+
+```typescript
+expect(output).toMatchObject({
+  schemaVersion: "handshake.cli.v1",
+  authorityCreated: false,
+  gatewayCheckPerformed: false,
+  mutationAttempted: false,
+  reasonCodes: [],
+});
+expect(JSON.stringify(output)).not.toContain("PAYMENT-SIGNATURE");
+```
+
+**Negotiation / A2A product tests:**
+
+```typescript
+expect(readback.nonClaims).toEqual(
+  expect.arrayContaining([
+    "policy_evaluation",
+    "gateway_check",
+    "mutation",
+  ]),
+);
+await expectNoAuthorityRecords(fixture.store);
+```
 
 ## Mocking
 
-**Framework:** Hand-written fakes and harnesses; no Jest/Vitest/Bun mock API usage was detected in `src` or `test`.
+**Framework:** None — no `mock`, `spyOn`, `vi.`, or Jest mocks detected under `test/`.
 
 **Patterns:**
-```typescript
-class MockKvNamespace {
-  readonly putCalls: Array<{ key: string; value: string; options?: KVNamespacePutOptions }> = [];
-  readonly deleteCalls: string[] = [];
+- Use real in-memory protocol store (`InMemoryProtocolStore` from `src/storage/memory`) via `makeKernelFixture()` in `test/support/fixtures.ts`.
+- Use `FaultInjectingProtocolStore` in `test/support/fault-injecting-protocol-store.ts` to simulate ambiguous commits and read faults without mocking the kernel API.
+- HTTP integration uses `createD1HttpHarness()` (`test/support/d1-http-harness.ts`): in-memory SQLite backing a D1-shaped API, real `createApp()` from `src/http/app`, test bearer tokens — no fetch mocks.
+- CLI tests invoke `runCliCommand` from `src/cli/main` with temp JSON fixture files (`mkdtemp`, `writeFile`).
 
-  async put(key: string, value: string, options?: KVNamespacePutOptions): Promise<void> {
-    this.putCalls.push(options ? { key, value, options } : { key, value });
-  }
+**What to mock:** Avoid introducing mock libraries; inject faults through store decorators or explicit test doubles in `test/support/`.
 
-  async delete(key: string): Promise<void> {
-    this.deleteCalls.push(key);
-  }
-}
-```
-Source pattern: `test/storage/kv-isolation-cache.test.ts`.
-
-**What to Mock:**
-- Mock transport with explicit fake `fetch` implementations that capture path, method, headers, and body. Example: `captureFetch` in `test/sdk/role-clients.test.ts`.
-- Mock persistence faults with protocol-store wrappers rather than global monkeypatching. Example: `FaultInjectingProtocolStore` in `test/support/fault-injecting-protocol-store.ts`.
-- Mock D1 locally with Bun SQLite while preserving D1-shaped methods. Example: `LocalD1Database` and `LocalD1PreparedStatement` in `test/support/d1-http-harness.ts`.
-- Mock host file surfaces with fixture classes. Examples: `test/support/package-manifest-surface.ts`, `test/support/repo-write-surface.ts`.
-- Mock KV bindings with narrow local classes that record calls. Example: `MockKvNamespace` in `test/storage/kv-isolation-cache.test.ts`.
-
-**What NOT to Mock:**
-- Do not mock the protocol state machine when testing policy/gateway behavior. Use `HandshakeKernel` with `InMemoryProtocolStore`, `D1ProtocolStore`, or a fault-injecting wrapper as in `test/protocol/kernel-policy-gateway.test.ts`.
-- Do not mock architecture rules. Static tests read real files with `node:fs` in `test/architecture/import-posture.test.ts`, `test/architecture/naming-posture.test.ts`, and `test/architecture/negotiation-no-authority-surface.test.ts`.
-- Do not mock product demos when their generated output is the contract. `test/product/external-adapter-sdk-demo.test.ts`, `test/product/x402-protected-spend-demo-report.test.ts`, and `test/product/service-workflow-admission.test.ts` run scripts with `Bun.spawn` and inspect generated artifacts.
-- Do not mock MCP stdio when checking process proof. `test/mcp/mcp-stdio-process.test.ts` uses `runMcpStdioProcessProof` against the local stdio server.
-- Do not mock gateway checks away in adapter mutation tests. `test/adapters/x402-wallet-gateway.test.ts` asserts signer invocation only after a verified gateway check.
+**What NOT to mock:**
+- Protocol kernel transition semantics under test.
+- Schema validation (use real Zod schemas, e.g. `McpX402PaymentProposalInputSchema.safeParse` in `test/mcp/mcp-schema-contract.test.ts`).
+- Canonicalization and digest functions when testing binding integrity.
 
 ## Fixtures and Factories
 
-**Test Data:**
+**Kernel fixture (`test/support/fixtures.ts`):**
+
 ```typescript
+export type KernelFixture = {
+  store: ProtocolStore;
+  kernel: HandshakeKernel;
+  tool: ToolCapability;
+  actionType: ActionType;
+  gateway: GatewayRegistryEntry;
+  envelope: OperatingEnvelope;
+};
+
 export function makeKernelFixture() {
   const store = new InMemoryProtocolStore();
   const kernel = new HandshakeKernel(store);
-  const createdAt = nowIso();
-
-  const tool = { toolCapabilityId: "tool_package_install", readWriteClassification: "consequential" };
-  const actionType = { actionTypeId: "atype_package_install", actionClass: "package.install" };
-  const gateway = { gatewayRegistryEntryId: "gateway_registry_package", gatewayId: "gateway_package_manager" };
-  const envelope = { envelopeId: "env_demo", allowedActionClasses: ["package.install"] };
-
+  /* registers demo catalog objects */
   return { store, kernel, tool, actionType, gateway, envelope };
 }
-```
-Condensed source pattern: `test/support/fixtures.ts`.
 
-**Location:**
-- Core protocol fixtures: `test/support/fixtures.ts`.
-- Gateway/posture invariant helpers: `test/support/kernel-invariant-helpers.ts`.
-- Store fault injection: `test/support/fault-injecting-protocol-store.ts`.
-- Transition performance budgets: `test/support/transition-budget-recorder.ts`.
-- HTTP/D1 harness: `test/support/d1-http-harness.ts`.
-- HTTP protocol fixtures: `test/support/http-protocol-fixtures.ts`.
-- Runtime flow fixtures: `test/support/package-install-flow.ts`, `test/support/repo-write-flow.ts`, `test/support/preview-deploy-flow.ts`, `test/support/codemode-multi-action-flow.ts`, `test/support/auth-md-flow.ts`.
-- Negotiation fixtures are local to their test files for now: `test/protocol/negotiation-schemas.test.ts`, `test/protocol/negotiation-object-registry.test.ts`, `test/protocol/negotiation-events.test.ts`.
+export function futureIso(minutes = 10): string {
+  return new Date(Date.now() + minutes * 60_000).toISOString();
+}
+```
+
+**Greenlit contract helper:** `createGreenlitContract()` composes proposal → policy → greenlight for gateway-check tests.
+
+**D1 HTTP harness:**
+
+```typescript
+export async function createD1HttpHarness(): Promise<D1HttpHarness> {
+  const db = /* LocalD1Database + migration 0001_protocol_kernel.sql */;
+  const app = createApp();
+  return {
+    db,
+    fetch: (input, init) => app.request(/* path */, init, env),
+    post: <T>(path, body, role?) => /* JSON + bearer role */,
+    query: <T>(sql, ...bindings) => /* D1 prepare */,
+    dispose: async () => { /* cleanup */ },
+  };
+}
+```
+
+**Negotiation/A2A:** `test/support/negotiation-fixtures.ts` exports `negotiationSession()`, `negotiationDigest`, `a2aIngressCheckpoint()` for product ingress tests.
+
+**Location for new fixtures:** Add to `test/support/<domain>-fixtures.ts` or extend `fixtures.ts` when shared across protocol and HTTP tests. Keep demo IDs stable (`tenant_demo`, `org_demo`) for snapshot-style assertions.
 
 ## Coverage
 
-**Requirements:** No line or branch coverage threshold is configured. No coverage script appears in `package.json`, and no coverage config file was detected.
+**Requirements:** No enforced coverage threshold in repo config; correctness is gated by `npm run check:repo` and architecture tests.
 
-**View Coverage:**
-```bash
-bun test --coverage # Available Bun capability, not a repo-defined gate
-```
+**View coverage:** Not configured (no `coverage/` script in `package.json`). If adding coverage, extend Bun's coverage flags locally — do not commit secrets or env files.
 
-**Gate Coverage:** Invariant coverage is enforced by focused scripts in `package.json`: `quality:architecture`, `quality:claims`, and `quality:storage`. The full closeout gate is `npm run check:repo`.
+**Implicit coverage targets:**
+- Every first-level `src/` lane lists **Guarding tests** in its `LANE.md` (cross-checked by import-posture tests).
+- Expansion of action families requires new tests naming execution shape, bypass posture, and proof-gap model (`QUALITY.md`).
 
 ## Test Types
 
-**Unit Tests:**
-- Protocol primitive and pure helper tests live under `test/protocol`: `test/protocol/canonical.test.ts`, `test/protocol/reason-code-registry.test.ts`, `test/protocol/refusal-format.test.ts`.
-- Protocol schema tests validate Zod contract shape and negative authority-shaped fields: `test/protocol/negotiation-schemas.test.ts`, `test/protocol/object-registry.test.ts`, `test/protocol/representation-contract.test.ts`.
-- Surface client tests live under `test/sdk`: `test/sdk/role-clients.test.ts`.
-- Adapter unit tests live under `test/adapters`: `test/adapters/package-install-gateway.test.ts`, `test/adapters/x402-wallet-gateway.test.ts`.
+**Unit tests (`test/protocol/`, parts of `test/adapters/`):**
+- Invoke `HandshakeKernel` methods directly; assert on returned records and store counts (`fixture.store.countRecordsOfType("mutation_attempt")`).
 
-**Integration Tests:**
-- D1/HTTP-backed flows live under `test/http` and `test/integration`: `test/http/d1-http.test.ts`, `test/integration/x402-d1-http.test.ts`, `test/integration/package-install-end-to-end.test.ts`.
-- Store parity and atomicity are tested across memory and D1 via `test/protocol/protocol-store-atomicity-contract.test.ts`.
-- Runtime-generated multi-action behavior is tested through kernel + fixtures in `test/runtime/codemode-multi-action-runtime.test.ts`.
+**Architecture / policy tests (`test/architecture/`):**
+- Static analysis via filesystem reads and regex scans (`naming-posture.test.ts`, `import-posture.test.ts`, `claim-boundary.test.ts`).
+- Validate package exports, banned vocabulary, lane manifests, and claim matrices against `README.md`, `AGENTS.md`, `package.json`.
 
-**E2E Tests:**
-- Product/demo smoke tests execute scripts or package-facing flows: `test/product/external-adapter-sdk-demo.test.ts`, `test/product/x402-protected-spend-demo-report.test.ts`, `test/product/hosted-package-consumer.test.ts`, `test/product/service-workflow-admission.test.ts`.
-- MCP process proof uses the local stdio server path in `test/mcp/mcp-stdio-process.test.ts`.
-- CLI readback and local project behavior live under `test/cli`: `test/cli/cli-evidence.test.ts`, `test/cli/cli-local-project.test.ts`, `test/cli/cli-x402-install-probes.test.ts`.
+**HTTP tests (`test/http/`):**
+- `http.test.ts`: in-memory store + `createApp()` request/response assertions, OpenAPI security schemes, security headers.
+- `d1-http.test.ts`: persistence and stream behavior through `createD1HttpHarness()`.
 
-**Architecture Tests:**
-- Repo shape and naming posture are first-class tests: `test/architecture/naming-posture.test.ts`.
-- Import and lane boundaries are tested in `test/architecture/import-posture.test.ts`.
-- Package exports and packable files are tested in `test/architecture/package-surface.test.ts` and `test/architecture/root-exports.test.ts`.
-- Public claim language is tested in `test/architecture/claim-boundary.test.ts` and `test/architecture/active-vocabulary.test.ts`.
-- Negotiation remains schema-only and non-authority through `test/architecture/negotiation-no-authority-surface.test.ts`.
+**CLI tests (`test/cli/`):**
+- Spawn commands through `runCliCommand([...args])`; assert JSON envelope shape and redaction (no raw payment material in stringified output).
 
-**Conformance Tests:**
-- Adapter no-mutation and gateway posture conformance live in `test/conformance/protected-mutation-adapter-conformance.test.ts`.
-- x402 upstream exact fixture and first-wedge conformance live in `test/conformance/x402-upstream-exact-fixtures.test.ts` and `test/conformance/x402-payment-conformance.test.ts`.
+**MCP tests (`test/mcp/`):**
+- Catalog cardinality (exactly one proposal tool), schema rejection of authority-shaped fields, resource URI templates.
 
-**Negotiation Evidence Tests:**
-- Commit `4946237` added schema-only negotiation evidence coverage. `test/protocol/negotiation-schemas.test.ts` validates strict evidence schemas for sessions, offers, decisions, linked agreements, obligation bindings, status transitions, and imported external protocol refs.
-- `test/protocol/negotiation-object-registry.test.ts` verifies negotiation object types are registered as `transition_evidence` with `audit_read` posture and payload-owned object IDs.
-- `test/protocol/negotiation-events.test.ts` accepts only recorded-only negotiation stream events and rejects authority-shaped names such as `negotiation_authorized`, `agreement_executed`, and `agreement_certified`.
-- `test/architecture/negotiation-no-authority-surface.test.ts` blocks negotiation imports into protected-action control areas, rejects `src/protocol/areas/negotiation/transitions.ts`, keeps negotiation out of `src/index.ts`, and prevents CLI/MCP/HTTP/SDK/adapters/storage/runtime surfaces from importing it.
+**Integration tests (`test/integration/`):**
+- Multi-hop flows: x402 D1 HTTP (`x402-d1-http.test.ts`), auth-md receipt reconstruction, package install end-to-end.
 
-Focused command for this slice:
-```bash
-npm run test -- test/protocol/negotiation-schemas.test.ts test/protocol/negotiation-object-registry.test.ts test/protocol/negotiation-events.test.ts test/architecture/negotiation-no-authority-surface.test.ts
-```
+**Product tests (`test/product/`):**
+- Buyer-facing slices: A2A ingress/admission/normalizer, service workflow admission, demo report shapes, hosted package consumer — always assert non-authority and non-claims.
+
+**Conformance tests (`test/conformance/`):**
+- Reference adapter posture (`protected-mutation-adapter-conformance.test.ts`, x402 conformance/fixture parity).
+
+**Model-based invariants (`test/protocol/model-based-invariants.test.ts`):**
+- Command scheduler over transition route IDs with shared `ModelContext` — exercises ordering and store counts without mocks.
 
 ## Common Patterns
 
-**Async Testing:**
+**Async testing:**
+
 ```typescript
-const fixture = await createGreenlitContract();
-const duplicate = await fixture.kernel.evaluatePolicy({
-  actionContractId: fixture.contract.actionContractId,
-  envelopeId: fixture.envelope.envelopeId,
+it("reconciles a pending surface operation without a second mutation attempt", async () => {
+  const fixture = await createGreenlitContract();
+  const gate = await fixture.kernel.gatewayCheck({ /* ... */ });
+  if (!gate.mutationAttempt) throw new Error("expected mutation attempt");
+  const result = await fixture.kernel.reconcileSurfaceOperation({ /* ... */ });
+  expect(result.reconciliation.finalityStatus).toBe("final");
 });
-
-expect(duplicate.decision.decision).toBe("refuse");
-expect(duplicate.greenlight).toBeNull();
 ```
-Source pattern: `test/protocol/kernel-policy-gateway.test.ts`.
 
-**Error Testing:**
+**Error testing:**
+
 ```typescript
-await expect(
-  fixture.kernel.putCatalogObject({ objectType: "greenlight", payload: fixture.greenlight }),
-).rejects.toThrow("Direct writes are not allowed");
-```
-Source pattern: `test/protocol/kernel-policy-gateway.test.ts`.
+await expect(fixture.kernel.proposeActionContract(proposalInputForCompilation(driftedCompilation)))
+  .rejects.toThrow(/* HandshakeProtocolError or message fragment */);
 
-**Compile-Time Negative Testing:**
+await expect(protocolStore.commitProtocolRecords({ records: [], events: [] }))
+  .rejects.toMatchObject({ /* structured error code */ });
+```
+
+**Schema contract testing:**
+
 ```typescript
-const invalidGatewayRoleMap: GatewayClientOptions = {
-  roleCredential: "gateway-token",
-  // @ts-expect-error gateway client must not accept role maps.
-  transitionTokens: {},
-};
-void invalidGatewayRoleMap;
+expect(McpX402PaymentProposalInputSchema.safeParse(base).success).toBe(true);
+expect(McpX402PaymentProposalInputSchema.safeParse({ ...base, greenlightRef: "x" }).success).toBe(false);
 ```
-Source pattern: `test/sdk/role-clients.test.ts`.
 
-**Redaction Testing:**
-```typescript
-expect(JSON.stringify(output)).not.toContain("PaymentPayload");
-expect(JSON.stringify(output)).not.toContain("PAYMENT-SIGNATURE");
-expect(JSON.stringify(output)).not.toContain("privateKey");
-```
-Source patterns: `test/cli/cli-evidence.test.ts`, `test/mcp/mcp-stdio-process.test.ts`, `test/protocol/credential-custody.test.ts`.
+**Filesystem architecture test:**
 
-**Static Source Tests:**
 ```typescript
 const violations = walk("src")
-  .map((file) => normalize(file))
-  .filter((file) => file.endsWith(".ts"))
   .filter((file) => file.split("/").some((segment) => bannedSourcePathSegments.has(segment)));
-
 expect(violations).toEqual([]);
 ```
-Source pattern: `test/architecture/naming-posture.test.ts`.
 
-**Authority-Surface Negative Tests:**
-```typescript
-expect(existsSync(join(negotiationRoot, "transitions.ts"))).toBe(false);
-expect(readFileSync("src/index.ts", "utf8")).not.toContain("Negotiation");
-expect(violations).toEqual([]);
-```
-Source pattern: `test/architecture/negotiation-no-authority-surface.test.ts`.
+**Claim matrix testing (`test/architecture/claim-boundary.test.ts`):**
 
-**Store Parity Tests:**
 ```typescript
-for (const factory of storeFactories) {
-  describe(`ProtocolStore atomicity contract (${factory.name})`, () => {
-    it("does not partially commit protocol records when greenlight issuance conflicts", async () => {
-      const { store, dispose } = await factory.create();
-      try {
-        // assertions against the real ProtocolStore contract
-      } finally {
-        await dispose();
+function expectClaimMatrix(entries: ClaimMatrixEntry[]) {
+  for (const entry of entries) {
+    for (const source of entry.sources) {
+      for (const phrase of entry.required ?? []) {
+        expect(normalizedSource, `${entry.label} must be stated in ${source.name}`).toContain(
+          normalizeRequiredClaim(phrase),
+        );
       }
-    });
-  });
+    }
+  }
 }
 ```
-Source pattern: `test/protocol/protocol-store-atomicity-contract.test.ts`.
+
+## Where to Add Tests
+
+| Change type | Test location | Example guard file |
+|-------------|---------------|-------------------|
+| Protocol transition / invariant | `test/protocol/` | `kernel-operation-lifecycle.test.ts` |
+| New `src/` lane or import rule | `test/architecture/` | `import-posture.test.ts`, `naming-posture.test.ts` |
+| HTTP route or admission | `test/http/` | `http.test.ts`, `d1-http.test.ts` |
+| CLI command envelope | `test/cli/` | `cli-evidence.test.ts` |
+| MCP tool/resource schema | `test/mcp/` | `mcp-schema-contract.test.ts` |
+| Adapter gateway / bypass | `test/adapters/` | `x402-bypass-probes.test.ts` |
+| End-to-end buyer flow | `test/integration/` or `test/product/` | `x402-d1-http.test.ts` |
+| Public export or marketing claim | `test/architecture/` | `claim-boundary.test.ts`, `root-exports.test.ts` |
+| Shared fixture / harness | `test/support/` | `fixtures.ts`, `d1-http-harness.ts` |
+
+Run the narrowest slice that covers your change before `npm run check:repo`.
 
 ---
 
-*Testing analysis: 2026-05-26*
+*Testing analysis: 2026-05-28*
