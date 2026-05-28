@@ -47,6 +47,11 @@ protected-action clearance -> terminal outcome`. Passport, admission, and
   or certification, cross-org trust, aggregate spend enforcement, hosted org
   auth, retention/search, or new kernel exports require a separate hosted
   workspace or a new pre-hosted kernel task with fresh proof gates.
+- Clerk-for-agents dual enforcement: admission identifies callers at the HTTP
+  middleware layer; adapter `run*Gateway` before mutation is the route-handler
+  enforcement point. Ingress-only posture is advisory, not Handshake. External
+  PEP (Envoy/Kong/OPA) is deployment glue only — adapter-side re-check against
+  the exact greenlight is still required.
 
 ## Required Separation
 

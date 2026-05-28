@@ -256,6 +256,35 @@ That follow-on work must carry fresh proof gates.
 This checkout must not expand protocol kernel exports for hosted needs merely
 because the service workflow product surface is now simpler.
 
+## Clerk-For-Agents Dual Enforcement
+
+Accepted: service-operator and agent-host integrations must treat **admission**
+and **gateway check** as separate enforcement layers. Ingress middleware that
+identifies callers and scopes transitions is not Handshake by itself.
+
+Request chain (Clerk-for-agents framing):
+
+```text
+Request
+  -> http/admission (middleware: identity + transition scope)
+  -> kernel transitions (compile, propose, policy, gatewayCheck evidence)
+  -> service app handler (adapter.run*Gateway before mutation)
+  -> downstream effect
+```
+
+Per D-00: admission or ingress alone is **advisory**, not Handshake. Only an
+adapter-wrapped `run*Gateway` (or equivalent gateway check) immediately before
+protected mutation is enforcement.
+
+Per D-12: external PEP layers (Envoy, Kong, OPA, or similar) may sit in front as
+deployment glue. Handshake still requires adapter-side observed-parameter
+re-check against the exact greenlight before consequence. External PEP does not
+replace the gateway check or create ambient mutation authority.
+
+The first runnable clearance wedge remains buyer-side `x402_payment.exact`
+per-call protected action. Dual enforcement applies to any protected surface,
+not payment-only integrations.
+
 ## Market And Expansion Scoring Boundary
 
 Accepted: market scoring is strategy input, not enforcement proof. A wedge can
