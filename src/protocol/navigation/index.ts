@@ -115,7 +115,24 @@ export type ProtocolNavigationEntry = {
   eventsEmitted: readonly ContractStreamEvent["eventType"][];
   authorityBoundary: string;
   evidenceObligation: string;
+  integratorTier1?: boolean;
 };
+
+export const integratorTier1TransitionIds = [
+  "registerToolCapability",
+  "registerActionType",
+  "registerGatewayRegistryEntry",
+  "registerOperatingEnvelope",
+  "registerInstallProposalCompiledRecords",
+  "registerDelegatedAuthorityRef",
+  "compileIntent",
+  "proposeActionContract",
+  "evaluatePolicy",
+  "gatewayCheck",
+  "reconcileSurfaceOperation",
+] as const satisfies readonly ProtocolTransitionId[];
+
+const integratorTier1Ids = new Set<string>(integratorTier1TransitionIds);
 
 export const protocolNavigation = [
   catalogEntry("registerToolCapability", "tool_capability"),
@@ -123,6 +140,7 @@ export const protocolNavigation = [
   catalogEntry("registerGatewayRegistryEntry", "gateway_registry_entry"),
   catalogEntry("registerOperatingEnvelope", "operating_envelope"),
   {
+    integratorTier1: true,
     transitionId: "registerInstallProposalCompiledRecords",
     kernelMethod: "registerInstallProposalCompiledRecords",
     phase: "install_setup",
@@ -141,6 +159,7 @@ export const protocolNavigation = [
       "atomically register compiled setup records or refusal without issuing policy, greenlight, gate, credential, mutation, receipt, or certificate authority",
   },
   {
+    integratorTier1: true,
     transitionId: "compileIntent",
     kernelMethod: "compileIntent",
     phase: "intent_compilation",
@@ -181,6 +200,7 @@ export const protocolNavigation = [
     evidenceObligation: "record opaque gateway credential ref without exposing secret material or minting authority",
   },
   {
+    integratorTier1: true,
     transitionId: "registerDelegatedAuthorityRef",
     kernelMethod: "registerDelegatedAuthorityRef",
     phase: "delegated_authority",
@@ -267,6 +287,7 @@ export const protocolNavigation = [
     evidenceObligation: "record current posture consulted later by policy and gateway checks",
   },
   {
+    integratorTier1: true,
     transitionId: "proposeActionContract",
     kernelMethod: "proposeActionContract",
     phase: "action_contract",
@@ -359,6 +380,7 @@ export const protocolNavigation = [
       "sign canonical terminal evidence after receipt, durable refusal, proof-gap, or replay-refusal terminalization",
   },
   {
+    integratorTier1: true,
     transitionId: "evaluatePolicy",
     kernelMethod: "evaluatePolicy",
     phase: "policy",
@@ -404,6 +426,7 @@ export const protocolNavigation = [
     evidenceObligation: "bind decision to the exact review artifact and policy input",
   },
   {
+    integratorTier1: true,
     transitionId: "gatewayCheck",
     kernelMethod: "gatewayCheck",
     phase: "gateway",
@@ -428,6 +451,7 @@ export const protocolNavigation = [
     evidenceObligation: "reload contract, greenlight, posture, isolation, sequence, and gateway policy before mutation",
   },
   {
+    integratorTier1: true,
     transitionId: "reconcileSurfaceOperation",
     kernelMethod: "reconcileSurfaceOperation",
     phase: "operation_lifecycle",
@@ -525,6 +549,7 @@ function catalogEntry(
   objectType: ProtocolObjectType,
 ): ProtocolNavigationEntry {
   return {
+    integratorTier1: integratorTier1Ids.has(transitionId),
     transitionId,
     kernelMethod: "putCatalogObject",
     phase: "catalog",

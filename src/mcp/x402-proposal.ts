@@ -5,8 +5,27 @@ import {
   serviceWorkflowContextCorrelationRef,
   serviceWorkflowContextEvidenceRefs,
 } from "../surfaces/service-workflow-admission";
+import {
+  classifyFailureClassFromReasonCodes,
+  mcpFailureClassEvidenceRef,
+} from "../protocol/foundation/failure-class";
+import type { SurfaceOutcomeBaseInput } from "../surfaces/outcome";
 import { mcpActionContractProposedOutcome, mcpNonContractOutcome, mcpToolResult, type McpToolResult } from "./output";
 import { digestMcp, type McpJsonValue } from "./digest";
+
+function mcpTaxonomyOutcome(
+  input: SurfaceOutcomeBaseInput & { reasonCodes: string[] },
+  isError = input.outcome !== "tools_list_changed",
+): McpToolResult {
+  const failureClass = classifyFailureClassFromReasonCodes(input.reasonCodes);
+  return mcpNonContractOutcome(
+    {
+      ...input,
+      evidenceRefs: [mcpFailureClassEvidenceRef(failureClass), ...(input.evidenceRefs ?? [])],
+    },
+    isError,
+  );
+}
 
 const DigestSchema = z.string().regex(/^sha256:[a-f0-9]{64}$/);
 const AtomicAmountSchema = z
@@ -149,7 +168,7 @@ export async function proposeMcpX402Payment(
 ): Promise<McpToolResult> {
   const parsed = McpX402PaymentProposalInputSchema.safeParse(inputValue);
   if (!parsed.success) {
-    return mcpNonContractOutcome({
+    return mcpTaxonomyOutcome({
       outcome: "tool_execution_error",
       phase: "tool_execution",
       reasonCodes: ["mcp_input_schema_invalid"],
@@ -162,7 +181,7 @@ export async function proposeMcpX402Payment(
   const idempotencyKey = await deriveMcpX402IdempotencyKey(input, trustedBinding.binding);
 
   if (options.toolsListChanged) {
-    return mcpNonContractOutcome({
+    return mcpTaxonomyOutcome({
       outcome: "tools_list_changed",
       phase: "freshness",
       reasonCodes: ["mcp_tools_list_changed"],
@@ -176,7 +195,7 @@ export async function proposeMcpX402Payment(
   }
 
   if (options.currentMetadataDigest && options.currentMetadataDigest !== input.metadataDigest) {
-    return mcpNonContractOutcome({
+    return mcpTaxonomyOutcome({
       outcome: "metadata_stale",
       phase: "freshness",
       reasonCodes: ["mcp_metadata_digest_stale"],
@@ -190,7 +209,7 @@ export async function proposeMcpX402Payment(
   }
 
   if ((options.installPosture ?? "ready") !== "ready") {
-    return mcpNonContractOutcome({
+    return mcpTaxonomyOutcome({
       outcome: "install_not_ready",
       phase: "readiness",
       reasonCodes: [`mcp_install_${options.installPosture ?? "unknown"}`],
@@ -204,7 +223,7 @@ export async function proposeMcpX402Payment(
   }
 
   if (!trustedBinding.binding) {
-    return mcpNonContractOutcome({
+    return mcpTaxonomyOutcome({
       outcome: "install_not_ready",
       phase: "readiness",
       reasonCodes: trustedBinding.reasonCodes,
@@ -218,7 +237,7 @@ export async function proposeMcpX402Payment(
   }
 
   if ((options.gatewayPosture ?? "online") === "offline") {
-    return mcpNonContractOutcome({
+    return mcpTaxonomyOutcome({
       outcome: "gateway_offline",
       phase: "readiness",
       reasonCodes: ["mcp_gateway_offline"],
@@ -233,7 +252,7 @@ export async function proposeMcpX402Payment(
   }
 
   if ((options.gatewayPosture ?? "online") === "unknown") {
-    return mcpNonContractOutcome({
+    return mcpTaxonomyOutcome({
       outcome: "tool_execution_error",
       phase: "tool_execution",
       reasonCodes: ["mcp_gateway_posture_unknown"],
@@ -246,7 +265,7 @@ export async function proposeMcpX402Payment(
   }
 
   if (compareAtomic(input.atomicAmount, trustedBinding.binding.trustedMaxAtomicAmountPerCall) > 0) {
-    return mcpNonContractOutcome({
+    return mcpTaxonomyOutcome({
       outcome: "refused",
       phase: "proposal",
       reasonCodes: ["x402_amount_exceeds_call_bound"],
@@ -261,7 +280,7 @@ export async function proposeMcpX402Payment(
 
   const postureRefusalReasonCodes = mcpX402PostureRefusalReasonCodes(input);
   if (postureRefusalReasonCodes.length > 0) {
-    return mcpNonContractOutcome({
+    return mcpTaxonomyOutcome({
       outcome: "refused",
       phase: "proposal",
       reasonCodes: postureRefusalReasonCodes,
@@ -281,7 +300,7 @@ export async function proposeMcpX402Payment(
     const code = errorCode(error);
     const transitionEvidence = errorTransitionEvidence(error, input.paymentRequiredEvidenceRef);
     if (code === "already_consumed" || code === "idempotency_duplicate_authority") {
-      return mcpNonContractOutcome({
+      return mcpTaxonomyOutcome({
         outcome: "replay_refused",
         phase: "replay",
         reasonCodes: [code],
@@ -298,7 +317,7 @@ export async function proposeMcpX402Payment(
     }
     if (code === "idempotency_key_params_mismatch") {
       const committedEvidence = transitionEvidence.proofRef !== null || transitionEvidence.refusalRef !== null;
-      return mcpNonContractOutcome({
+      return mcpTaxonomyOutcome({
         outcome: "refused",
         phase: "proposal",
         reasonCodes: [code],
@@ -314,7 +333,7 @@ export async function proposeMcpX402Payment(
       });
     }
     if (transitionEvidence.proofRef !== null) {
-      return mcpNonContractOutcome({
+      return mcpTaxonomyOutcome({
         outcome: "proof_gap",
         phase: "evidence",
         reasonCodes: [code],
@@ -329,7 +348,7 @@ export async function proposeMcpX402Payment(
       });
     }
     if (transitionEvidence.refusalRef !== null) {
-      return mcpNonContractOutcome({
+      return mcpTaxonomyOutcome({
         outcome: "refused",
         phase: "proposal",
         reasonCodes: [code],
@@ -343,7 +362,7 @@ export async function proposeMcpX402Payment(
         refusalRef: transitionEvidence.refusalRef,
       });
     }
-    return mcpNonContractOutcome({
+    return mcpTaxonomyOutcome({
       outcome: "tool_execution_error",
       phase: "tool_execution",
       reasonCodes: [code],
@@ -508,7 +527,7 @@ async function proposeContract(
     ...intentCompilation.candidateAction.refusalReasonCodes,
   ];
   if (intentCompilation.candidateAction.candidateStatus !== "contractable" || refusalReasonCodes.length > 0) {
-    return mcpNonContractOutcome({
+    return mcpTaxonomyOutcome({
       outcome: "refused",
       phase: "proposal",
       reasonCodes: refusalReasonCodes.length > 0 ? refusalReasonCodes : ["mcp_candidate_not_contractable"],
@@ -525,7 +544,7 @@ async function proposeContract(
 
   const candidateDigest = intentCompilation.candidateAction.candidateDigest;
   if (!candidateDigest) {
-    return mcpNonContractOutcome({
+    return mcpTaxonomyOutcome({
       outcome: "refused",
       phase: "proposal",
       reasonCodes: ["mcp_candidate_digest_missing"],
