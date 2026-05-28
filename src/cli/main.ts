@@ -11,6 +11,7 @@ import {
 } from "./projection-evidence";
 import { cliOutput } from "./output";
 import { supportBundleCommand } from "./support-bundle";
+import { serviceBootstrapCommand } from "./service/bootstrap";
 import {
   installHealthCommand,
   installX402PaymentCommand,
@@ -18,6 +19,7 @@ import {
   registerX402GatewayReadinessCommand,
   x402PaymentConformanceCommand,
 } from "./x402";
+import { serviceBootstrapCommand } from "./service/bootstrap";
 
 type CliCommandErrorCode =
   | "cli_command_unsupported"
@@ -172,6 +174,12 @@ export async function runCliCommand(argv: readonly string[]): Promise<unknown> {
       errorCode: "cli_required_argument_missing",
       message: "probes x402-payment requires <path>.",
       nextAction: "fix_arguments",
+    });
+  }
+  if (group === "service" && subcommand === "bootstrap") {
+    const inputPath = argv.find((part) => !part.startsWith("--") && part !== "service" && part !== "bootstrap");
+    return serviceBootstrapCommand({
+      installInput: inputPath ? await readJsonFile(inputPath) : undefined,
     });
   }
   return cliCommandErrorOutput({

@@ -10,6 +10,11 @@ export {
   installHealthProjectionCommand,
 } from "./projection-evidence";
 export { runCliCommand } from "./main";
+export {
+  defaultX402BootstrapInstallInput,
+  runServiceBootstrap,
+  serviceBootstrapCommand,
+} from "./service/bootstrap";
 export { CLI_SCHEMA_VERSION, cliOutput, cliNonClaims } from "./output";
 export type { CliOutputEnvelope } from "./output";
 export { supportBundleCommand } from "./support-bundle";
