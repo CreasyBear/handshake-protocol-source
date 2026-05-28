@@ -13,7 +13,19 @@ first:
 - `handshake service bootstrap` or `examples/service-operator-bootstrap/run.ts`
 
 Host doctor attestation binds to those registry digests; it does not substitute
-for service install.
+for service install. The host lane **does not own gateway registry** — registry
+and gateway credential custody remain service-operator responsibilities (D-21).
+
+## Bilateral setup order (host lane, D-22)
+
+After service bootstrap completes:
+
+1. `handshake host doctor` — binding digest attestation (non-authority).
+2. `handshake quickstart x402` — local probe and readiness scaffolding.
+3. `handshake simulate x402-payment` — non-authority simulation output.
+
+Optional: `handshake quickstart agent-spine` (same three steps). Trusted binding
+digests must match current service registry; stale digests fail closed.
 
 ## Canonical host commands (primary)
 

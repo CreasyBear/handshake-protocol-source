@@ -27,8 +27,10 @@ Host doctor, quickstart x402, and simulate are **not** Tier-1 kernel transitions
 | compileIntent | intent_compilation | POST /v0.2/intent-compilations | RuntimeClient.compileIntent | runtime_evidence | candidate evidence only | yes |
 | proposeActionContract | action_contract | POST /v0.2/action-contracts | RuntimeClient.proposeActionContract | runtime_evidence | exact contract proposal only | yes |
 | evaluatePolicy | policy | POST /v0.2/policy-decisions | PolicyClient.evaluatePolicy | control_plane | policy decision / greenlight only | yes |
-| gatewayCheck | gateway | POST /v0.2/gateway-check-attempts | GatewayClient.gatewayCheck | gateway_custody | gateway check before mutation | yes (x402 wedge) |
-| reconcileSurfaceOperation | operation_lifecycle | POST /v0.2/surface-operation-reconciliations | GatewayClient.reconcileSurfaceOperation | gateway_custody | downstream observation only | yes |
+| gatewayCheck | gateway | POST /v0.2/gateway-check-attempts | GatewayClient.gatewayCheck | gateway_custody | gateway check before mutation | yes (x402 wedge only) |
+| reconcileSurfaceOperation | operation_lifecycle | POST /v0.2/surface-operation-reconciliations | GatewayClient.reconcileSurfaceOperation | gateway_custody | downstream observation only | yes (x402 wedge only) |
+
+**Proof-gap families (not runnable in phase 04):** auth.md and package-install adapter families have `runnable: false` — see [service-operator-golden-path.md](./service-operator-golden-path.md#proof-gap-list-not-runnable-in-phase-04). Only x402 install/clearance paths are honestly runnable.
 
 ## Install triplet + HTTP profile
 

@@ -194,20 +194,29 @@ adjacency to the protocol.
 
 Current ledger:
 
-| Surface or claim                   | Current status                         | Boundary                                                                                    |
-| ---------------------------------- | -------------------------------------- | ------------------------------------------------------------------------------------------- |
-| `x402_payment.exact` per-call path | locally proven for self-hosted package | Exact contract, policy, one-use greenlight, gateway check, receipt/readback.                |
-| Hosted operation                   | proof gap                              | Requires deployed tenant boundary, hosted custody, retention, and ops evidence.             |
-| Provider/customer gateway custody  | proof gap beyond local/reference proof | Requires external custody proof, signer lease/rotation/revocation, and monitoring evidence. |
-| Settlement/finality                | proof gap                              | Downstream payment observation is not settlement finality.                                  |
-| Facilitator operation              | outside current claim                  | First wedge consumes x402 evidence; it does not operate a facilitator.                      |
-| Seller middleware                  | outside current claim                  | First wedge is buyer-side only.                                                             |
-| Marketplace or certification       | proof gap                              | Requires separate listing, rating, dispute, and trust evidence model.                       |
-| Cross-org trust                    | proof gap                              | Local terminal certificates and pinned keys do not create portable trust.                   |
-| Broad x402 compatibility           | cut line                               | Only one buyer-side `exact` per-call path is admitted.                                      |
-| Aggregate spend enforcement        | proof gap                              | Requires a policy-time and gateway-time aggregate ledger.                                   |
-| MCP Registry discoverability       | proof gap until verified               | Public npm availability and `server.json` metadata are distribution facts only.             |
-| Host-wide containment              | cut line                               | Host profiles and raw sibling probes record posture, not native containment.                |
+| Surface or claim | Current status | configuredBy | Boundary |
+| --- | --- | --- | --- |
+| Gateway registry entry | locally proven (x402 triplet) | service_operator | Service catalog/install owns registry binding before host attestation. |
+| Gateway credential custody | proof gap beyond local/reference | service_operator | External signer lease/rotation evidence required for production claims. |
+| Adapter mutation enforcement | locally proven on x402 wedge | service_operator | Handler must call `adapter.run*Gateway` before downstream effect. |
+| Trusted binding digests | locally proven (doctor attestation) | host_operator | Host doctor emits attestation evidence only — not identity or gateway ownership. |
+| MCP proposal wiring | locally proven (reference MCP) | shared | Host runtime wiring + service registry digests must both be fresh. |
+| Policy pack baseline | shared | shared | Service registers pack; host consumes policy version digests in bindings. |
+| Hosted admission verifier | proof gap until deployed | service_operator | Tenant boundary + verifier config evidence required for hosted claims. |
+| `x402_payment.exact` per-call path | locally proven for self-hosted package | service_operator | Exact contract, policy, one-use greenlight, gateway check, receipt/readback. |
+| Hosted operation | proof gap | service_operator | Requires deployed tenant boundary, hosted custody, retention, and ops evidence. |
+| Provider/customer gateway custody | proof gap beyond local/reference proof | service_operator | Requires external custody proof, signer lease/rotation/revocation, and monitoring evidence. |
+| Settlement/finality | proof gap | service_operator | Downstream payment observation is not settlement finality. |
+| Facilitator operation | outside current claim | — | First wedge consumes x402 evidence; it does not operate a facilitator. |
+| Seller middleware | outside current claim | — | First wedge is buyer-side only. |
+| Marketplace or certification | proof gap | — | Requires separate listing, rating, dispute, and trust evidence model. |
+| Cross-org trust | proof gap | — | Local terminal certificates and pinned keys do not create portable trust. |
+| Broad x402 compatibility | cut line | — | Only one buyer-side `exact` per-call path is admitted. |
+| Aggregate spend enforcement | proof gap | service_operator | Requires a policy-time and gateway-time aggregate ledger. |
+| MCP Registry discoverability | proof gap until verified | shared | Public npm availability and `server.json` metadata are distribution facts only. |
+| Host-wide containment | cut line | host_operator | Host profiles and raw sibling probes record posture, not native containment. |
+
+Standalone operator runbooks (`service-operator-runbook.md`, `host-operator-runbook.md`) are deferred post-execute; bilateral order lives in golden path docs for phase 04.
 
 Expansion admission requires a proposed second action family to name, in source
 and tests, all of the following before it can be called execution-ready:
@@ -579,6 +588,20 @@ exports, terminal certificates, settlement, provider custody, hosted operation,
 marketplace certification, or host-wide containment. Readiness rows must remain
 `pre_contract`; `trusted_gateway_ready` means ready for the runtime facade, not
 authorized to mutate.
+
+### Production acceptance custody matrix (configured-by)
+
+| Responsibility | configuredBy | Surface owner | Notes |
+| --- | --- | --- | --- |
+| gateway registry entry | service_operator | InstallClient / bootstrap | Atomic triplet; orphan without gateway refuses |
+| gateway credential custody | service_operator | GatewayClient / wallet adapter | Signer held at gateway, not agent-exposed |
+| adapter mutation enforcement | service_operator | Family adapters + handlers | `run*Gateway` before downstream mutation (D-24) |
+| trusted binding digests | host_operator | `handshake host doctor` | Attestation evidence only (D-23) |
+| MCP proposal wiring | shared | MCP x402 proposal bridge | Parity with HTTP `failureClass`; no authority |
+| policy pack baseline | service_operator | PolicyClient / bootstrap | Exact policy per action family |
+| hosted admission verifier | shared | HTTP admission + service workflow | Ingress identifies callers; not mutation authority |
+
+Do not claim hosted marketplace trust, cross-org federation, or registry discoverability as phase-04 proof.
 
 The `./sdk/role-clients` subpath now includes a role-scoped
 `ControlPlaneClient` for delegated-authority lifecycle management. It accepts
