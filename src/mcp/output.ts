@@ -1,5 +1,10 @@
 import { z } from "zod";
 import {
+  classifyFailureClassFromReasonCodes,
+  FailureClassSchema,
+  type FailureClass,
+} from "../protocol/foundation/failure-class";
+import {
   ActionContractProposedOutcomeSchema,
   SurfaceOutcomeSchema,
   surfaceOutcomeBase,
@@ -14,6 +19,7 @@ export const McpStructuredContentSchema = SurfaceOutcomeSchema;
 
 export const McpToolResultSchema = z.strictObject({
   structuredContent: McpStructuredContentSchema,
+  failureClass: FailureClassSchema.nullable().optional(),
   content: z.array(
     z.strictObject({
       type: z.literal("text"),
@@ -25,9 +31,14 @@ export const McpToolResultSchema = z.strictObject({
 
 export type McpToolResult = z.infer<typeof McpToolResultSchema>;
 
-export function mcpToolResult(structuredContent: SurfaceOutcome, isError = false): McpToolResult {
+export function mcpToolResult(
+  structuredContent: SurfaceOutcome,
+  isError = false,
+  failureClass?: FailureClass | null,
+): McpToolResult {
   return McpToolResultSchema.parse({
     structuredContent,
+    ...(failureClass !== undefined ? { failureClass } : {}),
     isError,
     content: [{ type: "text", text: JSON.stringify(structuredContent) }],
   });
@@ -37,7 +48,9 @@ export function mcpNonContractOutcome(
   input: SurfaceOutcomeBaseInput,
   isError = input.outcome !== "tools_list_changed",
 ) {
-  return mcpToolResult(surfaceOutcomeBase(input), isError);
+  const reasonCodes = input.reasonCodes ?? [];
+  const failureClass = classifyFailureClassFromReasonCodes(reasonCodes);
+  return mcpToolResult(surfaceOutcomeBase(input), isError, failureClass);
 }
 
 export function mcpActionContractProposedOutcome(
