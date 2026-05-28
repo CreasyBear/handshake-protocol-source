@@ -8,6 +8,7 @@ import { CredentialCustodyStatusSchema } from "../../protocol/areas/catalog-enve
 import type { CompileIntentInput, IntentCompilationRecord } from "../../protocol/areas/intent-compilation";
 import { digestCanonical } from "../../protocol/foundation/canonical";
 import { DigestSchema, IdSchema, type JsonValue } from "../../protocol/foundation/schema-core";
+import { canonicalizeHttpProfile } from "../http-profile/canonicalize";
 import { authMdGatewayCredentialBindingFor, authMdProtectedResourceRef } from "./profiles";
 
 export const AUTH_MD_PROTECTED_API_CALL_PROFILE = "auth_md_protected_api_call.exact.v0";
@@ -219,6 +220,16 @@ async function buildAuthMdProtectedApiCallCompileIntentInputUnchecked(
     dynamicHostConstructionObserved: attempt.dynamicHostConstructionObserved,
     retryAuthorityReuseDetected: attempt.retryAuthorityReuseDetected,
   }) satisfies Record<string, JsonValue>;
+  canonicalizeHttpProfile({
+    targetHttpMethod: parameters.targetHttpMethod,
+    endpointUrl: parameters.endpointUrl,
+    pathTemplate: parameters.pathTemplate,
+    requestBodyDigest: parameters.requestBodyDigest,
+    selectedHeadersDigest: parameters.selectedHeadersDigest,
+    dynamicEndpointConstructionObserved: parameters.dynamicEndpointConstructionObserved,
+    dynamicHostConstructionObserved: parameters.dynamicHostConstructionObserved,
+    retryAuthorityReuseDetected: parameters.retryAuthorityReuseDetected,
+  });
   const idempotencyDigest = await digestCanonical({
     profile: AUTH_MD_PROTECTED_API_CALL_PROFILE,
     protectedResource: attempt.protectedResource,
