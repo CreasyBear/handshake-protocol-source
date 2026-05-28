@@ -1,0 +1,4 @@
+{
+  "schemaVersion": "handshake.demo.service-operator-bootstrap.v1",
+  "note": "Run examples/service-operator-bootstrap/run.ts to regenerate this artifact."
+}
