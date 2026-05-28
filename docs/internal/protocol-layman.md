@@ -68,6 +68,27 @@ Those IDs help reconstruct which bundle was shown and which workflow context was
 used. They do not authorize action. Every protected action still starts with a
 fresh exact work order.
 
+## The Agent Lane (Short Chain)
+
+For agent hosts and integrators, the same authority spine uses product vocabulary
+without renaming schema exports:
+
+```text
+Standing Bounds -> Delegated Mandate -> Compile -> Work Order -> Clearance -> Outcome
+```
+
+| Plain word        | Protocol object                               | Does not mean permission because…                                      |
+| ----------------- | --------------------------------------------- | ---------------------------------------------------------------------- |
+| Standing Bounds   | `OperatingEnvelope`                           | It bounds attempt classes; policy and gateway still decide each event. |
+| Delegated Mandate | `DelegatedAuthorityRef`                       | It records mandate evidence; it is not a greenlight or gateway pass.   |
+| Compile           | `IntentCompilationRecord` / `CandidateAction` | It proposes; it does not authorize mutation.                           |
+| Work Order        | `ActionContract`                              | It is an exact commitment awaiting policy and gateway check.           |
+| Clearance         | Policy + one-use greenlight + gateway check   | Admission or middleware identity alone is not Handshake.               |
+| Outcome           | Receipt / refusal / proof gap                 | It records what happened; it is not reusable auth.                     |
+
+Admission identifies callers. Only an adapter-wrapped gateway check before
+mutation is enforcement. Ingress-only posture is advisory.
+
 ## The Work Order
 
 A vague request is not enough.

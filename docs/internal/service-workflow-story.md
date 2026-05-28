@@ -83,6 +83,52 @@ CandidateAction
 If the gateway cannot enforce the exact greenlight before consequence, the path
 is advisory, not Handshake.
 
+## Agent Lane (Parallel Projection)
+
+The **Agent lane** is a product vocabulary chain for agent hosts and integrators.
+It maps plain words to schema-native protocol objects. Schema export names stay
+unchanged; this section is additive cross-link only — it does not replace the
+canonical state path in `protocol-definition.md`.
+
+```text
+Standing Bounds
+-> Delegated Mandate (when required)
+-> Compile
+-> Work Order
+-> Clearance
+-> Outcome
+```
+
+| Agent lane term   | Schema-native object                          | Does not mean                                                                 |
+| ----------------- | --------------------------------------------- | ----------------------------------------------------------------------------- |
+| Standing Bounds   | `OperatingEnvelope`                           | Permission, mutation authority, or a reusable pass for future actions.        |
+| Delegated Mandate | `DelegatedAuthorityRef`                       | Greenlight, gateway check, spend approval, or signer access.                  |
+| Compile           | `IntentCompilationRecord` / `CandidateAction` | Policy decision, authority, or an executable contract.                        |
+| Work Order        | `ActionContract`                              | Ambient permission, plan approval, or a batch of unrelated mutations.           |
+| Clearance         | Policy decision + one-use greenlight + gateway check before mutation | Admission alone, workflow handle carry-forward, or ingress middleware theatre. |
+| Outcome           | Receipt / refusal / proof gap / replay refusal / terminal certificate | Downstream business success or permission for the next action.                |
+
+Every agent-lane projection that exposes workflow or compilation context must
+carry the same non-authority boundary as the service workflow surface:
+
+```text
+createsAuthority: false
+createsPolicyDecision: false
+createsGreenlight: false
+performsGatewayCheck: false
+permitsMutation: false
+exportsReceipt: false
+mintsTerminalCertificate: false
+freshActionContractRequired: true
+```
+
+`OperatingEnvelope` is class-level attempt bounds, not permission (D-01).
+`DelegatedAuthorityRef` is episodic mandate evidence, not a greenlight (D-02).
+Compile output proposes candidates only (D-03). `ActionContract` is an exact
+commitment, not execution authority (D-04). Clearance requires a gateway check
+before mutation — admission or handle carry-forward alone is advisory, not
+Handshake (D-00).
+
 ## Recovery States
 
 | State                | Meaning                                                     | Safe next move                                                 |
