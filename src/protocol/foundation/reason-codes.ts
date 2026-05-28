@@ -397,6 +397,20 @@ export function isRegisteredProtocolReasonCode(candidate: string): boolean {
   );
 }
 
+export function resolveProtocolReasonCodeMetadata(
+  candidate: string,
+): Pick<ProtocolReasonCodeEntry, "kind" | "phase"> | null {
+  const exact = protocolReasonCodes.find((entry) => entry.code === candidate);
+  if (exact) {
+    return { kind: exact.kind, phase: exact.phase };
+  }
+  const prefix = protocolReasonCodePrefixes.find((entry) => candidate.startsWith(entry.prefix));
+  if (prefix) {
+    return { kind: prefix.kind, phase: prefix.phase };
+  }
+  return null;
+}
+
 function code(
   value: string,
   kind: ProtocolReasonCodeKind,
