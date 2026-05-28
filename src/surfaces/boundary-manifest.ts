@@ -13,6 +13,10 @@ export const surfaceIds = [
   "cli.process",
   "mcp.runtime",
   "x402.protected_tool",
+  "surfaces.a2a_negotiation",
+  "surfaces.a2a_readback",
+  "surfaces.service_workflow_admission",
+  "surfaces.hosted_admission",
 ] as const;
 
 export type SurfaceId = (typeof surfaceIds)[number];
@@ -104,6 +108,10 @@ export type SurfaceBoundary = {
   readonly claimBoundaryLabels: readonly string[];
 };
 
+type SdkSurfaceId = Extract<SurfaceId, `sdk.${string}`>;
+type CliSurfaceId = Extract<SurfaceId, `cli.${string}`>;
+type RuntimeSurfaceId = Exclude<SurfaceId, SdkSurfaceId | CliSurfaceId>;
+
 const forbiddenAuthorityRouteFamilies = [
   "certificate_mint_write",
   "isolation_write",
@@ -194,7 +202,7 @@ const sharedClaimBoundaries = [
   "no_settlement_claim",
 ] as const;
 
-export const surfaceBoundaryManifest = {
+const sdkSurfaceBoundaryManifest = {
   "sdk.runtime": {
     id: "sdk.runtime",
     status: "active",
@@ -482,6 +490,9 @@ export const surfaceBoundaryManifest = {
     },
     claimBoundaryLabels: [...sharedClaimBoundaries, "gateway_transport_is_not_signer_custody"],
   },
+} as const satisfies Record<SdkSurfaceId, SurfaceBoundary>;
+
+const cliSurfaceBoundaryManifest = {
   "cli.operator": {
     id: "cli.operator",
     status: "active",
@@ -490,12 +501,18 @@ export const surfaceBoundaryManifest = {
     authorityPosture: "setup_only",
     sourceRoots: [
       "src/cli/command-manifest.ts",
+      "src/cli/demo/x402.ts",
+      "src/cli/host/doctor.ts",
       "src/cli/local-project/doctor.ts",
       "src/cli/local-project/index.ts",
       "src/cli/main.ts",
+      "src/cli/mcp/doctor.ts",
       "src/cli/output.ts",
+      "src/cli/quickstart/x402.ts",
+      "src/cli/state/inspect.ts",
       "src/cli/x402/index.ts",
       "src/cli/x402/local-state.ts",
+      "src/cli/x402/readiness.ts",
     ],
     allowedRouteFamilies: ["catalog_install_write", "install_health_read"],
     forbiddenRouteFamilies: [
@@ -511,8 +528,11 @@ export const surfaceBoundaryManifest = {
       "src/adapters/x402-payment/bypass-probes",
       "src/adapters/x402-payment/conformance",
       "src/adapters/x402-payment/install-proposal",
+      "src/adapters/x402-payment/protected-tool-profile",
       "src/adapters/x402-payment/protected-tool-readiness",
+      "src/mcp",
       "src/protocol/areas/bypass-probe",
+      "src/protocol/evidence-projections",
       "src/protocol/foundation",
       "src/surfaces",
     ],
@@ -538,9 +558,12 @@ export const surfaceBoundaryManifest = {
       "src/cli/aps-report.ts",
       "src/cli/certificate.ts",
       "src/cli/command-manifest.ts",
+      "src/cli/evidence/operation-readback-view.ts",
       "src/cli/main.ts",
       "src/cli/output.ts",
       "src/cli/projection-evidence.ts",
+      "src/cli/quality/report.ts",
+      "src/cli/simulate/x402-payment.ts",
       "src/cli/support-bundle.ts",
     ],
     allowedRouteFamilies: ["certificate_verify_local", "evidence_projection_read", "install_health_read"],
@@ -555,6 +578,8 @@ export const surfaceBoundaryManifest = {
     ],
     allowedImportRoots: [
       "src/cli",
+      "src/hosted-admission",
+      "src/mcp",
       "src/protocol/areas/authority-certificate/verify",
       "src/protocol/evidence-projections",
       "src/protocol/public",
@@ -596,6 +621,9 @@ export const surfaceBoundaryManifest = {
     requiredNonAuthorityFlags: proposalNonAuthorityFlags,
     claimBoundaryLabels: [...sharedClaimBoundaries, "process_start_is_not_gateway_custody"],
   },
+} as const satisfies Record<CliSurfaceId, SurfaceBoundary>;
+
+const runtimeSurfaceBoundaryManifest = {
   "mcp.runtime": {
     id: "mcp.runtime",
     status: "active",
@@ -618,7 +646,7 @@ export const surfaceBoundaryManifest = {
       "protected_path_posture_write",
       "surface_reconciliation_write",
     ],
-    allowedImportRoots: ["src/mcp", "src/sdk", "src/surfaces"],
+    allowedImportRoots: ["src/mcp", "src/protocol/evidence-projections", "src/sdk", "src/surfaces"],
     forbiddenImportFragments: [...forbiddenAuthorityImports, "adapters/", "storage/"],
     forbiddenCredentialShapes: [...authorityCredentialShapes, "review_custody_token"],
     forbiddenOutputFields: [
@@ -682,4 +710,189 @@ export const surfaceBoundaryManifest = {
       "tool_visibility_is_not_authorization",
     ],
   },
+} as const satisfies Record<RuntimeSurfaceId, SurfaceBoundary>;
+
+const productSurfaceBoundaryManifest = {
+  "surfaces.a2a_negotiation": {
+    id: "surfaces.a2a_negotiation",
+    status: "active",
+    plane: "runtime",
+    custodyRole: "runtime_evidence",
+    authorityPosture: "evidence_only",
+    sourceRoots: ["src/surfaces/a2a-negotiation-support"],
+    allowedRouteFamilies: ["evidence_projection_read", "runtime_evidence_write"],
+    forbiddenRouteFamilies: [
+      ...forbiddenAuthorityRouteFamilies,
+      "action_contract_proposal_write",
+      "bypass_probe_write",
+      "catalog_install_write",
+      "gateway_check_write",
+      "gateway_credential_write",
+      "protected_path_posture_write",
+      "surface_reconciliation_write",
+      "tool_call_draft_write",
+    ],
+    allowedImportRoots: [
+      "src/surfaces/a2a-negotiation-support",
+      "src/protocol/areas/action-contract",
+      "src/protocol/areas/negotiation",
+      "src/protocol/areas/policy-greenlight",
+      "src/protocol/evidence-projections",
+      "src/protocol/foundation",
+      "src/protocol/public",
+      "src/protocol/store/port",
+    ],
+    forbiddenImportFragments: [...forbiddenAuthorityImports, "adapters/x402-payment/wallet-gateway", "storage/"],
+    forbiddenCredentialShapes: [
+      ...authorityCredentialShapes.filter((shape) => shape !== "signer"),
+      "review_custody_token",
+    ],
+    forbiddenOutputFields: [
+      ...cliAuthorityOutputFields,
+      "greenlightId",
+      "greenlightRef",
+      "gatewayCheckInput",
+      "mutationCommand",
+    ],
+    requiredNonAuthorityFlags: evidenceNonAuthorityFlags,
+    claimBoundaryLabels: [
+      ...sharedClaimBoundaries,
+      "admission_readback_is_not_receipt_evidence",
+      "agreement_is_not_permission",
+      "a2a_ingress_admission_is_not_policy_or_gateway",
+    ],
+  },
+  "surfaces.a2a_readback": {
+    id: "surfaces.a2a_readback",
+    status: "active",
+    plane: "evidence",
+    custodyRole: "review_custody",
+    authorityPosture: "evidence_only",
+    sourceRoots: ["src/surfaces/a2a-negotiation-readback"],
+    allowedRouteFamilies: ["evidence_projection_read", "install_health_read"],
+    forbiddenRouteFamilies: [
+      ...forbiddenAuthorityRouteFamilies,
+      "action_contract_proposal_write",
+      "bypass_probe_write",
+      "catalog_install_write",
+      "gateway_check_write",
+      "runtime_evidence_write",
+      "surface_reconciliation_write",
+      "tool_call_draft_write",
+    ],
+    allowedImportRoots: [
+      "src/surfaces/a2a-negotiation-readback",
+      "src/protocol/public",
+      "src/protocol/foundation",
+      "src/protocol/evidence-projections",
+    ],
+    forbiddenImportFragments: [...forbiddenAuthorityImports, "adapters/", "storage/"],
+    forbiddenCredentialShapes: [
+      ...authorityCredentialShapes.filter((shape) => shape !== "signer"),
+      "signerMaterialIncluded",
+    ],
+    forbiddenOutputFields: [...cliAuthorityOutputFields.filter((field) => field !== "signer"), "downstreamSuccess"],
+    requiredNonAuthorityFlags: evidenceNonAuthorityFlags,
+    claimBoundaryLabels: [
+      ...sharedClaimBoundaries,
+      "gateway_check_remains_final_enforcement_point",
+      "agreement_evidence_is_not_downstream_success",
+      "admission_readback_is_not_receipt_evidence",
+    ],
+  },
+  "surfaces.service_workflow_admission": {
+    id: "surfaces.service_workflow_admission",
+    status: "active",
+    plane: "evidence",
+    custodyRole: "review_custody",
+    authorityPosture: "evidence_only",
+    sourceRoots: ["src/surfaces/service-workflow-admission"],
+    allowedRouteFamilies: ["evidence_projection_read", "install_health_read"],
+    forbiddenRouteFamilies: [
+      ...forbiddenAuthorityRouteFamilies,
+      "action_contract_proposal_write",
+      "bypass_probe_write",
+      "catalog_install_write",
+      "gateway_check_write",
+      "runtime_evidence_write",
+      "surface_reconciliation_write",
+      "tool_call_draft_write",
+    ],
+    allowedImportRoots: [
+      "src/surfaces/service-workflow-admission",
+      "src/protocol/public",
+      "src/protocol/foundation",
+    ],
+    forbiddenImportFragments: [...forbiddenAuthorityImports, "adapters/", "storage/"],
+    forbiddenCredentialShapes: [...authorityCredentialShapes],
+    forbiddenOutputFields: [...cliAuthorityOutputFields, "downstreamSuccess"],
+    requiredNonAuthorityFlags: evidenceNonAuthorityFlags,
+    claimBoundaryLabels: [
+      ...sharedClaimBoundaries,
+      "admission_readback_is_not_receipt_evidence",
+      "service_workflow_handle_is_not_clearance",
+      "fresh_action_contract_required",
+    ],
+  },
+  "surfaces.hosted_admission": {
+    id: "surfaces.hosted_admission",
+    status: "active",
+    plane: "operator",
+    custodyRole: "control_plane",
+    authorityPosture: "setup_only",
+    sourceRoots: ["src/hosted-admission"],
+    allowedRouteFamilies: ["evidence_projection_read", "install_health_read"],
+    forbiddenRouteFamilies: [
+      ...forbiddenAuthorityRouteFamilies,
+      "action_contract_proposal_write",
+      "bypass_probe_write",
+      "catalog_install_write",
+      "gateway_check_write",
+      "gateway_credential_write",
+      "runtime_evidence_write",
+      "surface_reconciliation_write",
+      "tool_call_draft_write",
+    ],
+    allowedImportRoots: [
+      "src/hosted-admission",
+      "src/protocol/context",
+      "src/protocol/foundation",
+      "src/protocol/public",
+      "src/http/errors",
+    ],
+    forbiddenImportFragments: [...forbiddenAuthorityImports, "adapters/", "storage/"],
+    forbiddenCredentialShapes: [
+      "allRoles",
+      "CallerAuthTokens",
+      "gateway_custody_token",
+      "private_key",
+      "signer",
+      "transitionTokens",
+      "wallet",
+    ],
+    forbiddenOutputFields: [...cliAuthorityOutputFields, "greenlightId", "greenlightRef", "gatewayCheckInput"],
+    requiredNonAuthorityFlags: proposalNonAuthorityFlags,
+    claimBoundaryLabels: [
+      ...sharedClaimBoundaries,
+      "hosted_admission_package_is_not_http_internals",
+      "hosted_caller_identity_is_not_reusable_auth",
+      "verifier_adapter_claim_is_not_gateway_check",
+    ],
+  },
+} as const satisfies Record<
+  Extract<
+    SurfaceId,
+    | "surfaces.a2a_negotiation"
+    | "surfaces.a2a_readback"
+    | "surfaces.service_workflow_admission"
+    | "surfaces.hosted_admission"
+  >,
+  SurfaceBoundary
+>;
+
+export const surfaceBoundaryManifest = {
+  ...sdkSurfaceBoundaryManifest,
+  ...cliSurfaceBoundaryManifest,
+  ...runtimeSurfaceBoundaryManifest,
+  ...productSurfaceBoundaryManifest,
 } as const satisfies Record<SurfaceId, SurfaceBoundary>;

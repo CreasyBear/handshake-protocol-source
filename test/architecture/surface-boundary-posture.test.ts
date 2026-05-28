@@ -24,6 +24,10 @@ const expectedSurfaceIds: readonly SurfaceId[] = [
   "cli.process",
   "mcp.runtime",
   "x402.protected_tool",
+  "surfaces.a2a_negotiation",
+  "surfaces.a2a_readback",
+  "surfaces.service_workflow_admission",
+  "surfaces.hosted_admission",
 ];
 
 const authorityRouteFamilies: readonly SurfaceRouteFamily[] = [
@@ -46,6 +50,10 @@ const modelOrOperatorSurfaces: readonly SurfaceId[] = [
   "cli.process",
   "mcp.runtime",
   "x402.protected_tool",
+  "surfaces.a2a_negotiation",
+  "surfaces.a2a_readback",
+  "surfaces.service_workflow_admission",
+  "surfaces.hosted_admission",
 ];
 
 const roleScopedTransitionClients: readonly SurfaceId[] = ["sdk.policy"];
@@ -264,8 +272,33 @@ function isAllowedInternalImport(boundary: SurfaceBoundary, target: string): boo
   return boundary.allowedImportRoots.some((root) => target === root || target.startsWith(`${root}/`));
 }
 
+const evidenceOnlySchemaNegativeMentions = [
+  "PaymentPayload",
+  "credentialMaterialIncluded",
+  "downstreamSuccessClaimedByAgreement",
+  "gatewayCheckRemainsFinalEnforcementPoint",
+  "greenlightId",
+  "paymentMaterialIncluded",
+  "proof_gap:a2a_raw_material:signer_material",
+  "rawCredentialMaterial",
+  "receiptExport",
+  "signerMaterialIncluded",
+  "signerMaterialObserved",
+  "signer_use",
+] as const;
+
 function stripRequiredNonAuthorityFlagMentions(text: string, boundary: SurfaceBoundary): string {
-  return Object.keys(boundary.requiredNonAuthorityFlags).reduce((current, flag) => current.replaceAll(flag, ""), text);
+  const withoutManifestFlags = Object.keys(boundary.requiredNonAuthorityFlags).reduce(
+    (current, flag) => current.replaceAll(flag, ""),
+    text,
+  );
+  if (boundary.authorityPosture !== "evidence_only" && boundary.authorityPosture !== "proposal_only") {
+    return withoutManifestFlags;
+  }
+  return evidenceOnlySchemaNegativeMentions.reduce(
+    (current, term) => current.replaceAll(term, ""),
+    withoutManifestFlags,
+  );
 }
 
 function walkTs(dir: string): string[] {
