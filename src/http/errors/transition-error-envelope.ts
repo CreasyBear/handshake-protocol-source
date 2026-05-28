@@ -171,7 +171,6 @@ export function failureClassForProtocolError(error: HandshakeProtocolError): Tra
       case "isolation":
         return "protected_action_refusal";
       case "recovery":
-        if (code === "recovery_terminal_conflict") return "protected_action_refusal";
         return error.metadata.proofRef ? "proof_gap" : "protected_action_refusal";
       case "protected_path_posture":
         return code.includes("stale") ? "stale_admission" : "proof_gap";

@@ -23,6 +23,16 @@ const remediationEntries: readonly ReasonCodeRemediationEntry[] = [
     requiresNewContract: true,
   },
   {
+    code: "hosted_caller_identity_expired",
+    docsUrl: "https://handshake.dev/docs/http/hosted-admission",
+    requiresNewContract: true,
+  },
+  {
+    code: "recovery_terminal_conflict",
+    docsUrl: "https://handshake.dev/docs/protocol/proof-gap",
+    requiresNewContract: true,
+  },
+  {
     code: "credential_resolution_replay_refused",
     docsUrl: "https://handshake.dev/docs/protocol/replay-refusal",
     requiresNewContract: true,
