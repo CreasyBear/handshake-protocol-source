@@ -22,13 +22,13 @@ export type InstallProposalBypassProbePlanItem = z.infer<typeof InstallProposalB
 export const InstallProposalCompiledKernelRecordsSchema = z.strictObject({
   toolCapability: ToolCapabilitySchema,
   actionType: ActionTypeSchema,
-  gatewayRegistryEntry: GatewayRegistryEntrySchema,
+  gatewayRegistryEntry: GatewayRegistryEntrySchema.nullable(),
   operatingEnvelope: OperatingEnvelopeSchema,
 });
 export type InstallProposalCompiledKernelRecords = {
   toolCapability: ToolCapability;
   actionType: ActionType;
-  gatewayRegistryEntry: GatewayRegistryEntry;
+  gatewayRegistryEntry: GatewayRegistryEntry | null;
   operatingEnvelope: OperatingEnvelope;
 };
 

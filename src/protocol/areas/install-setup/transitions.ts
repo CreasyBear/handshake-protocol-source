@@ -34,6 +34,12 @@ export async function registerInstallProposalCompiledRecords(
   if (proposal.status !== "ready_to_install" || proposal.compiledRecords === null) {
     return recordInstallProposalRefusal(recorder, proposal);
   }
+  if (!proposal.compiledRecords.gatewayRegistryEntry) {
+    return recordInstallProposalRefusal(recorder, {
+      ...proposal,
+      refusalReasonCodes: ["install_orphan_catalog_missing_gateway"],
+    });
+  }
 
   const records = installProposalCatalogRecords(proposal.compiledRecords);
   for (const record of records) {
@@ -106,6 +112,13 @@ async function recordInstallProposalRefusal(
 }
 
 function installProposalCatalogRecords(records: InstallProposalCompiledKernelRecords): ProtocolRecord[] {
+  if (!records.gatewayRegistryEntry) {
+    throw new HandshakeProtocolError(
+      "install_orphan_catalog_missing_gateway",
+      "Install setup requires gateway registry entry in compiled catalog triplet.",
+      422,
+    );
+  }
   return [
     { objectType: "tool_capability", payload: records.toolCapability },
     { objectType: "action_type", payload: records.actionType },
@@ -174,10 +187,14 @@ function installRefusedEvent(proposal: InstallProposal, refusal: Refusal): Event
 }
 
 function recordRefsFor(records: InstallProposalCompiledKernelRecords) {
+  const gatewayRegistryEntryId = records.gatewayRegistryEntry?.gatewayRegistryEntryId;
+  if (!gatewayRegistryEntryId) {
+    throw new Error("record refs require gateway registry entry");
+  }
   return {
     toolCapabilityId: records.toolCapability.toolCapabilityId,
     actionTypeId: records.actionType.actionTypeId,
-    gatewayRegistryEntryId: records.gatewayRegistryEntry.gatewayRegistryEntryId,
+    gatewayRegistryEntryId,
     operatingEnvelopeId: records.operatingEnvelope.envelopeId,
   };
 }
