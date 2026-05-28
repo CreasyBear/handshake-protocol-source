@@ -78,16 +78,33 @@ hosted path.
 | Delegated mandate    | Per spend/delegation event | May be pre-provisioned   |
 | Proof expectation    | x402 runnable wedge        | Same; extra audit rows   |
 
-### Atomic install (plan 03)
+### Atomic bootstrap (D-08)
 
-Copy-paste bootstrap lands in plan 03. Placeholder command:
+Register the x402 catalog triplet atomically via control-plane
+`InstallClient.registerInstallProposalCompiledRecords` (control_plane credential
+required on live workers):
 
 ```bash
-handshake service bootstrap --help
+bun run examples/service-operator-bootstrap/run.ts
+handshake service bootstrap
 ```
 
-Until bootstrap ships, use the admission demo below plus install docs in
-[integrator-tier-1-transitions.md](./integrator-tier-1-transitions.md) (advanced).
+Optional input fixture path:
+
+```bash
+handshake service bootstrap ./my-x402-install-input.json
+```
+
+**Success** (`outcome: compiled_records_registered`): `recordRefs` include
+`toolCapabilityId`, `actionTypeId`, `gatewayRegistryEntryId`, `operatingEnvelopeId`,
+plus `policyPackRef` / `policyPackVersion`. Authority flags remain false.
+
+**Refusal** (`outcome: install_proposal_refused`): `reasonCodes` explain compile or
+setup refusal; no orphan catalog writes.
+
+Inspect artifact: `examples/service-operator-bootstrap/output/latest.json`
+
+Product tests: `test/product/service-operator-bootstrap.test.ts`
 
 ### Runnable clearance wedge (x402 only)
 
