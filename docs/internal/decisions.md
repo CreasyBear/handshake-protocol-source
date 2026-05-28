@@ -272,7 +272,7 @@ Request
   -> downstream effect
 ```
 
-Per D-00: admission or ingress alone is **advisory**, not Handshake. Only an
+Per D-00: admission or ingress alone is advisory, not Handshake. Only an
 adapter-wrapped `run*Gateway` (or equivalent gateway check) immediately before
 protected mutation is enforcement.
 

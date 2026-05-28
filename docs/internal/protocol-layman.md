@@ -86,8 +86,7 @@ Standing Bounds -> Delegated Mandate -> Compile -> Work Order -> Clearance -> Ou
 | Clearance         | Policy + one-use greenlight + gateway check   | Admission or middleware identity alone is not Handshake.               |
 | Outcome           | Receipt / refusal / proof gap                 | It records what happened; it is not reusable auth.                     |
 
-Admission identifies callers. Only an adapter-wrapped gateway check before
-mutation is enforcement. Ingress-only posture is advisory.
+Admission identifies callers. Only an adapter-wrapped gateway check before mutation is enforcement. Ingress-only posture is advisory, not Handshake.
 
 ## The Work Order
 

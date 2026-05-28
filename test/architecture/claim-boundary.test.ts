@@ -436,6 +436,77 @@ describe("claim boundary", () => {
           /x402Client|privateKeyToAccount|SIGNING_PRIVATE_KEY|provider custody claim|hosted dashboard|cross-org certificate trust/i,
         ],
       },
+      {
+        label: "dual enforcement clerk framing",
+        sources: [{ name: "docs/internal/decisions.md", text: decisions }],
+        required: [
+          "Clerk-for-agents",
+          "run*Gateway",
+          "advisory, not Handshake",
+          "gateway check before mutation",
+        ],
+        requiredPatterns: [/http\/admission/i],
+        forbiddenPatterns: [
+          /admission (?:alone )?(?:authorizes|permits|protects) mutation/i,
+          /ingress (?:equals|is) (?:the )?protection/i,
+        ],
+      },
+      {
+        label: "dual enforcement protocol-notes cross-ref",
+        sources: [{ name: "docs/internal/protocol-notes.md", text: protocolNotes }],
+        required: ["Clerk-for-agents", "run*Gateway", "advisory, not Handshake"],
+        forbiddenPatterns: [/admission (?:alone )?(?:authorizes|permits|protects) mutation/i],
+      },
+      {
+        label: "dual enforcement operator docs",
+        sources: [
+          { name: "docs/internal/service-workflow-story.md", text: serviceWorkflowStory },
+          { name: "docs/internal/protocol-layman.md", text: protocolLayman },
+          { name: "AGENTS.md", text: agents },
+        ],
+        requiredPatterns: [
+          /gateway check before mutation/i,
+          /advisory, not Handshake/i,
+        ],
+        forbiddenPatterns: [
+          /admission (?:alone )?(?:authorizes|permits|protects) mutation/i,
+          /middleware (?:alone )?(?:authorizes|permits|protects) (?:mutation|protected)/i,
+        ],
+      },
+      {
+        label: "canonical state path integrity",
+        sources: [{ name: "docs/internal/protocol-definition.md", text: protocolDefinition }],
+        requiredPatterns: [
+          /## Canonical State Path/i,
+          /intent compilation record/i,
+          /candidate action/i,
+          /action contract/i,
+          /policy decision/i,
+          /gateway check attempt/i,
+          /mutation attempt, refusal, receipt, or proof gap/i,
+        ],
+        forbiddenPatterns: [
+          /OperatingEnvelope.*replaces.*action contract/i,
+          /ServiceWorkflowHandle.*replaces.*greenlight/i,
+          /admission.*replaces.*gateway check/i,
+        ],
+      },
+      {
+        label: "agent lane additive projection",
+        sources: [{ name: "docs/internal/service-workflow-story.md", text: serviceWorkflowStory }],
+        required: [
+          "Agent Lane",
+          "OperatingEnvelope",
+          "DelegatedAuthorityRef",
+          "ActionContract",
+          "additive cross-link only",
+          "does not replace the canonical state path",
+        ],
+        forbiddenPatterns: [
+          /Agent lane replaces the canonical state path/i,
+          /rename schema exports/i,
+        ],
+      },
     ]);
 
     const expansionQualityCanon = `${quality}\n${structure}`;
