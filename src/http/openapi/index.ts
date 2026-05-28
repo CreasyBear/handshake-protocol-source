@@ -12,7 +12,10 @@ const HealthResponseSchema = z.strictObject({
   version: z.literal(PROTOCOL_VERSION),
 });
 
-const errorResponse = jsonResponse("Protocol transition error", TransitionErrorResponseSchema);
+const errorResponse = jsonResponse(
+  "Protocol transition error with failureClass (auth | hosted_admission | protected_action_refusal | proof_gap | replay_refusal | stale_admission | internal), failurePhase, and optional RFC 9457 problemType URI. Status discipline: auth 401/403, hosted_admission 403, clearance refusals/replay/stale 409, proof_gap 422.",
+  TransitionErrorResponseSchema,
+);
 
 export const openApiDocument = {
   openapi: "3.1.0",
@@ -79,6 +82,7 @@ function openApiPathFor(route: (typeof transitionRouteDefinitions)[number]) {
         "404": errorResponse,
         "409": errorResponse,
         "412": errorResponse,
+        "422": errorResponse,
         "500": errorResponse,
         "503": errorResponse,
       },
@@ -98,6 +102,8 @@ function openApiEvidenceReadPathFor(route: (typeof evidenceReadRouteDefinitions)
         "401": errorResponse,
         "403": errorResponse,
         "404": errorResponse,
+        "409": errorResponse,
+        "422": errorResponse,
         "500": errorResponse,
         "503": errorResponse,
       },
