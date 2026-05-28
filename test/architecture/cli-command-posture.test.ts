@@ -43,7 +43,12 @@ describe("CLI command posture", () => {
       "probes.x402-payment",
       "register.x402-gateway-readiness",
       "install.health",
+      "host.doctor",
+      "quickstart.x402",
+      "quickstart.agent-spine",
+      "simulate.x402-payment",
       "conformance.x402-payment",
+      "service.bootstrap",
     ]);
     expect(cliCommandManifest.every((command) => command.status === "active")).toBe(true);
     expect(cliCommandManifest.every((command) => command.childProcessEnvInheritance === "none")).toBe(true);
