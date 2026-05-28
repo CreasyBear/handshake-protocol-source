@@ -166,9 +166,16 @@ Do not treat quickstart-shaped stub directories as clearance paths.
 
 _Table filled by plan 05 (`failureClass` × HTTP status × safe retry × forbidden actions)._
 
-| failureClass | HTTP | Safe retry | Forbidden |
-| ------------ | ---- | ---------- | --------- |
-| _(pending plan 05)_ | | | |
+| failureClass | HTTP | Safe retry? | Forbidden actions | What to run next |
+| ------------ | ---- | ----------- | ----------------- | ---------------- |
+| auth | 401 / 403 | No — fix bearer/custody token | Retry as OAuth refresh for clearance refusals | Re-run with correct role token; `handshake host doctor` on host lane |
+| hosted_admission | 403 | No — fix hosted identity/config | Treat as mutation authority | Refresh hosted verifier claims; check [hosted readiness](/v0.2/hosted/readiness) readback |
+| protected_action_refusal | 409 | No — craft new exact contract | Reuse greenlight or widen scope silently | SDK: new `proposeActionContract` + policy path; never refresh OAuth |
+| proof_gap | 422 | After evidence repair only | Assume downstream success without receipt | SDK: resolve proof gap or read evidence projection; do not retry same mutation |
+| replay_refusal | 409 | No — new idempotency key | Replay same greenlight | New contract + greenlight; inspect receipt `greenlightConsumptionStatus` |
+| stale_admission | 409 | After re-admission | Continue with stale hosted identity | Re-issue hosted caller identity; check freshness window |
+
+OAuth BCP: clearance refusals (`protected_action_refusal`, `replay_refusal`, `proof_gap`) must **not** be retried as credential refresh. Read dedicated routes may return **200** with claim/readiness status; mutation refusals never masquerade as auth **403**.
 
 ### Advanced (not first 30 minutes)
 

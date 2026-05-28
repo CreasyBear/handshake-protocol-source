@@ -18,6 +18,9 @@ top-level Start Here paths.
 | `npm run demo:service-workflow-admission` | Canonical service-side admission demo |
 | `handshake service bootstrap` | Atomic x402 catalog install (control-plane) |
 
+Operator-visible HTTP failures (`failureClass`, status discipline, safe retry):
+see the failure table in [service-operator-golden-path.md](./service-operator-golden-path.md#operator-visible-failures).
+
 Vocabulary: [service-workflow-story.md](./service-workflow-story.md)
 
 ## Host operator commands (only if you operate the host)
