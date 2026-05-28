@@ -106,6 +106,23 @@ Inspect artifact: `examples/service-operator-bootstrap/output/latest.json`
 
 Product tests: `test/product/service-operator-bootstrap.test.ts`
 
+### Bilateral setup order (D-22)
+
+Service operator lane runs first on Branch A:
+
+1. Register catalog triplet → atomic bootstrap (`handshake service bootstrap` or `examples/service-operator-bootstrap/run.ts`)
+2. Confirm gateway registry readiness and policy pack refs in bootstrap output
+3. Wire hosted admission verifier claims before exposing mutation routes
+4. Bind each consequential handler to `adapter.run*Gateway` before downstream effect
+
+Host lane runs after registry digests exist:
+
+- `handshake host doctor` for binding attestation (non-authority)
+- `handshake quickstart x402` / `handshake simulate x402-payment` for clearance rehearsal
+- Optional: `handshake quickstart agent-spine` (recommended, not mandatory for operator sign-off)
+
+Stale gateway registry or policy pack drift blocks downstream host attestation. Use the [failure table](#operator-visible-failures) — do not retry clearance refusals as OAuth refresh.
+
 ### Runnable clearance wedge (x402 only)
 
 Only **buyer-side `x402_payment.exact` per-call** is runnable in this phase.
@@ -154,13 +171,16 @@ adapter on Branch A routes. Product test anchor:
 
 ### Proof-gap list (not runnable in phase 04)
 
-| Family                         | Runnable | Notes                                      |
-| ------------------------------ | -------- | ------------------------------------------ |
-| auth.md live gateway           | false    | Credential discovery ≠ mutation authority  |
-| package-install live gateway   | false    | Material adapter pack is proof context     |
-| MCP Registry discoverability   | false    | npm publish ≠ registry lookup proof        |
+| Family | Runnable in phase 04? | proofGaps (summary) | What to use instead |
+| --- | --- | --- | --- |
+| auth.md protected API | false | live gateway, admission packet, provider custody | x402 wedge + `src/adapters/http-profile/` module (plan 08); external-adapter-sdk checklist |
+| package install | false | live gateway, composite admission, material evidence | x402 install triplet pattern via `handshake service bootstrap` |
+| MCP Registry discoverability | false | registry acceptance, lookup proof | local MCP doctor only; npm publish is distribution not authority |
 
-Do not treat quickstart-shaped stub directories as clearance paths.
+Do not treat quickstart-shaped stub directories as clearance paths. The only runnable
+clearance wedge in phase 04 is buyer-side `x402_payment.exact` per call.
+
+Forbidden operator language: "run the auth.md quickstart", "bootstrap package install clearance".
 
 ### Operator-visible failures
 
