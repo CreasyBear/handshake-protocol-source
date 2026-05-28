@@ -1,6 +1,6 @@
 # Phase 02 — Executable plans
 
-**Status:** Planned (research skipped; premortem adjustments 2026-05-28)  
+**Status:** Executing — Plans 01–02 complete (2026-05-28); Plans 03–06 pending  
 **Context:** [02-CONTEXT.md](./02-CONTEXT.md)  
 **Research:** [02-RESEARCH.md](./02-RESEARCH.md) (skipped; CONTEXT + CONCERNS)
 
@@ -19,8 +19,8 @@ Wave 4: 02-06 (blocked gates honesty) — after 02-03
 
 | Plan | File | Depends on | Decisions |
 |------|------|------------|-----------|
-| 01 | [02-01-PLAN.md](./02-01-PLAN.md) | — | D-05, D-07, D-08, D-20 |
-| 02 | [02-02-PLAN.md](./02-02-PLAN.md) | 01 | D-06, D-08 |
+| 01 | [02-01-PLAN.md](./02-01-PLAN.md) — **done** | — | D-05, D-07, D-08, D-20 |
+| 02 | [02-02-PLAN.md](./02-02-PLAN.md) — **done** | 01 | D-06, D-08 |
 | 03 | [02-03-PLAN.md](./02-03-PLAN.md) | 02 | D-02, D-13, D-14, D-22 |
 | 04 | [02-04-PLAN.md](./02-04-PLAN.md) | 03 | D-02, D-13, D-20, D-21 |
 | 05 | [02-05-PLAN.md](./02-05-PLAN.md) | 01 | D-03, D-04, D-16, D-17, D-18, D-19 |
