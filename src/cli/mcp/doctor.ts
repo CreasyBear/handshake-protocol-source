@@ -32,6 +32,9 @@ export async function mcpDoctorCommand(input: { cwd: string }) {
     ],
     result: {
       ...local,
+      evidenceKind: "cli_diagnostic" as const,
+      liveHostVerificationStatus: "not_performed" as const,
+      configMutationPerformedByDoctor: false,
       attestationEvidence: {
         bindingDigestRefs: [
           local.configRef,
