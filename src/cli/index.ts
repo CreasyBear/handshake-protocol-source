@@ -15,6 +15,10 @@ export {
   runServiceBootstrap,
   serviceBootstrapCommand,
 } from "./service/bootstrap";
+export { hostDoctorCommand } from "./host/doctor";
+export { runAgentSpineQuickstart } from "./quickstart/agent-spine";
+export { runX402Quickstart } from "./quickstart/x402";
+export { simulateX402PaymentCommand } from "./simulate/x402-payment";
 export { CLI_SCHEMA_VERSION, cliOutput, cliNonClaims } from "./output";
 export type { CliOutputEnvelope } from "./output";
 export { supportBundleCommand } from "./support-bundle";

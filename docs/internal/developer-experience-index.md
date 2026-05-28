@@ -16,7 +16,7 @@ top-level Start Here paths.
 | ------- | ------- |
 | [service-operator-golden-path.md](./service-operator-golden-path.md) | Primary TTHW narrative |
 | `npm run demo:service-workflow-admission` | Canonical service-side admission demo |
-| `handshake service bootstrap` | Atomic install (plan 03 — coming) |
+| `handshake service bootstrap` | Atomic x402 catalog install (control-plane) |
 
 Vocabulary: [service-workflow-story.md](./service-workflow-story.md)
 
