@@ -6,6 +6,11 @@ import {
   type TransitionErrorRetryability,
 } from "../../protocol/foundation/errors";
 import { problemTypeUriForCode } from "../../protocol/foundation/reason-code-remediation/index";
+import {
+  classifyFailureClassFromProtocolError,
+  FailureClassSchema,
+  type FailureClass,
+} from "../../protocol/foundation/failure-class";
 import { resolveProtocolReasonCodeMetadata } from "../../protocol/foundation/reason-codes";
 import { JsonValueSchema } from "../../protocol/public/schemas";
 import type { TransitionCallerRole } from "../admission/caller-auth";
@@ -27,15 +32,7 @@ export const TransitionCommitStateSchema = z.enum([
   "not_applicable",
 ]);
 
-export const TransitionFailureClassSchema = z.enum([
-  "auth",
-  "hosted_admission",
-  "protected_action_refusal",
-  "proof_gap",
-  "replay_refusal",
-  "stale_admission",
-  "internal",
-]);
+export const TransitionFailureClassSchema = FailureClassSchema;
 
 export const TransitionFailurePhaseSchema = z.enum(["admission", "transition", "readback"]).nullable();
 
@@ -59,7 +56,7 @@ export const TransitionErrorResponseSchema = z.strictObject({
   error: TransitionErrorEnvelopeSchema,
 });
 
-export type TransitionFailureClass = z.infer<typeof TransitionFailureClassSchema>;
+export type TransitionFailureClass = FailureClass;
 export type TransitionFailurePhase = z.infer<typeof TransitionFailurePhaseSchema>;
 export type TransitionErrorEnvelope = z.infer<typeof TransitionErrorEnvelopeSchema>;
 export type TransitionErrorResponseBody = z.infer<typeof TransitionErrorResponseSchema>;
@@ -127,61 +124,17 @@ export function httpStatusForFailureClass(
   }
 }
 
-const internalMisconfigurationCodes = new Set([
-  "caller_auth_not_configured",
-  "hosted_admission_config_not_configured",
-  "hosted_admission_config_invalid",
-  "hosted_caller_verifier_not_configured",
-  "durable_store_unavailable",
-]);
-
 function isStaleHostedAdmissionCode(code: string): boolean {
-  return code.includes("stale") || code.includes("expired");
+  return code === "hosted_caller_identity_stale";
 }
 
 export function failureClassForProtocolError(error: HandshakeProtocolError): TransitionFailureClass {
-  const code = error.code;
-  if (internalMisconfigurationCodes.has(code)) return "internal";
-
-  const httpAdmission = httpTransitionErrorCodes.find((entry) => entry.code === code);
+  const httpAdmission = httpTransitionErrorCodes.find((entry) => entry.code === error.code);
   if (httpAdmission?.phase === "auth") return "auth";
   if (httpAdmission?.phase === "hosted_admission") {
-    return isStaleHostedAdmissionCode(code) ? "stale_admission" : "hosted_admission";
+    return isStaleHostedAdmissionCode(error.code) ? "stale_admission" : "hosted_admission";
   }
-
-  if (code.startsWith("caller_auth_")) return "auth";
-  if (code.startsWith("hosted_")) {
-    return isStaleHostedAdmissionCode(code) ? "stale_admission" : "hosted_admission";
-  }
-  if (code.includes("replay") || code === "idempotency_duplicate_authority" || code === "generated_execution_graph_nonce_replay") {
-    return "replay_refusal";
-  }
-  const metadata = resolveProtocolReasonCodeMetadata(code);
-  if (metadata) {
-    switch (metadata.kind) {
-      case "refusal":
-        return "protected_action_refusal";
-      case "proof_gap":
-        return "proof_gap";
-      case "gateway_decision":
-        return code.includes("replay") ? "replay_refusal" : "protected_action_refusal";
-      case "policy_decision":
-        return code.includes("refusal") || code.includes("refused") ? "protected_action_refusal" : "proof_gap";
-      case "isolation":
-        return "protected_action_refusal";
-      case "recovery":
-        return error.metadata.proofRef ? "proof_gap" : "protected_action_refusal";
-      case "protected_path_posture":
-        return code.includes("stale") ? "stale_admission" : "proof_gap";
-      default:
-        break;
-    }
-  }
-
-  if (error.metadata.refusalRef) return "protected_action_refusal";
-  if (error.metadata.proofRef) return "proof_gap";
-  if (error.status >= 500) return "internal";
-  return "internal";
+  return classifyFailureClassFromProtocolError(error);
 }
 
 export function failurePhaseForError(
