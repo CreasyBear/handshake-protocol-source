@@ -132,7 +132,8 @@ Follow the embedded x402 clearance cross-ref to
 path (`ActionContract → PolicyDecision → Greenlight → GatewayCheck`).
 
 The demo proves admission/handle projection only until you wire your own gateway
-adapter on Branch A routes.
+adapter on Branch A routes. Product test anchor:
+`test/product/service-workflow-admission.test.ts`.
 
 ### Proof-gap list (not runnable in phase 04)
 
