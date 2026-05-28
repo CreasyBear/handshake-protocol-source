@@ -13,7 +13,7 @@ export async function mcpDoctorCommand(input: { cwd: string }) {
 
   return cliOutput({
     command: "mcp doctor",
-    plane: "mcp",
+    plane: "operator",
     ok: local.status === "ready",
     reasonCodes: local.reasonCodes,
     nextAction: local.status === "ready" ? "read_result" : "fix_install",
@@ -36,13 +36,13 @@ export async function mcpDoctorCommand(input: { cwd: string }) {
       liveHostVerificationStatus: "not_performed" as const,
       configMutationPerformedByDoctor: false,
       attestationEvidence: {
-        bindingDigestRefs: [
-          local.configRef,
-          local.workspaceRef,
-          local.trustBundleRef,
-        ].filter(Boolean),
-        policyVersionDigest: local.policyVersionDigest ?? null,
-        gatewayReadinessDigest: local.gatewayReadinessDigest ?? null,
+        bindingDigestRefs: {
+          configRef: local.configRef,
+          workspaceRef: local.workspaceRef,
+          trustBundleRef: local.trustBundleRef,
+        },
+        policyVersionDigest: local.x402InstallRef,
+        gatewayReadinessDigest: local.x402GatewayReadinessRef,
       },
       attestationEvidenceRef: `handshake://local/mcp-doctor/${attestationDigest.slice("sha256:".length, "sha256:".length + 16)}`,
       attestationDigest,

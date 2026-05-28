@@ -36,13 +36,13 @@ export async function hostDoctorCommand(input: { cwd: string }) {
       liveHostVerificationStatus: "not_performed" as const,
       configMutationPerformedByDoctor: false,
       attestationEvidence: {
-        bindingDigestRefs: [
-          local.configRef,
-          local.workspaceRef,
-          local.trustBundleRef,
-        ].filter(Boolean),
-        policyVersionDigest: local.policyVersionDigest ?? null,
-        gatewayReadinessDigest: local.gatewayReadinessDigest ?? null,
+        bindingDigestRefs: {
+          configRef: local.configRef,
+          workspaceRef: local.workspaceRef,
+          trustBundleRef: local.trustBundleRef,
+        },
+        policyVersionDigest: local.x402InstallRef,
+        gatewayReadinessDigest: local.x402GatewayReadinessRef,
       },
       attestationEvidenceRef: `handshake://local/host-doctor/${attestationDigest.slice("sha256:".length, "sha256:".length + 16)}`,
       attestationDigest,
