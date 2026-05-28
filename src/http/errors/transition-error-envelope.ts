@@ -136,12 +136,11 @@ const internalMisconfigurationCodes = new Set([
 ]);
 
 function isStaleHostedAdmissionCode(code: string): boolean {
-  return code === "hosted_caller_identity_stale";
+  return code.includes("stale") || code.includes("expired");
 }
 
 export function failureClassForProtocolError(error: HandshakeProtocolError): TransitionFailureClass {
   const code = error.code;
-  if (code === "recovery_terminal_conflict") return "protected_action_refusal";
   if (internalMisconfigurationCodes.has(code)) return "internal";
 
   const httpAdmission = httpTransitionErrorCodes.find((entry) => entry.code === code);
