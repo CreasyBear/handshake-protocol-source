@@ -17,6 +17,7 @@ import type {
 } from "../../protocol/areas/operation-lifecycle";
 import { digestCanonical } from "../../protocol/foundation/canonical";
 import { DigestSchema } from "../../protocol/foundation/schema-core";
+import { HandshakeProtocolError } from "../../protocol/foundation/errors";
 import {
   authMdProtectedApiCallRefusalReasonCodes,
   AuthMdProtectedApiCallParametersSchema,
@@ -135,9 +136,40 @@ export async function runAuthMdProtectedApiCallGateway(
     return { outcome, gatewayCheck, credentialResolutionEvidence: null, reconciliation: null, apiCallEvidence: null };
   }
 
+  const unsafeObservedReasons = authMdGatewayUnsafeObservedParameterReasons(observedParameters);
+  if (unsafeObservedReasons.length > 0) {
+    const failureEvidence = await redactedAuthMdFailureEvidence({
+      surfaceOperationRef,
+      error: new HandshakeProtocolError(
+        unsafeObservedReasons[0] ?? "auth_md_gateway_observed_parameters_refused",
+        `auth.md gateway refused unsafe observed parameters: ${unsafeObservedReasons.join(",")}`,
+        409,
+        { refusalRef: `refusal:auth-md-unsafe:${verifiedGate.gateAttemptId}` },
+      ),
+    });
+    const { reconciliation } = await input.protocol.reconcileSurfaceOperation({
+      mutationAttemptId: verifiedGate.mutationAttemptId,
+      idempotencyKey: verifiedGate.idempotencyKey,
+      observedSurfaceOperationRef: surfaceOperationRef,
+      observedDownstreamStatus: "refused",
+      ...failureEvidence,
+      evidenceRefs: [
+        ...(failureEvidence.evidenceRefs ?? []),
+        ...unsafeObservedReasons.map((reasonCode) => `reason_code:${reasonCode}`),
+      ],
+      resolvedProofGapIds: [],
+    });
+    return {
+      outcome: "protected_api_call_failed",
+      gatewayCheck,
+      credentialResolutionEvidence: null,
+      reconciliation,
+      apiCallEvidence: null,
+    };
+  }
+
   let credentialResolutionEvidence: CredentialResolutionEvidence | null = null;
   try {
-    assertNoGatewayUnsafeObservedParameters(observedParameters);
     const providerRefs = providerRefsForGate(verifiedGate);
     credentialResolutionEvidence = await input.protocol.recordCredentialResolutionEvidence({
       actionContractId: input.actionContractId,
@@ -222,8 +254,8 @@ export async function runAuthMdProtectedApiCallGateway(
   }
 }
 
-function assertNoGatewayUnsafeObservedParameters(parameters: AuthMdProtectedApiCallParameters): void {
-  const reasons = authMdProtectedApiCallRefusalReasonCodes({
+function authMdGatewayUnsafeObservedParameterReasons(parameters: AuthMdProtectedApiCallParameters): string[] {
+  const reasons = [...authMdProtectedApiCallRefusalReasonCodes({
     principalIntentRef: "gateway-observed:auth-md-protected-api-call",
     generatedCodeOrSpecRef: "gateway-observed:auth-md-protected-api-call",
     protectedResource: parameters.protectedResource,
@@ -249,16 +281,14 @@ function assertNoGatewayUnsafeObservedParameters(parameters: AuthMdProtectedApiC
     dynamicEndpointConstructionObserved: parameters.dynamicEndpointConstructionObserved,
     dynamicHostConstructionObserved: parameters.dynamicHostConstructionObserved,
     retryAuthorityReuseDetected: parameters.retryAuthorityReuseDetected,
-  });
-  if (reasons.length > 0) {
-    throw new Error(`auth.md gateway refused unsafe observed parameters: ${reasons.join(",")}`);
-  }
+  })];
   if (
     new URL(parameters.protectedResource).origin !== parameters.protectedResourceOrigin ||
     new URL(parameters.endpointUrl).origin !== parameters.endpointOrigin
   ) {
-    throw new Error("auth.md gateway refused origin field drift in observed parameters");
+    reasons.push("auth_md_protected_resource_origin_mismatch");
   }
+  return reasons;
 }
 
 async function credentialResolutionRequestDigest(
