@@ -61,6 +61,18 @@ describe("transition error failureClass taxonomy", () => {
     expect(gapClassified.body.error.failureClass).toBe("proof_gap");
   });
 
+  it("preserves explicit HTTP status for ingress-shaping transition error codes", () => {
+    for (const scenario of [
+      { code: "invalid_request" as const, status: 400 },
+      { code: "record_not_found" as const, status: 404 },
+      { code: "transition_request_body_too_large" as const, status: 413 },
+    ]) {
+      const error = new HandshakeProtocolError(scenario.code, "Ingress shaping.", scenario.status);
+      expect(failureClassForProtocolError(error)).toBe("internal");
+      expect(transitionErrorResult(error).status).toBe(scenario.status);
+    }
+  });
+
   it("maps replay refusals to 409 replay_refusal", () => {
     const replay = new HandshakeProtocolError(
       "credential_resolution_replay_refused",

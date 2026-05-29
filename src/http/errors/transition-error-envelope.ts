@@ -130,9 +130,14 @@ function isStaleHostedAdmissionCode(code: string): boolean {
 
 export function failureClassForProtocolError(error: HandshakeProtocolError): TransitionFailureClass {
   const httpAdmission = httpTransitionErrorCodes.find((entry) => entry.code === error.code);
-  if (httpAdmission?.phase === "auth") return "auth";
-  if (httpAdmission?.phase === "hosted_admission") {
-    return isStaleHostedAdmissionCode(error.code) ? "stale_admission" : "hosted_admission";
+  if (httpAdmission) {
+    if (httpAdmission.phase === "auth") return "auth";
+    if (httpAdmission.phase === "hosted_admission") {
+      return isStaleHostedAdmissionCode(error.code) ? "stale_admission" : "hosted_admission";
+    }
+    // Ingress/request-shaping HTTP codes (400/404/413, etc.) are not clearance refusals.
+    // Keep failureClass internal so httpStatusForFailureClass honors error.status.
+    return "internal";
   }
   return classifyFailureClassFromProtocolError(error);
 }

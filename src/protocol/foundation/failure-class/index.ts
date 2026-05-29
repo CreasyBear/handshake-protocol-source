@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { isRegisteredHttpTransitionErrorCode } from "../../../http/errors/codes";
 import { HandshakeProtocolError } from "../errors";
 import {
   resolveProtocolReasonCodeMetadata,
@@ -117,6 +118,7 @@ export function classifyFailureClassFromProtocolError(error: HandshakeProtocolEr
   if (error.metadata.refusalRef) return "protected_action_refusal";
   if (error.metadata.proofRef) return "proof_gap";
   if (error.status >= 500) return "internal";
+  if (isRegisteredHttpTransitionErrorCode(code)) return "internal";
   if (error.status >= 400 && error.status < 500) return "protected_action_refusal";
   return "internal";
 }
