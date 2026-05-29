@@ -1,0 +1,42 @@
+{
+  "signedChain": {
+    "version": 1,
+    "principal_pk": "79b5562e8fe654f94078b112e8a98ba7901f853ae695bed7e0e3910bad049664",
+    "principal_scope": "57863a5078fab7c149cbc8cbb1399a28aad3203f88918c288fadf34435d03e7c",
+    "certs": [
+      {
+        "version": 1,
+        "delegator_pk": "79b5562e8fe654f94078b112e8a98ba7901f853ae695bed7e0e3910bad049664",
+        "delegate_pk": "e7f162a10bec559afea195e4dce84b69568d5d2cb0963eb446c0685e2b17f2f0",
+        "scope_root": "57863a5078fab7c149cbc8cbb1399a28aad3203f88918c288fadf34435d03e7c",
+        "scope_proof": {
+          "subset_intents": [],
+          "proofs": []
+        },
+        "nonce": "0405060708090a0b0c0d0e0f10111213",
+        "issued_at": 1699992800,
+        "expiration_unix": 1699996400,
+        "max_depth": 8,
+        "extensions": {
+          "fields": {}
+        },
+        "signature": "6c677bab4907d661de8bed1a8a26a8abbd8ca4b2636b4e9829048e02fdb9a0baf98ba0bc62e2d389e4fdb83342b26c297105f352d0e8d9d31f7912dcd3c87c07"
+      }
+    ]
+  },
+  "executorPk": "e7f162a10bec559afea195e4dce84b69568d5d2cb0963eb446c0685e2b17f2f0",
+  "intentHash": "57863a5078fab7c149cbc8cbb1399a28aad3203f88918c288fadf34435d03e7c",
+  "merkleProof": {
+    "siblings": []
+  },
+  "nowUnix": 1700000000,
+  "driftToleranceSecs": 15,
+  "expected": {
+    "valid": false,
+    "chainFingerprint": "a5ce1b9dc494f472548f0d530e9fc0be9b91ba90152f7a5c142e6f820bfac23d",
+    "certFingerprints": [
+      "167ba5f5642502c7ab7c78ed6dceae8d46bfbf212c2bf4a54cf975730a87c357"
+    ],
+    "reasonCode": "delegation_evidence_invalid:expired"
+  }
+}
