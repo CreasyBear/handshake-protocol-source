@@ -2,7 +2,7 @@
 
 Last protocol audit: 2026-05-24.
 
-For the canonical definition, see `docs/internal/protocol-definition.md`. For the architecture and schema map, see `docs/internal/protocol-kernel-architecture.md`. For the plain-English translation, see `docs/internal/protocol-layman.md`. This file keeps implementation-facing protocol notes compact.
+For the canonical definition, see `docs/internal/protocol-definition.md`. For the architecture and schema map, see `docs/internal/protocol-kernel-architecture.md`. For the plain-English translation, see `docs/internal/protocol-layman.md`. For A1 delegation evidence composability (evidence-only; does not create authority), see `docs/internal/a1-handshake-composability.md` and **D-72** in `docs/internal/decisions.md`. This file keeps implementation-facing protocol notes compact.
 
 ## Primitive
 
