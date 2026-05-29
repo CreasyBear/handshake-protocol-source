@@ -1,10 +1,9 @@
 import { PROTOCOL_VERSION } from "../../protocol/public/schemas";
 import {
-  failureClassForProtocolError,
   TransitionErrorResponseSchema,
   type TransitionErrorEnvelope,
 } from "../../http/errors/transition-error-envelope";
-import { HandshakeProtocolError } from "../../protocol/foundation/errors";
+import { failureClassFromHttpStatus } from "../../protocol/foundation/failure-class";
 import {
   HANDSHAKE_ORIGINATING_IDENTITY_HEADER,
   HANDSHAKE_PROTOCOL_VERSION_HEADER,
@@ -74,9 +73,7 @@ export class RoleScopedTransport {
     const parsedBody = await parseJsonBody(response);
     const parsedError = TransitionErrorResponseSchema.safeParse(parsedBody);
     if (parsedError.success) return parsedError.data.error;
-    const failureClass = failureClassForProtocolError(
-      new HandshakeProtocolError("http_error", `HTTP ${response.status}`, response.status),
-    );
+    const failureClass = failureClassFromHttpStatus(response.status);
     return {
       code: "http_error",
       message: `Handshake request failed with HTTP ${response.status}.`,

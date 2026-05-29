@@ -28,6 +28,40 @@ describe("role-scoped SDK failureClass", () => {
     });
   });
 
+  it("preserves failureClass from HTTP status when error body is empty or malformed", async () => {
+    for (const scenario of [
+      { status: 401, failureClass: "auth" as const },
+      { status: 409, failureClass: "protected_action_refusal" as const },
+      { status: 422, failureClass: "proof_gap" as const },
+    ]) {
+      const emptyBodyClient = new GatewayClient(
+        "http://handshake.test",
+        { roleCredential: "gateway-token" },
+        async () => new Response("", { status: scenario.status }),
+      );
+      await expect(emptyBodyClient.gatewayCheck(minimalGatewayCheckInput())).rejects.toMatchObject({
+        status: scenario.status,
+        failureClass: scenario.failureClass,
+        code: "http_error",
+      });
+
+      const malformedBodyClient = new GatewayClient(
+        "http://handshake.test",
+        { roleCredential: "gateway-token" },
+        async () =>
+          new Response("<html>upstream</html>", {
+            status: scenario.status,
+            headers: { "content-type": "text/html" },
+          }),
+      );
+      await expect(malformedBodyClient.gatewayCheck(minimalGatewayCheckInput())).rejects.toMatchObject({
+        status: scenario.status,
+        failureClass: scenario.failureClass,
+        code: "http_error",
+      });
+    }
+  });
+
   it("returns evidence readback without HandshakeClientError on HTTP 200", async () => {
     const actionContractId = "contract_evidence_demo";
     const evidenceClient = new EvidenceClient(
