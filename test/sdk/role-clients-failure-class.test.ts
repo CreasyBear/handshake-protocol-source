@@ -9,11 +9,7 @@ import {
 
 describe("role-scoped SDK failureClass", () => {
   it("surfaces protected_action_refusal on policy refusal with HTTP 409", async () => {
-    const policyClient = new PolicyClient(
-      "http://handshake.test",
-      { roleCredential: "policy-token", role: "runtime_evidence" },
-      errorFetch(409, policyRefusalEnvelope()),
-    );
+    const policyClient = new PolicyClient("http://handshake.test", { roleCredential: "policy-token" }, errorFetch(409, policyRefusalEnvelope()));
 
     await expect(policyClient.evaluatePolicy(minimalEvaluatePolicyInput())).rejects.toMatchObject({
       status: 409,
@@ -23,15 +19,9 @@ describe("role-scoped SDK failureClass", () => {
   });
 
   it("surfaces auth failureClass on missing bearer with HTTP 401", async () => {
-    const gatewayClient = new GatewayClient(
-      "http://handshake.test",
-      { roleCredential: "gateway-token", role: "gateway_custody" },
-      errorFetch(401, authEnvelope()),
-    );
+    const gatewayClient = new GatewayClient("http://handshake.test", { roleCredential: "gateway-token" }, errorFetch(401, authEnvelope()));
 
-    await expect(
-      gatewayClient.gatewayCheck(minimalGatewayCheckInput()),
-    ).rejects.toMatchObject({
+    await expect(gatewayClient.gatewayCheck(minimalGatewayCheckInput())).rejects.toMatchObject({
       status: 401,
       failureClass: "auth",
       code: "caller_auth_required",
@@ -104,17 +94,15 @@ function authEnvelope() {
 function minimalEvaluatePolicyInput() {
   return {
     actionContractId: "contract_demo",
-    policyPackRef: "policy:demo",
-    policyPackVersion: "v1",
-    evaluationDigest: `sha256:${"b".repeat(64)}`,
+    envelopeId: "env_demo",
+    signingSecret: "test-secret",
   };
 }
 
 function minimalGatewayCheckInput() {
   return {
     actionContractId: "contract_demo",
-    gatewayRegistryEntryId: "gateway_demo",
-    gatewayCheckDigest: `sha256:${"c".repeat(64)}`,
-    idempotencyKey: "idem_demo",
+    greenlightId: "greenlight_demo",
+    observedParameters: { atomicAmount: "1000" },
   };
 }

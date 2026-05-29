@@ -13,6 +13,7 @@ import {
   x402DelegatedSpendAuthorityBindingFor,
   x402WalletGatewayCredentialBindingFor,
 } from "../../src/adapters/x402-payment/install-proposal";
+import { requireInstallProposalGatewayRegistryEntry } from "../../src/install/install-proposal";
 import { runX402WalletGateway, type X402PaymentParameters } from "../../src/adapters/x402-payment/wallet-gateway";
 import { runPackageInstallGateway } from "../../src/adapters/package-install/gateway";
 import { digestCanonical } from "../../src/protocol/foundation/canonical";
@@ -29,6 +30,7 @@ import {
   packageInstallRuntimeConfig,
 } from "../support/package-install-flow";
 import { futureIso, makeKernelFixture, registerFixtureObjects } from "../support/fixtures";
+import { localX402PaymentAttemptBindings } from "../support/install-proposal-helpers";
 
 const ED25519_ALGORITHM = { name: "Ed25519" } as Algorithm;
 const x402Digest = `sha256:${"a".repeat(64)}` as const;
@@ -83,6 +85,7 @@ describe("adapter-backed APS proof spine", () => {
             asset: x402.proposal.endpointEvidence.token,
             payTo: x402.proposal.endpointEvidence.payee,
             maxTimeoutSeconds: 60,
+            selectedPaymentRequirementIndex: 0,
             selectedPaymentRequirementDigest: x402SelectedPaymentRequirementDigest,
             sdkPackageVersions: x402SdkPackageVersions,
             extensionKeys: ["payment-identifier"],
@@ -419,6 +422,7 @@ async function greenlitX402Contract() {
           atomicAmount: "2500",
           paymentRequirementsDigest: x402.proposal.endpointEvidence.paymentRequirementsDigest,
           paymentRequiredEvidenceRef: "evidence:x402-payment-required",
+          ...localX402PaymentAttemptBindings(),
         },
       ],
     },
@@ -441,7 +445,7 @@ async function installX402ProofProfile(fixture: ReturnType<typeof makeKernelFixt
   await fixture.kernel.putCatalogObject({ objectType: "action_type", payload: records.actionType });
   await fixture.kernel.putCatalogObject({
     objectType: "gateway_registry_entry",
-    payload: records.gatewayRegistryEntry,
+    payload: requireInstallProposalGatewayRegistryEntry(records.gatewayRegistryEntry),
   });
   await fixture.kernel.putCatalogObject({ objectType: "operating_envelope", payload: records.operatingEnvelope });
   const credentialRef = await registerX402WalletCredentialRef(fixture, proposal, records);
@@ -459,15 +463,15 @@ async function installX402ProofProfile(fixture: ReturnType<typeof makeKernelFixt
       operatingEnvelopeId: records.operatingEnvelope.envelopeId,
       toolCatalogRef: `${records.toolCapability.toolCatalogId}@${records.toolCapability.toolCatalogVersion}`,
       actionCatalogRef: `${records.actionType.actionCatalogId}@${records.actionType.actionCatalogVersion}`,
-      gatewayRegistryRef: `gateway_registry@${records.gatewayRegistryEntry.gatewayRegistryVersion}`,
+      gatewayRegistryRef: `gateway_registry@${(requireInstallProposalGatewayRegistryEntry(records.gatewayRegistryEntry)).gatewayRegistryVersion}`,
       gatewayReadinessRef: "handshake://local/x402/gateway-readiness.json",
       gatewayReadinessDigest: x402Digest,
       policyVersionRef: `${proposal.policyPackRef}@${proposal.policyPackVersion}`,
       policyVersionDigest: x402Digest,
       toolCapabilityId: records.toolCapability.toolCapabilityId,
       actionTypeId: records.actionType.actionTypeId,
-      gatewayRegistryEntryId: records.gatewayRegistryEntry.gatewayRegistryEntryId,
-      gatewayId: records.gatewayRegistryEntry.gatewayId,
+      gatewayRegistryEntryId: (requireInstallProposalGatewayRegistryEntry(records.gatewayRegistryEntry)).gatewayRegistryEntryId,
+      gatewayId: (requireInstallProposalGatewayRegistryEntry(records.gatewayRegistryEntry)).gatewayId,
       gatewayCredentialBinding: x402WalletGatewayCredentialBindingFor(credentialRef),
       delegatedAuthorityBinding: x402DelegatedSpendAuthorityBindingFor(authorityRef),
       maxAtomicAmountPerCall: proposal.spendBounds.maxAtomicAmountPerCall,
@@ -488,7 +492,7 @@ async function recordGatewayCheckedX402Posture(
       tenantId: proposal.tenantId,
       organizationId: proposal.organizationId,
       runtimeAdapterId: records.toolCapability.runtimeAdapterId,
-      gatewayId: records.gatewayRegistryEntry.gatewayId,
+      gatewayId: (requireInstallProposalGatewayRegistryEntry(records.gatewayRegistryEntry)).gatewayId,
       actionClass: "x402_payment.exact",
       resourceRef: proposal.resourceRef,
       protectedSurfaceKind: "x402_payment",
@@ -516,7 +520,7 @@ async function recordGatewayCheckedX402Posture(
     tenantId: proposal.tenantId,
     organizationId: proposal.organizationId,
     runtimeAdapterId: records.toolCapability.runtimeAdapterId,
-    gatewayId: records.gatewayRegistryEntry.gatewayId,
+    gatewayId: (requireInstallProposalGatewayRegistryEntry(records.gatewayRegistryEntry)).gatewayId,
     actionClass: "x402_payment.exact",
     resourceRef: proposal.resourceRef,
     protectedSurfaceKind: "x402_payment",

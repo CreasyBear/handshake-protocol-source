@@ -35,6 +35,7 @@ import {
   type RuntimeClientOptions,
 } from "handshake-protocol-kernel/sdk/role-clients";
 import type { InstallProposal } from "../../src/install";
+import { requireInstallProposalGatewayRegistryEntry } from "../../src/install/install-proposal";
 import { makeKernelFixture } from "../support/fixtures";
 
 describe("role-scoped SDK clients", () => {
@@ -519,7 +520,9 @@ function installSetupResponse(body: unknown): unknown {
     recordRefs: {
       toolCapabilityId: proposal.compiledRecords.toolCapability.toolCapabilityId,
       actionTypeId: proposal.compiledRecords.actionType.actionTypeId,
-      gatewayRegistryEntryId: proposal.compiledRecords.gatewayRegistryEntry.gatewayRegistryEntryId,
+      gatewayRegistryEntryId: requireInstallProposalGatewayRegistryEntry(
+        proposal.compiledRecords.gatewayRegistryEntry,
+      ).gatewayRegistryEntryId,
       operatingEnvelopeId: proposal.compiledRecords.operatingEnvelope.envelopeId,
     },
     refusal: null,

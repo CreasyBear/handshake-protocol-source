@@ -1,4 +1,5 @@
 import { describe, expect, it } from "bun:test";
+import type { InstallProposal } from "../../src/install";
 import { PROTOCOL_VERSION } from "../../src/protocol/public/schemas";
 import {
   ControlPlaneClient,
@@ -8,9 +9,11 @@ import {
   RuntimeClient,
   type HandshakeFetch,
 } from "../../src/sdk/surface-clients";
+import { futureIso, makeKernelFixture, makePackageInstallCandidate } from "../support/fixtures";
 
 describe("Tier-1 SDK role-clients walkthrough", () => {
   it("composes Tier-1 clients with distinct roles and no bundled execute", async () => {
+    const fixture = makeKernelFixture();
     const calls: Array<{ path: string; authorization: string | null }> = [];
     const fetchImpl: HandshakeFetch = async (_input, init) => {
       const path = new URL(String(_input)).pathname;
@@ -31,18 +34,25 @@ describe("Tier-1 SDK role-clients walkthrough", () => {
       fetchImpl,
     );
     await controlPlane.registerDelegatedAuthorityRef({
-      delegatedAuthorityRefId: "delegated_demo",
-      tenantId: "tenant_demo",
-      organizationId: "org_demo",
-      principalId: "principal_demo",
-      agentId: "agent_demo",
+      tenantId: fixture.envelope.tenantId,
+      organizationId: fixture.envelope.organizationId,
+      principalId: fixture.envelope.principalId,
+      agentId: fixture.envelope.agentId,
+      runtimeAdapterId: fixture.tool.runtimeAdapterId,
+      operatingEnvelopeId: fixture.envelope.envelopeId,
+      gatewayId: fixture.gateway.gatewayId,
+      gatewayRegistryEntryId: fixture.gateway.gatewayRegistryEntryId,
+      protectedSurfaceKind: fixture.actionType.protectedSurfaceKind,
+      actionClasses: [fixture.actionType.actionClass],
+      resourceRefs: [fixture.envelope.allowedResources[0] ?? "*"],
       authorityKind: "spend",
-      policyPackRef: "policy:demo",
-      policyPackVersion: "v1",
-      maxAtomicAmountPerCall: "1000",
-      delegatedAuthorityRefDigest: `sha256:${"a".repeat(64)}`,
-      status: "active",
+      grantStatus: "active",
+      policyPackRef: fixture.envelope.policyPackRef,
+      policyPackVersion: fixture.envelope.policyPackVersion,
+      amountParameterName: "atomicAmount",
+      maxAtomicAmountPerAction: "1000",
       evidenceExpectationRefs: [],
+      expiresAt: futureIso(),
     });
 
     const runtime = new RuntimeClient(
@@ -57,59 +67,32 @@ describe("Tier-1 SDK role-clients walkthrough", () => {
       principalId: "principal_demo",
       agentId: "agent_demo",
       runId: "run_demo",
-      runtimeAdapterId: "runtime_demo",
-      operatingEnvelopeId: "env_demo",
-      toolCatalogRef: "tool_catalog@v1",
-      actionCatalogRef: "action_catalog@v1",
+      runtimeAdapterId: "runtime_codex",
+      operatingEnvelopeId: fixture.envelope.envelopeId,
+      toolCatalogRef: "tool_catalog_demo@v1",
+      actionCatalogRef: "action_catalog_demo@v1",
       gatewayRegistryRef: "gateway_registry@v1",
-      generatedCodeOrSpecRefs: ["code:demo"],
-      declaredAssumptions: [],
-      requiredEvidenceRefs: [],
-      candidate: {
-        candidateActionId: "candidate_demo",
-        toolCapabilityId: "tool_demo",
-        actionTypeId: "action_demo",
-        gatewayRegistryEntryId: "gateway_demo",
-        protectedSurfaceKind: "http_api",
-        resourceRef: "https://api.example/resource",
-        humanSummary: "demo",
-        paramsDigest: `sha256:${"b".repeat(64)}`,
-        candidateDigest: `sha256:${"c".repeat(64)}`,
-        sequencingDependencies: [],
-        rollbackExpectations: [],
-        evidenceExpectations: [],
-        uncertaintyMarkers: [],
-      },
+      candidate: makePackageInstallCandidate(fixture),
     });
 
-    const policy = new PolicyClient(
-      "http://handshake.test",
-      { roleCredential: "control-token", role: "runtime_evidence" },
-      fetchImpl,
-    );
+    const policy = new PolicyClient("http://handshake.test", { roleCredential: "control-token" }, fetchImpl);
     await policy.evaluatePolicy({
       actionContractId: "contract_demo",
-      policyPackRef: "policy:demo",
-      policyPackVersion: "v1",
-      evaluationDigest: `sha256:${"d".repeat(64)}`,
+      envelopeId: fixture.envelope.envelopeId,
+      signingSecret: "test-secret",
     });
 
-    const gateway = new GatewayClient(
-      "http://handshake.test",
-      { roleCredential: "gateway-token", role: "gateway_custody" },
-      fetchImpl,
-    );
+    const gateway = new GatewayClient("http://handshake.test", { roleCredential: "gateway-token" }, fetchImpl);
     await gateway.gatewayCheck({
       actionContractId: "contract_demo",
-      gatewayRegistryEntryId: "gateway_demo",
-      gatewayCheckDigest: `sha256:${"e".repeat(64)}`,
-      idempotencyKey: "idem_first",
+      greenlightId: "greenlight_demo",
+      observedParameters: { package: "hono" },
     });
     await gateway.gatewayCheck({
       actionContractId: "contract_demo",
-      gatewayRegistryEntryId: "gateway_demo",
-      gatewayCheckDigest: `sha256:${"f".repeat(64)}`,
-      idempotencyKey: "idem_retry",
+      greenlightId: "greenlight_demo_retry",
+      observedParameters: { package: "hono" },
+      surfaceOperationRef: "surface-op:retry",
     });
 
     const roles = new Set(calls.map((call) => call.authorization));
@@ -122,7 +105,7 @@ describe("Tier-1 SDK role-clients walkthrough", () => {
   });
 });
 
-function minimalInstallProposal() {
+function minimalInstallProposal(): InstallProposal {
   return {
     installProposalId: "install_walkthrough",
     schemaVersion: PROTOCOL_VERSION,
