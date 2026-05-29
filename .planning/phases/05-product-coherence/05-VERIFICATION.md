@@ -6,7 +6,7 @@ score: 13/13
 overrides_applied: 0
 health:
   tsc: "0 errors (npx tsc --noEmit)"
-  bun_test: "846 pass / 3 fail (849 total)"
+  bun_test: "849 pass / 3 fail (852 total)"
   acceptable_failures:
     - "repo naming posture > keeps workspace metadata junk out of active repo surfaces"
     - "repo naming posture > keeps deleted scratch documents out of the active tree"
@@ -167,22 +167,25 @@ Acceptable test residuals (846/849) match Phase 04 baseline — not new Phase 05
 ## Close-out reconciliation
 
 **When:** 2026-05-29 (local Phase 04+05 close-out; no push/PR/npm publish)  
-**Base:** `6e23848` on `phase-05-product-coherence`
+**Base:** `e60fc87` on `phase-05-product-coherence`
 
 **Fixes applied:**
 
 - `05-KEEL-AUDIT.md` Table A row 2 retargeted from `candidate-decision.ts:39` (`generated_execution_graph_missing`, D-66) to `candidate-decision.ts:67` (`unknown_operating_envelope`) plus `deriveEnvelopeReasonCodes` at `:165-185`. Row 3 remains the agent-origin graph site; rows are not redundant.
+- **05-REVIEW HR-01 + MR-01** resolved @ `e60fc87`: registry-first `FailureClass` derivation in `classifyFailureClassFromReasonCode` (`src/protocol/foundation/failure-class/index.ts:132-143`); parity tests in `test/protocol/failure-class-taxonomy.test.ts`.
+
+**Deferred (non-blocking, recorded in `CONCERNS.md`):** MR-02 (SDK 409 fallback), MR-03 (auth.md custody binding), MR-04 (x402 gateway catch collapse).
 
 **Health re-run at close-out:**
 
 | Gate | Result |
 |------|--------|
 | `npx tsc --noEmit` | 0 errors |
-| `bun test` | 846 pass / 3 fail (849 total) — only `repo naming posture` (2) + `manifest coverage` (1) |
+| `bun test` | 849 pass / 3 fail (852 total) — only `repo naming posture` (2) + `manifest coverage` (1) |
 | `check-service-agent-gating-phase --tier operator` | 10/10 |
 | `check-service-agent-gating-phase --tier full` | 15/15 |
 
-**05-REVIEW.md:** Not available after ~5 min poll (11×20s); close-out treated as provisional on independent code review only. No CRITICAL/HIGH code fixes were pending in Phase-05 radius beyond the keel citation (planning artifact).
+**05-REVIEW.md:** Complete — **SHIP-WITH-FIXES**, HR-01 resolved, 3 non-blocking MRs deferred. Review no longer provisional.
 
 **Remote ship:** Deferred — gh CLI absent + npm 401 per operator instruction.
 

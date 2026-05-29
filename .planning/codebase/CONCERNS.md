@@ -1,350 +1,304 @@
 # Codebase Concerns
 
-**Analysis Date:** 2026-05-28
+**Analysis Date:** 2026-05-29  
+**Branch:** `phase-05-product-coherence` @ `aef9478`  
+**Prior map:** 2026-05-28 (authority-boundary narrative; superseded by this pass)
 
-## Priority Authority-Boundary Risks
-
-These four areas are the highest-risk confusion points for future implementation. Treat any surface that records, projects, or readbacks evidence as **advisory until a gateway check owns the mutation credential** and verifies the exact one-use greenlight.
-
-### Gateway enforcement vs advisory surfaces
-
-**What is actually enforced:** Only the gateway check path in `src/adapters/x402-payment/wallet-gateway.ts` (and analogous adapter gateways) may invoke signers after a verified one-use greenlight. Policy in `src/protocol/areas/policy-greenlight/` authorizes one attempt; storage atomicity in `src/storage/d1/index.ts` and `src/storage/memory/index.ts` binds consumption.
-
-**What is advisory only (must not be sold as enforcement):**
-
-| Surface class | Location | Risk if misread |
-|---------------|----------|-----------------|
-| Runtime ingress | `src/runtime/ingress/index.ts`, `src/runtime/LANE.md` | Proposal/refusal evidence mistaken for gateway enforcement |
-| Generated graph / codemode | `src/runtime/codemode-multi-action/generated-graph-evidence.ts` | `commandRiskClassifierPosture: "advisory_no_match"` is not a gate |
-| MCP x402 proposal | `src/mcp/x402-proposal.ts` | Tool output can look precise while runtime rejects the shape |
-| Service workflow admission | `src/surfaces/service-workflow-admission/index.ts` | Handle/admission correlation mistaken for clearance or reusable auth |
-| A2A ingress admission | `src/surfaces/a2a-negotiation-support/ingress-admission.ts` | Normalization readiness mistaken for policy/greenlight/gateway |
-| Proof packets | `src/surfaces/proof-packets/` | Blocked/incomplete packets mistaken for live execution proof |
-| SDK repair | `src/sdk/repair.ts` | Remediation hints mistaken for authority recovery |
-| CLI doctor/quality/simulate | `src/cli/host/doctor.ts`, `src/cli/mcp/doctor.ts`, `src/cli/quality/report.ts`, `src/cli/simulate/x402-payment.ts` | Diagnostics mistaken for protected-action clearance |
-| Evidence projections | `src/protocol/evidence-projections/store-reader.ts` | Readback timelines mistaken for mutation proof |
-
-**Architecture tests that encode this split:** `test/architecture/claim-boundary.test.ts`, `test/architecture/surface-boundary-posture.test.ts`, `test/architecture/workflow-admission-boundary.test.ts`, `test/architecture/mcp-surface-posture.test.ts`, `test/architecture/cli-command-posture.test.ts`.
-
-**Safe modification:** Before any new export, CLI command, MCP tool, HTTP route, or package subpath ships, declare in `src/surfaces/boundary-manifest.ts` whether it is `setup_only`, `evidence_only`, `policy_transition_transport`, or true gateway-adjacent—and keep model/operator surfaces off authority route families.
-
-### Generated-code bypass
-
-**Current registered interception:** `src/runtime/ingress/registry.ts` registers only `package_install`, `x402_payment`, and `auth_md_protected_api_call`. Host profiles in `src/adapters/x402-payment/protected-tool-profile/` and bypass probes in `src/adapters/x402-payment/bypass-probes.ts` record posture for named adapters, not host-wide containment.
-
-**Proof gaps (explicit in source and gates):**
-
-- Host-wide containment: `src/surfaces/proof-packets/host-generated-code-containment.ts` — `scripts/check-host-generated-code-containment.mjs --expect-status blocked`
-- Raw sibling routes, dynamic dispatch, truncated graphs: tested locally in `test/runtime/runtime-ingress.test.ts` and host bypass harnesses, not proven across every host path
-- Codemode multi-action loops/retries: `src/runtime/codemode-multi-action/` compiles candidates; advisory classifiers do not block execution
-- A2A adapter moves: `src/surfaces/a2a-negotiation-support/move-compiler.ts` compiles external protocol moves into evidence; gateway still required for the one exact protected action
-
-**Failure mode:** Generated code calls an unwrapped consequential tool, uses stale review UI, or retries with a different contract while a prior greenlight is consumed—Handshake records refusal/proof gap only on paths that reach the wrapped dispatcher.
-
-**Safe modification:** Add each new family through registry + family schemas + bypass probes + architecture tests together. Never infer containment from transcript summaries or activation proof packets.
-
-### Receipt and evidence theatre
-
-**Distinct evidence types that must not collapse:**
-
-1. **Gateway check** — verified binding to exact greenlight and contract digest (`src/protocol/areas/gateway-gate/`)
-2. **Downstream execution** — observed mutation result; may be unknown/suspect (`src/protocol/areas/receipt-export/`, proof-gap paths)
-3. **Readback/projection** — assembled for humans/agents (`src/protocol/evidence-projections/projections.ts`, `src/protocol/evidence-projections/store-reader.ts`)
-4. **Terminal certificate** — signed terminal evidence only; not permission (`src/protocol/areas/authority-certificate/`)
-5. **Proof packet** — distribution/activation/containment readback with explicit `authorityBoundary.createsAuthority: false`
-
-**Theatre patterns to refuse:**
-
-- Service workflow handle or A2A agreement acceptance displayed as if it were a receipt (`readbackBoundary: "admission_readback_is_not_receipt_evidence"` in `src/surfaces/service-workflow-admission/index.ts`)
-- Live x402 paid retry packet with `status: "blocked"` presented as successful payment (`src/surfaces/proof-packets/live-x402/paid-retry.ts`, `scripts/check-live-x402-paid-retry.mjs --expect-status blocked`)
-- Clean-installed activation with `downstreamOutcomeStatus: "pending"` presented as end-to-end proof (`test/architecture/proof-packets.test.ts`)
-- Auth.md + x402 interlock packet with `readyForCompositeExecution: false` presented as composite execution readiness (`src/adapters/auth-md-x402-interlock/packet.ts`, `scripts/check-auth-md-x402-admission-packet.mjs --expect-status packet_clear`)
-- MCP doctor passing stdio config check presented as gateway-checked mutation (`test/architecture/proof-packets.test.ts` mcpDoctor block)
-
-**Safe modification:** Every projector must keep gateway check, downstream outcome, and terminal certificate fields separable in schema and tests. Prefer `proof_gap` over smoothing missing evidence.
-
-### Hosted admission boundaries
-
-**What hosted admission proves (pre-hosted gates, `docs/internal/decisions.md` Hosted Admission Lock):**
-
-- Non-authority service workflow schemas and principal-agent link lifecycle (`test/architecture/workflow-admission-boundary.test.ts`)
-- Provider-neutral verifier adapters and redacted `TransitionCallerIdentity` (`src/hosted-admission/hosted-verifier-adapter.ts`, `test/http/hosted-identity-evidence.test.ts`)
-- Tenant/org/project/workspace scope checks and raw-read audit fail-closed posture (`src/http/handlers/hosted-record-scope.ts`, `src/http/handlers/raw-read-audit.ts`)
-- Package subpaths `./hosted-admission` and `./surfaces/service-workflow-admission` without HTTP internals (`src/hosted-admission/LANE.md`)
-
-**What hosted admission does not prove:**
-
-- Deployed hosted operation, live provider/customer custody, settlement/finality
-- Hosted retention, search, or mutation authority
-- Cross-org trust, marketplace certification, aggregate spend enforcement
-- Automatic project/workspace narrowing when stored records omit those fields (`src/http/handlers/hosted-record-scope.ts`)
-
-**Duplication boundary:** `src/http/admission/` re-exports `src/hosted-admission/` for HTTP wiring; package consumers must use `handshake-protocol-kernel/hosted-admission`, not HTTP internals (`test/product/hosted-package-consumer.test.ts`).
-
-**Safe modification:** Extend hosted paths only with object-specific redacted projections from `src/protocol/areas/object-registry/index.ts`. Keep generic raw reads internal; require audit sink in promoted modes.
+This document lists **open** technical debt, proof gaps, and operational blockers verified against the tree at HEAD. Closed Phase 05 security mitigations (Mechanism A custody, import confinement) are cited only where an **accepted residual** remains.
 
 ---
 
-## Tech Debt
+## Open proof gaps (distribution and posture)
 
-**Runtime ingress public surface is narrower than its generic name suggests:**
-- Issue: `src/runtime/ingress/index.ts` exposes runtime ingress API that compiles caller-supplied execution traces into proposal-only evidence, but `src/runtime/ingress/registry.ts` registers only three families.
-- Files: `src/runtime/ingress/index.ts`, `src/runtime/ingress/families.ts`, `src/runtime/ingress/registry.ts`, `test/runtime/runtime-ingress.test.ts`
-- Impact: Callers can mistake runtime ingress for broad host/tool interception. Source records/refuses observed traces; it does not prove every raw sibling host path, browser tool, shell call, network call, or MCP operation is intercepted.
-- Safe modification: Add each new consequential family through registry, family schemas, action proposal code, and refusal evidence together.
-- Test/proof gap: Extend `test/runtime/runtime-ingress.test.ts` for each family with ambiguous dispatch, dynamic dispatch, late-bound dispatch, raw sibling bypass, and mixed-envelope cases.
+### MCP Registry discoverability unverified
 
-**Boundary manifest lags new CLI and package export surfaces:**
-- Issue: `src/surfaces/boundary-manifest.ts` lists fixed `sourceRoots` for `cli.operator` and `cli.evidence` but omits newer command implementations: `src/cli/host/doctor.ts`, `src/cli/mcp/doctor.ts`, `src/cli/quality/report.ts`, `src/cli/state/inspect.ts`, `src/cli/simulate/x402-payment.ts`, `src/cli/demo/x402.ts`, `src/cli/quickstart/x402.ts`, `src/cli/x402/readiness.ts`. Package exports `./surfaces/service-workflow-admission` and `./surfaces/a2a-negotiation-readback` have no dedicated manifest surface IDs.
-- Files: `src/surfaces/boundary-manifest.ts`, `src/cli/command-manifest.ts`, `package.json`, `test/architecture/surface-boundary-posture.test.ts`, `test/architecture/cli-command-posture.test.ts`
-- Impact: `existingSurfaceFiles()` in surface-boundary tests skips files not listed in `sourceRoots`, so forbidden-import and credential-shape enforcement does not apply to new CLI modules. New package subpaths can ship without explicit claim-boundary rows.
-- Safe modification: Add manifest entries or extend `sourceRoots` before exposing commands/exports. Prefer automated export-to-manifest coverage over hardcoded surface ID lists.
-- Test/proof gap: Map `package.json` `exports` and all `cliCommandManifest` handler files to boundary-manifest coverage.
+| Field | Detail |
+|-------|--------|
+| **What** | Public npm publication does not prove MCP Registry acceptance or lookup. Launch `distribution_bar` stays blocked. |
+| **Where** | `src/surfaces/product-launch-gate-resolution.ts:81-101` (`blockerReasonCodes`: `mcp_registry_submission_not_accepted`, `mcp_registry_discoverability_not_verified`; registry GET 404 + empty search); `src/surfaces/proof-packets/distribution-provenance.ts:153-164`; `docs/internal/decisions.md:77`, `:244`, `:613`; `README.md:24`; `AGENTS.md:154` |
+| **Severity** | **High** (blocks distribution launch language; not an authority bug) |
+| **Why open** | Registry submission/lookup not verified in this checkout; source records honest blockers. |
+| **Closes when** | Official MCP Registry returns server by `io.github.CreasyBear/handshake-protocol-kernel` name/version; update `productLaunchGateResolutions` + distribution readback inputs; re-run `scripts/check-distribution-provenance.mjs` / product-completion gates. |
 
-**A2A negotiation support surfaces lack boundary-manifest registration:**
-- Issue: `src/surfaces/a2a-negotiation-support/` (ingress admission, normalizer, move compiler, obligation binder, adapter transcript) and `src/surfaces/a2a-negotiation-readback/` are product surfaces with product tests but not listed in `surfaceIds` or `expectedSurfaceIds` in `test/architecture/surface-boundary-posture.test.ts`.
-- Files: `src/surfaces/a2a-negotiation-support/`, `src/surfaces/a2a-negotiation-readback/index.ts`, `test/product/a2a-*.test.ts`, `test/architecture/negotiation-no-authority-surface.test.ts`
-- Impact: A2A ingress/readback can drift toward authority language (agreement = permission) without the same import/output posture enforcement applied to MCP/CLI/SDK surfaces. Protocol negotiation area remains isolated (`test/architecture/negotiation-no-authority-surface.test.ts`) but surfaces layer is not in that test's downstream roots.
-- Safe modification: Add manifest surface(s) with explicit non-authority flags matching `A2ANegotiationIngressAdmissionAuthorityBoundarySchema` and A2A readback `AuthorityBoundarySchema`.
-- Test/proof gap: Extend architecture tests to cover `src/surfaces/a2a-negotiation-support` and package export `./surfaces/a2a-negotiation-readback`.
+### Whole-repo export surface vs published npm (manifest + distribution)
 
-**Product closeout gates duplicate source projection logic in script validators:**
-- Issue: `scripts/check-product-completion.mjs` manually validates proof-packet/readback shapes overlapping with `src/surfaces/proof-packets/product-completion.ts`.
-- Files: `scripts/check-product-completion.mjs`, `src/surfaces/proof-packets/product-completion.ts`, `package.json`, `test/architecture/proof-packets.test.ts`, `test/architecture/product-closeout-bundle.test.ts`
-- Impact: Closeout logic can drift between script and projector; blocked status can be misread as product readiness.
-- Safe modification: Change projector schema, script validation, and architecture tests in the same patch.
-- Test/proof gap: `package.json` `pack:check` expects `check-product-completion --expect-status incomplete` until all required proof surfaces bind.
+| Field | Detail |
+|-------|--------|
+| **What** | Local `package.json` `exports` omits `./hosted-admission` and `./surfaces/service-workflow-admission` even though `src/hosted-admission/` and `src/surfaces/service-workflow-admission/` exist and `boundary-manifest.ts` registers `surfaces.hosted_admission` / `surfaces.service_workflow_admission`. `test/architecture/manifest-coverage.test.ts` fails; published npm@0.2.7 cannot expose the same subpaths as the repo intends. |
+| **Where** | `package.json:26-77` (exports list — subpaths absent); `test/architecture/manifest-coverage.test.ts:21-28`, `:128-131` (expects both exports); `src/surfaces/boundary-manifest.ts:849-884` (`sourceRoots` present); `src/surfaces/proof-packets/distribution-provenance.ts:50-57`, `:137-142` (`missingLocalExports` gap when published tarball lacks local export keys) |
+| **Severity** | **High** |
+| **Why open** | Exports not added to `package.json` / build bundles after hosted-admission and service-workflow surfaces landed; pre-Phase-04 baseline gap, still open at `aef9478` (see `05-VERIFICATION.md` acceptable_failures). |
+| **Closes when** | Add `./hosted-admission` and `./surfaces/service-workflow-admission` to `package.json` `exports`, extend `scripts/build-package-bundles.mjs` / `dist/` outputs, publish new npm version, confirm `manifest-coverage` and distribution readback green. |
 
-**MCP x402 proposal schema duplicates runtime and adapter x402 shape:**
-- Issue: `src/mcp/x402-proposal.ts` mirrors x402 action proposal and runtime ingress fields.
-- Files: `src/mcp/x402-proposal.ts`, `src/adapters/x402-payment/action-proposal.ts`, `src/runtime/ingress/index.ts`, `test/mcp/mcp-x402-proposal.test.ts`, `test/mcp/mcp-schema-contract.test.ts`
-- Impact: MCP can accept shapes runtime rejects, producing proposal evidence that fails exact payment requirement binding at gateway time.
-- Safe modification: Extract shared schema fragments or add parity tests compiling MCP inputs through runtime ingress and action proposal paths.
+### Integrator raw x402 SDK bypass (security F-01 / T-12)
 
-**Large orchestration and projector files concentrate authority-sensitive logic:**
-- Issue: High line counts in proof packet projectors, runtime ingress, x402 proposal, protocol transitions, and evidence projections.
-- Files: `src/protocol/evidence-projections/projections.ts`, `src/surfaces/proof-packets/product-completion.ts`, `src/mcp/x402-proposal.ts`, `src/surfaces/proof-packets/host-generated-code-containment.ts`, `src/runtime/ingress/index.ts`, `test/architecture/proof-packets.test.ts`
-- Impact: Authority language blur—reviewers can miss paths upgrading proposal/readback into implied greenlight, gateway check, or receipt.
-- Safe modification: Split by owned protocol concept per `STRUCTURE.md` folder rules.
+| Field | Detail |
+|-------|--------|
+| **What** | Host or integrator code can call `@x402/core/client` / `@x402/evm` outside `runX402WalletGateway` / `assertGatewayHeldSigningCommand`. That path produces **no** Handshake clearance evidence; it is not repo-wide enforceable. |
+| **Where** | `docs/internal/decisions.md:365-367` (explicit proof gap); `.planning/phases/05-product-coherence/05-SECURITY.md:55-63` (F-01); `test/architecture/import-posture.test.ts:283-298` (confines SDK imports to `src/adapters/x402-payment/wallet-gateway.ts` only **inside this repo**); `src/adapters/x402-payment/wallet-gateway.ts:143-187`, `:301`, `:375` (guard on canonical paths) |
+| **Severity** | **Medium** (accepted) |
+| **Why open** | Phase 05 disposition: mitigate in-repo, **accept** external bypass as proof gap (D-25-style consumer inventory deferred). |
+| **Closes when** | Integrator conformance gate / documented mandatory wrapper entrypoints + optional consumer-repo CI; not claimed closed by kernel-only import rules. |
 
----
+### HTTP transition sequence matrix ≠ per-request gate (security F-02 / T-08)
 
-## Known Bugs
-
-**No confirmed source-level runtime defect detected in this mapping pass:**
-- Symptoms: Several hard blocks and incomplete gates are expected outcomes, not bugs.
-- Files: `package.json`, `scripts/check-product-completion.mjs`, `scripts/check-host-generated-code-containment.mjs`, `scripts/check-live-x402-paid-retry.mjs`, `src/surfaces/product-launch-gate-resolution.ts`
-- Trigger: `pack:check` expects incomplete product completion, blocked host containment, blocked live paid retry, and blocked distribution launch gate (`test/architecture/product-launch-gate-resolution.test.ts`).
-- Workaround: Treat blocked readbacks as proof gaps, not successful live execution or terminal authority.
-- Safe modification: Convert blockers only by adding source-owned positive evidence and tightening gates—not by weakening expected status.
-
-**Raw record read scope depends on payload fields for project/workspace narrowing:**
-- Symptoms: `src/http/handlers/hosted-record-scope.ts` narrows project/workspace access only when stored record payload contains `projectId` or `workspaceId`.
-- Files: `src/http/handlers/internal-record-read.ts`, `src/http/handlers/hosted-record-scope.ts`, `src/http/handlers/raw-read-audit.ts`, `src/protocol/areas/object-registry/index.ts`, `test/http/http.test.ts`
-- Trigger: Hosted raw read against `audit_read` object with tenant/org scope but no project/workspace fields may be visible at tenant/org scope.
-- Safe modification: Prefer object-specific redacted projections; require each `audit_read` type to declare mandatory scope fields.
-- Test/proof gap: Matrix over `protocolObjectRegistry` `audit_read` types for hosted scope with and without project/workspace fields.
+| Field | Detail |
+|-------|--------|
+| **What** | `transitionSequenceMatrix` is a **construction-time** drift guard (matrix/registry parity, acyclicity). It does **not** reject out-of-order HTTP requests by itself. Per-request ordering comes from route `recordScope` + kernel transition guards. |
+| **Where** | `src/http/admission/transition-sequence-matrix.ts:4-15`, `:74-85` (comments + `assertTransitionSequenceMatrixCoverage`); `src/http/app.ts:33-34` (wired at app build); `.planning/phases/05-product-coherence/05-SECURITY.md:65-73` (F-02); `.planning/phases/05-product-coherence/05-KEEL-AUDIT.md:73-86` |
+| **Severity** | **Medium** (accepted) |
+| **Why open** | By design — adding request-time matrix rejection would duplicate kernel guards and risk “second policy engine” theatre. |
+| **Closes when** | N/A for acceptance; only “closes” if product docs stop implying matrix is per-request enforcement (already labeled drift guard in source). |
 
 ---
 
-## Security Considerations
+## Deferred remote operations (not done at HEAD)
 
-**Host-generated-code containment is a blocked proof surface, not a host-wide guarantee:**
-- Risk: Treating profile transcript or summary as host-wide containment lets generated code escape the contract boundary.
-- Files: `src/surfaces/proof-packets/host-generated-code-containment.ts`, `scripts/build-host-generated-code-containment-transcript.mjs`, `scripts/check-host-generated-code-containment.mjs`
-- Current mitigation: Proof packet records gaps for missing live host activation, transcript digest, exact contract binding, dispatch interception, raw sibling refusal, dynamic dispatch refusal, truncated graph refusal.
-- Recommendations: Keep `--expect-status blocked` until live adapter transcript evidence exists.
+### PR / merge to main / npm publish
 
-**Credential custody and redaction are typed hygiene, not provider-grade secret lifecycle proof:**
-- Risk: `CredentialSafeStringSchema` rejects known secret patterns; unknown provider formats can evade fixed classifiers.
-- Files: `src/protocol/areas/credential-custody/schemas.ts`, `src/adapters/auth-md-x402-interlock/packet.ts`, `test/protocol/credential-custody.test.ts`
-- Current mitigation: Schemas require `secretMaterialIncluded: false`, gateway credential refs, redacted resolution evidence.
-- Recommendations: Provider-specific custody adapters and fuzz corpora before live custody claims.
+| Field | Detail |
+|-------|--------|
+| **What** | Phase 04+05 work lives on stacked branches locally; `origin/main` is behind local `main` (8 commits ahead per local tracking). Full phase stack (`phase-05-product-coherence`) is **139 commits** ahead of `origin/main` merge-base — not merged/pushed as a unit in this mapping pass. npm publish to expose new export surface blocked operationally (401) when attempted outside trusted-publish workflow. |
+| **Where** | Git state at map time: branch `phase-05-product-coherence` @ `aef9478`; `05-VERIFICATION.md:27-28` verified @ `6e23848`; `docs/internal/decisions.md:760-762` (`actually_published` / `registry_discoverable` definitions) |
+| **Severity** | **High** (release/process) |
+| **Why open** | No `gh` merge + no successful maintainer npm publish of export-complete artifact in this session; operator tooling constraints (per plan context). |
+| **Closes when** | PR merged to `main`, `npm publish` with provenance for version containing full export surface, registry verification, tags aligned with `CHANGELOG.md`. |
 
-**Generic hosted raw reads are audit-sensitive and must not become customer search:**
-- Risk: `src/http/handlers/internal-record-read.ts` can return raw protocol records when posture permits.
-- Files: `src/http/handlers/internal-record-read.ts`, `src/http/handlers/raw-read-audit.ts`, `src/http/admission/index.ts`, `src/hosted-admission/hosted-admission-config.ts`
-- Current mitigation: Route absent from normal OpenAPI; fails closed without raw-read audit sink in hosted preview/production modes; 404 posture for missing/unauthorized records.
-- Recommendations: Build narrowly scoped redacted projection endpoints for service-facing readback.
+### CI: check-only, no publish-on-merge
 
-**Surface boundary manifest can lag newly exported or routed product surfaces:**
-- Risk: Hand-maintained `src/surfaces/boundary-manifest.ts` may not cover new exports, CLI routes, A2A surfaces, or hosted flows.
-- Files: `src/surfaces/boundary-manifest.ts`, `test/architecture/surface-boundary-posture.test.ts`, `test/architecture/claim-boundary.test.ts`
-- Current mitigation: Architecture tests assert known surface IDs, forbidden route families, import boundaries, claim-boundary labels.
-- Recommendations: Every new export/route/command requires manifest update before merge.
-
-**SDK repair explanations are local projections, not recovery authority:**
-- Risk: `src/sdk/repair.ts` `explainHandshakeError()` could be misused to justify retry without a fresh action contract.
-- Files: `src/sdk/repair.ts`, `src/protocol/foundation/reason-code-remediation/index.ts`
-- Current mitigation: Hard-coded `authorityCreatedByRepair: false`, `requiresNewContract` from remediations, `repairBoundary: "local_reason_code_projection"`.
-- Recommendations: Keep repair out of gateway/signing paths; CLI forbids mutation-shaped command terms including "repair" and "gateway check" in names (`test/architecture/cli-command-posture.test.ts`).
+| Field | Detail |
+|-------|--------|
+| **What** | GitHub Actions runs `npm run check:repo` only — no release, no npm publish, no registry push on merge. |
+| **Where** | `.github/workflows/check.yml:14-24` (`bun install` + `npm run check:repo`); `test/architecture/naming-posture.test.ts:161-168` (asserts workflow lacks `trusted-publish` / `npm publish`) |
+| **Severity** | **Medium** |
+| **Why open** | Trusted publish workflow exists in **release projection** artifact (`.github/workflows/trusted-publish.yml` in projected tree — see `test/architecture/release-repository-projection.test.ts:61-66`), not in live repo CI on every push. |
+| **Closes when** | Add trusted-publish (or equivalent) workflow to default branch with OIDC/npm provenance; document in `docs/internal/release-admin-runbook.md`. |
 
 ---
 
-## Performance Bottlenecks
+## Test residuals (environmental / baseline)
 
-**D1 conflict classification relies on post-error reads and constraint-triggered failures:**
-- Problem: `src/storage/d1/index.ts` classifies batch conflicts by follow-up reads; `src/storage/d1/statements.ts` uses intentional NOT NULL violations for digest mismatch.
-- Files: `src/storage/d1/index.ts`, `src/storage/d1/statements.ts`, `migrations/0001_protocol_kernel.sql`, `test/protocol/protocol-store-atomicity-contract.test.ts`
-- Improvement path: Add fault-injection tests for ambiguous D1/network errors so callers record proof gaps instead of assuming success.
-- Test/proof gap: No coverage for ambiguous D1 transport failure or error message drift.
+### Repo naming posture (2 failures)
 
-**Large proof/readback tests are slow to review and easy to under-run selectively:**
-- Problem: `test/architecture/proof-packets.test.ts`, `test/http/http.test.ts`, `test/runtime/runtime-ingress.test.ts` carry many independent authority assertions.
-- Improvement path: Split by primitive only if `npm run check:repo` and `npm run quality:architecture` still execute all cases.
+| Field | Detail |
+|-------|--------|
+| **What** | `test/architecture/naming-posture.test.ts` fails on workspace junk and scratch paths — not authority regressions. |
+| **Where** | `:54-60` — `.DS_Store` under `src/**`, `test/`, etc. (21 paths at map run); `:121-124` — `.agents`, `skills-lock.json` still on disk (`nonCanonicalScratchFiles`) |
+| **Severity** | **Low** (environmental) |
+| **Why open** | macOS metadata + local agent scaffold not removed; Phase 05 verification explicitly lists both as **acceptable_failures** (`05-VERIFICATION.md:10-13`). |
+| **Closes when** | Delete `.DS_Store` from tree (or add to global gitignore outside test scope); remove or quarantine `.agents` / `skills-lock.json` per `planning-scratch-quarantine` policy. |
 
----
+### Manifest coverage (1 failure)
 
-## Fragile Areas
+| Field | Detail |
+|-------|--------|
+| **What** | `manifest coverage > maps each product surface export…` fails: `package.json missing expected export ./hosted-admission` and `./surfaces/service-workflow-admission`. |
+| **Where** | `test/architecture/manifest-coverage.test.ts:143` |
+| **Severity** | **Medium** (baseline debt; blocks full green `bun test`) |
+| **Why open** | Same root cause as export/npm gap above. |
+| **Closes when** | Add exports to `package.json` (manifest entries already exist). |
 
-**Live x402 paid retry readback exists while wallet gateway execution remains local/reference only:**
-- Files: `src/adapters/x402-payment/wallet-gateway.ts`, `src/surfaces/proof-packets/live-x402/paid-retry.ts`, `scripts/check-live-x402-paid-retry.mjs`
-- Why fragile: `assertSandboxProviderEnvironment()` requires `providerEnvironmentPosture === "local_reference_sandbox"`. Live paid retry packet is readback scaffolding, not signer execution.
-- Safe modification: Separate customer-gateway live adapter with custody proof, post-gateway signer invocation, one-use greenlight consumption, live retry response, terminal readback.
-- Test coverage: Wallet gateway tests cover local/reference; funded customer-gateway live retry fixture missing.
+### Release repository projection
 
-**One-use greenlight and exact gateway check binding depend on storage atomicity:**
-- Files: `src/storage/d1/index.ts`, `src/storage/memory/index.ts`, `src/protocol/areas/policy-greenlight/transitions.ts`, `test/protocol/protocol-store-atomicity-contract.test.ts`
-- Why fragile: Duplicate consume, idempotency mismatch, or receipt-index conflict corrupts reconstruction.
-- Safe modification: Keep memory and D1 behaviorally aligned through shared atomicity tests. KV is cache-only for isolation/envelope snapshots.
+| Field | Detail |
+|-------|--------|
+| **What** | At `aef9478`, isolated test **passes** (~1.5s). Not among the three recorded failures in `05-VERIFICATION.md`. If full-suite CI times out, treat as environmental (Node spawn + temp dir), not a logic failure. |
+| **Where** | `test/architecture/release-repository-projection.test.ts:10-88`; `scripts/project-release-repository.js` |
+| **Severity** | **Low** (watch) |
+| **Why open** | N/A unless reproduced under `npm run check:repo` timeout. |
+| **Closes when** | If flaky: increase CI timeout or cache npm for projection smoke; otherwise no code change. |
 
-**Product launch gates encode blocked external claims in source:**
-- Files: `src/surfaces/product-launch-gate-resolution.ts`, `test/architecture/product-launch-gate-resolution.test.ts`, `docs/internal/decisions.md`
-- Why fragile: Distribution gate blocked on npm version/export mismatch and MCP Registry 404; live external x402 gate blocked on missing funded customer-gateway signer and live signed retry. Narrative docs can outpace these resolved blockers.
-- Safe modification: Update `productLaunchGateResolutions` evidence when external state changes; do not weaken `nonClaims` arrays.
-
-**Package/public distribution state is a proof packet, not authority:**
-- Files: `src/surfaces/proof-packets/product-completion.ts`, `docs/internal/decisions.md`, `package.json`
-- Why fragile: Public npm availability and MCP Registry discoverability confused with execution authority.
-- Safe modification: Keep distribution proof separate from policy, greenlight, gateway check, mutation, receipt, terminal certificate.
-
-**A2A negotiated x402 room is local/reference readback only:**
-- Files: `examples/a2a-negotiated-x402-room/`, `src/surfaces/a2a-negotiation-readback/index.ts`, `test/product/a2a-negotiated-x402-room.test.ts`
-- Why fragile: Agreement evidence binds one obligation to one exact contract, but agreement acceptance does not substitute for gateway check (`gatewayCheckRemainsFinalEnforcementPoint: true` in readback schema).
-- Safe modification: Keep non-claims for marketplace, escrow, settlement, cross-org trust, native host containment explicit in readback output.
+**Current architecture test tally (this pass):** `bun test` on naming + manifest + release projection → **17 pass / 3 fail** (matches verification doc modulo HEAD `aef9478` vs `6e23848`).
 
 ---
 
-## Scaling Limits
+## Phase 05 security — accepted MEDs (not fixed)
 
-**Runtime family scaling is registry-heavy and must stay explicit:**
-- Current capacity: Three registered runtime ingress families in `src/runtime/ingress/registry.ts`.
-- Limit: New protected-action types increase duplicated schemas, refusal reasons, classifiers, and tests unless common scaffolding is extracted without weakening exact contracts.
-- Scaling path: Shared family scaffolding only after two or more families need identical dispatch/bypass/refusal patterns.
-- Files: `src/runtime/ingress/registry.ts`, `src/runtime/ingress/families.ts`, `test/runtime/runtime-ingress.test.ts`
+Source: `.planning/phases/05-product-coherence/05-SECURITY.md` (audited `6e23848`; branch now `aef9478`).
 
-**Hosted operation remains outside the current kernel claim:**
-- Current capacity: Hosted admission modules, identity evidence, raw-read controls exist as source and tests.
-- Limit: Hosted provider custody, settlement, marketplace, cross-org trust, aggregate spend, retention/search not closed.
-- Scaling path: Separate hosted workspace with fresh proof gates per `docs/internal/decisions.md` Hosted Admission Lock.
-- Files: `src/hosted-admission/`, `src/http/admission/`, `docs/internal/decisions.md`
-
-**Protocol object registry grows faster than hosted read models:**
-- Current capacity: `src/protocol/areas/object-registry/index.ts` classifies internal-only, audit read, public read, externalizable.
-- Limit: New protocol objects reconstructable internally without safe hosted projection.
-- Scaling path: Every new object type declares storage posture, hosted read posture, redaction, receipt/proof-gap relationship.
+| ID | Severity | Status | Evidence | Closes when |
+|----|----------|--------|----------|-------------|
+| **F-01** | Medium | **Accepted** | Raw integrator SDK bypass — see proof gap above | D-25 integrator inventory / adoption conformance |
+| **F-02** | Medium | **Accepted** | Matrix drift guard only — see proof gap above | Documentation only; do not promote to per-request gate |
+| F-03 | Low | Open (optional) | `createLocalX402SandboxSigningSurface` delegates guard to official surface (`05-SECURITY.md:77-84`) | Redundant `assertGatewayHeldSigningCommand` at wrapper entry |
+| F-04 | Low | Open (optional) | `src/experimental.ts:22-32` exports wallet types; unstable boundary (`05-SECURITY.md:86-93`) | Keep off `src/index.ts`; custody contract tests if promoted |
+| F-05 | Low | Accepted | Test literal `"test-secret"` in fixtures (`05-SECURITY.md:95-102`) | Continue redaction tests; no repo real keys |
 
 ---
 
-## Dependencies at Risk
+## Phase 05 review — deferred MEDs (non-blocking, not fixed)
 
-**Cloudflare D1 and KV semantics are authority-adjacent:**
-- Risk: D1 batch/constraint semantics are durable protocol-store contract; KV must not become authoritative for greenlights or gateway checks.
-- Files: `src/storage/d1/index.ts`, `src/storage/kv/index.ts`, `test/protocol/protocol-store-atomicity-contract.test.ts`, `test/storage/kv-isolation-cache.test.ts`
+Source: `.planning/phases/05-product-coherence/05-REVIEW.md` (SHIP-WITH-FIXES @ `e60fc87`; HR-01/MR-01 resolved).
 
-**x402 SDK/payment requirement behavior is pinned to exact local/reference posture:**
-- Risk: SDK drift while source only claims local/reference buyer-side proof; live settlement/finality overclaim if SDK output treated as terminal execution proof.
-- Files: `src/adapters/x402-payment/wallet-gateway.ts`, `src/adapters/x402-payment/action-proposal.ts`, `src/surfaces/proof-packets/live-x402/`
+| ID | Severity | Status | Where | Why deferred |
+|----|----------|--------|-------|--------------|
+| **MR-02** | Medium | **Deferred** | `src/protocol/foundation/failure-class/index.ts:55-61`; consumers `src/sdk/surface-clients/transport.ts:76-87`, `src/sdk/client.ts:328-339` | Empty/non-JSON error bodies collapse 409 subtypes via `failureClassFromHttpStatus`; structured envelopes preserve replay vs refusal. Accepted degradation until optional `x-handshake-failure-class` header or documented intentional collapse. |
+| **MR-03** | Medium | **Deferred** | `src/adapters/auth-md/gateway.ts:251-265` (cf. x402 `wallet-gateway.ts:143-187`, `:301`, `:375`) | D-64 Mechanism A structural for x402 only; auth.md lacks shared `assertGatewayHeldExecutionCommand` before I/O. Custom `AuthMdProtectedApiCallSurface` could ignore resolution evidence. Needs architecture test analogous to `x402-gateway-credential-custody.test.ts`. |
+| **MR-04** | Medium | **Deferred** | `src/adapters/x402-payment/wallet-gateway.ts:332-357` | Bare `catch` maps custody/signing throws to generic `payment_signature_failed`; operators cannot distinguish custody violation from downstream signing failure without parsing message prefix. |
 
-**MCP Registry and public npm are distribution dependencies, not control-plane authority:**
-- Risk: Registry acceptance and npm latest version change outside kernel; must not wire into policy/greenlight decisions.
-- Files: `src/surfaces/proof-packets/product-completion.ts`, `src/surfaces/product-launch-gate-resolution.ts`, `scripts/check-product-completion.mjs`
+**HR-01 / MR-01 (same hunk):** **Resolved** @ `e60fc87` — registry-first classification; refusal kinds no longer mislabeled as `proof_gap`.
 
----
-
-## Missing Critical Features
-
-**Customer-gateway live x402 paid retry proof:**
-- Problem: Local/reference x402 proof exists; live buyer-side paid retry requires customer custody, one-use greenlight consumption, verified gateway check, post-gateway signer, payment material digests, live retry response, terminal readback.
-- Blocks: Live paid execution claims, customer gateway custody claims, product completion.
-- Files: `src/surfaces/proof-packets/live-x402/paid-retry.ts`, `scripts/check-live-x402-paid-retry.mjs`, `src/adapters/x402-payment/wallet-gateway.ts`
-
-**Provider-grade credential custody lifecycle:**
-- Problem: Redacted credential references modeled; provider vault integration, signer lease/rotation/revocation not proven.
-- Blocks: Hosted provider custody, live customer gateway operation.
-- Files: `src/protocol/areas/credential-custody/`, `src/adapters/auth-md/profiles.ts`
-
-**Host-wide generated-code containment:**
-- Problem: Containment proof covers named runtime adapter evidence, not every mutation-capable host path.
-- Blocks: Claims that generated code cannot bypass Handshake across whole host runtime, IDE, shell, browser, CI, MCP environment.
-- Files: `src/surfaces/proof-packets/host-generated-code-containment.ts`, `scripts/check-host-generated-code-containment.mjs`
-
-**Hosted service readback model:**
-- Problem: Hosted admission and raw-read controls exist; customer-safe hosted readback/search/retention incomplete.
-- Blocks: Hosted operation, customer support workflows, org audit search.
-- Files: `src/hosted-admission/`, `src/http/handlers/internal-record-read.ts`, `src/protocol/areas/object-registry/index.ts`
-
-**Current-surface distribution proof:**
-- Problem: npm latest missing current local exports (`./hosted-admission`, `./surfaces/service-workflow-admission`); MCP Registry submission not accepted.
-- Blocks: Product completion and public distribution claims per `productLaunchGateResolutionFor("distribution_bar")`.
-- Files: `src/surfaces/product-launch-gate-resolution.ts`, `scripts/check-product-completion.mjs`, `package.json`
-
-**Auth.md + x402 composite execution (expansion candidate, not current product):**
-- Problem: Interlock packet clears provenance readback with `readyForCompositeExecution: false`; expansion gate requires exact contract, policy, one-use greenlight, gateway check before composite claims.
-- Blocks: Composite auth.md + x402 execution marketing until separate proof gate passes.
-- Files: `src/adapters/auth-md-x402-interlock/packet.ts`, `test/architecture/auth-md-x402-interlock-packet.test.ts`, `src/surfaces/product-launch-gate-resolution.ts`
+**Phase 05 mitigate threats (T-01–T-11):** marked **CLOSED** in security audit with code pins (wallet gateway custody, import posture, gateway invariants, agent-origin graph). Do not re-list as open unless regressions appear.
 
 ---
 
-## Test Coverage Gaps
+## Phase 04 review — deferred HIGH/MED status at HEAD
 
-**Runtime ingress host-interception coverage:**
-- What's not tested: Live host interception across shell, browser, MCP, package manager, cloud API, dynamic generated-code dispatch outside registered families.
-- Files: `src/runtime/ingress/`, `src/surfaces/proof-packets/host-generated-code-containment.ts`, `test/runtime/runtime-ingress.test.ts`
-- Risk: Runtime evidence mistaken for gateway enforcement or host-wide containment.
-- Priority: High
+Source: `.planning/phases/04-service-agent-gating/04-REVIEW.md` (SHIP-WITH-FIXES, 2026-05-29).
 
-**Boundary manifest coverage for exports, CLI handlers, and A2A surfaces:**
-- What's not tested: Automatic mapping of `package.json` exports, all CLI handler files, and `src/surfaces/a2a-negotiation-support/` to boundary-manifest posture.
-- Files: `src/surfaces/boundary-manifest.ts`, `src/cli/command-manifest.ts`, `package.json`, `test/architecture/surface-boundary-posture.test.ts`
-- Risk: New surfaces ship without explicit proposal/evidence/readback versus authority posture.
-- Priority: High
+| ID | Original | At `aef9478` | Evidence |
+|----|----------|--------------|----------|
+| **H-01** | Policy refusals → `proof_gap` | **Largely fixed** | `src/protocol/foundation/reason-codes.ts:188-197` — `decisionPolarity: "refusal"` on `envelope_not_active`, `action_class_outside_envelope`, `prior_action_not_greenlit`, etc.; `failure-class/index.ts:79-82` honors polarity |
+| **H-02** | `"proof"` substring misclassification | **Fixed** | Broad `code.includes("proof")` removed from `classifyFailureClassFromReasonCode`; metadata-driven path only (`failure-class/index.ts:139-167`) |
+| **H-03** | Integrator HTTP routes ungated | **Partial** | `src/http/mutation-route-manifest.ts:1-82` + `test/architecture/http-handler-mutation-gating.test.ts:52-84` inventory first-party handlers/examples; **arbitrary integrator services still out of scope** (same as F-01/D-25) |
+| **H-04** | SDK loses taxonomy on malformed body | **Partial** | `src/sdk/surface-clients/transport.ts:72-90`, `src/sdk/client.ts:324-342` — malformed body uses `failureClassFromHttpStatus` (409→refusal, 422→proof_gap); typed reason codes still lost without envelope |
+| M-01 | Dual-enforcement test doc-only | **Unchanged** | `test/architecture/dual-enforcement-posture.test.ts` — prose guard only; paired with mutation manifest for structural inventory |
+| M-02 | Recovery reason-code path | **Improved** | `failure-class/index.ts:85-86` — recovery uses `proofRef` option in metadata path |
+| M-03 | Auth.md gateway throws plain `Error` | **Not re-verified this pass** | Still listed in 04-REVIEW; spot-check before claiming closed |
+| M-04 | Install proposal plain `Error` | **Not re-verified this pass** | Still listed in 04-REVIEW |
+| M-05 | Unknown errors → `internal` | **Partial** | `failure-class/index.ts:119-123` — 4xx without metadata → `protected_action_refusal`; 5xx → `internal` |
 
-**Credential and payment material redaction fuzzing:**
-- What's not tested: Unknown credential names, encoded secret variants, provider-specific payment material, transcript redaction corpus.
-- Files: `src/protocol/areas/credential-custody/schemas.ts`, `src/adapters/auth-md-x402-interlock/packet.ts`, `test/protocol/credential-custody.test.ts`
-- Risk: Raw material enters evidence/readback while schemas pass known-pattern tests.
-- Priority: High
+**04-REVIEW explicit deferrals to Phase 05:** mutation manifest (shipped `05-01`), MCP registry proof gap (still open), manifest export mapping (still open), failureClass parity hardening (H-01/H-02 largely addressed).
 
-**D1 ambiguous failure and migration drift:**
-- What's not tested: Ambiguous D1 transport failure, changed SQLite/D1 error messages, partial outage during authority-sensitive writes.
-- Files: `src/storage/d1/index.ts`, `migrations/0001_protocol_kernel.sql`, `test/protocol/protocol-store-atomicity-contract.test.ts`
-- Risk: Storage errors misclassified; greenlight/gateway/receipt state unreconstructable.
-- Priority: High
-
-**Hosted raw-read object matrix:**
-- What's not tested: Every `audit_read` object type under hosted identity, purpose, expiry, tenant/org, project/workspace, hidden-object, audit-sink conditions.
-- Files: `src/protocol/areas/object-registry/index.ts`, `src/http/handlers/internal-record-read.ts`, `src/http/handlers/hosted-record-scope.ts`
-- Risk: Hosted raw reads leak broader tenant/org records or internal protocol evidence.
-- Priority: High
-
-**MCP x402 schema parity:**
-- What's not tested: MCP x402 proposal parity against runtime ingress and x402 action proposal across valid inputs, refusal inputs, binding mismatches.
-- Files: `src/mcp/x402-proposal.ts`, `src/runtime/ingress/index.ts`, `src/adapters/x402-payment/action-proposal.ts`
-- Risk: MCP diverges from exact action-contract canonicalization.
-- Priority: Medium
-
-**A2A surface authority posture architecture tests:**
-- What's not tested: Architecture-level import/output posture for `src/surfaces/a2a-negotiation-support/` and exported `./surfaces/a2a-negotiation-readback` (product tests exist in `test/product/a2a-*.test.ts` only).
-- Files: `src/surfaces/a2a-negotiation-support/`, `src/surfaces/a2a-negotiation-readback/index.ts`, `test/architecture/negotiation-no-authority-surface.test.ts`
-- Risk: A2A ingress/readback treated as negotiation authority or agreement-as-permission.
-- Priority: Medium
-
-**Evidence projection store reader batching:**
-- What's not tested: `RECEIPT_TIMELINE_EVENT_BATCH_SIZE = 100` boundary behavior for large receipt timelines in `src/protocol/evidence-projections/store-reader.ts`.
-- Risk: Incomplete timeline readback presented as full reconstruction evidence.
-- Priority: Low
+**Note:** No `04-SECURITY.md` artifact in `.planning/phases/04-service-agent-gating/`; security posture for Phase 04 is in `04-REVIEW.md` + Phase 05 `05-SECURITY.md`.
 
 ---
 
-*Concerns audit: 2026-05-28*
+## Tech debt (authority and surfaces — still relevant)
+
+### Boundary manifest vs new CLI handlers
+
+- **Issue:** Several CLI handler files are listed in `manifest-coverage.test.ts:40-57` and covered by expanded `cli.*` roots, but export/subpath drift remains the gating failure — not missing CLI roots.
+- **Files:** `src/surfaces/boundary-manifest.ts`, `src/cli/command-manifest.ts`, `test/architecture/surface-boundary-posture.test.ts`
+- **Impact:** New commands can ship without export-level discoverability even when manifest roots cover handlers.
+- **Fix approach:** Export map + manifest export test green together.
+
+### A2A surfaces — product tests only
+
+- **Issue:** `src/surfaces/a2a-negotiation-support/` and `./surfaces/a2a-negotiation-readback` export exist in `package.json:52-56` and manifest (`manifest-coverage.test.ts:29-32`) but A2A negotiation support folder is **not** in `surfaceIds` / `expectedSurfaceIds` in older concern text — verify `boundary-manifest.ts` for `surfaces.a2a_readback` before extending.
+- **Impact:** Weaker architecture posture enforcement than MCP/CLI for negotiation ingress.
+- **Fix approach:** Add manifest surface IDs + `surface-boundary-posture` expected IDs for A2A support tree.
+
+### Product completion gates still incomplete by design
+
+- **Issue:** `pack:check` and product-completion projectors expect **blocked/incomplete** for host containment, live paid retry, distribution, dual-enforcement evidence unless inputs prove otherwise.
+- **Files:** `src/surfaces/proof-packets/product-completion.ts:185-207` (`dual_enforcement_posture` needs `dualEnforcementPostureTestPassed` + `mutationManifestGatingTestPassed` in input); `scripts/check-product-completion.mjs`
+- **Impact:** Blocked readbacks are correct; marketing must not read them as live proof.
+- **Fix approach:** Feed gate JSON from passing architecture tests + real distribution readback.
+
+### Per-customer bypass scaffold (D-25 / D-54)
+
+- **Issue:** Scaffold only; blocked unless first-party dogfood customer id present.
+- **Files:** `src/surfaces/proof-packets/per-customer-bypass-scaffold/index.ts:1-47`
+- **Impact:** No per-customer containment claims for external integrators.
+- **Fix approach:** Named dogfood evidence only; never auto-complete product completion.
+
+---
+
+## Security considerations (ongoing)
+
+### Host-generated-code containment — blocked proof surface
+
+- **Risk:** Containment proof does not prove host-wide interception.
+- **Files:** `src/surfaces/proof-packets/host-generated-code-containment.ts`, `scripts/check-host-generated-code-containment.mjs`
+- **Mitigation:** `--expect-status blocked` in pack checks.
+- **Recommendations:** Keep blocked until live host transcript evidence exists.
+
+### Hosted raw reads and scope narrowing
+
+- **Risk:** `hosted-record-scope` may not narrow project/workspace when payload omits those fields.
+- **Files:** `src/http/handlers/hosted-record-scope.ts`, `src/http/handlers/internal-record-read.ts`, `src/http/handlers/raw-read-audit.ts`
+- **Mitigation:** Fail-closed without audit sink; 404 posture.
+- **Recommendations:** Object-specific redacted projections per `object-registry` types.
+
+### SDK repair is not recovery authority
+
+- **Risk:** Misuse of `explainHandshakeError` to justify retry without new contract.
+- **Files:** `src/sdk/repair.ts`, `src/protocol/foundation/reason-code-remediation/index.ts`
+- **Mitigation:** `authorityCreatedByRepair: false`, `requiresNewContract` from remediations.
+
+### Gateway custody transition_errors map to `internal`
+
+- **Risk:** `gateway_custody_proof_*` codes use `kind: "transition_error"` → `failureClass: "internal"` (`failure-class/index.ts:89-90`) unless `classifiedFailure` set per code (`reason-codes.ts:174-186` — no `classifiedFailure` on those lines).
+- **Impact:** MCP/SDK taxonomy may show “internal” for custody mismatches (residual of 04-REVIEW H-02 class).
+- **Recommendations:** Add `classifiedFailure: "protected_action_refusal"` or `"proof_gap"` per custody code in reason-code registry.
+
+---
+
+## Fragile areas
+
+### Live x402 paid retry vs local/reference gateway
+
+- **Files:** `src/adapters/x402-payment/wallet-gateway.ts`, `src/surfaces/proof-packets/live-x402/paid-retry.ts`
+- **Why fragile:** Sandbox/local posture only; live customer-gateway path not proven.
+- **Test coverage:** Wallet gateway unit/architecture tests; live funded retry fixture missing.
+
+### One-use greenlight / storage atomicity
+
+- **Files:** `src/storage/d1/index.ts`, `src/storage/memory/index.ts`, `src/protocol/areas/policy-greenlight/transitions.ts`
+- **Why fragile:** OCC/idempotency conflicts corrupt reconstruction if misclassified.
+
+### Product launch gates vs external reality
+
+- **Files:** `src/surfaces/product-launch-gate-resolution.ts`, `docs/internal/decisions.md`
+- **Why fragile:** Narrative can outpace `resolved_blocked` distribution and registry evidence.
+
+---
+
+## Test coverage gaps (priority)
+
+| Area | What's missing | Files | Risk | Priority |
+|------|----------------|-------|------|----------|
+| Integrator HTTP mutation inventory | Routes outside `src/http/handlers` allowlist | `src/http/mutation-route-manifest.ts`, `http-handler-mutation-gating.test.ts` | False sense of full-service gating | High |
+| Export/manifest/npm parity | Published tarball export keys | `package.json`, `manifest-coverage.test.ts`, `distribution-provenance.ts` | Consumers cannot import hosted/service-workflow subpaths | High |
+| MCP/registry readback | Live registry acceptance | `distribution-provenance.ts`, `product-launch-gate-resolution.ts` | False discoverability claims | High |
+| Credential custody taxonomy | `gateway_custody_proof_*` failureClass | `reason-codes.ts`, `failure-class/index.ts` | Wrong retry semantics on custody failures | Medium |
+| Malformed SDK HTTP body | Typed codes when envelope parse fails | `src/sdk/client.ts`, `surface-clients/transport.ts` | 04-REVIEW H-04 residual | Medium |
+| Hosted raw-read matrix | All `audit_read` types under scope rules | `object-registry/index.ts`, `internal-record-read.ts` | Scope leak at tenant/org | High |
+| Runtime host-wide interception | Shell/browser/MCP outside registered families | `src/runtime/ingress/`, `host-generated-code-containment` | Ingress evidence ≠ enforcement | High |
+
+---
+
+## Missing critical features (unchanged intent)
+
+| Feature | Blocks | Key files |
+|---------|--------|-----------|
+| Customer-gateway live x402 paid retry | Live paid execution claims | `src/surfaces/proof-packets/live-x402/paid-retry.ts`, `wallet-gateway.ts` |
+| Provider-grade credential custody | Hosted/live custody marketing | `src/protocol/areas/credential-custody/` |
+| Host-wide generated-code containment | Whole-host bypass claims | `host-generated-code-containment.ts` |
+| Hosted customer-safe readback/search | Hosted operation | `src/hosted-admission/`, `internal-record-read.ts` |
+| Current-surface public distribution | Product completion / registry | `package.json`, `product-launch-gate-resolution.ts` |
+| Auth.md + x402 composite execution | Composite marketing | `src/adapters/auth-md-x402-interlock/packet.ts` |
+
+---
+
+## Source markers: TODO / FIXME / proof gap
+
+| Scan | Result |
+|------|--------|
+| `grep TODO\|FIXME\|HACK\|XXX` in `src/` | **No matches** |
+| `proof gap` in `src/` | **Domain vocabulary** (protocol transitions, readbacks, launch gates) — not outstanding engineering TODOs. Examples: `src/protocol/navigation/index.ts:467`, `src/surfaces/product-launch-gate-resolution.ts:127`, `src/surfaces/a2a-negotiation-readback/index.ts:204-226`. |
+
+Do not treat protocol `proof_gap` record types as “missing implementation tickets” without reading the surrounding transition or readback contract.
+
+---
+
+## Dependencies at risk
+
+| Dependency | Risk | Files |
+|------------|------|-------|
+| Cloudflare D1/KV | D1 is authority store; KV must stay cache-only | `src/storage/d1/index.ts`, `src/storage/kv/index.ts` |
+| x402 SDK | Drift vs local/reference claims | `wallet-gateway.ts`, x402 proof packets |
+| MCP Registry / npm | External; must not drive policy | `product-launch-gate-resolution.ts`, `distribution-provenance.ts` |
+
+---
+
+## Scaling limits (unchanged)
+
+- **Runtime ingress:** Three registered families in `src/runtime/ingress/registry.ts` — each new family needs registry + tests + bypass probes.
+- **Hosted operation:** Admission modules exist; hosted custody/settlement/marketplace not closed (`docs/internal/decisions.md` Hosted Admission Lock).
+- **Object registry:** New protocol objects need hosted projection declarations (`src/protocol/areas/object-registry/index.ts`).
+
+---
+
+*Concerns audit: 2026-05-29 @ `aef9478`*
