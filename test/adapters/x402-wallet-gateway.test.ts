@@ -311,6 +311,52 @@ describe("x402 wallet gateway adapter", () => {
     expect(JSON.stringify(result.signatureEvidence)).not.toContain('paymentSignature":"');
   });
 
+  it("structurally refuses a forged verified gate at the official signer (D-64)", async () => {
+    const fixture = await greenlitOfficialX402Contract();
+    const signer = trackedOfficialSigner();
+    const surface = createOfficialExactX402SigningSurface({
+      signer: signer.surfaceSigner,
+      paymentRequired: officialPaymentRequired,
+      selectedPaymentRequirementIndex: fixture.evidence.selectedPaymentRequirementIndex,
+      selectedPaymentRequirementDigest: fixture.evidence.selectedPaymentRequirementDigest,
+      downstreamPaymentStatus: "unknown",
+    });
+
+    let capturedCommand: X402PaymentSignatureCommand | null = null;
+    const capturingSurface = {
+      async signPayment(command: X402PaymentSignatureCommand) {
+        capturedCommand = command;
+        return surface.signPayment(command);
+      },
+    };
+
+    const result = await runX402WalletGateway({
+      protocol: fixture.kernel,
+      surface: capturingSurface,
+      actionContractId: fixture.contract.actionContractId,
+      greenlightId: fixture.greenlight.greenlightId,
+      observedParameters: fixture.contract.parameters as X402PaymentParameters,
+    });
+    expect(result.outcome).toBe("payment_signature_proof_gap");
+    if (!capturedCommand) throw new Error("expected captured official signing command");
+    const validCommand: X402PaymentSignatureCommand = capturedCommand;
+
+    const forgedGate: X402PaymentSignatureCommand = {
+      ...validCommand,
+      verifiedGate: { ...validCommand.verifiedGate, gateAttemptId: "" },
+    };
+    await expect(surface.signPayment(forgedGate)).rejects.toThrow();
+
+    const unboundCredential: X402PaymentSignatureCommand = {
+      ...validCommand,
+      credentialResolutionEvidence: {
+        ...validCommand.credentialResolutionEvidence,
+        gateAttemptId: "gate_other_9999",
+      },
+    };
+    await expect(surface.signPayment(unboundCredential)).rejects.toThrow();
+  });
+
   it("records a local sandbox 402 challenge and signed retry only after gateway admission", async () => {
     const fixture = await greenlitOfficialX402Contract();
     const sandbox = createLocalX402PaidHttpSandbox({
