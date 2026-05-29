@@ -5,7 +5,8 @@ export type ProductCompletionGateId =
   | "public_distribution_and_registry"
   | "customer_gateway_live_x402_paid_proof"
   | "auth_md_x402_admission_packet"
-  | "dual_enforcement_posture";
+  | "dual_enforcement_posture"
+  | "per_customer_bypass_scaffold";
 
 export const PRODUCT_COMPLETION_READBACK_KIND = "product_completion_readback" as const;
 
@@ -28,6 +29,7 @@ export const PRODUCT_COMPLETION_GATE_IDS = [
   "customer_gateway_live_x402_paid_proof",
   "auth_md_x402_admission_packet",
   "dual_enforcement_posture",
+  "per_customer_bypass_scaffold",
 ] as const satisfies readonly ProductCompletionGateId[];
 
 export const PRODUCT_COMPLETION_PACK_CHECK_EXPECT_STATUS = "incomplete" as const;

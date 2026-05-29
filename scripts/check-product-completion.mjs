@@ -99,6 +99,11 @@ function buildProductCompletionProof(pkg) {
         mutationManifestGatingTestPassed: false,
         evidenceRefs: ["evidence:test:dual-enforcement-posture:pending"],
       },
+      perCustomerBypassScaffold: {
+        customerOnboardingRef: null,
+        firstPartyDogfoodCustomerId: null,
+        evidenceRefs: [],
+      },
     },
   });
 }

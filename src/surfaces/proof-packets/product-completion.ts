@@ -63,6 +63,11 @@ export type ProductCompletionReadbackInput = {
       readonly mutationManifestGatingTestPassed: boolean;
       readonly evidenceRefs: readonly string[];
     };
+    readonly perCustomerBypassScaffold?: {
+      readonly customerOnboardingRef: string | null;
+      readonly firstPartyDogfoodCustomerId: string | null;
+      readonly evidenceRefs: readonly string[];
+    };
   };
 };
 
@@ -122,6 +127,7 @@ export function projectProductCompletionReadback(input: ProductCompletionReadbac
       evidenceRefs: input.gates.authMdX402AdmissionPacket.evidenceRefs,
     }),
     dualEnforcementPostureGateResult(input),
+    perCustomerBypassScaffoldGateResult(input),
   ];
   assertProductCompletionGateIds(gateResults.map((result) => result.gateId));
   const incompleteGateIds = gateResults
@@ -198,6 +204,23 @@ function dualEnforcementPostureGateResult(input: ProductCompletionReadbackInput)
       "evidence:phase-04:04-11-deferred",
       "evidence:test:dual-enforcement-posture",
     ],
+  });
+}
+
+/** D-25 / D-54 — always incomplete until named first-party dogfood evidence exists. */
+function perCustomerBypassScaffoldGateResult(input: ProductCompletionReadbackInput) {
+  const gate = input.gates.perCustomerBypassScaffold;
+  const dogfoodReady =
+    gate?.firstPartyDogfoodCustomerId === "handshake-internal-dogfood" &&
+    gate.customerOnboardingRef !== null &&
+    gate.customerOnboardingRef.length > 0;
+  return productCompletionGateResult({
+    gateId: "per_customer_bypass_scaffold",
+    title: "Per-customer service-workflow-admission bypass scaffold (first-party dogfood only)",
+    completed: false,
+    hardBlocked: !dogfoodReady && gate?.customerOnboardingRef === null,
+    blockers: dogfoodReady ? [] : ["per_customer_bypass_scaffold_incomplete", "customer_onboarding_ref_absent"],
+    evidenceRefs: gate?.evidenceRefs ?? ["evidence:phase-04:D-25-scaffold"],
   });
 }
 
