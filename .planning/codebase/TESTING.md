@@ -1,6 +1,6 @@
 # Testing Patterns
 
-**Analysis Date:** 2026-05-28
+**Analysis Date:** 2026-05-29
 
 ## Test Framework
 
@@ -17,7 +17,7 @@
 ```bash
 bun test                              # all tests
 npm test                              # alias via package.json
-npm run check:types                   # tsc --noEmit (types before/at CI)
+npm run check:types                   # tsc --noEmit
 npm run lint                          # eslint src test --max-warnings=0
 npm run format:check                  # prettier --check .
 npm run check:repo                    # build + types + lint + format + test + pack:check + git diff --check
@@ -29,7 +29,6 @@ npm run check:repo                    # build + types + lint + format + test + p
 npm run quality:architecture   # import/naming/surface/cli/mcp/conformance posture
 npm run quality:storage        # D1/http + kernel invariants + evidence projections
 npm run quality:claims         # active vocabulary + claim boundary
-npm run quality:tier3          # cross-cutting CLI/MCP/SDK/http/adapters slice
 ```
 
 Local fast slice from `QUALITY.md`:
@@ -38,6 +37,57 @@ Local fast slice from `QUALITY.md`:
 npm run check:types
 bun test
 git diff --check
+```
+
+**Phase 04 service-agent gating scripts** (`scripts/check-service-agent-gating-phase.mjs`):
+
+```bash
+npm run check:service-agent-gating-phase              # operator tier — 10 tests
+npm run check:service-agent-gating-phase:full         # full tier — 15 tests (10 + 5)
+```
+
+| Tier | Flag | Count | Suite |
+|------|------|-------|-------|
+| operator | `--tier operator` | 10/10 | Operator product completion, dual enforcement, failure-class HTTP/SDK/MCP, bootstrap, golden path, proof-gap honesty, custody matrix, HTTP mutation gating |
+| full | `--tier full` | 15/15 | Operator suite plus maintainer completion, integrator parity, HTTP profile canonicalization/orphan catalog, CLI agent-spine sequencer |
+
+Operator tier files (always run):
+
+1. `test/architecture/operator-product-completion-contract.test.ts`
+2. `test/architecture/dual-enforcement-posture.test.ts`
+3. `test/http/transition-error-failure-class.test.ts`
+4. `test/product/service-operator-bootstrap.test.ts`
+5. `test/integration/service-operator-golden-path.test.ts`
+6. `test/architecture/proof-gap-honesty.test.ts`
+7. `test/architecture/custody-matrix-parity.test.ts`
+8. `test/architecture/http-handler-mutation-gating.test.ts`
+9. `test/sdk/role-clients-failure-class.test.ts`
+10. `test/mcp/mcp-failure-class-parity.test.ts`
+
+Full-tier additions:
+
+11. `test/architecture/maintainer-product-completion-contract.test.ts`
+12. `test/architecture/integrator-parity.test.ts`
+13. `test/adapters/http-profile-canonicalization.test.ts`
+14. `test/adapters/http-profile-orphan-catalog.test.ts`
+15. `test/cli/cli-agent-spine-sequencer.test.ts`
+
+Verified at HEAD `aef9478` (branch `phase-05-product-coherence`): both tiers pass.
+
+## Known Acceptable Residual Failures
+
+When running the full `bun test` suite locally, these structural-guard tests may fail for environmental or baseline reasons without blocking phase closeout:
+
+| Test file | Failing case(s) | Cause | Mitigation |
+|-----------|-----------------|-------|------------|
+| `test/architecture/naming-posture.test.ts` | `keeps workspace metadata junk out of active repo surfaces` | Local `.DS_Store` files under repo tree | Delete junk files or add to global gitignore; not a source defect |
+| `test/architecture/naming-posture.test.ts` | `keeps deleted scratch documents out of the active tree` | Local `.agents/` or `skills-lock.json` present | Remove untracked scratch; `STRUCTURE.md` marks these as non-canon |
+| `test/architecture/manifest-coverage.test.ts` | `maps each product surface export to a manifest surface with matching sourceRoots` | Pre-existing baseline: expects `./hosted-admission` and `./surfaces/service-workflow-admission` exports not yet in `package.json` | Track as manifest/export drift; other manifest-coverage cases pass |
+
+**Timeout note:** `test/architecture/release-repository-projection.test.ts` spawns `scripts/project-release-repository.js` (~1.6s isolated). It can time out when run inside the full parallel suite but passes in isolation:
+
+```bash
+bun test test/architecture/release-repository-projection.test.ts
 ```
 
 ## Test File Organization
@@ -66,12 +116,94 @@ test/
 ```
 
 **Naming:**
-- Files: `<area>-<subject>.test.ts` or `<subject>.test.ts` (e.g. `kernel-operation-lifecycle.test.ts`, `cli-evidence.test.ts`).
+- Files: `<area>-<subject>.test.ts` or `<subject>.test.ts`.
 - One primary `describe` per guarded boundary; multiple `it` cases per invariant.
 
-**Support code:**
-- Shared builders and harnesses live in `test/support/` — not counted as test files.
-- Key support modules: `fixtures.ts`, `d1-http-harness.ts`, `fault-injecting-protocol-store.ts`, `negotiation-fixtures.ts`, `http-protocol-fixtures.ts`, flow helpers (`package-install-flow.ts`, `auth-md-flow.ts`).
+## Architecture / Structural Guard Suites
+
+These tests act as repo posture enforcement — not unit tests of runtime behavior. They walk the filesystem, parse manifests, and compare against frozen allowlists.
+
+### Claim and doctrine (`test/architecture/claim-boundary.test.ts`)
+
+- **`expectClaimMatrix`** — normalizes canonical doc text and asserts required phrases and forbidden patterns with exact phrasing.
+- Required product/protocol language includes: `cleared protected-action event`, `protocol kernel`, `product surface`, `public npm availability does not create authority`, `MCP Registry discoverability remains a proof gap`, certificate-is-terminal-evidence-not-permission patterns.
+- Validates root vs `./adapter-sdk` vs `./runtime` vs `./conformance` vs `./experimental` export separation (no authority symbols at root).
+- Scans `AGENTS.md`, `README.md`, `QUALITY.md`, `STRUCTURE.md`, `docs/internal/*`, lane manifests, and example READMEs.
+
+Companion: `test/architecture/active-vocabulary.test.ts` (run via `quality:claims`).
+
+### Package and export surface
+
+| File | Guards |
+|------|--------|
+| `test/architecture/package-surface.test.ts` | `package.json` exports, bins, MCP name, no `./surfaces` barrel, publishable posture |
+| `test/architecture/root-exports.test.ts` | Frozen sorted export list from `src/index.ts` |
+| `test/architecture/manifest-coverage.test.ts` | Maps `package.json` exports and CLI handler files to `src/surfaces/boundary-manifest.ts` `sourceRoots` |
+| `test/architecture/hosted-admission-reexport-only.test.ts` | Hosted admission subpath curation |
+
+### Naming and planning quarantine
+
+| File | Guards |
+|------|--------|
+| `test/architecture/naming-posture.test.ts` | Banned bucket segments, loose-file limits, `index.ts` public faces, Tier/stage label ban, `.DS_Store` junk, deleted scratch paths, overclaiming/vague protocol verbs, CI pinned to `npm run check:repo` |
+| `test/architecture/planning-scratch-quarantine.test.ts` | D-62: macro-plan/concierge markers must not appear in scripts, README, `src/`, `test/`, `docs/` |
+| `test/architecture/canonical-doc-forbidden-copy.test.ts` | Forbidden legacy doc paths in canon |
+
+### Import and lane posture
+
+| File | Guards |
+|------|--------|
+| `test/architecture/import-posture.test.ts` | LANE.md field completeness, transport off protocol internals, removed compatibility shims |
+| `test/architecture/surface-boundary-posture.test.ts` | `boundary-manifest.ts` completeness, non-authority flags, forbidden authority routes |
+| `test/architecture/cli-command-posture.test.ts` | CLI manifest alignment |
+| `test/architecture/cli-non-authority-copy.test.ts` | CLI must not claim authority (D-60) |
+| `test/architecture/mcp-surface-posture.test.ts` | MCP catalog posture |
+| `test/architecture/negotiation-no-authority-surface.test.ts` | Negotiation area isolation from gateway/policy imports |
+
+### Authority boundary and bypass
+
+| File | Guards |
+|------|--------|
+| `test/adapters/x402-bypass-probes.test.ts` | Hostile bypass probe executors; policy greenlight only after gateway-owned probes pass |
+| `test/architecture/http-handler-mutation-gating.test.ts` | HTTP handlers cannot mutate without gating |
+| `test/architecture/dual-enforcement-posture.test.ts` | Service golden path dual-enforcement language |
+| `test/architecture/workflow-admission-boundary.test.ts` | Service workflow admission boundary |
+| `test/architecture/x402-gateway-credential-custody.test.ts` | Gateway credential custody invariants |
+| `test/architecture/gateway-invariant-*.test.ts` | Signer custody, params mismatch, replay |
+
+### FailureClass taxonomy and parity
+
+| File | Guards |
+|------|--------|
+| `test/protocol/failure-class-taxonomy.test.ts` | Reason-code → `FailureClass` mapping via `src/protocol/foundation/failure-class/index.ts` |
+| `test/http/transition-error-failure-class.test.ts` | HTTP envelope `failureClass` alignment |
+| `test/sdk/role-clients-failure-class.test.ts` | SDK client failureClass parity |
+| `test/mcp/mcp-failure-class-parity.test.ts` | MCP binding reason codes vs HTTP classifier |
+
+### Integrator parity and product completion
+
+| File | Guards |
+|------|--------|
+| `test/architecture/integrator-parity.test.ts` | `integratorParityTransitionIds` tagged in navigation; HTTP route role/path parity |
+| `test/architecture/operator-product-completion-contract.test.ts` | Golden path docs, runbooks, examples, required tests wired |
+| `test/architecture/maintainer-product-completion-contract.test.ts` | Maintainer-tier test/doc closure |
+| `test/architecture/product-completion-parity.test.ts` | Product completion gate parity |
+| `test/architecture/proof-gap-honesty.test.ts` | Proof gaps not smoothed over in canon |
+
+### Release and distribution
+
+| File | Guards |
+|------|--------|
+| `test/architecture/release-repository-projection.test.ts` | Release artifact projection (may timeout in full suite) |
+| `test/architecture/package-release-proof.test.ts` | Release proof records |
+| `test/architecture/npm-maintainer-posture.test.ts` | npm maintainer posture |
+| `test/architecture/release-admin-gate.test.ts` | Release admin gate |
+
+Run the architecture slice:
+
+```bash
+npm run quality:architecture
+```
 
 ## Test Structure
 
@@ -92,10 +224,25 @@ describe("Handshake kernel invariants: operation lifecycle", () => {
 ```
 
 **Patterns:**
-- No `beforeEach` / `afterEach` / `beforeAll` hooks in the suite — tests construct fixtures inline or via async helpers (`createGreenlitContract()`, `createD1HttpHarness()`).
-- Prefer `async` tests with `await` on kernel/HTTP calls.
-- Use `throw new Error("expected …")` for narrow guard clauses when narrowing nullable results after an action.
+- No global `beforeEach` / `afterEach` hooks in most suites — tests construct fixtures inline or via async helpers.
 - Architecture tests walk the filesystem with Node `fs` and aggregate violations into sorted arrays compared with `expect(violations).toEqual([])`.
+
+**Claim matrix helper (`test/architecture/claim-boundary.test.ts`):**
+
+```typescript
+function expectClaimMatrix(entries: ClaimMatrixEntry[]) {
+  for (const entry of entries) {
+    for (const source of entry.sources) {
+      const normalizedSource = normalizeRequiredClaim(source.text);
+      for (const phrase of entry.required ?? []) {
+        expect(normalizedSource, `${entry.label} must be stated in ${source.name}`).toContain(
+          normalizeRequiredClaim(phrase),
+        );
+      }
+    }
+  }
+}
+```
 
 **Authority-boundary assertions (product/cli/mcp):**
 
@@ -110,179 +257,55 @@ expect(output).toMatchObject({
 expect(JSON.stringify(output)).not.toContain("PAYMENT-SIGNATURE");
 ```
 
-**Negotiation / A2A product tests:**
-
-```typescript
-expect(readback.nonClaims).toEqual(
-  expect.arrayContaining([
-    "policy_evaluation",
-    "gateway_check",
-    "mutation",
-  ]),
-);
-await expectNoAuthorityRecords(fixture.store);
-```
-
 ## Mocking
 
 **Framework:** None — no `mock`, `spyOn`, `vi.`, or Jest mocks detected under `test/`.
 
 **Patterns:**
 - Use real in-memory protocol store (`InMemoryProtocolStore` from `src/storage/memory`) via `makeKernelFixture()` in `test/support/fixtures.ts`.
-- Use `FaultInjectingProtocolStore` in `test/support/fault-injecting-protocol-store.ts` to simulate ambiguous commits and read faults without mocking the kernel API.
-- HTTP integration uses `createD1HttpHarness()` (`test/support/d1-http-harness.ts`): in-memory SQLite backing a D1-shaped API, real `createApp()` from `src/http/app`, test bearer tokens — no fetch mocks.
-- CLI tests invoke `runCliCommand` from `src/cli/main` with temp JSON fixture files (`mkdtemp`, `writeFile`).
+- Use `FaultInjectingProtocolStore` in `test/support/fault-injecting-protocol-store.ts` for fault injection.
+- HTTP integration uses `createD1HttpHarness()` in `test/support/d1-http-harness.ts`.
+- CLI tests invoke `runCliCommand` from `src/cli/main.ts` with temp JSON fixture files.
 
-**What to mock:** Avoid introducing mock libraries; inject faults through store decorators or explicit test doubles in `test/support/`.
-
-**What NOT to mock:**
-- Protocol kernel transition semantics under test.
-- Schema validation (use real Zod schemas, e.g. `McpX402PaymentProposalInputSchema.safeParse` in `test/mcp/mcp-schema-contract.test.ts`).
-- Canonicalization and digest functions when testing binding integrity.
+**What NOT to mock:** Protocol kernel transition semantics, Zod schema validation, canonicalization/digest functions under test.
 
 ## Fixtures and Factories
 
-**Kernel fixture (`test/support/fixtures.ts`):**
+**Kernel fixture (`test/support/fixtures.ts`):** `makeKernelFixture()`, `createGreenlitContract()`, `futureIso()`.
 
-```typescript
-export type KernelFixture = {
-  store: ProtocolStore;
-  kernel: HandshakeKernel;
-  tool: ToolCapability;
-  actionType: ActionType;
-  gateway: GatewayRegistryEntry;
-  envelope: OperatingEnvelope;
-};
+**D1 HTTP harness (`test/support/d1-http-harness.ts`):** `createD1HttpHarness()` with in-memory SQLite + real `createApp()`.
 
-export function makeKernelFixture() {
-  const store = new InMemoryProtocolStore();
-  const kernel = new HandshakeKernel(store);
-  /* registers demo catalog objects */
-  return { store, kernel, tool, actionType, gateway, envelope };
-}
+**Negotiation/A2A:** `test/support/negotiation-fixtures.ts`.
 
-export function futureIso(minutes = 10): string {
-  return new Date(Date.now() + minutes * 60_000).toISOString();
-}
-```
-
-**Greenlit contract helper:** `createGreenlitContract()` composes proposal → policy → greenlight for gateway-check tests.
-
-**D1 HTTP harness:**
-
-```typescript
-export async function createD1HttpHarness(): Promise<D1HttpHarness> {
-  const db = /* LocalD1Database + migration 0001_protocol_kernel.sql */;
-  const app = createApp();
-  return {
-    db,
-    fetch: (input, init) => app.request(/* path */, init, env),
-    post: <T>(path, body, role?) => /* JSON + bearer role */,
-    query: <T>(sql, ...bindings) => /* D1 prepare */,
-    dispose: async () => { /* cleanup */ },
-  };
-}
-```
-
-**Negotiation/A2A:** `test/support/negotiation-fixtures.ts` exports `negotiationSession()`, `negotiationDigest`, `a2aIngressCheckpoint()` for product ingress tests.
-
-**Location for new fixtures:** Add to `test/support/<domain>-fixtures.ts` or extend `fixtures.ts` when shared across protocol and HTTP tests. Keep demo IDs stable (`tenant_demo`, `org_demo`) for snapshot-style assertions.
+**Location for new fixtures:** `test/support/<domain>-fixtures.ts` or extend `fixtures.ts`.
 
 ## Coverage
 
-**Requirements:** No enforced coverage threshold in repo config; correctness is gated by `npm run check:repo` and architecture tests.
-
-**View coverage:** Not configured (no `coverage/` script in `package.json`). If adding coverage, extend Bun's coverage flags locally — do not commit secrets or env files.
+**Requirements:** No enforced coverage threshold; correctness is gated by `npm run check:repo` and architecture tests.
 
 **Implicit coverage targets:**
-- Every first-level `src/` lane lists **Guarding tests** in its `LANE.md` (cross-checked by import-posture tests).
+- Every first-level `src/` lane lists **Guarding tests** in its `LANE.md`.
 - Expansion of action families requires new tests naming execution shape, bypass posture, and proof-gap model (`QUALITY.md`).
 
 ## Test Types
 
-**Unit tests (`test/protocol/`, parts of `test/adapters/`):**
-- Invoke `HandshakeKernel` methods directly; assert on returned records and store counts (`fixture.store.countRecordsOfType("mutation_attempt")`).
+**Unit tests (`test/protocol/`, parts of `test/adapters/`):** Direct `HandshakeKernel` invocation; store count assertions.
 
-**Architecture / policy tests (`test/architecture/`):**
-- Static analysis via filesystem reads and regex scans (`naming-posture.test.ts`, `import-posture.test.ts`, `claim-boundary.test.ts`).
-- Validate package exports, banned vocabulary, lane manifests, and claim matrices against `README.md`, `AGENTS.md`, `package.json`.
+**Architecture / policy tests (`test/architecture/`):** Filesystem scans, manifest parity, claim matrices.
 
-**HTTP tests (`test/http/`):**
-- `http.test.ts`: in-memory store + `createApp()` request/response assertions, OpenAPI security schemes, security headers.
-- `d1-http.test.ts`: persistence and stream behavior through `createD1HttpHarness()`.
+**HTTP tests (`test/http/`):** `http.test.ts`, `d1-http.test.ts`, OpenAPI contract.
 
-**CLI tests (`test/cli/`):**
-- Spawn commands through `runCliCommand([...args])`; assert JSON envelope shape and redaction (no raw payment material in stringified output).
+**CLI tests (`test/cli/`):** `runCliCommand` envelope shape and redaction.
 
-**MCP tests (`test/mcp/`):**
-- Catalog cardinality (exactly one proposal tool), schema rejection of authority-shaped fields, resource URI templates.
+**MCP tests (`test/mcp/`):** Catalog cardinality, schema rejection of authority-shaped fields.
 
-**Integration tests (`test/integration/`):**
-- Multi-hop flows: x402 D1 HTTP (`x402-d1-http.test.ts`), auth-md receipt reconstruction, package install end-to-end.
+**Integration tests (`test/integration/`):** `x402-d1-http.test.ts`, `service-operator-golden-path.test.ts`, auth-md reconstruction.
 
-**Product tests (`test/product/`):**
-- Buyer-facing slices: A2A ingress/admission/normalizer, service workflow admission, demo report shapes, hosted package consumer — always assert non-authority and non-claims.
+**Product tests (`test/product/`):** A2A ingress, service workflow admission, demo reports — always assert non-authority.
 
-**Conformance tests (`test/conformance/`):**
-- Reference adapter posture (`protected-mutation-adapter-conformance.test.ts`, x402 conformance/fixture parity).
+**Conformance tests (`test/conformance/`):** Reference adapter posture.
 
-**Model-based invariants (`test/protocol/model-based-invariants.test.ts`):**
-- Command scheduler over transition route IDs with shared `ModelContext` — exercises ordering and store counts without mocks.
-
-## Common Patterns
-
-**Async testing:**
-
-```typescript
-it("reconciles a pending surface operation without a second mutation attempt", async () => {
-  const fixture = await createGreenlitContract();
-  const gate = await fixture.kernel.gatewayCheck({ /* ... */ });
-  if (!gate.mutationAttempt) throw new Error("expected mutation attempt");
-  const result = await fixture.kernel.reconcileSurfaceOperation({ /* ... */ });
-  expect(result.reconciliation.finalityStatus).toBe("final");
-});
-```
-
-**Error testing:**
-
-```typescript
-await expect(fixture.kernel.proposeActionContract(proposalInputForCompilation(driftedCompilation)))
-  .rejects.toThrow(/* HandshakeProtocolError or message fragment */);
-
-await expect(protocolStore.commitProtocolRecords({ records: [], events: [] }))
-  .rejects.toMatchObject({ /* structured error code */ });
-```
-
-**Schema contract testing:**
-
-```typescript
-expect(McpX402PaymentProposalInputSchema.safeParse(base).success).toBe(true);
-expect(McpX402PaymentProposalInputSchema.safeParse({ ...base, greenlightRef: "x" }).success).toBe(false);
-```
-
-**Filesystem architecture test:**
-
-```typescript
-const violations = walk("src")
-  .filter((file) => file.split("/").some((segment) => bannedSourcePathSegments.has(segment)));
-expect(violations).toEqual([]);
-```
-
-**Claim matrix testing (`test/architecture/claim-boundary.test.ts`):**
-
-```typescript
-function expectClaimMatrix(entries: ClaimMatrixEntry[]) {
-  for (const entry of entries) {
-    for (const source of entry.sources) {
-      for (const phrase of entry.required ?? []) {
-        expect(normalizedSource, `${entry.label} must be stated in ${source.name}`).toContain(
-          normalizeRequiredClaim(phrase),
-        );
-      }
-    }
-  }
-}
-```
+**Model-based invariants (`test/protocol/model-based-invariants.test.ts`):** Command scheduler over transition route IDs.
 
 ## Where to Add Tests
 
@@ -290,16 +313,18 @@ function expectClaimMatrix(entries: ClaimMatrixEntry[]) {
 |-------------|---------------|-------------------|
 | Protocol transition / invariant | `test/protocol/` | `kernel-operation-lifecycle.test.ts` |
 | New `src/` lane or import rule | `test/architecture/` | `import-posture.test.ts`, `naming-posture.test.ts` |
-| HTTP route or admission | `test/http/` | `http.test.ts`, `d1-http.test.ts` |
-| CLI command envelope | `test/cli/` | `cli-evidence.test.ts` |
-| MCP tool/resource schema | `test/mcp/` | `mcp-schema-contract.test.ts` |
+| HTTP route or admission | `test/http/` | `http.test.ts`, `transition-error-failure-class.test.ts` |
+| CLI command envelope | `test/cli/` | `cli-evidence.test.ts`, `cli-non-authority-copy.test.ts` |
+| MCP tool/resource schema | `test/mcp/` | `mcp-schema-contract.test.ts`, `mcp-failure-class-parity.test.ts` |
 | Adapter gateway / bypass | `test/adapters/` | `x402-bypass-probes.test.ts` |
-| End-to-end buyer flow | `test/integration/` or `test/product/` | `x402-d1-http.test.ts` |
+| FailureClass mapping | `test/protocol/` + transport | `failure-class-taxonomy.test.ts` |
+| End-to-end buyer flow | `test/integration/` or `test/product/` | `service-operator-golden-path.test.ts` |
 | Public export or marketing claim | `test/architecture/` | `claim-boundary.test.ts`, `root-exports.test.ts` |
+| Planning scratch promotion | `test/architecture/` | `planning-scratch-quarantine.test.ts` |
 | Shared fixture / harness | `test/support/` | `fixtures.ts`, `d1-http-harness.ts` |
 
 Run the narrowest slice that covers your change before `npm run check:repo`.
 
 ---
 
-*Testing analysis: 2026-05-28*
+*Testing analysis: 2026-05-29*

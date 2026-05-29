@@ -1,16 +1,23 @@
 # Coding Conventions
 
-**Analysis Date:** 2026-05-28
+**Analysis Date:** 2026-05-29
 
-Canonical repo guidance lives in `QUALITY.md`, `STRUCTURE.md`, and lane manifests (`src/**/LANE.md`). This document captures enforceable patterns the executor should follow when writing or changing code.
+Canonical repo guidance lives in `QUALITY.md`, `STRUCTURE.md`, `AGENTS.md`, and lane manifests (`src/**/LANE.md`). This document captures enforceable patterns the executor should follow when writing or changing code.
 
 ## Naming Patterns
 
 **Files and folders:**
-- Name by owned concept, not generic buckets. Banned path segments: `utils`, `helpers`, `common`, `misc`, `stuff`, `manager`, `service` (enforced in `test/architecture/naming-posture.test.ts`).
+- Name by owned concept, not generic buckets. Banned path segments under `src/**`: `utils`, `helpers`, `common`, `misc`, `stuff`, `manager`, `service` (enforced in `test/architecture/naming-posture.test.ts`).
+- The `service` ban is why CLI operator code lives at `src/cli/service-operator/` (not `src/cli/service/`). Product docs use `service-operator-*` filenames (for example `docs/internal/service-operator-golden-path.md`), not internal planning tier labels.
 - Protocol primitives live under `src/protocol/areas/<concept>/` with focused filenames (`transitions.ts`, `schemas.ts`, `inputs.ts`, `index.ts`).
 - Product and transport lanes mirror ownership: `src/http/`, `src/cli/`, `src/mcp/`, `src/surfaces/`, `src/adapters/<adapter>/`.
-- Every first-level `src/` lane must ship `LANE.md` or `README.md` with the manifest fields listed in `QUALITY.md`.
+- Every first-level `src/` lane must ship `LANE.md` or `README.md` with the manifest fields listed in `QUALITY.md` / `STRUCTURE.md` (validated by `test/architecture/import-posture.test.ts`).
+
+**Banned planning labels (repo-facing surfaces):**
+- Internal planning-stage vocabulary must not appear in repo-facing paths, scripts, CI names, README, canonical docs, exported symbols, or test titles.
+- Specifically forbidden in repo-facing files (see `test/architecture/naming-posture.test.ts`): `Tier 1`–`Tier 4`, `tier1`, `tier doctrine`, and similar stage labels.
+- Use product/protocol nouns instead — for example `integrator-parity` (`test/architecture/integrator-parity.test.ts`, `docs/internal/integrator-parity-transitions.md`) rather than legacy tier numbering.
+- Repo-facing roots scanned: `AGENTS.md`, `README.md`, `QUALITY.md`, `STRUCTURE.md`, `docs/internal`, `examples`, `package.json`, `.github`, `src`, `test`.
 
 **Functions (protocol modules):**
 - Durable writes: `record*`, `persist*`, `commit*`, `consume*`, `mark*`, `activate*`.
@@ -43,14 +50,97 @@ export type SurfaceOperationReconciliationResult = {
 - Prefix intentionally unused bindings with `_` to satisfy ESLint (`argsIgnorePattern`, `varsIgnorePattern` in `eslint.config.js`).
 
 **Tests:**
-- Mirror source ownership in path: `test/protocol/kernel-operation-lifecycle.test.ts`, `test/product/a2a-ingress-admission.test.ts`.
+- Mirror source ownership in path: `test/protocol/kernel-operation-lifecycle.test.ts`, `test/product/service-operator-bootstrap.test.ts`.
 - Describe blocks name the guarded boundary, not the file:
 
 ```typescript
 describe("repo naming posture", () => { /* ... */ });
-describe("A2A production ingress admission", () => { /* ... */ });
+describe("planning scratch quarantine", () => { /* ... */ });
 describe("Handshake kernel invariants: operation lifecycle", () => { /* ... */ });
 ```
+
+## Module And Directory Layout
+
+**Directory + `index.ts` posture (not loose files):**
+- A source folder with more than three `.ts` files (excluding `index.ts`) must expose an `index.ts` public face.
+- A source folder must not exceed seven loose `.ts` files (excluding `index.ts`).
+- Area modules stay under `src/protocol/areas/*`; foundation helpers use directory modules such as `src/protocol/foundation/failure-class/index.ts` (not a loose `failure-class.ts` at the foundation root).
+- Protocol area folders use `transitions.ts`, `schemas.ts`, `inputs.ts`, `guards.ts`, and `index.ts` as the standard layout.
+
+**First-level `src/` lanes with `LANE.md` (authority boundary files):**
+- `src/adapters/LANE.md`
+- `src/adapter-sdk/LANE.md`
+- `src/cli/LANE.md`
+- `src/conformance/LANE.md`
+- `src/hosted-admission/LANE.md`
+- `src/http/LANE.md`
+- `src/install/LANE.md`
+- `src/mcp/LANE.md`
+- `src/protocol/LANE.md`
+- `src/runtime/LANE.md`
+- `src/sdk/LANE.md`
+- `src/storage/LANE.md`
+- `src/surfaces/LANE.md`
+- `src/x402-protected-tool/LANE.md`
+
+Each manifest must include all fourteen required `##` sections listed in `STRUCTURE.md` (Authority owner through Scope boundary).
+
+## `.planning/` Scratch Quarantine
+
+**Rule:** Files under `.planning/` are scratch. They must not leak into repo-facing source paths, `package.json` scripts, CI workflow names, exported symbols, or canonical docs (`AGENTS.md` line 221; `STRUCTURE.md`).
+
+**Enforced markers (D-62)** — must not appear in `src/`, `test/`, `docs/`, `README.md`, or `package.json` scripts (`test/architecture/planning-scratch-quarantine.test.ts`):
+- `.planning/macro-plan`
+- `.planning/macro/concierge`
+- `concierge-demand-test-scaffold`
+
+**Also quarantined from active canon** (naming posture):
+- `Agent-Founder.md`
+- `.agents` skill bundles
+- `skills-lock.json`
+
+When `.planning/codebase/*` informs work, tracked source, canonical docs, and passing tests win on factual disagreements (`STRUCTURE.md`).
+
+## Surfaces Must Not Create Authority
+
+Product surfaces (CLI, MCP, SDK readbacks, `src/surfaces/*`) expose proposal, evidence, and readback only. They must not create policy decisions, greenlights, gateway checks, mutation attempts, or certificates.
+
+**Manifest contract:** `src/surfaces/boundary-manifest.ts` defines `surfaceNonAuthorityFlags` and per-surface `requiredNonAuthorityFlags`. Every model-facing and operator-facing surface must require all flags to be `false`:
+
+```typescript
+export const surfaceNonAuthorityFlags = [
+  "authorityCreated",
+  "credentialMaterialIncluded",
+  "gatewayCheckPerformed",
+  "greenlightCreated",
+  "mutationAttempted",
+  "mutationCommandIncluded",
+  "rawInternalRecordIncluded",
+  "receiptExportCreated",
+  "authorityCertificateMinted",
+] as const;
+```
+
+**Guarding tests:**
+- `test/architecture/surface-boundary-posture.test.ts` — manifest completeness, forbidden authority route families, required non-authority flags, forbidden credential/output shapes.
+- `test/architecture/negotiation-no-authority-surface.test.ts` — negotiation area does not import protected-action control areas; only `record*` transitions exported.
+- `test/architecture/cli-non-authority-copy.test.ts` — CLI copy must not imply authority (D-60).
+- `test/architecture/claim-boundary.test.ts` — canonical docs must state projection/readback "without creating authority".
+
+**Product test assertion pattern:**
+
+```typescript
+expect(output).toMatchObject({
+  authorityCreated: false,
+  greenlightCreated: false,
+  gatewayCheckPerformed: false,
+  mutationAttempted: false,
+  rawInternalRecordIncluded: false,
+  credentialMaterialIncluded: false,
+});
+```
+
+Role-scoped SDK policy/gateway clients are policy transition transport — not product authority surfaces (`surface-boundary-posture.test.ts` distinguishes `sdk.policy`).
 
 ## Code Style
 
@@ -85,49 +175,27 @@ Run `npm run lint` (`--max-warnings=0`). Zero warnings is required for closeout.
 2. Value imports from `src/` (kernel, adapters, surfaces).
 3. Separate `import type { ... }` lines for types only.
 
-Example from `test/http/http.test.ts`:
-
-```typescript
-import { describe, expect, it } from "bun:test";
-import { createApp } from "../../src/http/app";
-import type { CallerAuthTokens, TransitionCallerRole } from "../../src/http/admission/caller-auth";
-import { HandshakeKernel } from "../../src/protocol/kernel";
-import {
-  type ContractEvidenceProjection,
-  PROTOCOL_VERSION,
-  type ProofGap,
-} from "../../src/protocol/public/schemas";
-import { InMemoryProtocolStore } from "../../src/storage/memory";
-import { createGreenlitContract, makeKernelFixture } from "../support/fixtures";
-```
-
 **Path style:**
 - Use relative paths from the importing file (`../../src/...`, `../support/...`). No path aliases in `tsconfig.json`.
 - Import protocol meaning through public faces (`src/protocol/public/schemas`, `src/protocol/public/inputs`) from transport, SDK, and product code — not through deep `src/protocol/areas/*` internals (guarded by `test/architecture/import-posture.test.ts`).
 
 **Barrel files:**
 - Folders with more than three `.ts` files (excluding `index.ts`) must expose an `index.ts` public face.
-- Curated package exports live in `src/index.ts` and `package.json` `exports`; do not re-export internal kernel/store objects at root.
+- Curated package exports live in `src/index.ts` and `package.json` `exports`; do not re-export internal kernel/store objects at root (`test/architecture/root-exports.test.ts`).
 
 ## Error Handling
 
 **Protocol errors:**
 - Throw `HandshakeProtocolError` from `src/protocol/foundation/errors` for invariant violations.
-- Parse inputs with Zod schemas at transition boundaries (`ReconcileSurfaceOperationInputSchema.parse` pattern in `src/protocol/areas/operation-lifecycle/transitions.ts`).
+- Classify transport-facing failures through `src/protocol/foundation/failure-class/index.ts` (`FailureClassSchema`: `auth`, `hosted_admission`, `protected_action_refusal`, `proof_gap`, `replay_refusal`, `stale_admission`, `internal`).
+- Parse inputs with Zod schemas at transition boundaries.
 
 **HTTP/SDK:**
-- Map protocol errors to typed HTTP envelopes via `src/http/errors/` (see `HandshakeProtocolError` usage in `test/http/http.test.ts`).
-- SDK clients surface structured rejections; tests use `rejects.toMatchObject` / `rejects.toThrow`:
-
-```typescript
-await expect(errorClient.getGeneratedGraphEvidenceProjection("geg_missing")).rejects.toMatchObject({
-  /* structured client error */
-});
-await expect(fixture.kernel.proposeActionContract(followUpInput)).rejects.toThrow(/* ... */);
-```
+- Map protocol errors to typed HTTP envelopes via `src/http/errors/transition-error-envelope.ts`.
+- SDK clients surface structured rejections; tests use `rejects.toMatchObject` / `rejects.toThrow`.
 
 **Fail closed:**
-- Missing custody, schema invalidity, and isolation blocks must refuse — never silently succeed. Product surfaces assert non-authority flags on outputs (`authorityCreated: false`, `gatewayCheckPerformed: false`, etc.).
+- Missing custody, schema invalidity, and isolation blocks must refuse — never silently succeed.
 
 ## Logging
 
@@ -145,59 +213,31 @@ await expect(fixture.kernel.proposeActionContract(followUpInput)).rejects.toThro
 
 **JSDoc/TSDoc:**
 - Sparse; types and schema names are the primary documentation.
-- Export types for transition results and public SDK shapes; avoid duplicating schema field lists in comments.
 
 ## Function Design
 
 **Size:**
-- Transition functions orchestrate guard → plan → commit; keep helper types (`SurfaceOperationReconciliationContext`, `SurfaceOperationEvidencePlan`) file-local when they clarify commit phases.
+- Transition functions orchestrate guard → plan → commit; keep helper types file-local when they clarify commit phases.
 
 **Parameters:**
 - Pass explicit IDs and digests; avoid passing loose `Record<string, unknown>` at protocol boundaries.
-- Use `satisfies` for fixture constants that must conform to auth or schema types:
-
-```typescript
-const TEST_CALLER_AUTH_TOKENS = {
-  control_plane: "test_control_plane_token",
-  /* ... */
-} as const satisfies CallerAuthTokens;
-```
+- Use `satisfies` for fixture constants that must conform to auth or schema types.
 
 **Return values:**
 - Transition functions return structured result objects with both primary record and side effects (`resolvedProofGaps`, `createdProofGap`).
-- CLI/MCP commands return envelope objects with authority boundary fields and `reasonCodes` (see `test/cli/cli-evidence.test.ts`).
+- CLI/MCP commands return envelope objects with authority boundary fields and `reasonCodes`.
 
 ## Module Design
 
 **Exports:**
 - Each lane's `index.ts` re-exports the public surface declared in its `LANE.md`.
-- Package subpaths (`./sdk/role-clients`, `./hosted-admission`, `./surfaces/a2a-negotiation-readback`) match `package.json` exports — do not add root exports without updating `test/architecture/root-exports.test.ts` and `test/architecture/claim-boundary.test.ts`.
-
-**Lane manifests:**
-- Required sections (validated by `test/architecture/import-posture.test.ts`): Authority owner, Current proof claim, Use cases, Constraints and assumptions, Core components, Failure and scale posture, Future package target, Allowed imports, Forbidden imports, Guarding tests, Public surface, Extraction trigger, Scope boundary.
+- Package subpaths match `package.json` `exports` — do not add root exports without updating `test/architecture/root-exports.test.ts` and `test/architecture/claim-boundary.test.ts`.
 
 **Forbidden patterns:**
 - Generic bucket directories under `src/`.
-- Repo-facing internal planning labels in scripts, README, CI names, or test titles.
+- Internal planning labels in repo-facing scripts, README, CI names, or test titles.
 - Compatibility shims listed as removed in `test/architecture/import-posture.test.ts` (e.g. `src/protocol/policy.ts`).
-
-## Authority Boundary Assertions (Product Code)
-
-Non-authority surfaces must not imply permission. When adding CLI, MCP, or readback output, include and test:
-
-```typescript
-expect(output).toMatchObject({
-  authorityCreated: false,
-  greenlightCreated: false,
-  gatewayCheckPerformed: false,
-  mutationAttempted: false,
-  rawInternalRecordIncluded: false,
-  credentialMaterialIncluded: false,
-});
-```
-
-Negotiation and A2A evidence tests additionally require `authorityCreated: false`, `gatewayCheckPerformed: false`, and `mutationAttempted: false` on recorded transitions.
 
 ---
 
-*Convention analysis: 2026-05-28*
+*Convention analysis: 2026-05-29*
