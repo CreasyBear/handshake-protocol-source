@@ -27,6 +27,7 @@ export type ProtocolReasonCodePrefixEntry = {
 
 export const protocolReasonCodes = [
   code("bootstrap_record_digest_conflict", "transition_error", "catalog"),
+  code("install_orphan_catalog_missing_gateway", "transition_error", "catalog"),
   code("invalid_transition_greenlight_already_issued", "transition_error", "policy"),
   code("greenlight_issuance_refusal_commit_conflict", "transition_error", "policy"),
   code("idempotency_ledger_conflict", "transition_error", "policy"),

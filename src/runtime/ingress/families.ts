@@ -1,5 +1,6 @@
 import type { CompileIntentInput } from "../../protocol/areas/intent-compilation";
 import {
+  buildAuthMdProtectedApiCallCompileIntentInput,
   buildAuthMdProtectedApiCallCompileIntentInputForRuntimeRefusal,
   authMdProtectedApiCallRefusalReasonCodes,
   type AuthMdProtectedApiCallAttempt,
@@ -58,16 +59,18 @@ export async function buildCompileIntentInputForDispatch(
     );
   }
   if (isAuthMdProtectedApiCallDispatch(dispatch)) {
-    return buildAuthMdProtectedApiCallCompileIntentInputForRuntimeRefusal(
-      requireAuthMdProtectedApiCallConfig(config),
-      authMdProtectedApiCallAttemptForDispatch(
-        block,
-        dispatch,
-        sequenceNumber,
-        graphRefs,
-        requiredPriorActionContractIds,
-      ),
+    const attempt = authMdProtectedApiCallAttemptForDispatch(
+      block,
+      dispatch,
+      sequenceNumber,
+      graphRefs,
+      requiredPriorActionContractIds,
     );
+    const buildAuthMdCompileInput =
+      authMdProtectedApiCallRefusalReasonCodes(attempt).length > 0
+        ? buildAuthMdProtectedApiCallCompileIntentInputForRuntimeRefusal
+        : buildAuthMdProtectedApiCallCompileIntentInput;
+    return buildAuthMdCompileInput(requireAuthMdProtectedApiCallConfig(config), attempt);
   }
   const attempt = x402PaymentAttemptForDispatch(
     block,

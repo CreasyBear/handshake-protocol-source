@@ -220,16 +220,19 @@ async function buildAuthMdProtectedApiCallCompileIntentInputUnchecked(
     dynamicHostConstructionObserved: attempt.dynamicHostConstructionObserved,
     retryAuthorityReuseDetected: attempt.retryAuthorityReuseDetected,
   }) satisfies Record<string, JsonValue>;
-  canonicalizeHttpProfile({
-    targetHttpMethod: parameters.targetHttpMethod,
-    endpointUrl: parameters.endpointUrl,
-    pathTemplate: parameters.pathTemplate,
-    requestBodyDigest: parameters.requestBodyDigest,
-    selectedHeadersDigest: parameters.selectedHeadersDigest,
-    dynamicEndpointConstructionObserved: parameters.dynamicEndpointConstructionObserved,
-    dynamicHostConstructionObserved: parameters.dynamicHostConstructionObserved,
-    retryAuthorityReuseDetected: parameters.retryAuthorityReuseDetected,
-  });
+  const refusalReasonCodes = authMdProtectedApiCallRefusalReasonCodes(attempt);
+  if (refusalReasonCodes.length === 0) {
+    canonicalizeHttpProfile({
+      targetHttpMethod: parameters.targetHttpMethod,
+      endpointUrl: parameters.endpointUrl,
+      pathTemplate: parameters.pathTemplate,
+      requestBodyDigest: parameters.requestBodyDigest,
+      selectedHeadersDigest: parameters.selectedHeadersDigest,
+      dynamicEndpointConstructionObserved: parameters.dynamicEndpointConstructionObserved,
+      dynamicHostConstructionObserved: parameters.dynamicHostConstructionObserved,
+      retryAuthorityReuseDetected: parameters.retryAuthorityReuseDetected,
+    });
+  }
   const idempotencyDigest = await digestCanonical({
     profile: AUTH_MD_PROTECTED_API_CALL_PROFILE,
     protectedResource: attempt.protectedResource,
