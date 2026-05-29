@@ -145,7 +145,8 @@ async function deriveGatewayConstraintEvaluation(
     ...isolationScopeRefsForGreenlight(greenlight),
   ]);
   const protectedPathPosture = await loadCurrentPostureForContract(store, contract);
-  const ledgerKeyDigest = await idempotencyLedgerKeyDigest(idempotencyLedgerKey(contract));
+  const ledgerKeyDigest =
+    greenlight.idempotencyLedgerKeyDigest ?? (await idempotencyLedgerKeyDigest(idempotencyLedgerKey(contract)));
   const idempotencyLedgerEntry = await store.getCurrentIdempotencyLedgerEntry(ledgerKeyDigest);
   const protectedPathEvaluation = evaluateRequiredProtectedPathPosture({
     contract,

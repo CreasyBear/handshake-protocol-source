@@ -1,0 +1,2 @@
+{"lens":"CEO","severity":"P0","finding":"Acceptance must not create authority.","required_change":"Keep LinkedAgreement non-authority and require fresh protected-action contracts for each obligation."}
+{"lens":"CEO","severity":"P1","finding":"A2A negotiation can become marketplace sprawl.","required_change":"Keep first proof to buyer-agent/seller-agent x402_payment.exact and cut marketplace, escrow, reputation, and settlement claims."}

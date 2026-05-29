@@ -4,6 +4,7 @@ import { verifyCertificateCommand } from "./certificate";
 import { cliCommandManifest, cliSchemaOutput } from "./command-manifest";
 import type { CliCommandPlane } from "./command-manifest";
 import { doctorCommand, initCommand } from "./local-project/doctor";
+import { evidenceFetchCommand } from "./evidence/fetch";
 import {
   evidenceContractViewCommand,
   evidenceReceiptTimelineCommand,
@@ -11,6 +12,11 @@ import {
 } from "./projection-evidence";
 import { cliOutput } from "./output";
 import { supportBundleCommand } from "./support-bundle";
+import { hostDoctorCommand } from "./host/doctor";
+import { runAgentSpineQuickstart } from "./quickstart/agent-spine";
+import { runX402Quickstart } from "./quickstart/x402";
+import { serviceBootstrapCommand } from "./service-operator/bootstrap";
+import { simulateX402PaymentCommand } from "./simulate/x402-payment";
 import {
   installHealthCommand,
   installX402PaymentCommand,
@@ -62,6 +68,26 @@ export async function runCliCommand(argv: readonly string[]): Promise<unknown> {
       errorCode: "cli_required_argument_missing",
       message: "evidence aps-report requires <path>.",
       nextAction: "fix_arguments",
+    });
+  }
+  if (group === "evidence" && subcommand === "fetch") {
+    const contractId = optionValue(argv, "--contract-id");
+    if (!contractId) {
+      return cliCommandErrorOutput({
+        argv,
+        errorCode: "cli_required_argument_missing",
+        message: "evidence fetch requires --contract-id <id>.",
+        nextAction: "fix_arguments",
+      });
+    }
+    const baseUrl = optionValue(argv, "--base-url");
+    const cwd = optionValue(argv, "--cwd");
+    const roleCredential = optionValue(argv, "--role-credential");
+    return evidenceFetchCommand({
+      contractId,
+      ...(baseUrl ? { baseUrl } : {}),
+      ...(cwd ? { cwd } : {}),
+      ...(roleCredential ? { roleCredential } : {}),
     });
   }
   if (group === "evidence" && subcommand === "contract-view" && maybePath) {
@@ -174,6 +200,26 @@ export async function runCliCommand(argv: readonly string[]): Promise<unknown> {
       nextAction: "fix_arguments",
     });
   }
+  if (group === "service" && subcommand === "bootstrap") {
+    const inputPath = argv.find((part) => !part.startsWith("--") && part !== "service" && part !== "bootstrap");
+    return serviceBootstrapCommand({
+      installInput: inputPath ? await readJsonFile(inputPath) : undefined,
+    });
+  }
+  const cwd = optionValue(argv, "--cwd") ?? process.cwd();
+  if (group === "host" && subcommand === "doctor") {
+    return hostDoctorCommand({ cwd });
+  }
+  if (group === "quickstart" && subcommand === "x402") {
+    const inputPath = argv.find((part) => !part.startsWith("--") && part !== "quickstart" && part !== "x402");
+    return runX402Quickstart({ cwd, installInputPath: inputPath ?? null });
+  }
+  if (group === "quickstart" && subcommand === "agent-spine") {
+    return runAgentSpineQuickstart({ cwd });
+  }
+  if (group === "simulate" && subcommand === "x402-payment") {
+    return simulateX402PaymentCommand({ cwd });
+  }
   return cliCommandErrorOutput({
     argv,
     errorCode: "cli_command_unsupported",
@@ -197,7 +243,10 @@ export function cliCommandErrorOutput(input: {
     retryability: "retryable_after_fix",
     commitState: "not_started",
     redactionProfileRef: "cli-error:v1-redacted",
-    warnings: ["Command failed before any authority, gateway check, signer use, or protected mutation."],
+    warnings: [
+      "Command failed before any authority, gateway check, signer use, or protected mutation.",
+      "No ServiceWorkflowAdmission, ServiceWorkflowHandle, clearance, policy decision, greenlight, gateway check, signer use, or protected mutation was created.",
+    ],
     result: {
       errorCode: input.errorCode,
       message: input.message,

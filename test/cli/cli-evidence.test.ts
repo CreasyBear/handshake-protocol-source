@@ -117,10 +117,11 @@ describe("CLI evidence surface", () => {
       command: "schema",
       result: {
         commands: [
-          { id: "schema", agentSafe: true },
-          { id: "init", agentSafe: false },
+          { id: "schema", agentSafe: true, nonGoals: expect.arrayContaining(["workflow handle authority"]) },
+          { id: "init", agentSafe: false, workflowPosture: expect.stringContaining("does not create") },
           { id: "doctor", agentSafe: true },
           { id: "evidence.aps-report", agentSafe: true },
+          { id: "evidence.fetch", agentSafe: true },
           { id: "evidence.contract-view", agentSafe: true },
           { id: "evidence.receipt-timeline", agentSafe: true },
           { id: "cert.verify", agentSafe: true },
@@ -129,7 +130,12 @@ describe("CLI evidence surface", () => {
           { id: "probes.x402-payment", agentSafe: false },
           { id: "register.x402-gateway-readiness", agentSafe: false },
           { id: "install.health", agentSafe: true },
+          { id: "host.doctor", agentSafe: true },
+          { id: "quickstart.x402", agentSafe: false },
+          { id: "quickstart.agent-spine", agentSafe: false },
+          { id: "simulate.x402-payment", agentSafe: true },
           { id: "conformance.x402-payment", agentSafe: true },
+          { id: "service.bootstrap", agentSafe: false },
         ],
       },
     });
@@ -165,6 +171,10 @@ describe("CLI evidence surface", () => {
       nextAction: "run_schema",
       retryability: "retryable_after_fix",
       commitState: "not_started",
+      warnings: [
+        "Command failed before any authority, gateway check, signer use, or protected mutation.",
+        "No ServiceWorkflowAdmission, ServiceWorkflowHandle, clearance, policy decision, greenlight, gateway check, signer use, or protected mutation was created.",
+      ],
       result: {
         errorCode: "cli_command_unsupported",
         message: "Unsupported command.",
@@ -174,6 +184,7 @@ describe("CLI evidence surface", () => {
           "init",
           "doctor",
           "evidence aps-report",
+          "evidence fetch",
           "evidence contract-view",
           "evidence receipt-timeline",
           "cert verify",
@@ -182,7 +193,12 @@ describe("CLI evidence surface", () => {
           "probes x402-payment",
           "register x402-gateway-readiness",
           "install health",
+          "host doctor",
+          "quickstart x402",
+          "quickstart agent-spine",
+          "simulate x402-payment",
           "conformance x402-payment",
+          "service bootstrap",
         ],
       },
     });

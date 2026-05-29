@@ -3,12 +3,12 @@
   "name": "io.github.CreasyBear/handshake-protocol-kernel",
   "title": "Handshake Protocol Kernel",
   "description": "Local MCP stdio proposal/evidence server for Handshake x402 exact protected-spend candidate inspection. It does not issue policy decisions, greenlights, gateway checks, mutations, receipt exports, authority certificates, provider custody, hosted operation, or broad MCP protection.",
-  "version": "0.2.7",
+  "version": "0.2.8",
   "packages": [
     {
       "registryType": "npm",
       "identifier": "handshake-protocol-kernel",
-      "version": "0.2.7",
+      "version": "0.2.8",
       "transport": {
         "type": "stdio"
       }

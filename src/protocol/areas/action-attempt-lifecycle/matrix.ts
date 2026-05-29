@@ -37,6 +37,20 @@ const catalogRecorded = {
   terminalOutcome: "evidence_only",
 } as const;
 
+const negotiationRecorded = {
+  phase: "negotiation",
+  state: "negotiation_recorded",
+  authorityEffect: "evidence_only",
+  terminalOutcome: "open",
+} as const;
+
+const negotiationConflict = {
+  phase: "negotiation",
+  state: "negotiation_conflict",
+  authorityEffect: "none",
+  terminalOutcome: "proof_gap",
+} as const;
+
 export const actionAttemptHostileTraceMatrix: Record<ActionAttemptHostileTraceClass, ActionAttemptLifecycleEntry> = {
   unknown_consequential_tool: entry(
     {
@@ -356,6 +370,54 @@ export const actionAttemptLifecycleMatrix: Partial<Record<ActionAttemptLifecycle
       terminalOutcome: "proof_gap",
     },
     "contract conflict records proof gap instead of choosing hidden authority",
+  ),
+  "recordNegotiationSession:recorded": entry(
+    negotiationRecorded,
+    "negotiation session records context evidence only and cannot create protected-action authority",
+  ),
+  "recordNegotiationSession:conflict": entry(
+    negotiationConflict,
+    "negotiation session conflicts block evidence recording without selecting hidden authority",
+  ),
+  "recordNegotiationOffer:recorded": entry(
+    negotiationRecorded,
+    "negotiation offer records one specific offer version as evidence only",
+  ),
+  "recordNegotiationOffer:conflict": entry(
+    negotiationConflict,
+    "negotiation offer conflicts block stale or ambiguous offer evidence before authority",
+  ),
+  "recordNegotiationDecision:recorded": entry(
+    negotiationRecorded,
+    "negotiation decision records acceptance or refusal evidence without minting an action contract",
+  ),
+  "recordNegotiationDecision:conflict": entry(
+    negotiationConflict,
+    "negotiation decision conflicts block stale decisions before authority",
+  ),
+  "recordLinkedAgreement:recorded": entry(
+    negotiationRecorded,
+    "linked agreement records accepted-offer evidence without policy, greenlight, gateway, or mutation authority",
+  ),
+  "recordLinkedAgreement:conflict": entry(
+    negotiationConflict,
+    "linked agreement conflicts block mismatched accepted-offer evidence",
+  ),
+  "recordAgreementObligationBinding:recorded": entry(
+    negotiationRecorded,
+    "agreement obligation binding records one active obligation to one exact action contract before policy may evaluate it",
+  ),
+  "recordAgreementObligationBinding:conflict": entry(
+    negotiationConflict,
+    "agreement obligation binding conflicts block stale or mismatched contract evidence before greenlight",
+  ),
+  "transitionAgreementStatus:recorded": entry(
+    negotiationRecorded,
+    "agreement status transition records lifecycle evidence that future policy checks must consult",
+  ),
+  "transitionAgreementStatus:conflict": entry(
+    negotiationConflict,
+    "agreement status conflicts block stale lifecycle evidence without smoothing it over",
   ),
   "createAuthorityCertificate:exported": entry(
     {

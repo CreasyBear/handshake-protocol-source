@@ -1,5 +1,7 @@
 # Plain-English Protocol Guide
 
+> **Doc type:** Explanation
+
 Last plain-language protocol audit: 2026-05-21.
 
 This document translates `docs/internal/protocol-definition.md` and
@@ -19,15 +21,73 @@ Handshake says:
 > exact work order, check that exact work order, make the real gate check the
 > pass before anything changes, and keep a record of what happened.
 
-For a builder-buyer, the product outcome is a cleared protected-action event: a
-specific terminal Handshake event with reconstructable evidence that a service
-can accept, refuse, or treat as a proof gap.
+For a builder-buyer, the category claim is **reconstructable clearance before
+consequence**: a service must reconstruct clearance evidence before treating
+downstream consequence as proof. The product outcome is a cleared protected-action
+event — one specific terminal Handshake event with reconstructable evidence that
+a service can accept, refuse, or treat as a proof gap.
 
 The protocol kernel is the source-owned machinery that records the exact work
 order, decision, pass, gate check, receipt/refusal/proof gap, and optional
 certificate. A product surface is the CLI, MCP, SDK, docs, demo, or
 service-facing readback that exposes proposal and evidence without creating
 authority.
+
+## The Service Workflow Surface
+
+The simple service-facing story is:
+
+```text
+Present evidence bundle (readback only)
+-> ServiceWorkflowAdmission (mapping only)
+-> ServiceWorkflowHandle (correlation only)
+-> Request reconstructable clearance
+-> Read outcome evidence
+```
+
+That story hides protocol detail from the user. It does not hide authority.
+
+`ServiceWorkflowAdmission` is the service's accepted, refused, stale, or
+proof-gap mapping of that presented evidence. It is not a policy decision,
+greenlight, gateway check, receipt, certificate, or mutation permission.
+
+`ServiceWorkflowHandle` is a workflow context reference the agent can carry for
+correlation and readback. It is not a badge, bearer token, retry permission,
+x402 payment approval, auth.md credential, gateway pass, or receipt export.
+
+The surface may carry these IDs:
+
+```text
+passportPackageDigest
+passportPresentationId
+admissionId
+serviceWorkflowHandleId
+serviceWorkflowHandleDigest
+```
+
+Those IDs help reconstruct which bundle was shown and which workflow context was
+used. They do not authorize action. Every protected action still starts with a
+fresh exact work order.
+
+## The Agent Lane (Short Chain)
+
+For agent hosts and integrators, the same authority spine uses product vocabulary
+without renaming schema exports:
+
+```text
+Standing Bounds -> Delegated Mandate -> Compile -> Work Order -> Clearance -> Outcome
+```
+
+| Plain word        | Protocol object                               | Does not mean permission because…                                      |
+| ----------------- | --------------------------------------------- | ---------------------------------------------------------------------- |
+| Standing Bounds   | `OperatingEnvelope`                           | It bounds attempt classes; policy and gateway still decide each event. |
+| Delegated Mandate | `DelegatedAuthorityRef`                       | It records mandate evidence; it is not a greenlight or gateway pass.   |
+| Compile           | `IntentCompilationRecord` / `CandidateAction` | It proposes; it does not authorize mutation.                           |
+| Work Order        | `ActionContract`                              | It is an exact commitment awaiting policy and gateway check.           |
+| Clearance         | Policy + one-use greenlight + gateway check   | Admission or middleware identity alone is not Handshake.               |
+| Outcome           | Receipt / refusal / proof gap                 | It records what happened; it is not reusable auth.                     |
+
+Admission identifies callers. Only an adapter-wrapped gateway check before mutation is enforcement. Ingress-only posture is advisory, not Handshake.
 
 ## The Work Order
 

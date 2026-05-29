@@ -12,6 +12,7 @@ import {
 import {
   InstallProposalCompiledKernelRecordsSchema,
   InstallProposalSchema,
+  requireInstallProposalGatewayRegistryEntry,
   type InstallProposalCompiledKernelRecords,
 } from "../../install/install-proposal";
 import { ProtectedActionAdapterPackSchema } from "../../install/protected-action-adapter-pack";
@@ -199,6 +200,7 @@ export async function buildX402WalletGatewayCredentialRefInput(
   recordsValue: InstallProposalCompiledKernelRecords | null = proposal.compiledRecords,
 ): Promise<RegisterGatewayCredentialRefInput> {
   const records = requireCompiledRecords(recordsValue);
+  const gatewayRegistryEntry = requireInstallProposalGatewayRegistryEntry(records.gatewayRegistryEntry);
   const providerRegistryRef = `provider:x402-wallet-gateway:${proposal.walletGatewayProfile.walletGatewayId}`;
   const providerRegistryDigest = await digestCanonical({
     walletGatewayId: proposal.walletGatewayProfile.walletGatewayId,
@@ -215,12 +217,12 @@ export async function buildX402WalletGatewayCredentialRefInput(
     tenantId: proposal.tenantId,
     organizationId: proposal.organizationId,
     principalId: proposal.spendBounds.principalId,
-    gatewayId: records.gatewayRegistryEntry.gatewayId,
-    gatewayRegistryEntryId: records.gatewayRegistryEntry.gatewayRegistryEntryId,
+    gatewayId: gatewayRegistryEntry.gatewayId,
+    gatewayRegistryEntryId: gatewayRegistryEntry.gatewayRegistryEntryId,
     protectedSurfaceKind: "x402_payment",
     actionClasses: ["x402_payment.exact"],
     resourceRefs: [proposal.resourceRef],
-    resourceNamespaceRef: records.gatewayRegistryEntry.resourceNamespaceRef,
+    resourceNamespaceRef: gatewayRegistryEntry.resourceNamespaceRef,
     credentialKind: "x402_wallet_signer",
     custodyStatus: credentialCustodyStatusForWalletSigner(proposal.walletGatewayProfile.signerCustodyStatus),
     providerClass: "x402_wallet_gateway",
@@ -255,6 +257,7 @@ export async function buildX402DelegatedSpendAuthorityRefInput(
   recordsValue: InstallProposalCompiledKernelRecords | null = proposal.compiledRecords,
 ): Promise<RegisterDelegatedAuthorityRefInput> {
   const records = requireCompiledRecords(recordsValue);
+  const gatewayRegistryEntry = requireInstallProposalGatewayRegistryEntry(records.gatewayRegistryEntry);
   return {
     tenantId: proposal.tenantId,
     organizationId: proposal.organizationId,
@@ -262,8 +265,8 @@ export async function buildX402DelegatedSpendAuthorityRefInput(
     agentId: proposal.spendBounds.agentId,
     runtimeAdapterId: proposal.spendBounds.runtimeAdapterId,
     operatingEnvelopeId: records.operatingEnvelope.envelopeId,
-    gatewayId: records.gatewayRegistryEntry.gatewayId,
-    gatewayRegistryEntryId: records.gatewayRegistryEntry.gatewayRegistryEntryId,
+    gatewayId: gatewayRegistryEntry.gatewayId,
+    gatewayRegistryEntryId: gatewayRegistryEntry.gatewayRegistryEntryId,
     protectedSurfaceKind: "x402_payment",
     actionClasses: ["x402_payment.exact"],
     resourceRefs: [proposal.resourceRef],

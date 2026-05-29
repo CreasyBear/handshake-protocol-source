@@ -16,6 +16,7 @@ docs/internal/protocol-definition.md
 docs/internal/protocol-kernel-architecture.md
 docs/internal/protocol-layman.md
 docs/internal/protocol-notes.md
+docs/internal/service-workflow-story.md
 ```
 
 `.planning/` is scratch. Long plans, source studies, public-facing product docs, and historical prompts are not active repo truth.
@@ -38,21 +39,51 @@ The category is protected actions for automated decision making.
 
 Builder-buyer product language centers on a cleared protected-action event: one specific terminal Handshake event with reconstructable evidence that a service can accept, refuse, or treat as a proof gap.
 
+**Category claim (D-59):** *reconstructable clearance before consequence* — services must reconstruct clearance evidence before treating downstream consequence as proof. This is not an approval workflow, agent-permissions product, or audit-trail substitute.
+
+## Phase 05 product coherence (shipped)
+
+Accepted on branch `phase-05-product-coherence` (local close-out 2026-05-29). Phase 05 is a synthesis pass — not a new protocol mechanism layer.
+
+- **D-50:** Phase 05 unifies product surfaces and narrative; it does not add kernel transition semantics or new wedges.
+- **D-51:** Comprehensive delivery scale (~14 plans) for scrub, polish, and keel integrity — not an MVP cut.
+- **D-52:** Phase 05 execution required Phase 04 verification `status: passed` as a hard gate.
+- **D-53:** Carry-forward integrity for the Phase-04 deferred lane (mutation manifest, HTTP profile conformance, dual-enforcement inventory, operator runbooks, D-25 scaffolds).
+- **D-54:** D-25 per-customer bypass scaffolds remain honestly incomplete — no inflated claims for un-onboarded customers.
+- **D-55:** CLI, SDK, and MCP evidence readback routes through the same live-fetch spine (`OperationReadbackProjection` keyed by `actionContractId`).
+- **D-56:** One-import agent ergonomics via root re-export of role clients from `src/index.ts` (no `createHandshakeClients()` factory).
+- **D-57:** Intent-compilation stages appear in the readback spine as non-authority projection rows (`createsAuthority: false`).
+- **D-58:** Correlation index is read-only evidence keyed by `actionContractId`; it does not create authority.
+- **D-60:** Forbidden-copy lint is structural: canonical docs and CLI copy must not leak category-drift vocabulary without explicit negation or non-authority windows.
+- **D-61:** Diataxis coverage labels apply to internal docs; Phase 05 adds persona golden paths, not a full doc rewrite mandate.
+- **D-62:** Concierge demand-test scaffold lives only under `.planning/macro/` — quarantined from package scripts, exports, and CI.
+- **D-63:** Keel-integrity audit (`05-KEEL-AUDIT.md`) records each claimed invariant with a structural site, architecture-test pin, or honest proof-gap label (D-70).
+- **D-64:** Mechanism A — x402 gateway-held credential custody (see section below); signer unreachable without passed gate + gateway-resolved redacted evidence.
+- **D-65:** Gateway invariant architecture tests promote only after the structural custody site exists (05-13 before 05-14 promotion).
+- **D-66:** Agent-origin compilations require a generated execution graph refusal at `candidate-decision.ts` before contract authority is implied.
+- **D-67:** Phase 05 does not replace Phase 04; it depends on Phase 04 landing first.
+- **D-68:** Phase 05 does not add new wedge families or new kernel transitions.
+- **D-69:** Narrative polish must not soften the category claim or reintroduce passport/approval/HITL framing in headlines.
+- **D-70:** Keel audit rows require `file:line` citations; mis-mapped citations are proof-gap honesty failures, not enforcement failures.
+- **D-71:** Hosted-admission consolidation remains re-export-only polish — no hosted workspace promotion from Phase 05.
+
 Shared product/protocol vocabulary:
 
-- `protocol kernel`: the source-owned state machine and schemas for exact contracts, policy decisions, one-use greenlights, gateway checks, receipts, refusals, proof gaps, isolation, and terminal certificates.
-- `product surface`: CLI, MCP, SDK, docs, demo, or service-facing readback surfaces that expose proposal/evidence/readback without creating authority.
+- `protocol kernel`: the source-owned authority state machine and schemas for exact contracts, policy decisions, one-use greenlights, gateway checks, receipts, refusals, proof gaps, isolation, and terminal certificates.
+- `product surface`: projection/readback surfaces such as CLI, MCP, docs, demos, or service-facing readbacks that expose proposal/evidence/readback without creating authority.
+- `role-scoped protocol transition client`: an SDK or HTTP client that transports a specific kernel transition under custody. It is not a product authority surface and does not make product nouns authoritative.
+- `ServiceWorkflowAdmission` and `ServiceWorkflowHandle`: non-authority product-surface records for presented evidence, service-side admission status, correlation, and readback context. They do not create identity, policy decisions, greenlights, gateway checks, mutations, receipts, certificates, reusable auth, signer use, or spend approval; each protected action still requires a fresh exact action contract.
 - `AuthorityCertificate`: verifiable terminal evidence for one event. The certificate is terminal evidence, not permission, identity, settlement, hosted trust, or reusable auth.
 - Distribution is separate from authority. Public npm availability does not create authority, and MCP Registry discoverability remains a proof gap until verified.
 
 The current kernel centers on protected action control:
 
 ```text
-exact action contract
+CandidateAction / exact action contract
 -> exact policy decision
--> one-use gateway-bound greenlight
+-> one-use gateway-bound greenlight or refusal
 -> gateway check before mutation
--> receipt, refusal, or proof gap
+-> receipt, refusal, replay refusal, proof gap, or optional terminal certificate
 ```
 
 The first official wedge is one buyer-side `x402_payment.exact` per-call
@@ -191,20 +222,29 @@ adjacency to the protocol.
 
 Current ledger:
 
-| Surface or claim                   | Current status                         | Boundary                                                                                    |
-| ---------------------------------- | -------------------------------------- | ------------------------------------------------------------------------------------------- |
-| `x402_payment.exact` per-call path | locally proven for self-hosted package | Exact contract, policy, one-use greenlight, gateway check, receipt/readback.                |
-| Hosted operation                   | proof gap                              | Requires deployed tenant boundary, hosted custody, retention, and ops evidence.             |
-| Provider/customer gateway custody  | proof gap beyond local/reference proof | Requires external custody proof, signer lease/rotation/revocation, and monitoring evidence. |
-| Settlement/finality                | proof gap                              | Downstream payment observation is not settlement finality.                                  |
-| Facilitator operation              | outside current claim                  | First wedge consumes x402 evidence; it does not operate a facilitator.                      |
-| Seller middleware                  | outside current claim                  | First wedge is buyer-side only.                                                             |
-| Marketplace or certification       | proof gap                              | Requires separate listing, rating, dispute, and trust evidence model.                       |
-| Cross-org trust                    | proof gap                              | Local terminal certificates and pinned keys do not create portable trust.                   |
-| Broad x402 compatibility           | cut line                               | Only one buyer-side `exact` per-call path is admitted.                                      |
-| Aggregate spend enforcement        | proof gap                              | Requires a policy-time and gateway-time aggregate ledger.                                   |
-| MCP Registry discoverability       | proof gap until verified               | Public npm availability and `server.json` metadata are distribution facts only.             |
-| Host-wide containment              | cut line                               | Host profiles and raw sibling probes record posture, not native containment.                |
+| Surface or claim | Current status | configuredBy | Boundary |
+| --- | --- | --- | --- |
+| Gateway registry entry | locally proven (x402 triplet) | service_operator | Service catalog/install owns registry binding before host attestation. |
+| Gateway credential custody | proof gap beyond local/reference | service_operator | External signer lease/rotation evidence required for production claims. |
+| Adapter mutation enforcement | locally proven on x402 wedge | service_operator | Handler must call `adapter.run*Gateway` before downstream effect. |
+| Trusted binding digests | locally proven (doctor attestation) | host_operator | Host doctor emits attestation evidence only — not identity or gateway ownership. |
+| MCP proposal wiring | locally proven (reference MCP) | shared | Host runtime wiring + service registry digests must both be fresh. |
+| Policy pack baseline | shared | shared | Service registers pack; host consumes policy version digests in bindings. |
+| Hosted admission verifier | proof gap until deployed | service_operator | Tenant boundary + verifier config evidence required for hosted claims. |
+| `x402_payment.exact` per-call path | locally proven for self-hosted package | service_operator | Exact contract, policy, one-use greenlight, gateway check, receipt/readback. |
+| Hosted operation | proof gap | service_operator | Requires deployed tenant boundary, hosted custody, retention, and ops evidence. |
+| Provider/customer gateway custody | proof gap beyond local/reference proof | service_operator | Requires external custody proof, signer lease/rotation/revocation, and monitoring evidence. |
+| Settlement/finality | proof gap | service_operator | Downstream payment observation is not settlement finality. |
+| Facilitator operation | outside current claim | — | First wedge consumes x402 evidence; it does not operate a facilitator. |
+| Seller middleware | outside current claim | — | First wedge is buyer-side only. |
+| Marketplace or certification | proof gap | — | Requires separate listing, rating, dispute, and trust evidence model. |
+| Cross-org trust | proof gap | — | Local terminal certificates and pinned keys do not create portable trust. |
+| Broad x402 compatibility | cut line | — | Only one buyer-side `exact` per-call path is admitted. |
+| Aggregate spend enforcement | proof gap | service_operator | Requires a policy-time and gateway-time aggregate ledger. |
+| MCP Registry discoverability | proof gap until verified | shared | Public npm availability and `server.json` metadata are distribution facts only. |
+| Host-wide containment | cut line | host_operator | Host profiles and raw sibling probes record posture, not native containment. |
+
+Standalone operator runbooks (`service-operator-runbook.md`, `host-operator-runbook.md`) are deferred post-execute; bilateral order lives in golden path docs for phase 04.
 
 Expansion admission requires a proposed second action family to name, in source
 and tests, all of the following before it can be called execution-ready:
@@ -226,6 +266,120 @@ the full repo gate (`npm run check:repo`) to pass. Until then, `auth.md + x402`,
 repo write, CI/deploy, cloud configuration, database/data-plane, marketplace,
 agent-management, or other protected actions remain proof contexts rather than
 execution-ready product surfaces.
+
+## Hosted Admission Lock
+
+Accepted: pre-hosted product simplification is not a hosted-operation
+go-ahead.
+
+Hosted product work may consume or extend the service workflow surface only
+after the pre-hosted service workflow gates have source-owned proof or
+explicitly accepted proof-gap posture. The current completed gates prove
+non-authority admission/handle schema, active surface alignment, local example
+readback, generated-agent misuse refusal, and one fresh `x402_payment.exact`
+fixture gate. They do not prove hosted operation, provider/customer custody,
+settlement/finality, marketplace or certification, cross-org trust, aggregate
+spend enforcement, hosted org auth, retention/search, or hosted mutation
+authority.
+
+If hosted work needs hosted operation, tenant/org auth, hosted custody, retention,
+search, marketplace/certification, cross-org trust, aggregate spend, or new
+protocol-kernel exports, route that work to a separate hosted workspace or a
+new pre-hosted kernel task with its own generated execution shape, protected
+action path, gateway authority holder, credential holder, bypass posture,
+evidence path, proof-gap model, non-claims, and `npm run check:repo` proof.
+That follow-on work must carry fresh proof gates.
+
+This checkout must not expand protocol kernel exports for hosted needs merely
+because the service workflow product surface is now simpler.
+
+## Clerk-For-Agents Dual Enforcement
+
+Accepted: service-operator and agent-host integrations must treat **admission**
+and **gateway check** as separate enforcement layers. Ingress middleware that
+identifies callers and scopes transitions is not Handshake by itself.
+
+Request chain (Clerk-for-agents framing):
+
+```text
+Request
+  -> http/admission (middleware: identity + transition scope)
+  -> kernel transitions (compile, propose, policy, gatewayCheck evidence)
+  -> service app handler (adapter.run*Gateway before mutation)
+  -> downstream effect
+```
+
+Per D-00: admission or ingress alone is advisory, not Handshake. Only an
+adapter-wrapped `run*Gateway` (or equivalent gateway check) immediately before
+protected mutation is enforcement.
+
+Per D-12: external PEP layers (Envoy, Kong, OPA, or similar) may sit in front as
+deployment glue. Handshake still requires adapter-side observed-parameter
+re-check against the exact greenlight before consequence. External PEP does not
+replace the gateway check or create ambient mutation authority.
+
+The first runnable clearance wedge remains buyer-side `x402_payment.exact`
+per-call protected action. Dual enforcement applies to any protected surface,
+not payment-only integrations.
+
+### Product-completion gate `dual_enforcement_posture` (D-53)
+
+The `dual_enforcement_posture` gate in `src/surfaces/proof-packets/product-completion-contract.ts`
+projects **incomplete** until structural architecture evidence exists: passing
+`test/architecture/dual-enforcement-posture.test.ts` (Phase-04 plan **04-01**) and
+mutation-manifest inventory at `src/http/mutation-route-manifest.ts` (Phase-05 plan **05-01**).
+Admission middleware identifies callers and scopes transitions; it does **not**
+authorize protected mutation. Admission alone is advisory — only adapter-wrapped
+`run*Gateway` immediately before consequence is Handshake enforcement.
+
+## x402 Gateway-Held Credential Custody (Mechanism A)
+
+Accepted: the x402 payment signer holds **gateway-held credential custody**. The
+signer is structurally unreachable without a passed `VerifiedGatewayCheck` and
+gate-bound, redacted credential-resolution evidence. This is enforcement, not a
+comment or naming posture.
+
+Mechanism A is enforced by `assertGatewayHeldSigningCommand` in
+`src/adapters/x402-payment/wallet-gateway.ts`. It runs at two boundaries before
+any signature:
+
+- the orchestration entry `runX402WalletGateway`, immediately before
+  `surface.signPayment`; and
+- the official signing surface entry `createOfficialExactX402SigningSurface`'s
+  `signPayment`, so an integrator that constructs the official surface directly
+  still cannot bypass the check.
+
+The guard refuses unless the `X402PaymentSignatureCommand` carries:
+
+- `verifiedGate.gatewayCheckStatus === "passed"` with non-empty
+  `gateAttemptId` and `mutationAttemptId` (a forged or unfilled gate is refused);
+  and
+- `credentialResolutionEvidence` that is gateway-resolved — `resultClass ===
+  "used_by_gateway"`, `credentialMaterialIncluded === false`,
+  `redactionStatus === "redacted"` — and bound to the same gate by matching
+  `gateAttemptId`, `actionContractId`, and `greenlightId`.
+
+Raw caller-supplied credential references therefore cannot reach the signer:
+only redacted refs that the gateway resolved against the verified gate are
+admitted, and the emitted `credentialMaterialPosture: "gateway_held_redacted"`
+is a structurally enforced invariant rather than a label. Bypass via a raw x402
+SDK outside the host-trusted path remains a **proof gap**, not enforcement — it
+does not run this guard and produces no Handshake clearance evidence.
+
+This invariant is pinned by `test/architecture/x402-gateway-credential-custody.test.ts`,
+promoted from adapter runtime patterns in the same landing per the
+architecture-promotion rule (an architecture-level test is admitted only for a
+structurally enforced invariant, never an advisory one).
+
+**Integrator migration note:** `X402PaymentSignatureCommand` is unchanged — the
+guard is additive and ABI-stable (no shape change, no new required field beyond
+the already-present `verifiedGate` and `credentialResolutionEvidence`).
+Integrators that route through `runX402WalletGateway` or the official signing
+surface need no code change. Integrators that previously constructed signing
+commands by hand must supply a real passed `VerifiedGatewayCheck` and
+gateway-resolved redacted resolution evidence bound to that gate; hand-rolled
+commands with empty gate ids, unbound evidence, or
+`credentialMaterialIncluded: true` now refuse before signing.
 
 ## Market And Expansion Scoring Boundary
 
@@ -353,7 +507,7 @@ through Handshake. Do not claim live paid execution, settlement finality,
 provider custody, or buyer-side production readiness from a 402 challenge
 alone.
 
-Package provenance is now satisfied for `0.2.7` by the public artifact
+Package provenance is now satisfied for `0.2.8` by the public artifact
 repository's trusted-publish workflow. The successful run published
 `handshake-protocol-kernel@0.2.7`, recorded npm registry integrity and
 signature metadata, produced GitHub Actions provenance, and passed clean
@@ -369,7 +523,7 @@ This checkout is an internal TypeScript protocol kernel. It should not carry lon
 
 Accepted: the active repo canon is compact and internal.
 
-Former ADR, plan, product, protocol, business, reference, audit, and spec subtrees are no longer active repo truth. Durable decisions move into this file only when they protect implementation boundaries. Protocol definition lives in `docs/internal/protocol-definition.md`. Kernel architecture and schema mapping live in `docs/internal/protocol-kernel-architecture.md`. Plain-English translation lives in `docs/internal/protocol-layman.md`. Compact implementation notes live in `docs/internal/protocol-notes.md`. Planning, marketing, source studies, and historical prompts belong outside the active repo tree.
+Former ADR, plan, product, protocol, business, reference, audit, and spec subtrees are no longer active repo truth. Durable decisions move into this file only when they protect implementation boundaries. Protocol definition lives in `docs/internal/protocol-definition.md`. Kernel architecture and schema mapping live in `docs/internal/protocol-kernel-architecture.md`. Plain-English translation lives in `docs/internal/protocol-layman.md`. Compact implementation notes live in `docs/internal/protocol-notes.md`. The service workflow story lives in `docs/internal/service-workflow-story.md` as a product-surface translation only; it does not create authority. Planning, marketing, source studies, and historical prompts belong outside the active repo tree.
 
 ## Structural Decision
 
@@ -521,6 +675,20 @@ exports, terminal certificates, settlement, provider custody, hosted operation,
 marketplace certification, or host-wide containment. Readiness rows must remain
 `pre_contract`; `trusted_gateway_ready` means ready for the runtime facade, not
 authorized to mutate.
+
+### Production acceptance custody matrix (configured-by)
+
+| Responsibility | configuredBy | Surface owner | Notes |
+| --- | --- | --- | --- |
+| gateway registry entry | service_operator | InstallClient / bootstrap | Atomic triplet; orphan without gateway refuses |
+| gateway credential custody | service_operator | GatewayClient / wallet adapter | Signer held at gateway, not agent-exposed |
+| adapter mutation enforcement | service_operator | Family adapters + handlers | `run*Gateway` before downstream mutation (D-24) |
+| trusted binding digests | host_operator | `handshake host doctor` | Attestation evidence only (D-23) |
+| MCP proposal wiring | shared | MCP x402 proposal bridge | Parity with HTTP `failureClass`; no authority |
+| policy pack baseline | service_operator | PolicyClient / bootstrap | Exact policy per action family |
+| hosted admission verifier | shared | HTTP admission + service workflow | Ingress identifies callers; not mutation authority |
+
+Do not claim hosted marketplace trust, cross-org federation, or registry discoverability as phase-04 proof.
 
 The `./sdk/role-clients` subpath now includes a role-scoped
 `ControlPlaneClient` for delegated-authority lifecycle management. It accepts

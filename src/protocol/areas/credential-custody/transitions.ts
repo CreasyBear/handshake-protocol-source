@@ -461,6 +461,21 @@ function assertCustodyProofPacketContext(context: CustodyProofPacketContext): vo
       409,
     );
   }
+  if (
+    input.custodyClaimLevel !== "local_fixture" &&
+    (!input.leaseRef ||
+      !input.leaseVersion ||
+      !input.leaseIssuedAt ||
+      !input.leaseExpiresAt ||
+      input.attestationRefs.length === 0 ||
+      input.attestationDigests.length === 0)
+  ) {
+    throw new HandshakeProtocolError(
+      "gateway_custody_proof_customer_evidence_missing",
+      "Customer/provider custody proof requires current lease and attestation evidence.",
+      409,
+    );
+  }
   if (input.custodyDriftStatus !== "current" || input.resolverDriftStatus !== "current") {
     throw new HandshakeProtocolError(
       "gateway_custody_proof_drifted",

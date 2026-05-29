@@ -1,4 +1,5 @@
 import { describe, expect, it } from "bun:test";
+import { readFileSync } from "node:fs";
 import packageJson from "../../package.json";
 import serverJson from "../../server.json";
 
@@ -70,6 +71,12 @@ describe("package surface", () => {
       import: "./dist/sdk/surface-clients/index.mjs",
       default: "./dist/sdk/surface-clients/index.mjs",
     });
+    expect(pkg.exports["./surfaces/a2a-negotiation-readback"]).toEqual({
+      types: "./dist/surfaces/a2a-negotiation-readback/index.d.ts",
+      import: "./dist/surfaces/a2a-negotiation-readback/index.mjs",
+      default: "./dist/surfaces/a2a-negotiation-readback/index.mjs",
+    });
+    expect(pkg.exports["./surfaces"]).toBeUndefined();
     expect(pkg.exports["./cli"]).toEqual({
       types: "./dist/cli/index.d.ts",
       import: "./dist/cli/index.mjs",
@@ -105,6 +112,17 @@ describe("package surface", () => {
     expect(pkg.files).not.toContain("QUALITY.md");
     expect(pkg.files).not.toContain("STRUCTURE.md");
     expect(pkg.files).not.toContain(deletedBusinessDocsPath);
+  });
+
+  it("keeps the A2A negotiation readback as a narrow non-authority subpath", () => {
+    const packageSurfaceCheck = readFileSync("scripts/check-package-surface.mjs", "utf8");
+
+    expect(pkg.exports["./surfaces"]).toBeUndefined();
+    expect(pkg.exports["./surfaces/a2a-negotiation-readback"]).toBeDefined();
+    expect(packageSurfaceCheck).toContain('"dist/surfaces/index.mjs"');
+    expect(packageSurfaceCheck).toContain('"dist/surfaces/index.d.ts"');
+    expect(packageSurfaceCheck).toContain('"dist/surfaces/a2a-negotiation-readback/index.mjs"');
+    expect(packageSurfaceCheck).toContain('"dist/surfaces/a2a-negotiation-readback/index.d.ts"');
   });
 
   it("binds package checks into the full repo gate", () => {

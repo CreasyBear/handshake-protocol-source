@@ -20,6 +20,14 @@ import { IdempotencyLedgerEntrySchema } from "../idempotency-ledger/schemas";
 import { BypassProbeSchema } from "../bypass-probe/schemas";
 import { ToolCallDraftSchema } from "../tool-call-draft/schemas";
 import { IntentCompilationRecordSchema } from "../intent-compilation/schemas";
+import {
+  AgreementObligationBindingSchema,
+  AgreementStatusTransitionSchema,
+  LinkedAgreementSchema,
+  NegotiationDecisionSchema,
+  NegotiationOfferSchema,
+  NegotiationSessionSchema,
+} from "../negotiation/schemas";
 import { BreakerDecisionSchema, IsolationStateSchema } from "../isolation-breaker/schemas";
 import {
   ProtectedSurfaceOperationClaimSchema,
@@ -53,6 +61,12 @@ export const ProtocolObjectTypeSchema = z.enum([
   "tool_call_draft",
   "protected_path_posture",
   "intent_compilation",
+  "negotiation_session",
+  "negotiation_offer",
+  "negotiation_decision",
+  "linked_agreement",
+  "agreement_obligation_binding",
+  "agreement_status_transition",
   "action_contract",
   "authority_certificate",
   "policy_decision",
@@ -102,6 +116,18 @@ export const ProtocolRecordSchema = z.discriminatedUnion("objectType", [
   z.strictObject({ objectType: z.literal("tool_call_draft"), payload: ToolCallDraftSchema }),
   z.strictObject({ objectType: z.literal("protected_path_posture"), payload: ProtectedPathPostureSchema }),
   z.strictObject({ objectType: z.literal("intent_compilation"), payload: IntentCompilationRecordSchema }),
+  z.strictObject({ objectType: z.literal("negotiation_session"), payload: NegotiationSessionSchema }),
+  z.strictObject({ objectType: z.literal("negotiation_offer"), payload: NegotiationOfferSchema }),
+  z.strictObject({ objectType: z.literal("negotiation_decision"), payload: NegotiationDecisionSchema }),
+  z.strictObject({ objectType: z.literal("linked_agreement"), payload: LinkedAgreementSchema }),
+  z.strictObject({
+    objectType: z.literal("agreement_obligation_binding"),
+    payload: AgreementObligationBindingSchema,
+  }),
+  z.strictObject({
+    objectType: z.literal("agreement_status_transition"),
+    payload: AgreementStatusTransitionSchema,
+  }),
   z.strictObject({ objectType: z.literal("action_contract"), payload: ActionContractSchema }),
   z.strictObject({ objectType: z.literal("authority_certificate"), payload: AuthorityCertificateSchema }),
   z.strictObject({ objectType: z.literal("policy_decision"), payload: PolicyDecisionSchema }),

@@ -59,7 +59,11 @@ import type {
 } from "../protocol/areas/recovery";
 import { PROTOCOL_VERSION } from "../protocol/public/schemas";
 import type { CallerAuthTokens, TransitionCallerRole } from "../http/admission/caller-auth";
-import { TransitionErrorResponseSchema, type TransitionErrorEnvelope } from "../http/errors/transition-error-envelope";
+import {
+  TransitionErrorResponseSchema,
+  type TransitionErrorEnvelope,
+} from "../http/errors/transition-error-envelope";
+import { failureClassFromHttpStatus } from "../protocol/foundation/failure-class";
 import {
   HANDSHAKE_ORIGINATING_IDENTITY_HEADER,
   HANDSHAKE_PROTOCOL_VERSION_HEADER,
@@ -90,6 +94,9 @@ export class HandshakeClientError extends Error {
   public readonly requestIdentity: string | null;
   public readonly proofRef: string | null;
   public readonly refusalRef: string | null;
+  public readonly failureClass: TransitionErrorEnvelope["failureClass"];
+  public readonly failurePhase: TransitionErrorEnvelope["failurePhase"];
+  public readonly problemType: TransitionErrorEnvelope["problemType"];
 
   constructor(
     public readonly status: number,
@@ -105,6 +112,9 @@ export class HandshakeClientError extends Error {
     this.requestIdentity = envelope.requestIdentity;
     this.proofRef = envelope.proofRef;
     this.refusalRef = envelope.refusalRef;
+    this.failureClass = envelope.failureClass;
+    this.failurePhase = envelope.failurePhase;
+    this.problemType = envelope.problemType;
   }
 }
 
@@ -315,6 +325,7 @@ export class HandshakeClient {
     const parsedBody = await parseJsonBody(response);
     const parsedError = TransitionErrorResponseSchema.safeParse(parsedBody);
     if (parsedError.success) return parsedError.data.error;
+    const failureClass = failureClassFromHttpStatus(response.status);
     return {
       code: "http_error",
       message: `Handshake request failed with HTTP ${response.status}.`,
@@ -325,6 +336,9 @@ export class HandshakeClient {
       requestIdentity: response.headers.get(HANDSHAKE_REQUEST_IDENTITY_HEADER),
       proofRef: null,
       refusalRef: null,
+      failureClass,
+      failurePhase: null,
+      problemType: null,
     };
   }
 }

@@ -317,7 +317,14 @@ async function currentClaimForContract(store: ProtocolStore, contract: ActionCon
 
 async function currentIdempotencyLedgerForContract(store: ProtocolStore, contract: ActionContract) {
   const ledgerKeyDigest = await idempotencyLedgerKeyDigest(idempotencyLedgerKey(contract));
-  return store.getCurrentIdempotencyLedgerEntry(ledgerKeyDigest);
+  const current = await store.getCurrentIdempotencyLedgerEntry(ledgerKeyDigest);
+  if (current) return current;
+  const contractLedgerEntries = await store.listRecordsByActionContract<IdempotencyLedgerEntry>(
+    "idempotency_ledger_entry",
+    contract.actionContractId,
+    { tenantId: contract.tenantId, organizationId: contract.organizationId },
+  );
+  return contractLedgerEntries.at(-1) ?? null;
 }
 
 function buildOrphanIsolationState(

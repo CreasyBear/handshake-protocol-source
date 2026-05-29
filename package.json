@@ -1,6 +1,6 @@
 {
   "name": "handshake-protocol-kernel",
-  "version": "0.2.7",
+  "version": "0.2.8",
   "description": "Protected action infrastructure for automated decision making: protocol kernel, CLI evidence views, and local MCP proposal/evidence server.",
   "license": "Apache-2.0",
   "mcpName": "io.github.CreasyBear/handshake-protocol-kernel",
@@ -49,6 +49,11 @@
       "import": "./dist/sdk/surface-clients/index.mjs",
       "default": "./dist/sdk/surface-clients/index.mjs"
     },
+    "./surfaces/a2a-negotiation-readback": {
+      "types": "./dist/surfaces/a2a-negotiation-readback/index.d.ts",
+      "import": "./dist/surfaces/a2a-negotiation-readback/index.mjs",
+      "default": "./dist/surfaces/a2a-negotiation-readback/index.mjs"
+    },
     "./cli": {
       "types": "./dist/cli/index.d.ts",
       "import": "./dist/cli/index.mjs",
@@ -87,6 +92,8 @@
     "test": "bun test",
     "demo:self-hosted": "bun run ./examples/self-hosted-activation/run.ts",
     "demo:aps": "bun run ./examples/x402-protected-spend/run.ts",
+    "demo:service-workflow-admission": "bun run ./examples/service-workflow-admission/run.ts",
+    "demo:service-operator-golden-path": "bun run ./examples/service-operator-golden-path/run.ts",
     "demo:adapter-sdk": "bun run ./examples/external-adapter-sdk/run.ts",
     "demo:x402-tool-profiles": "bun run ./examples/x402-protected-tool-profiles/run.ts",
     "demo:mcp-transcript": "bun run ./examples/mcp-reference-transcript/run.ts",
@@ -98,6 +105,8 @@
     "lint": "eslint src test --max-warnings=0",
     "check:types": "tsc --noEmit --pretty false",
     "pack:check": "npm run build && node scripts/check-package-surface.mjs && node scripts/check-published-entrypoints.mjs && node scripts/check-clean-installed-activation.mjs && node scripts/check-release-proof.mjs && node scripts/check-npm-maintainer-posture.mjs",
+    "check:service-agent-gating-phase": "node scripts/check-service-agent-gating-phase.mjs --tier operator",
+    "check:service-agent-gating-phase:full": "node scripts/check-service-agent-gating-phase.mjs --tier full",
     "check:repo": "npm run build && npm run check:types && npm run lint && npm run format:check && npm run test && npm run pack:check && git diff --check",
     "release:admin:check": "node scripts/check-release-admin.js",
     "release:admin:check:remote": "node scripts/check-release-admin.js --remote-readback",

@@ -14,6 +14,7 @@ This lane defines a source-owned MCP catalog, strict `x402_payment.exact` propos
 - Let the host submit one exact buyer-side `x402_payment.exact` proposal candidate.
 - Let the host receive structured refusal, not-ready, stale-metadata, or proposal outcomes.
 - Let the host read redacted evidence projections through explicit resources.
+- Let the host see service workflow admission and handle boundaries as read-only context when preparing a fresh protected-action proposal.
 - Let the local self-hosted packet prove the source-owned MCP stdio process can list tools, read resources, and call the proposal tool without creating authority.
 - Treat certificate resources as local terminal evidence references only; MCP does not mint, verify hosted trust, publish revocation state, or create cross-org certificate trust.
 
@@ -24,6 +25,7 @@ This lane defines a source-owned MCP catalog, strict `x402_payment.exact` propos
 - Gateway custody, control-plane install, signer material, mutation execution, and terminal certificate minting live outside MCP.
 - Generated execution graph creation remains kernel-only in this checkout; MCP records that posture instead of creating a new HTTP authority path.
 - The first public proposal tool is `handshake.actions.x402_payment.propose`.
+- A `ServiceWorkflowHandle` is correlation/readback context only. MCP must not use it as permission, payment approval, retry permission, credential posture, or proof that the gateway will accept the action.
 
 ## Core components
 
@@ -82,3 +84,5 @@ Extract only after the catalog, proposal schema, resource mapping, process custo
 ## Scope boundary
 
 MCP can propose and display evidence. It cannot authorize, approve, pay, execute, recover, retry, export, certify, install, supervise processes, or hold mutation credentials.
+
+MCP can carry service workflow context into proposal preparation only if the proposal still becomes one fresh exact action contract. It must not treat admission, handle, badge, or certificate evidence as an executable grant.

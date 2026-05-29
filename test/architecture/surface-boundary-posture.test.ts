@@ -24,6 +24,10 @@ const expectedSurfaceIds: readonly SurfaceId[] = [
   "cli.process",
   "mcp.runtime",
   "x402.protected_tool",
+  "surfaces.a2a_negotiation",
+  "surfaces.a2a_readback",
+  "surfaces.service_workflow_admission",
+  "surfaces.hosted_admission",
 ];
 
 const authorityRouteFamilies: readonly SurfaceRouteFamily[] = [
@@ -46,9 +50,13 @@ const modelOrOperatorSurfaces: readonly SurfaceId[] = [
   "cli.process",
   "mcp.runtime",
   "x402.protected_tool",
+  "surfaces.a2a_negotiation",
+  "surfaces.a2a_readback",
+  "surfaces.service_workflow_admission",
+  "surfaces.hosted_admission",
 ];
 
-const authoritySurfaces: readonly SurfaceId[] = ["sdk.policy"];
+const roleScopedTransitionClients: readonly SurfaceId[] = ["sdk.policy"];
 
 describe("surface boundary posture", () => {
   it("defines one complete manifest entry for each planned product surface", () => {
@@ -88,12 +96,12 @@ describe("surface boundary posture", () => {
     expect(violations.sort()).toEqual([]);
   });
 
-  it("keeps explicit authority surfaces narrow and named", () => {
+  it("keeps role-scoped transition clients narrow and named without making them product authority surfaces", () => {
     const violations: string[] = [];
-    for (const id of authoritySurfaces) {
+    for (const id of roleScopedTransitionClients) {
       const boundary = boundaryFor(id);
-      if (boundary.authorityPosture !== "policy_authority") {
-        violations.push(`${id} is not marked policy authority`);
+      if (boundary.authorityPosture !== "policy_transition_transport") {
+        violations.push(`${id} is not marked as policy transition transport`);
       }
       if (!boundary.allowedRouteFamilies.includes("policy_decision_write")) {
         violations.push(`${id} cannot write policy decisions`);
@@ -105,8 +113,12 @@ describe("surface boundary posture", () => {
       if (boundary.claimBoundaryLabels.includes("runtime_evidence_is_not_authority")) {
         violations.push(`${id} is mislabeled as runtime proposal surface`);
       }
+      if (!boundary.claimBoundaryLabels.includes("policy_transition_transport_is_not_gateway_execution")) {
+        violations.push(`${id} does not say policy transition transport is not gateway execution`);
+      }
     }
 
+    expect(JSON.stringify(surfaceBoundaryManifest)).not.toContain("policy_authority");
     expect(violations.sort()).toEqual([]);
   });
 
@@ -260,8 +272,33 @@ function isAllowedInternalImport(boundary: SurfaceBoundary, target: string): boo
   return boundary.allowedImportRoots.some((root) => target === root || target.startsWith(`${root}/`));
 }
 
+const evidenceOnlySchemaNegativeMentions = [
+  "PaymentPayload",
+  "credentialMaterialIncluded",
+  "downstreamSuccessClaimedByAgreement",
+  "gatewayCheckRemainsFinalEnforcementPoint",
+  "greenlightId",
+  "paymentMaterialIncluded",
+  "proof_gap:a2a_raw_material:signer_material",
+  "rawCredentialMaterial",
+  "receiptExport",
+  "signerMaterialIncluded",
+  "signerMaterialObserved",
+  "signer_use",
+] as const;
+
 function stripRequiredNonAuthorityFlagMentions(text: string, boundary: SurfaceBoundary): string {
-  return Object.keys(boundary.requiredNonAuthorityFlags).reduce((current, flag) => current.replaceAll(flag, ""), text);
+  const withoutManifestFlags = Object.keys(boundary.requiredNonAuthorityFlags).reduce(
+    (current, flag) => current.replaceAll(flag, ""),
+    text,
+  );
+  if (boundary.authorityPosture !== "evidence_only" && boundary.authorityPosture !== "proposal_only") {
+    return withoutManifestFlags;
+  }
+  return evidenceOnlySchemaNegativeMentions.reduce(
+    (current, term) => current.replaceAll(term, ""),
+    withoutManifestFlags,
+  );
 }
 
 function walkTs(dir: string): string[] {

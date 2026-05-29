@@ -17,6 +17,12 @@ export type KernelTransitionMethod =
   | "transitionToolCallDraft"
   | "createProtectedPathPosture"
   | "proposeActionContract"
+  | "recordNegotiationSession"
+  | "recordNegotiationOffer"
+  | "recordNegotiationDecision"
+  | "recordLinkedAgreement"
+  | "recordAgreementObligationBinding"
+  | "transitionAgreementStatus"
   | "createAuthorityCertificate"
   | "evaluatePolicy"
   | "createReviewArtifact"
@@ -49,6 +55,12 @@ export type ProtocolTransitionId =
   | "transitionToolCallDraft"
   | "createProtectedPathPosture"
   | "proposeActionContract"
+  | "recordNegotiationSession"
+  | "recordNegotiationOffer"
+  | "recordNegotiationDecision"
+  | "recordLinkedAgreement"
+  | "recordAgreementObligationBinding"
+  | "transitionAgreementStatus"
   | "createAuthorityCertificate"
   | "evaluatePolicy"
   | "createReviewArtifact"
@@ -72,6 +84,7 @@ export type ProtocolTransitionPhase =
   | "delegated_authority"
   | "protected_path_posture"
   | "action_contract"
+  | "negotiation"
   | "authority_certificate"
   | "policy"
   | "review"
@@ -102,7 +115,24 @@ export type ProtocolNavigationEntry = {
   eventsEmitted: readonly ContractStreamEvent["eventType"][];
   authorityBoundary: string;
   evidenceObligation: string;
+  integratorParity?: boolean;
 };
+
+export const integratorParityTransitionIds = [
+  "registerToolCapability",
+  "registerActionType",
+  "registerGatewayRegistryEntry",
+  "registerOperatingEnvelope",
+  "registerInstallProposalCompiledRecords",
+  "registerDelegatedAuthorityRef",
+  "compileIntent",
+  "proposeActionContract",
+  "evaluatePolicy",
+  "gatewayCheck",
+  "reconcileSurfaceOperation",
+] as const satisfies readonly ProtocolTransitionId[];
+
+const integratorParityIds = new Set<string>(integratorParityTransitionIds);
 
 export const protocolNavigation = [
   catalogEntry("registerToolCapability", "tool_capability"),
@@ -110,6 +140,7 @@ export const protocolNavigation = [
   catalogEntry("registerGatewayRegistryEntry", "gateway_registry_entry"),
   catalogEntry("registerOperatingEnvelope", "operating_envelope"),
   {
+    integratorParity: true,
     transitionId: "registerInstallProposalCompiledRecords",
     kernelMethod: "registerInstallProposalCompiledRecords",
     phase: "install_setup",
@@ -128,6 +159,7 @@ export const protocolNavigation = [
       "atomically register compiled setup records or refusal without issuing policy, greenlight, gate, credential, mutation, receipt, or certificate authority",
   },
   {
+    integratorParity: true,
     transitionId: "compileIntent",
     kernelMethod: "compileIntent",
     phase: "intent_compilation",
@@ -168,6 +200,7 @@ export const protocolNavigation = [
     evidenceObligation: "record opaque gateway credential ref without exposing secret material or minting authority",
   },
   {
+    integratorParity: true,
     transitionId: "registerDelegatedAuthorityRef",
     kernelMethod: "registerDelegatedAuthorityRef",
     phase: "delegated_authority",
@@ -254,6 +287,7 @@ export const protocolNavigation = [
     evidenceObligation: "record current posture consulted later by policy and gateway checks",
   },
   {
+    integratorParity: true,
     transitionId: "proposeActionContract",
     kernelMethod: "proposeActionContract",
     phase: "action_contract",
@@ -269,6 +303,72 @@ export const protocolNavigation = [
     evidenceObligation: "bind a contractable candidate or record refusal/proof-gap evidence",
   },
   {
+    transitionId: "recordNegotiationSession",
+    kernelMethod: "recordNegotiationSession",
+    phase: "negotiation",
+    outcomeClasses: ["recorded", "conflict"],
+    recordsWritten: ["negotiation_session", "contract_stream_event"],
+    eventsEmitted: ["negotiation_session_recorded"],
+    authorityBoundary: "negotiation context evidence only",
+    evidenceObligation:
+      "record parties, runtime posture, assumptions, uncertainty, and imported protocol evidence without issuing policy, greenlight, gate, mutation, receipt, or certificate authority",
+  },
+  {
+    transitionId: "recordNegotiationOffer",
+    kernelMethod: "recordNegotiationOffer",
+    phase: "negotiation",
+    outcomeClasses: ["recorded", "conflict"],
+    recordsWritten: ["negotiation_offer", "contract_stream_event"],
+    eventsEmitted: ["negotiation_offer_recorded"],
+    authorityBoundary: "offer evidence only",
+    evidenceObligation:
+      "record a specific offer version and reconstruction refs without turning accepted terms into protected-action authority",
+  },
+  {
+    transitionId: "recordNegotiationDecision",
+    kernelMethod: "recordNegotiationDecision",
+    phase: "negotiation",
+    outcomeClasses: ["recorded", "conflict"],
+    recordsWritten: ["negotiation_decision", "contract_stream_event"],
+    eventsEmitted: ["negotiation_decision_recorded"],
+    authorityBoundary: "decision evidence only",
+    evidenceObligation:
+      "record accept, reject, counter, withdraw, or expire against one current offer version without issuing an action contract or greenlight",
+  },
+  {
+    transitionId: "recordLinkedAgreement",
+    kernelMethod: "recordLinkedAgreement",
+    phase: "negotiation",
+    outcomeClasses: ["recorded", "conflict"],
+    recordsWritten: ["linked_agreement", "contract_stream_event"],
+    eventsEmitted: ["linked_agreement_recorded"],
+    authorityBoundary: "accepted agreement evidence only",
+    evidenceObligation:
+      "bind the accepted decision, offer digest, accepting party, and counterparty ref without authorizing any mutation",
+  },
+  {
+    transitionId: "recordAgreementObligationBinding",
+    kernelMethod: "recordAgreementObligationBinding",
+    phase: "negotiation",
+    outcomeClasses: ["recorded", "conflict"],
+    recordsWritten: ["agreement_obligation_binding", "contract_stream_event"],
+    eventsEmitted: ["agreement_obligation_binding_recorded"],
+    authorityBoundary: "obligation-to-contract evidence only",
+    evidenceObligation:
+      "bind one active agreement obligation to one exact action contract digest, params digest, action type, resource, and counterparty before policy may consider it",
+  },
+  {
+    transitionId: "transitionAgreementStatus",
+    kernelMethod: "transitionAgreementStatus",
+    phase: "negotiation",
+    outcomeClasses: ["recorded", "conflict"],
+    recordsWritten: ["agreement_status_transition", "contract_stream_event"],
+    eventsEmitted: ["agreement_status_transition_recorded"],
+    authorityBoundary: "agreement lifecycle evidence only",
+    evidenceObligation:
+      "record withdrawal, dispute, expiry, supersession, or resolution so future policy can refuse stale agreement-backed contracts",
+  },
+  {
     transitionId: "createAuthorityCertificate",
     kernelMethod: "createAuthorityCertificate",
     phase: "authority_certificate",
@@ -280,6 +380,7 @@ export const protocolNavigation = [
       "sign canonical terminal evidence after receipt, durable refusal, proof-gap, or replay-refusal terminalization",
   },
   {
+    integratorParity: true,
     transitionId: "evaluatePolicy",
     kernelMethod: "evaluatePolicy",
     phase: "policy",
@@ -325,6 +426,7 @@ export const protocolNavigation = [
     evidenceObligation: "bind decision to the exact review artifact and policy input",
   },
   {
+    integratorParity: true,
     transitionId: "gatewayCheck",
     kernelMethod: "gatewayCheck",
     phase: "gateway",
@@ -349,6 +451,7 @@ export const protocolNavigation = [
     evidenceObligation: "reload contract, greenlight, posture, isolation, sequence, and gateway policy before mutation",
   },
   {
+    integratorParity: true,
     transitionId: "reconcileSurfaceOperation",
     kernelMethod: "reconcileSurfaceOperation",
     phase: "operation_lifecycle",
@@ -446,6 +549,7 @@ function catalogEntry(
   objectType: ProtocolObjectType,
 ): ProtocolNavigationEntry {
   return {
+    integratorParity: integratorParityIds.has(transitionId),
     transitionId,
     kernelMethod: "putCatalogObject",
     phase: "catalog",

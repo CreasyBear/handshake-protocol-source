@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { digestMcp, type McpJsonValue } from "./digest";
 import { MCP_SCHEMA_VERSION } from "./output";
+import { mcpServiceWorkflowBoundary } from "./catalog";
 
 export const McpResourceReadSchema = z.strictObject({
   schemaVersion: z.literal(MCP_SCHEMA_VERSION),
@@ -23,6 +24,8 @@ export type McpResourceRead = z.infer<typeof McpResourceReadSchema>;
 export type McpEvidenceResourceClient = {
   getContractEvidenceProjection(actionContractId: string): Promise<unknown>;
   getAgentTransactionEnvelopeProjection(actionContractId: string): Promise<unknown>;
+  getOperationReadbackProjection(actionContractId: string): Promise<unknown>;
+  getOperationCorrelationIndex(actionContractId: string): Promise<unknown>;
   getReceiptTimelineProjection(receiptId: string): Promise<unknown>;
   getIdempotencyRecoveryProjection(actionContractId: string): Promise<unknown>;
   getProtectedPathInstallHealthProjection(actionContractId: string): Promise<unknown>;
@@ -55,6 +58,8 @@ type ParsedMcpResourceUri =
   | { kind: "metadata"; actionClass: string }
   | { kind: "challenge"; challengeId: string }
   | { kind: "contract"; actionContractId: string }
+  | { kind: "operationReadback"; actionContractId: string }
+  | { kind: "operationCorrelation"; actionContractId: string }
   | { kind: "envelope"; actionContractId: string }
   | { kind: "receiptTimeline"; receiptId: string }
   | { kind: "idempotency"; actionContractId: string }
@@ -73,6 +78,22 @@ export function parseMcpResourceUri(uri: string): ParsedMcpResourceUri {
   if (parsed.hostname === "challenges" && segments[0]) return { kind: "challenge", challengeId: segments[0] };
   if (parsed.hostname === "evidence" && segments[0] === "contracts" && segments[1]) {
     return { kind: "contract", actionContractId: segments[1] };
+  }
+  if (
+    parsed.hostname === "evidence" &&
+    segments[0] === "operations" &&
+    segments[1] &&
+    segments[2] === "readback"
+  ) {
+    return { kind: "operationReadback", actionContractId: segments[1] };
+  }
+  if (
+    parsed.hostname === "evidence" &&
+    segments[0] === "operations" &&
+    segments[1] &&
+    segments[2] === "correlation"
+  ) {
+    return { kind: "operationCorrelation", actionContractId: segments[1] };
   }
   if (parsed.hostname === "evidence" && segments[0] === "envelopes" && segments[1]) {
     return { kind: "envelope", actionContractId: segments[1] };
@@ -102,6 +123,7 @@ async function readPayload(parsed: ParsedMcpResourceUri, evidenceClient: McpEvid
         resourceVersion: "mcp-metadata.v1",
         actionClass: parsed.actionClass,
         proposalTool: "handshake.actions.x402_payment.propose",
+        serviceWorkflowBoundary: mcpServiceWorkflowBoundary,
         authorityCreated: false,
         gatewayCheckPerformed: false,
         mutationAttempted: false,
@@ -114,6 +136,10 @@ async function readPayload(parsed: ParsedMcpResourceUri, evidenceClient: McpEvid
       };
     case "contract":
       return evidenceClient.getContractEvidenceProjection(parsed.actionContractId);
+    case "operationReadback":
+      return evidenceClient.getOperationReadbackProjection(parsed.actionContractId);
+    case "operationCorrelation":
+      return evidenceClient.getOperationCorrelationIndex(parsed.actionContractId);
     case "envelope":
       return evidenceClient.getAgentTransactionEnvelopeProjection(parsed.actionContractId);
     case "receiptTimeline":

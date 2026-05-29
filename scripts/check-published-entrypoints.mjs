@@ -22,6 +22,7 @@ const requiredPublishedFiles = [
   "dist/adapter-sdk/index.mjs",
   "dist/cli/index.mjs",
   "dist/mcp/index.mjs",
+  "dist/surfaces/a2a-negotiation-readback/index.mjs",
   "dist/x402-protected-tool/index.mjs",
   "dist/bin/handshake.mjs",
   "dist/bin/handshake-mcp.mjs",
@@ -54,6 +55,7 @@ assert.ok(cliOutput.nonClaims.includes("broad MCP/CLI/browser/shell/network cont
 
 await checkMcpStdioBin();
 await checkRoleClientsSubpath();
+await checkA2ANegotiationReadbackSubpath();
 await checkX402ProtectedToolSubpath();
 
 async function checkRoleClientsSubpath() {
@@ -72,6 +74,28 @@ async function checkRoleClientsSubpath() {
   assert.equal(typeof roleClients.PolicyClient, "function");
   assert.equal("HandshakeClient" in roleClients, false);
   assert.equal(/ReceiptExport|AuthorityCertificateMint|PaymentPayload/u.test(exportNames.join(" ")), false);
+}
+
+async function checkA2ANegotiationReadbackSubpath() {
+  const readback = await import("handshake-protocol-kernel/surfaces/a2a-negotiation-readback");
+  const exportNames = Object.keys(readback).sort();
+  assert.deepEqual(exportNames, [
+    "A2ANegotiationProductReadbackSchema",
+    "A2ANegotiationReadbackInputSchema",
+    "a2aNegotiationReadbackNonClaims",
+    "projectA2ANegotiationProductReadback",
+    "renderA2ANegotiationAgentHandoff",
+    "renderA2ANegotiationCustomerReadback",
+  ]);
+  assert.equal(typeof readback.projectA2ANegotiationProductReadback, "function");
+  assert.equal(typeof readback.renderA2ANegotiationCustomerReadback, "function");
+  assert.equal(typeof readback.renderA2ANegotiationAgentHandoff, "function");
+  assert.equal("HandshakeKernel" in readback, false);
+  assert.equal("PolicyClient" in readback, false);
+  assert.equal(
+    /GatewayCheck|GreenlightSchema|PaymentPayload|PAYMENT-SIGNATURE|runX402WalletGateway/u.test(exportNames.join(" ")),
+    false,
+  );
 }
 
 async function checkX402ProtectedToolSubpath() {

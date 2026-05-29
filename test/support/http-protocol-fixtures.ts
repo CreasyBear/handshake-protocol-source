@@ -47,6 +47,7 @@ export function hostedIdentity(overrides: Partial<TransitionCallerIdentity> = {}
     tenantId: "tenant_demo",
     organizationId: "org_demo",
     projectId: "project_demo",
+    workspaceId: null,
     custodyRoles: ["runtime_evidence"],
     hostedRoles: ["auditor"],
     hostedScopes: ["evidence:redacted:read", "hosted:readiness:read"],

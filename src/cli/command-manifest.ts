@@ -21,6 +21,9 @@ export type CliCommandManifestEntry = {
   readonly nonGoals: readonly string[];
 };
 
+export const cliServiceWorkflowPosture =
+  "CLI surface only: local setup, readiness, and evidence readback; does not create ServiceWorkflowAdmission, ServiceWorkflowHandle, clearance, policy decision, greenlight, gateway check, mutation, receipt export, or certificate." as const;
+
 const sharedNonGoals = [
   "policy evaluation",
   "gateway check",
@@ -28,6 +31,7 @@ const sharedNonGoals = [
   "credential custody",
   "raw record access",
   "process startup",
+  "workflow handle authority",
 ] as const;
 
 export const cliCommandManifest = [
@@ -84,6 +88,24 @@ export const cliCommandManifest = [
     custodyRole: "review_custody",
     routeFamilies: [],
     filesystemReads: ["explicit aps report json path"],
+    filesystemWrites: [],
+    childProcessEnvInheritance: "none",
+    outputSchema: CLI_SCHEMA_VERSION,
+    agentSafe: true,
+    redactionPosture: "redacted_projection_only",
+    nonGoals: sharedNonGoals,
+  },
+  {
+    id: "evidence.fetch",
+    aliases: ["evidence fetch"],
+    status: "active",
+    plane: "evidence",
+    custodyRole: "review_custody",
+    routeFamilies: ["evidence_projection_read"],
+    filesystemReads: [
+      "optional local .handshake/evidence/operations readback json when --cwd is set",
+      "HANDSHAKE_BASE_URL or --base-url HTTP evidence readback",
+    ],
     filesystemWrites: [],
     childProcessEnvInheritance: "none",
     outputSchema: CLI_SCHEMA_VERSION,
@@ -223,6 +245,77 @@ export const cliCommandManifest = [
     nonGoals: sharedNonGoals,
   },
   {
+    id: "host.doctor",
+    aliases: ["host doctor"],
+    status: "active",
+    plane: "operator",
+    custodyRole: "none",
+    routeFamilies: [],
+    filesystemReads: [".handshake/project.json", "external role credential profile"],
+    filesystemWrites: [],
+    childProcessEnvInheritance: "none",
+    outputSchema: CLI_SCHEMA_VERSION,
+    agentSafe: true,
+    redactionPosture: "manifest_only",
+    nonGoals: [...sharedNonGoals, "parallel identity system", "gateway readiness certification"],
+  },
+  {
+    id: "quickstart.x402",
+    aliases: ["quickstart x402"],
+    status: "active",
+    plane: "operator",
+    custodyRole: "none",
+    routeFamilies: [],
+    filesystemReads: [".handshake/project.json", "optional x402 install input json path"],
+    filesystemWrites: [],
+    childProcessEnvInheritance: "none",
+    outputSchema: CLI_SCHEMA_VERSION,
+    agentSafe: false,
+    redactionPosture: "redacted_projection_only",
+    nonGoals: [...sharedNonGoals, "live control-plane registration", "signer use"],
+  },
+  {
+    id: "quickstart.agent-spine",
+    aliases: ["quickstart agent-spine"],
+    status: "active",
+    plane: "operator",
+    custodyRole: "none",
+    routeFamilies: [],
+    filesystemReads: [".handshake/project.json"],
+    filesystemWrites: [],
+    childProcessEnvInheritance: "none",
+    outputSchema: CLI_SCHEMA_VERSION,
+    agentSafe: false,
+    redactionPosture: "redacted_projection_only",
+    nonGoals: [
+      ...sharedNonGoals,
+      "bundled execute API",
+      "greenlight reuse",
+      "authority creation",
+      "live x402 operation beyond quickstart scope",
+    ],
+  },
+  {
+    id: "simulate.x402-payment",
+    aliases: ["simulate x402-payment"],
+    status: "active",
+    plane: "operator",
+    custodyRole: "none",
+    routeFamilies: [],
+    filesystemReads: [".handshake/project.json"],
+    filesystemWrites: [],
+    childProcessEnvInheritance: "none",
+    outputSchema: CLI_SCHEMA_VERSION,
+    agentSafe: true,
+    redactionPosture: "redacted_projection_only",
+    nonGoals: [
+      ...sharedNonGoals,
+      "live wallet operation",
+      "bundled execute API",
+      "greenlight reuse",
+    ],
+  },
+  {
     id: "conformance.x402-payment",
     aliases: ["conformance x402-payment"],
     status: "active",
@@ -237,6 +330,27 @@ export const cliCommandManifest = [
     redactionPosture: "redacted_projection_only",
     nonGoals: [...sharedNonGoals, "broad x402 compatibility"],
   },
+  {
+    id: "service.bootstrap",
+    aliases: ["service bootstrap"],
+    status: "active",
+    plane: "operator",
+    custodyRole: "none",
+    routeFamilies: ["install_health_read"],
+    filesystemReads: [".handshake/project.json", "optional x402 install input json path"],
+    filesystemWrites: [],
+    childProcessEnvInheritance: "none",
+    outputSchema: CLI_SCHEMA_VERSION,
+    agentSafe: false,
+    redactionPosture: "redacted_projection_only",
+    nonGoals: [
+      ...sharedNonGoals,
+      "live wallet mutation",
+      "second action-family install",
+      "orphan catalog without compiled-records transition",
+      "signer use",
+    ],
+  },
 ] as const satisfies readonly CliCommandManifestEntry[];
 
 export function cliSchemaOutput() {
@@ -249,5 +363,7 @@ export function cliSchemaOutput() {
     outputSchema: command.outputSchema,
     agentSafe: command.agentSafe,
     redactionPosture: command.redactionPosture,
+    nonGoals: command.nonGoals,
+    workflowPosture: cliServiceWorkflowPosture,
   }));
 }

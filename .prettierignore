@@ -10,3 +10,4 @@ examples/x402-protected-spend/output
 examples/mcp-reference-transcript/output
 examples/self-hosted-activation/output
 examples/x402-protected-tool-profiles/output
+examples/service-workflow-admission/output

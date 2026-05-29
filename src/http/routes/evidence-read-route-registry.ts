@@ -4,6 +4,8 @@ import {
   ContractEvidenceProjectionSchema,
   GeneratedGraphEvidenceProjectionSchema,
   IdempotencyRecoveryProjectionSchema,
+  OperationCorrelationIndexSchema,
+  OperationReadbackProjectionSchema,
   ProtectedPathInstallHealthProjectionSchema,
   ReceiptTimelineProjectionSchema,
 } from "../../protocol/public/schemas";
@@ -13,6 +15,8 @@ export type EvidenceReadRouteId =
   | "getGeneratedGraphEvidenceProjection"
   | "getContractEvidenceProjection"
   | "getAgentTransactionEnvelopeProjection"
+  | "getOperationReadbackProjection"
+  | "getOperationCorrelationIndex"
   | "getIdempotencyRecoveryProjection"
   | "getReceiptTimelineProjection"
   | "getProtectedPathInstallHealthProjection";
@@ -81,6 +85,38 @@ export const evidenceReadRouteDefinitions = [
       {
         name: "actionContractId",
         description: "Action contract identifier used to assemble the redacted transaction envelope.",
+      },
+    ],
+  },
+  {
+    routeId: "getOperationReadbackProjection",
+    honoPath: "/v0.2/evidence/operations/:actionContractId/readback",
+    openApiPath: "/v0.2/evidence/operations/{actionContractId}/readback",
+    roles: evidenceReadRoles,
+    summary: "Read redacted operation readback for diagnostics only",
+    responseDescription:
+      "Operation readback projection with compilation provenance stages. Inspection evidence only; does not create authority or greenlights.",
+    responseSchema: OperationReadbackProjectionSchema,
+    pathParameters: [
+      {
+        name: "actionContractId",
+        description: "Action contract identifier for operation readback assembly.",
+      },
+    ],
+  },
+  {
+    routeId: "getOperationCorrelationIndex",
+    honoPath: "/v0.2/evidence/operations/:actionContractId/correlation",
+    openApiPath: "/v0.2/evidence/operations/{actionContractId}/correlation",
+    roles: evidenceReadRoles,
+    summary: "Read linked operation correlation refs for diagnostics only",
+    responseDescription:
+      "Read-only correlation index over existing evidence refs. No mutation routes and no authority creation.",
+    responseSchema: OperationCorrelationIndexSchema,
+    pathParameters: [
+      {
+        name: "actionContractId",
+        description: "Action contract identifier for correlation index assembly.",
       },
     ],
   },

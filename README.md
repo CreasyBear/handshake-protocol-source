@@ -1,5 +1,7 @@
 # Handshake Protocol Kernel
 
+> **Doc type:** Explanation
+
 Handshake is protected action infrastructure for automated decision making. This
 package is the installable protocol kernel, CLI, SDK, and local MCP
 proposal/evidence server for reducing one consequential automated action to an
@@ -7,19 +9,39 @@ exact contract before mutation. Vague intent and generated code are not
 authority. A protected path requires an
 exact action contract, policy decision, one-use greenlight or refusal, gateway
 check before mutation, and receipt, refusal, replay refusal, proof gap, or
-optional terminal AuthorityCertificate. Certificate is terminal evidence, not
-permission.
+optional terminal AuthorityCertificate.
+Certificate is terminal evidence, not permission.
 
-Category: protected actions for automated decision making; certificate is terminal evidence, not permission.
+Category: protected actions for automated decision making, framed as **reconstructable clearance before consequence**. A service must be able to reconstruct clearance evidence before treating downstream consequence as proof. Certificates are terminal evidence, not permission.
 
 Core terms: a `cleared protected-action event` is one terminal event with
-reconstructable evidence; the `protocol kernel` is the state machine and schema
-set; a `product surface` is CLI, MCP, SDK, docs, demo, or service readback that
-exposes proposal/evidence without creating authority. Public npm availability
+reconstructable evidence; the `protocol kernel` is the only authority state
+machine and schema set; a `product surface` is a projection/readback surface
+such as CLI, MCP, docs, demo, or service readback that exposes
+proposal/evidence without creating authority. Role-scoped protocol transition
+clients, such as SDK policy or gateway clients, transport specific kernel
+transitions under custody; they are not product authority surfaces. Public npm availability
 does not create authority. MCP Registry discoverability remains a proof gap
 until registry acceptance and lookup are verified.
 
-Package: `handshake-protocol-kernel@0.2.7`. MCP name:
+First-use product projection/readback surfaces should teach the service workflow as:
+
+```text
+Present evidence bundle (readback only)
+-> ServiceWorkflowAdmission (mapping only)
+-> ServiceWorkflowHandle (correlation only)
+-> Request reconstructable clearance for one protected action
+-> Read outcome evidence
+```
+
+`ServiceWorkflowAdmission` means service-side accepted/refused/stale/proof-gap
+mapping, not policy. `ServiceWorkflowHandle` means correlation and readback
+context only, not permission. Each protected action still requires a fresh exact
+action contract, policy decision, one-use greenlight or refusal, and gateway
+check before mutation. Presentation bundles are evidence for readback — they do
+not grant clearance by themselves.
+
+Package: `handshake-protocol-kernel@0.2.8`. MCP name:
 `io.github.CreasyBear/handshake-protocol-kernel`. Runtime: Node.js `>=20`.
 License: Apache-2.0. Published package repository form: package artifact repository, not source mirror.
 The published package repo contains package artifacts and trusted-publish
@@ -44,6 +66,11 @@ handshake register x402-gateway-readiness ./x402-gateway-readiness.json --record
 handshake install health --cwd .
 handshake-mcp
 ```
+
+In service-workflow terms, these CLI commands prepare local/readiness evidence
+before any fresh `ServiceWorkflowAdmission`, `ServiceWorkflowHandle`, or
+Request Clearance; they do not create admission, handle, clearance, or outcome
+authority.
 
 These commands do not create policy decisions, greenlights, gateway checks,
 payment material, mutations, receipts, or certificates. They establish local
@@ -75,7 +102,8 @@ and redacted evidence readback. The package root still exposes the lower-level
 `HandshakeClient`, but first-slice activation should teach role-scoped clients
 first. `InstallClient` performs one server-side setup commit, not hosted
 installation authority. `PolicyClient.evaluatePolicy()` evaluates one exact
-action contract; it cannot perform the gateway check or mutate.
+action contract through the protocol authority spine; it is not a product
+surface, cannot perform the gateway check, and cannot mutate.
 
 Use `adapter-sdk` for third-party protected-action adapter packs and
 install-proposal shape review. It is definition-only: not an install client, not
@@ -99,7 +127,20 @@ it uses real local MCP stdio proposal/evidence proof;
 `npm run demo:aps` writes `examples/x402-protected-spend/output/latest.md` and
 is not hosted operation, not broad x402 compatibility; `npm run demo:adapter-sdk`
 writes `examples/external-adapter-sdk/output/latest.md` and is not policy evaluation,
-not gateway check, not mutation.
+not gateway check, not mutation;
+`npm run demo:service-workflow-admission` writes
+`examples/service-workflow-admission/output/latest.md` and is admission readback
+plus handle context only, not clearance or authority.
+
+Hosted admission lock: this service workflow simplification is not a
+hosted-operation go-ahead. Hosted product work may consume projection/readback
+surfaces only after the pre-hosted service workflow gates have source-owned
+proof or explicit proof-gap posture. If hosted work needs hosted operation,
+provider custody,
+settlement/finality, marketplace or certification, cross-org trust, aggregate
+spend enforcement, hosted org auth, retention/search, or new kernel exports,
+route it to a separate hosted workspace or a new pre-hosted kernel task. Do not
+expand protocol kernel exports for hosted needs without fresh proof gates.
 
 No adapter family defines the protocol. This package is not broad x402
 compatibility, not live provider custody, hosted mutation authority, production
@@ -113,11 +154,11 @@ payment-budget management is intentionally outside the current remit.
 
 Trusted Publishing: MCP Registry discoverability is now the remaining
 distribution launch blocker.
-`0.2.7` npm availability is verified by registry readback, npm signature
+`0.2.8` npm availability is verified by registry readback, npm signature
 metadata, GitHub Actions provenance publication, and clean installed-artifact
 smoke. Public npm availability still does not create authority.
 
-Trusted Publishing workflow input: `expected_version = 0.2.7`. Release proof
+Trusted Publishing workflow input: `expected_version = 0.2.8`. Release proof
 states: `ready_to_publish` means package shape and local gates passed;
 `actually_published` means npm publish and installed-artifact readback passed
 for the exact version; `registry_discoverable` means MCP Registry acceptance and

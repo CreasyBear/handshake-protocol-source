@@ -19,8 +19,8 @@ describe("proof packet projectors", () => {
       package: {
         name: packageJson.name,
         version: packageJson.version,
-        packedFile: "handshake-protocol-kernel-0.2.7.tgz",
-        localArtifactPath: ".planning/artifacts/handshake-protocol-kernel-0.2.7.tgz",
+        packedFile: "handshake-protocol-kernel-0.2.8.tgz",
+        localArtifactPath: ".planning/artifacts/handshake-protocol-kernel-0.2.8.tgz",
         tarballSha256: "a".repeat(64),
         tarballSizeBytes: 123,
         npmIntegrity: "sha512-example",
@@ -146,7 +146,7 @@ trust_level = "trusted"
 url = "https://mcp.exa.ai/mcp?exaApiKey=secret"
 `,
       expectedArtifact: {
-        path: ".planning/artifacts/handshake-protocol-kernel-0.2.7.tgz",
+        path: ".planning/artifacts/handshake-protocol-kernel-0.2.8.tgz",
         exists: true,
         sha256: "b".repeat(64),
         sizeBytes: 123,
@@ -175,7 +175,7 @@ url = "https://mcp.exa.ai/mcp?exaApiKey=secret"
       configText: '[mcp_servers.handshake_x402]\ncommand = "npx"\nargs = ["handshake-mcp"]\n',
       expectedServer: expectedCodexServer(),
       expectedArtifact: {
-        path: ".planning/artifacts/handshake-protocol-kernel-0.2.7.tgz",
+        path: ".planning/artifacts/handshake-protocol-kernel-0.2.8.tgz",
         exists: true,
         sha256: "b".repeat(64),
         sizeBytes: 123,
@@ -202,7 +202,7 @@ url = "https://mcp.exa.ai/mcp?exaApiKey=secret"
         '[mcp_servers.handshake_x402]\ncommand = "/usr/local/bin/node"\nargs = ["/tmp/handshake/dist/bin/handshake-mcp.mjs"]\n',
       expectedServer: expectedCodexServer(),
       expectedArtifact: {
-        path: ".planning/artifacts/handshake-protocol-kernel-0.2.7.tgz",
+        path: ".planning/artifacts/handshake-protocol-kernel-0.2.8.tgz",
         exists: true,
         sha256: "b".repeat(64),
         sizeBytes: 123,
@@ -239,7 +239,7 @@ url = "https://mcp.exa.ai/mcp?exaApiKey=secret"
         ],
       },
       expectedArtifact: {
-        path: ".planning/artifacts/handshake-protocol-kernel-0.2.7.tgz",
+        path: ".planning/artifacts/handshake-protocol-kernel-0.2.8.tgz",
         exists: true,
         sha256: "b".repeat(64),
         sizeBytes: 123,
@@ -403,7 +403,7 @@ url = "https://mcp.exa.ai/mcp?exaApiKey=secret"
     ]);
   });
 
-  it("aggregates the four product gates without hiding hard blockers", () => {
+  it("aggregates product gates without hiding hard blockers or dual-enforcement proof gaps", () => {
     const readback = projectProductCompletionReadback({
       generatedAt: "2026-05-25T00:00:00.000Z",
       commandRefs: ["npm run check:repo", "node scripts/check-distribution-provenance.mjs"],
@@ -454,14 +454,25 @@ url = "https://mcp.exa.ai/mcp?exaApiKey=secret"
           createsAuthority: false,
           evidenceRefs: ["auth-md-x402-interlock-packet.test.ts"],
         },
+        dualEnforcementPosture: {
+          dualEnforcementPostureTestPassed: false,
+          mutationManifestGatingTestPassed: false,
+          evidenceRefs: [],
+        },
+        perCustomerBypassScaffold: {
+          customerOnboardingRef: null,
+          firstPartyDogfoodCustomerId: null,
+          evidenceRefs: ["per-customer-bypass-scaffold-readback.json"],
+        },
       },
     });
 
-    expect(readback.status).toBe("closed_with_hard_blocks");
-    expect(readback.incompleteGateIds).toEqual([]);
+    expect(readback.status).toBe("incomplete");
+    expect(readback.incompleteGateIds).toEqual(["dual_enforcement_posture"]);
     expect(readback.hardBlockedGateIds).toEqual([
       "public_distribution_and_registry",
       "customer_gateway_live_x402_paid_proof",
+      "per_customer_bypass_scaffold",
     ]);
     expect(readback.overclaimViolations).toEqual([]);
     expect(readback.authorityBoundary.createsAuthority).toBe(false);

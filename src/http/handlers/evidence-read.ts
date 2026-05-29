@@ -14,6 +14,8 @@ import {
   projectAgentTransactionEnvelope,
   projectContractEvidence,
   projectIdempotencyRecovery,
+  projectOperationCorrelationIndex,
+  projectOperationReadback,
   projectProtectedPathInstallHealth,
   projectReceiptTimeline,
 } from "../../protocol/evidence-projections";
@@ -114,6 +116,29 @@ export async function handleEvidenceRead(
             missingEventCount: events.missingEventCount,
             reconciliations: reconciliations.map((record) => record.payload),
           }),
+        );
+      }
+      case "getOperationReadbackProjection": {
+        const actionContractId = c.req.param("actionContractId");
+        if (!actionContractId) return recordNotFound(c, errorContext);
+        const contractRecord = await store.getRecord<ActionContract>("action_contract", actionContractId);
+        if (!contractRecord || !callerCanReadRecord(admission.hostedIdentity, contractRecord)) {
+          return recordNotFound(c, errorContext);
+        }
+        const projection = await projectOperationReadback(
+          await assembleAgentTransactionEnvelopeInput(store, contractRecord.payload),
+        );
+        return c.json(projection);
+      }
+      case "getOperationCorrelationIndex": {
+        const actionContractId = c.req.param("actionContractId");
+        if (!actionContractId) return recordNotFound(c, errorContext);
+        const contractRecord = await store.getRecord<ActionContract>("action_contract", actionContractId);
+        if (!contractRecord || !callerCanReadRecord(admission.hostedIdentity, contractRecord)) {
+          return recordNotFound(c, errorContext);
+        }
+        return c.json(
+          projectOperationCorrelationIndex(await assembleAgentTransactionEnvelopeInput(store, contractRecord.payload)),
         );
       }
       case "getProtectedPathInstallHealthProjection": {

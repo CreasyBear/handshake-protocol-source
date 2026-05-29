@@ -1,0 +1,2 @@
+{"lens":"ENGINEERING","severity":"P0","finding":"Cross-org dependencies exceed current same-org sequence dependency support.","required_change":"Treat cross-org trust as proof gap until a trust model exists."}
+{"lens":"ENGINEERING","severity":"P0","finding":"Policy must validate agreement state before greenlight.","required_change":"Add agreement-backed obligation policy hook before any gateway path can clear."}

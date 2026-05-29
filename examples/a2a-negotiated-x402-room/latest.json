@@ -1,0 +1,211 @@
+{
+  "generatedAt": "2026-05-26T00:00:00.000Z",
+  "fixtureKind": "a2a_negotiated_x402_room",
+  "contract": {
+    "actionContractId": "act_00000000-0000-4000-8000-000000000008",
+    "actionContractDigest": "sha256:c3d84e6eb55bf70b9b6dcbb432fdfe8731fe8e25e15f5f35b6b4c4fb3cc75c14",
+    "paramsDigest": "sha256:a00d76dbe83b6608ca9a779042166aed82bb6a30e0b6600a1c7b1737eec4493b",
+    "actionClass": "x402_payment.exact",
+    "resourceRef": "x402:base-sepolia:0xpayee:https://api.example.com/mcp/premium-context",
+    "clearingEvidenceRefs": {
+      "obligationRef": "obligation:x402-exact-call",
+      "counterpartyRef": "agent:seller"
+    }
+  },
+  "authorityBoundary": {
+    "acceptedAgreementCreatedPolicyDecision": false,
+    "acceptedAgreementCreatedGreenlight": false,
+    "acceptedAgreementPerformedGatewayCheck": false,
+    "acceptedAgreementAttemptedMutation": false,
+    "signerInvokedBeforeGatewayCheck": false,
+    "gatewayCheckRemainsFinalEnforcementPoint": true
+  },
+  "policy": {
+    "decision": "greenlight",
+    "decisionReasonCode": "policy_passed",
+    "greenlightId": "grn_00000000-0000-4000-8000-000000000020",
+    "greenlightMaxUses": 1
+  },
+  "gateway": {
+    "firstOutcome": "payment_signature_proof_gap",
+    "firstGateDecision": "passed",
+    "firstMutationAttempted": true,
+    "replayOutcome": "gateway_check_refused",
+    "replayReasonCode": "already_consumed",
+    "signerInvocationCount": 1
+  },
+  "supportPacket": {
+    "packetKind": "a2a_negotiation_support_packet",
+    "actionContractId": "act_00000000-0000-4000-8000-000000000008",
+    "actionContractDigest": "sha256:c3d84e6eb55bf70b9b6dcbb432fdfe8731fe8e25e15f5f35b6b4c4fb3cc75c14",
+    "paramsDigest": "sha256:a00d76dbe83b6608ca9a779042166aed82bb6a30e0b6600a1c7b1737eec4493b",
+    "actionClass": "x402_payment.exact",
+    "resourceRef": "x402:base-sepolia:0xpayee:https://api.example.com/mcp/premium-context",
+    "agreement": {
+      "linkedAgreementId": "linked_agreement_demo",
+      "agreementDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "agreementStatus": "active",
+      "obligationRef": "obligation:x402-exact-call",
+      "counterpartyRef": "agent:seller",
+      "evidencePosture": "local_evidence_only"
+    },
+    "obligationBinding": {
+      "agreementObligationBindingId": "agreement_obligation_binding_demo",
+      "obligationRef": "obligation:x402-exact-call",
+      "actionContractDigest": "sha256:c3d84e6eb55bf70b9b6dcbb432fdfe8731fe8e25e15f5f35b6b4c4fb3cc75c14",
+      "paramsDigest": "sha256:a00d76dbe83b6608ca9a779042166aed82bb6a30e0b6600a1c7b1737eec4493b",
+      "counterpartyRef": "agent:seller"
+    },
+    "negotiation": {
+      "negotiationSessionId": "negotiation_session_demo",
+      "acceptedOfferVersionId": "offer_version_1",
+      "acceptedNegotiationDecisionId": "negotiation_decision_accept_v1",
+      "acceptedOfferContentDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "partyRefs": ["agent:buyer", "agent:seller"]
+    },
+    "lifecycle": {
+      "assemblyStatus": "assembled",
+      "assemblyReasonCode": null,
+      "assemblyReason": null,
+      "policyDecisionId": "pol_00000000-0000-4000-8000-00000000001f",
+      "policyDecision": "greenlight",
+      "greenlightId": "grn_00000000-0000-4000-8000-000000000020",
+      "gatewayCheckAttemptId": "gat_00000000-0000-4000-8000-00000000004a",
+      "mutationAttemptId": "mut_00000000-0000-4000-8000-00000000002d",
+      "receiptId": "rcp_00000000-0000-4000-8000-00000000004b",
+      "downstreamFinalityStatus": "unknown",
+      "proofGapIds": ["gap_00000000-0000-4000-8000-000000000040"],
+      "refusalIds": ["ref_5e2f7ad3fd8fa3f6bf9fb415b10b5485025435321ab3cc1c"]
+    },
+    "authorityBoundary": {
+      "agreementAcceptanceCreatedAuthority": false,
+      "obligationBindingCreatedAuthority": false,
+      "policyMayCreateOneUseGreenlight": true,
+      "gatewayCheckRemainsFinalEnforcementPoint": true,
+      "downstreamSuccessClaimedByAgreement": false
+    },
+    "redaction": {
+      "rawTranscriptIncluded": false,
+      "rawOfferTermsIncluded": false,
+      "paymentPayloadIncluded": false,
+      "paymentSignatureIncluded": false,
+      "credentialMaterialIncluded": false
+    }
+  },
+  "productReadback": {
+    "readbackKind": "a2a_negotiation_product_readback",
+    "schemaVersion": "a2a.negotiation.readback.v1",
+    "status": "gateway_checked_downstream_unknown",
+    "actionContractId": "act_00000000-0000-4000-8000-000000000008",
+    "actionContractDigest": "sha256:c3d84e6eb55bf70b9b6dcbb432fdfe8731fe8e25e15f5f35b6b4c4fb3cc75c14",
+    "paramsDigest": "sha256:a00d76dbe83b6608ca9a779042166aed82bb6a30e0b6600a1c7b1737eec4493b",
+    "actionClass": "x402_payment.exact",
+    "resourceRef": "x402:base-sepolia:0xpayee:https://api.example.com/mcp/premium-context",
+    "negotiatedEvidence": {
+      "linkedAgreementId": "linked_agreement_demo",
+      "agreementStatus": "active",
+      "obligationRef": "obligation:x402-exact-call",
+      "counterpartyRef": "agent:seller",
+      "evidencePosture": "local_evidence_only"
+    },
+    "protectedAction": {
+      "policyDecisionId": "pol_00000000-0000-4000-8000-00000000001f",
+      "policyDecision": "greenlight",
+      "greenlightId": "grn_00000000-0000-4000-8000-000000000020",
+      "gatewayCheckAttemptId": "gat_00000000-0000-4000-8000-00000000004a",
+      "mutationAttemptId": "mut_00000000-0000-4000-8000-00000000002d",
+      "receiptId": "rcp_00000000-0000-4000-8000-00000000004b",
+      "downstreamFinalityStatus": "unknown"
+    },
+    "developerExperience": {
+      "targetTimeToHelloWorldMinutes": 5,
+      "runCommand": "bun examples/a2a-negotiated-x402-room/generate.ts",
+      "expectedOutputFiles": ["latest.json", "latest.md", "agent-handoff.md"],
+      "inspectFirst": [
+        "authorityBoundary.agreementAcceptanceCreatedAuthority",
+        "protectedAction.gatewayCheckAttemptId",
+        "protectedAction.downstreamFinalityStatus",
+        "customerExperience.nextActions"
+      ],
+      "failureModes": [
+        "missing agreement obligation binding becomes a proof gap",
+        "stale negotiation evidence is refused before greenlight",
+        "changed payment parameters are refused at the gateway before signer use",
+        "downstream finality unknown remains unknown, not success"
+      ]
+    },
+    "agentExperience": {
+      "runtimeProfiles": ["codex", "mcp", "x402", "generic"],
+      "sourceBoundary": [
+        "Use this readback packet as evidence only.",
+        "Do not infer authority from an accepted agreement.",
+        "Bind future mutations to a fresh exact ActionContract and gateway check."
+      ],
+      "toolContract": [
+        "Read support packet fields and public readback fields.",
+        "Do not request raw payment payloads, payment signatures, or credential material.",
+        "Do not call signer or mutation tools unless a verified gateway check is present."
+      ],
+      "stopConditions": [
+        "Stop on missing obligation binding.",
+        "Stop on agreement, params, selected payment requirement, endpoint, amount, or counterparty drift.",
+        "Stop on readback assembly failure.",
+        "Record downstream unknown as a proof gap or next action, not success."
+      ],
+      "recoveryPath": [
+        "Re-run the readback generator to refresh local evidence.",
+        "Inspect proofGapIds and refusalIds before retrying.",
+        "Create a new exact ActionContract for any new mutation attempt."
+      ],
+      "evalPath": [
+        "bun test test/product/a2a-negotiated-x402-room.test.ts",
+        "bun examples/a2a-negotiated-x402-room/generate.ts",
+        "npm run quality:claims",
+        "npm run quality:architecture"
+      ]
+    },
+    "customerExperience": {
+      "headline": "A negotiated agreement was linked to one exact protected action; authority came only from policy and gateway checks.",
+      "verified": [
+        "Agreement evidence linked_agreement_demo is recorded with status active.",
+        "Obligation binding agreement_obligation_binding_demo pins the exact action contract digest.",
+        "Policy created one-use greenlight grn_00000000-0000-4000-8000-000000000020.",
+        "Gateway check gat_00000000-0000-4000-8000-00000000004a is recorded before mutation evidence."
+      ],
+      "unknown": [
+        "Downstream business finality is unknown.",
+        "Proof gaps remain: gap_00000000-0000-4000-8000-000000000040.",
+        "Payment signature material is redacted from the readback."
+      ],
+      "nextActions": [
+        "Resolve or preserve proof gaps before claiming success.",
+        "Do not retry payment with the same greenlight."
+      ]
+    },
+    "authorityBoundary": {
+      "agreementAcceptanceCreatedAuthority": false,
+      "obligationBindingCreatedAuthority": false,
+      "policyMayCreateOneUseGreenlight": true,
+      "gatewayCheckRemainsFinalEnforcementPoint": true,
+      "downstreamSuccessClaimedByAgreement": false
+    },
+    "redaction": {
+      "rawTranscriptIncluded": false,
+      "rawOfferTermsIncluded": false,
+      "paymentPayloadIncluded": false,
+      "paymentSignatureIncluded": false,
+      "credentialMaterialIncluded": false
+    },
+    "nonClaims": [
+      "marketplace_operation",
+      "legal_contract_formation",
+      "escrow",
+      "settlement_finality",
+      "reputation",
+      "cross_org_trust",
+      "provider_custody",
+      "reusable_authority",
+      "native_host_containment"
+    ]
+  }
+}

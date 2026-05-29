@@ -372,6 +372,7 @@ describe("protocol module import posture", () => {
       "../idempotency-ledger/schemas",
       "../intent-compilation/schemas",
       "../isolation-breaker/schemas",
+      "../negotiation/schemas",
       "../operation-lifecycle/schemas",
       "../policy-greenlight/schemas",
       "../proof-gap/schemas",

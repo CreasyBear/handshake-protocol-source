@@ -1,308 +1,437 @@
-<!-- refreshed: 2026-05-25 -->
+<!-- refreshed: 2026-05-29 -->
 # Architecture
 
-**Analysis Date:** 2026-05-25
+**Analysis Date:** 2026-05-29
 
 ## System Overview
 
+Handshake is a TypeScript protocol kernel for protected action infrastructure. The kernel records exact action contracts, policy decisions, one-use greenlights, gateway checks, receipts, refusals, proof gaps, and optional terminal certificates. Product surfaces (CLI, MCP, SDK, surfaces) propose and read evidence; they do not create authority. Reference gateway adapters in `src/adapters/` perform protected-surface mutation only after a verified `gatewayCheck` transition.
+
+Core model (authority chain):
+
 ```text
-Product and integration surfaces
-`src/cli`, `src/mcp`, `src/sdk`, `src/http`, `src/runtime`, `src/surfaces`
-        |
-        v
-HTTP admission and route dispatch
-`src/http/app.ts`, `src/http/admission/index.ts`,
-`src/http/routes/transition-route-registry.ts`,
-`src/http/routes/transition-invokers.ts`
-        |
-        v
-Protocol authority kernel
-`src/protocol/kernel.ts`, `src/protocol/areas/*`
-        |
-        v
-Protocol store and reconstruction state
-`src/protocol/store/port.ts`, `src/storage/*`, `migrations/0001_protocol_kernel.sql`
-        |
-        +--> Gateway adapters before mutation
-        |    `src/adapters/x402-payment/wallet-gateway.ts`,
-        |    `src/adapters/package-install/gateway.ts`
-        |
-        +--> Evidence projections and read models
-             `src/protocol/evidence-projections/*`,
-             `src/http/handlers/evidence-read.ts`
+Principal vague intent
+        │
+        ▼
+Intent compilation (candidate actions, overreach/refusal markers)
+  `src/protocol/areas/intent-compilation/`
+        │
+        ▼
+CandidateAction → ActionContract (exact commitment)
+  `src/protocol/areas/action-contract/`
+        │
+        ▼
+Atomic policy evaluation (greenlight / refusal / review / halt / quarantine)
+  `src/protocol/areas/policy-greenlight/transitions.ts`
+        │
+        ▼
+Gateway check before mutation (enforcement boundary)
+  `src/protocol/areas/gateway-gate/transitions.ts`
+        │
+        ▼
+Adapter mutation (only after VerifiedGatewayCheck)
+  `src/adapters/*`
+        │
+        ▼
+Receipt / refusal / proof-gap / optional authority certificate
+  `src/protocol/areas/operation-lifecycle/`, `refusal/`, `proof-gap/`
+```
+
+```text
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                     Product surfaces (no authority)                          │
+├──────────────┬──────────────┬──────────────┬──────────────┬───────────────┤
+│  `src/cli/`  │ `src/mcp/`   │ `src/sdk/`   │`src/surfaces/│`src/x402-     │
+│  evidence,   │ stdio tools, │ Handshake    │ readbacks,   │protected-tool/│
+│  service-    │ resources,   │ Client +     │ proof        │ facade,       │
+│  operator    │ x402 propose │ role clients │ packets      │ readiness     │
+└──────┬───────┴──────┬───────┴──────┬───────┴──────┬───────┴───────┬───────┘
+       │              │              │              │               │
+       │  HTTP/SDK    │  HTTP/SDK    │  POST /v0.2  │  store read   │  runtime
+       │  or local    │  or ref      │  transitions │  projections  │  ingress
+       ▼              ▼              ▼              ▼               ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│              Transport & admission (`src/http/`, `src/hosted-admission/`)    │
+│  `app.ts` → admission → mutation manifest parity → sequence matrix →       │
+│  `transition-invokers` → `HandshakeKernel`                                 │
+│  Handlers lane: read-only allowlist (evidence, verifier, hosted readiness) │
+└────────────────────────────────────┬────────────────────────────────────────┘
+                                     │
+       ┌─────────────────────────────┼─────────────────────────────┐
+       ▼                             ▼                             ▼
+┌──────────────────┐    ┌──────────────────────┐    ┌──────────────────────┐
+│ `src/runtime/`   │    │ `src/protocol/`       │    │ `src/adapters/`       │
+│ ingress,         │───▶│ kernel + areas        │◀───│ x402 wallet gateway,  │
+│ proposals,       │    │ (state transitions)   │    │ package-install, etc. │
+│ generated graphs │    │                       │    │ mutate AFTER gate     │
+└──────────────────┘    └──────────┬───────────┘    └──────────────────────┘
+                                   │
+                                   ▼
+                    ┌──────────────────────────────────────┐
+                    │ `src/storage/` — `ProtocolStore` port   │
+                    │ `memory/`, `d1/`, `kv/` + `migrations/` │
+                    └──────────────────────────────────────┘
 ```
 
 ## Component Responsibilities
 
 | Component | Responsibility | File |
 |-----------|----------------|------|
-| Canonical repo doctrine | Defines current product kernel, authority invariants, and scratch-vs-canon boundaries. | `AGENTS.md`, `README.md`, `QUALITY.md`, `STRUCTURE.md`, `docs/internal/decisions.md`, `docs/internal/protocol-notes.md` |
-| Protocol kernel facade | Coordinates protocol transitions and persists append-only state through the store port. | `src/protocol/kernel.ts` |
-| Protocol areas | Own source-level schemas, transition inputs, transition outputs, and state-machine rules for each protected-action primitive. | `src/protocol/areas/*` |
-| Policy greenlight area | Produces policy decisions and one-use greenlights without performing gateway checks or mutations. | `src/protocol/areas/policy-greenlight/transitions.ts`, `src/protocol/areas/policy-greenlight/policy-record/index.ts` |
-| Gateway gate area | Verifies exact greenlight, contract, idempotency, isolation, path posture, credential binding, and drift before consequence. | `src/protocol/areas/gateway-gate/transitions.ts`, `src/protocol/areas/gateway-gate/artifacts.ts` |
-| Runtime ingress | Compiles runtime/tool observations into candidate actions and contracts; it is proposal-only. | `src/runtime/ingress/index.ts`, `src/runtime/ingress/registry.ts` |
-| HTTP transport | Enforces caller custody/read admission and dispatches route IDs to kernel transitions. | `src/http/app.ts`, `src/http/admission/index.ts`, `src/http/routes/transition-route-registry.ts`, `src/http/routes/transition-invokers.ts` |
-| Gateway adapters | Hold mutation-side integration logic and only execute after a verified gateway check. | `src/adapters/x402-payment/wallet-gateway.ts`, `src/adapters/package-install/gateway.ts` |
-| Evidence projections | Build redacted review/readback models from stored protocol records. | `src/protocol/evidence-projections/projections.ts`, `src/protocol/evidence-projections/assembly.ts` |
-| Storage adapters | Implement append-only events, current indexes, greenlight consumption, idempotency ledgers, and scoped reads. | `src/storage/memory/index.ts`, `src/storage/d1/index.ts`, `src/protocol/store/port.ts` |
-| Architecture tests | Freeze import posture, package surfaces, surface authority boundaries, and public claims. | `test/architecture/*` |
+| HandshakeKernel | Facade over all protocol transitions; no transport | `src/protocol/kernel.ts` |
+| Protocol areas | Owned primitives: contract, policy, gateway gate, negotiation, etc. | `src/protocol/areas/*` |
+| ProtocolRecorder | Append-only events + atomic record commits | `src/protocol/events/records.ts` |
+| ProtocolStore | Durable records, stream tail, greenlight consumption, gate commits | `src/protocol/store/port.ts` |
+| FailureClass taxonomy | Cross-surface failure classification (HTTP/MCP/SDK) | `src/protocol/foundation/failure-class/index.ts` |
+| HTTP app | Hono routes, admission, transition dispatch, evidence reads | `src/http/app.ts` |
+| Mutation route manifest | Frozen POST inventory; drift guard at app construction | `src/http/mutation-route-manifest.ts` |
+| Transition sequence matrix | Declared prerequisite routes; acyclic drift guard | `src/http/admission/transition-sequence-matrix.ts` |
+| Transition invokers | Map route IDs to kernel methods (+ runtime ingress bridge) | `src/http/routes/transition-invokers.ts` |
+| Runtime ingress | Compile dispatch blocks into candidates/contracts (observer lane) | `src/runtime/ingress/index.ts` |
+| HandshakeClient | Typed HTTP transition + evidence calls | `src/sdk/client.ts` |
+| Role surface clients | Custody-scoped clients (policy, gateway, evidence, etc.) | `src/sdk/surface-clients/` |
+| Reference adapters | Gateway fixtures; enforcement before mutation | `src/adapters/x402-payment/wallet-gateway.ts`, etc. |
+| MCP stdio server | Proposal tool + redacted evidence resources | `src/mcp/stdio/server.ts` |
+| CLI runner | Command manifest, projections, service-operator bootstrap | `src/cli/main.ts` |
+| Surfaces | Boundary manifest, proof packets, A2A readback, integrator parity | `src/surfaces/boundary-manifest.ts` |
+| Hosted admission | Provider-neutral caller identity evidence contracts | `src/hosted-admission/` |
+| Worker entry | Cloudflare `fetch` → `createApp()` | `src/worker.ts` |
+| Package exports | Curated public API | `src/index.ts` |
 
 ## Pattern Overview
 
-**Overall:** Source-owned protocol kernel with narrow transport/adapters, append-only receipts, and redacted projection read models.
+**Overall:** Layered authority boundary with a single kernel facade, append-only evidence store, and dual-enforcement transport posture (Phase 04–05).
 
-**Key Characteristics:**
-- Authority lives in protocol transitions and gateway checks, not in CLI, SDK, MCP, review UI, runtime ingress, public exports, or generated demos.
-- Policy greenlights are exact, one-use, gateway-bound records; they are not execution proof and do not perform mutation.
-- Gateway adapters hold the final mutation boundary and must obtain `VerifiedGatewayCheck` evidence before calling an external surface.
-- Evidence read models are projections assembled from protocol records; they support review and recovery but do not create authority.
-- `.planning/` is scratch; tracked source, root docs, and `docs/internal/*` are the current repo truth.
+**Key characteristics:**
+- Every consequential path reduces to an exact `ActionContract`, then policy, then one-use greenlight, then `gatewayCheck` before mutation.
+- Runtime and MCP/CLI are proposal and readback lanes; they never substitute for gateway enforcement.
+- HTTP admission binds caller custody role per transition; hosted routes add scope checks via `src/hosted-admission/hosted-caller-identity.ts`.
+- HTTP handlers are read-only; all protocol mutation goes through POST transition routes inventoried in `mutation-route-manifest.ts`.
+- Example and adapter runners must call `run*Gateway` before protected mutation (`test/architecture/http-handler-mutation-gating.test.ts`).
+- Gateway adapters are the only place that should touch payment/signing/install mutation credentials after a passed gate.
 
 ## Layers
 
-**Canonical Doctrine:**
-- Purpose: Define the current product boundary and the vocabulary future work must obey.
-- Location: `AGENTS.md`, `README.md`, `QUALITY.md`, `STRUCTURE.md`, `docs/internal/decisions.md`, `docs/internal/protocol-notes.md`
-- Contains: Product kernel, decisions, quality rules, source ownership rules, protocol notes.
-- Depends on: No source implementation.
-- Used by: Planning, implementation, architecture tests, package-surface claims.
+**Protocol kernel (`src/protocol/`):**
+- Purpose: Source-owned state machine, schemas, canonicalization, transition guards.
+- Location: `src/protocol/`
+- Contains: `kernel.ts`, `areas/*`, `foundation/*` (including `failure-class/`), `events/*`, `public/*`, `evidence-projections/*`, `navigation/*`, `store/port.ts`
+- Depends on: Nothing outside protocol (per `src/protocol/LANE.md`)
+- Used by: HTTP invokers, SDK, storage implementations, tests
 
-**Surface and Client Layer:**
-- Purpose: Expose Handshake through CLI, MCP, SDK role clients, demos, and public package exports without becoming authority.
-- Location: `src/cli`, `src/mcp`, `src/sdk`, `src/surfaces`, `src/index.ts`, `src/experimental.ts`
-- Contains: Command manifests, MCP server glue, role clients, renderable surfaces, curated package exports, experimental reference fixtures.
-- Depends on: Public protocol/surface contracts and HTTP clients.
-- Used by: Consumers, examples, package exports, conformance demos.
+**HTTP transport (`src/http/`):**
+- Purpose: Worker/Hono app, OpenAPI, transition routes, evidence read routes, verifier projections.
+- Location: `src/http/`
+- Contains: `app.ts`, `routes/`, `handlers/` (read-only allowlist), `admission/`, `errors/`, `mutation-route-manifest.ts`
+- Depends on: Protocol kernel, storage resolution, hosted-admission helpers
+- Used by: `src/worker.ts`, integration tests, SDK default transport
+- Construction guards: `assertMutationRouteManifestParity()` and `assertTransitionSequenceMatrixCoverage()` run at module load in `src/http/app.ts`
 
-**Runtime Proposal Layer:**
-- Purpose: Convert runtime/tool observations into intent compilation records and proposed action contracts.
-- Location: `src/runtime/ingress/index.ts`, `src/runtime/ingress/families.ts`, `src/runtime/ingress/registry.ts`
-- Contains: Proposal-only family registry for `package.install`, `x402_payment.exact`, and `auth.md.protected_api_call`; generated graph and tool-call draft recording.
-- Depends on: Protocol kernel transitions that create proposal records.
-- Used by: HTTP transition route `runtimeIngress.proposeActionContracts` and demos.
+**Runtime observer (`src/runtime/`):**
+- Purpose: Generated-execution evidence, ingress dispatch parsing, family-specific action proposals.
+- Location: `src/runtime/ingress/`, `src/runtime/codemode-multi-action/`, per-family folders
+- Depends on: Protocol types, adapter proposal configs
+- Used by: `transitionInvokers.proposeRuntimeIngressActionContracts`, CLI/MCP bridges
 
-**Admission and Transport Layer:**
-- Purpose: Admit or reject HTTP callers by custody role, entitlement, route metadata, tenant/org scope, and hosted scope posture.
-- Location: `src/http/app.ts`, `src/http/admission/index.ts`, `src/http/routes/*`, `src/http/handlers/*`
-- Contains: Hono app, transition route registry, transition invokers, evidence read routes, record-read handlers, readiness/verifier handlers.
-- Depends on: `src/protocol/kernel.ts`, `src/storage/*`, request headers, route metadata.
-- Used by: Cloudflare Worker entry point `src/worker.ts`, SDK/CLI/MCP clients, hosted or local HTTP deployments.
+**Reference adapters (`src/adapters/`):**
+- Purpose: Gateway registry fixtures, wallet gateway (gateway-held custody), protected-tool facade wiring, bypass probes.
+- Location: `src/adapters/x402-payment/`, `src/adapters/package-install/`, `src/adapters/auth-md/`, etc.
+- Depends on: Protocol records, runtime ingress shapes; must not own protocol meaning
+- Used by: Integration tests, `src/x402-protected-tool/`, experimental exports
 
-**Protocol Authority Kernel:**
-- Purpose: Own the state machine that turns exact contracts into policy decisions, one-use greenlights, gateway checks, receipts, refusals, proof gaps, isolation, and certificates.
-- Location: `src/protocol/kernel.ts`, `src/protocol/areas/*`
-- Contains: Source-owned schemas, transition inputs, transition outputs, digest/canonicalization helpers, status transitions, receipts, isolation records.
-- Depends on: Protocol store port and protocol-local utilities.
-- Used by: HTTP transport, tests, adapters, projection assembly.
+**Product surfaces (`src/cli/`, `src/mcp/`, `src/sdk/`, `src/surfaces/`):**
+- Purpose: Ergonomic proposal, evidence projection, conformance status, readbacks, integrator-parity navigation.
+- Depends on: HTTP/SDK or in-process test clients
+- Must not: Evaluate policy, issue greenlights, perform gateway checks, or mutate protected surfaces directly
 
-**Gateway Adapter Layer:**
-- Purpose: Bridge verified gateway checks to real mutation surfaces.
-- Location: `src/adapters/x402-payment/wallet-gateway.ts`, `src/adapters/package-install/gateway.ts`
-- Contains: Adapter-specific gateway execution, credential resolution evidence, official signer custody for x402, package-install surface invocation.
-- Depends on: `src/protocol/areas/gateway-gate/artifacts.ts`, kernel gateway-check transitions, adapter-specific mutation APIs.
-- Used by: External integration examples and runtime-gateway flows.
-
-**Persistence Layer:**
-- Purpose: Persist append-only events and current-state indexes required for reconstruction and replay protection.
-- Location: `src/protocol/store/port.ts`, `src/storage/memory/index.ts`, `src/storage/d1/index.ts`, `src/storage/kv`, `migrations/0001_protocol_kernel.sql`
-- Contains: Store interface, in-memory implementation, D1 implementation, Cloudflare KV helpers, SQL tables for current ledgers and stream events.
-- Depends on: Protocol record types.
-- Used by: Kernel, HTTP app, projections, tests.
-
-**Projection and Read Model Layer:**
-- Purpose: Build scoped, redacted evidence views for review, recovery, and diagnostics.
-- Location: `src/protocol/evidence-projections/projections.ts`, `src/protocol/evidence-projections/assembly.ts`, `src/http/routes/evidence-read-route-registry.ts`, `src/http/handlers/evidence-read.ts`, `src/http/handlers/internal-record-read.ts`
-- Contains: Contract evidence projection, transaction envelope projection, timeline projection, read-route role/scope metadata, raw record guardrails.
-- Depends on: Store reads and protocol record types.
-- Used by: Review custody and runtime evidence read endpoints.
-
-## Authority Boundary
-
-**Authority lives here:**
-- `src/protocol/areas/policy-greenlight/transitions.ts` evaluates policy and records policy decisions while explicitly keeping gateway checks and mutation attempts false.
-- `src/protocol/areas/policy-greenlight/policy-record/index.ts` creates `Greenlight` records bound to contract digest, policy pack, gateway, idempotency key, and `maxUses: 1`.
-- `src/protocol/areas/gateway-gate/transitions.ts` verifies the exact greenlight, observed request digest, isolation state, protected path posture, delegated authority binding, gateway credential binding, sequence dependencies, idempotency ledger, and gateway policy drift before committing a gateway plan.
-- `src/protocol/areas/gateway-gate/artifacts.ts` exposes `verifiedGatewayCheckFromResult` only when the gateway check passes and a mutation attempt/surface operation reference exists.
-- `src/adapters/x402-payment/wallet-gateway.ts` signs x402 payloads only after deriving verified gateway evidence from the kernel.
-- `src/adapters/package-install/gateway.ts` calls the package-install mutation surface only after verified gateway evidence exists.
-- `src/storage/memory/index.ts`, `src/storage/d1/index.ts`, and `migrations/0001_protocol_kernel.sql` enforce replay-sensitive current indexes such as greenlight consumption, idempotency ledger, isolation current state, protected path operation claims, and receipt lookup.
-
-**Authority does not live here:**
-- `src/runtime/ingress/index.ts` records proposed contracts and sets non-authority posture; it does not issue greenlights, gateway checks, or mutation proof.
-- `src/http/admission/index.ts` admits callers to routes and evidence reads; admission is custody/read entitlement, not permission to mutate.
-- `src/protocol/evidence-projections/*` builds read models; projections never write greenlights or gateway checks.
-- `src/cli`, `src/mcp`, `src/sdk`, `src/surfaces`, and `examples/*` expose product surfaces and demos; they must not become hidden policy or gateway authority.
-- `src/index.ts` curates public exports and intentionally excludes the kernel class, stores, internal recorder, and reference gateway runners from the root package surface.
-
-## Passport, Admission, Service Gateway, Principal-Agent Link
-
-**Current source-owned shapes:**
-- Passport-like identity is represented as evidence binding, not authority: `ParticipantIdentityBinding` in `src/protocol/areas/catalog-envelope/schemas.ts` and `OperatingEnvelope.participantIdentityBindings` in `src/protocol/areas/catalog-envelope/schemas.ts`.
-- The principal-agent link is already explicit on `OperatingEnvelope` in `src/protocol/areas/catalog-envelope/schemas.ts`, copied onto `ActionContract` in `src/protocol/areas/action-contract/schemas.ts`, and bound through `DelegatedAuthorityRef` in `src/protocol/areas/delegated-authority/schemas.ts`.
-- Admission is HTTP route custody and read entitlement in `src/http/admission/index.ts`, using metadata from `src/http/routes/transition-route-registry.ts` and `src/http/routes/evidence-read-route-registry.ts`.
-- Service gateway concepts map to `GatewayRegistryEntry` in `src/protocol/areas/catalog-envelope/schemas.ts`, `GatewayCredentialRef` and custody proof packets in `src/protocol/areas/credential-custody/schemas.ts`, and gateway checks in `src/protocol/areas/gateway-gate/*`.
-
-**Simplification rule:**
-- Do not add a separate `Passport` protocol primitive unless it narrows exact gateway enforcement. Treat passport as a projection/readback name over `ParticipantIdentityBinding`, `OperatingEnvelope`, `ActionContract`, and `DelegatedAuthorityRef`.
-- Do not make admission a source of protected-action authority. Keep admission as caller custody and route entitlement, then let policy greenlight and gateway check decide consequence.
-- Do not introduce a new service-gateway layer beside the existing gateway registry, credential custody, and gateway gate. Rename or project if needed, but keep the mutation boundary in `src/protocol/areas/gateway-gate/*` and adapter gateway files.
-- Keep the principal-agent link as canonical source data on envelope, contract, and delegated authority references; avoid duplicating it into a reusable auth token.
+**Storage (`src/storage/`):**
+- Purpose: `ProtocolStore` implementations (memory for tests, D1 for Worker, KV plumbing).
+- Location: `src/storage/memory/`, `src/storage/d1/`, `src/storage/kv/`
+- Schema: `migrations/` (canonical D1)
 
 ## Data Flow
 
-### Primary Protected-Action Path
+### Primary protected-action chain (kernel)
 
-1. Caller reaches the Worker/Hono app (`src/worker.ts`, `src/http/app.ts`).
-2. HTTP route metadata selects custody requirements and the kernel invoker (`src/http/routes/transition-route-registry.ts`, `src/http/routes/transition-invokers.ts`).
-3. Admission checks caller role, route family, hosted scope, tenant/org scope, and evidence-read posture (`src/http/admission/index.ts`).
-4. Runtime ingress or explicit transition creates intent compilation, contract, catalog envelope, authority reference, credential posture, and related records (`src/runtime/ingress/index.ts`, `src/protocol/kernel.ts`).
-5. Policy evaluation records decision and, when allowed, a one-use greenlight bound to the exact contract and gateway (`src/protocol/areas/policy-greenlight/transitions.ts`, `src/protocol/areas/policy-greenlight/policy-record/index.ts`).
-6. Gateway check revalidates current state, exact request digest, idempotency, isolation, delegated authority, credential custody, protected path posture, sequencing, and policy drift (`src/protocol/areas/gateway-gate/transitions.ts`).
-7. Adapter performs external mutation only after verified gateway evidence exists (`src/adapters/x402-payment/wallet-gateway.ts`, `src/adapters/package-install/gateway.ts`).
-8. Receipt, refusal, proof gap, reconciliation, recovery, isolation, or certificate records are appended to the store (`src/protocol/kernel.ts`, `src/protocol/store/port.ts`, `src/storage/*`).
+Applies to all action classes including `x402_payment.exact`:
 
-### Evidence Read Path
+1. **Catalog / install setup** — `putCatalogObject`, `registerInstallProposalCompiledRecords` (`src/http/routes/transition-invokers.ts` → `src/protocol/kernel.ts`)
+2. **Runtime evidence** — `createRuntimeExecution`, optional `createGeneratedExecutionGraph`, `createToolCallDraft` (`src/protocol/areas/runtime-evidence/`, `generated-execution-graph/`, `tool-call-draft/`)
+3. **Intent → contract** — `compileIntent` (`src/protocol/areas/intent-compilation/candidate-decision.ts` derives `CandidateAction` contractability) then `proposeActionContract` (`src/protocol/areas/action-contract/`)
+4. **Credential custody evidence** — `registerGatewayCredentialRef`, `recordGatewayCustodyProofPacket`, `recordCredentialResolutionEvidence` (`src/protocol/areas/credential-custody/`) — records only, no secrets
+5. **Policy** — `evaluatePolicy` issues greenlight, refusal, review, halt, or quarantine (`src/protocol/areas/policy-greenlight/transitions.ts`)
+6. **Gateway check (enforcement boundary)** — `gatewayCheck` (`src/protocol/areas/gateway-gate/transitions.ts`)
+7. **Downstream observation** — `reconcileSurfaceOperation`, receipts, proof gaps, optional `createAuthorityCertificate` (`src/protocol/areas/operation-lifecycle/`, `authority-certificate/`)
 
-1. Caller requests a read route declared in `src/http/routes/evidence-read-route-registry.ts`.
-2. Admission validates role, read scope, tenant/org scope, and artifact posture (`src/http/admission/index.ts`).
-3. Handler loads only needed protocol records from the store (`src/http/handlers/evidence-read.ts`, `src/http/handlers/internal-record-read.ts`).
-4. Projection code redacts and assembles review/readback views (`src/protocol/evidence-projections/projections.ts`, `src/protocol/evidence-projections/assembly.ts`).
-5. HTTP response returns evidence projection, not raw authority or mutation permission (`src/http/handlers/evidence-read.ts`).
+**State management:** All authority-bearing state lives in `ProtocolStore` via `ProtocolRecorder` commits. `ActionAttemptLifecycle` is derived evidence in `src/protocol/areas/action-attempt-lifecycle/`, not a separate authority object. Idempotency is enforced in `src/protocol/areas/idempotency-ledger/` before greenlight consumption.
 
-### Runtime Ingress Proposal Path
+### x402 protected action path (first wedge)
 
-1. Runtime ingress receives tool/action observations and declared runtime posture (`src/runtime/ingress/index.ts`).
-2. Registry selects a proposal-only action family (`src/runtime/ingress/registry.ts`, `src/runtime/ingress/families.ts`).
-3. Kernel records runtime execution, generated action graph, tool-call draft, intent compilation, and action contract (`src/runtime/ingress/index.ts`, `src/protocol/kernel.ts`).
-4. Response declares candidate actions and explicitly marks policy, greenlight, gateway check, mutation, receipt, certificate, and permission as false (`src/runtime/ingress/index.ts`).
+End-to-end local/reference flow (integration anchor: `test/integration/x402-d1-http.test.ts`):
 
-**State Management:**
-- State is append-only plus current-index ledgers. `migrations/0001_protocol_kernel.sql` defines durable D1 tables for stream events, greenlight consumption, idempotency current state, isolation current state, protected path operation claims, and receipt lookup. `src/storage/memory/index.ts` mirrors those semantics for tests and local runs.
+```text
+Agent runtime / codemode dispatch
+        │
+        ▼
+Runtime ingress block (x402 family)
+  `src/runtime/ingress/` + `src/adapters/x402-payment/action-proposal.ts`
+        │
+        ▼
+HTTP POST proposeRuntimeIngressActionContracts  OR  kernel.proposeActionContract
+  `src/http/routes/transition-invokers.ts`
+        │
+        ▼
+evaluatePolicy  →  one-use Greenlight (bound to exact contract digest)
+  `src/protocol/areas/policy-greenlight/`
+        │
+        ▼
+╔═══════════════════════════════════════════════════════════════════╗
+║  GATEWAY CHECK BOUNDARY — `kernel.gatewayCheck()`                  ║
+║  `src/protocol/areas/gateway-gate/transitions.ts`                  ║
+║  Verifies: greenlight binding, params digest, isolation,           ║
+║  protected-path posture, credential refs, idempotency, drift       ║
+║  Records: gate attempt, receipt, refusal, replay refusal, proof gap ║
+║  Does NOT: sign payments or call protected HTTP APIs               ║
+╚═══════════════════════════════════════════════════════════════════╝
+        │
+        ▼
+Reference wallet gateway (gateway-held custody, D-64)
+  `src/adapters/x402-payment/wallet-gateway.ts`
+  `assertGatewayHeldSigningCommand()` — signer requires VerifiedGatewayCheck
+  + gate-bound `used_by_gateway` credential resolution evidence
+  Mutation + signer use ONLY after gateDecision === passed
+        │
+        ▼
+recordCredentialResolutionEvidence (post-gate use evidence)
+reconcileSurfaceOperation (downstream finality, no retry authority)
+```
+
+**MCP proposal path:** `src/mcp/x402-proposal.ts` → runtime client → same transition chain; tool name `handshake.actions.x402_payment.propose` (`src/mcp/catalog.ts`). MCP exposes redacted `handshake://evidence/*` resources (`src/mcp/resources.ts`), not raw records. MCP tool outcomes attach `FailureClass` via `classifyFailureClassFromReasonCodes` (`src/mcp/output.ts`).
+
+**Protected-tool facade path:** `src/x402-protected-tool/index.ts` re-exports `prepareProtectedX402ToolDispatch` from `src/adapters/x402-payment/protected-tool-facade/` — packages readiness snapshots and dispatch preparation for host activation profiles (`src/adapters/x402-payment/protected-tool-profile/*`).
+
+**CLI path:** `src/cli/x402/*`, `src/cli/demo/x402.ts`, `src/cli/simulate/x402-payment.ts` drive install, probes, and evidence views via `src/cli/main.ts`; they render APS/evidence, not gateway custody. Service-operator bootstrap lives at `src/cli/service-operator/bootstrap.ts` (command id `service.bootstrap` in `src/cli/command-manifest.ts`).
+
+### HTTP request path
+
+1. Request hits `createApp()` route (`src/http/app.ts`)
+2. Construction-time guards already verified mutation manifest parity and sequence matrix coverage
+3. `authorizeTransitionAdmission` — role token + optional hosted identity (`src/http/admission/`)
+4. Body parsed against route `requestSchema` (`src/http/routes/transition-route-registry.ts`)
+5. `kernelFor` constructs `HandshakeKernel` with store + request context (`src/http/store/resolution.ts`)
+6. `transitionInvokers[routeId](kernel, body)` executes transition
+7. JSON 201 or structured `TransitionErrorEnvelope` with `failureClass` (`src/http/errors/transition-error-envelope.ts`)
+
+Evidence reads use GET handlers in `src/http/handlers/evidence-read.ts` and `src/http/routes/evidence-read-route-registry.ts` — read-only projections from `src/protocol/evidence-projections/` (including `store-reader.ts` for in-process readback).
+
+### SDK client path
+
+`HandshakeClient` in `src/sdk/client.ts` posts to `/v0.2/*` transition paths with caller role headers from `src/http/admission/caller-auth.ts`. Specialized clients in `src/sdk/surface-clients/` (control-plane, runtime, policy, gateway, install, evidence) wrap the same transport under explicit custody roles per `src/surfaces/boundary-manifest.ts` and integrator-parity table in `docs/internal/integrator-parity-transitions.md`. SDK transport maps HTTP status to `FailureClass` via `failureClassFromHttpStatus` (`src/sdk/surface-clients/transport.ts`); `src/sdk/repair.ts` derives remediation hints from failure class.
+
+## Dual-enforcement gating (Phase 04–05)
+
+Handshake enforces mutation authority at two complementary layers:
+
+**Layer 1 — HTTP handler allowlist (transport):**
+- All first-party HTTP handlers under `src/http/handlers/` must be read-only (evidence, verifier, hosted readiness, internal record read).
+- Enforced by `test/architecture/http-handler-mutation-gating.test.ts` against `readOnlyHandlerAllowlist`.
+- Handlers must not import `run*Gateway` or perform direct mutation patterns.
+
+**Layer 2 — Adapter-gated runners (mutation side):**
+- Protected mutation happens only in `src/adapters/*` after `VerifiedGatewayCheck`.
+- Example runners (`examples/x402-protected-spend/run.ts`, etc.) must call `run*Gateway` before mutation.
+- Every POST transition row in `src/http/mutation-route-manifest.ts` carries `requiresAdapterGatewayCheck: true` — documenting that HTTP transitions record authority steps; actual protected-surface mutation remains adapter-side after gate pass.
+
+**Service mutation route manifest:**
+- Frozen inventory at `src/http/mutation-route-manifest.ts` mirrors `transitionRouteDefinitions` exactly.
+- `assertMutationRouteManifestParity()` throws at app construction on drift (missing/extra POST paths).
+- Separate from `src/surfaces/boundary-manifest.ts` surface ownership (adjudication #7).
+
+**Transition sequence matrix:**
+- `src/http/admission/transition-sequence-matrix.ts` documents canonical prerequisite routes (e.g. `gatewayCheck` requires `proposeActionContract`).
+- `assertTransitionSequenceMatrixCoverage()` verifies coverage, referential integrity, and acyclicity at app construction.
+- Admission ordering contract only — per-request rejection still comes from kernel guards and scope resolvers.
+
+## FailureClass taxonomy
+
+Central definition: `src/protocol/foundation/failure-class/index.ts`.
+
+| FailureClass | Meaning | Typical sources |
+|--------------|---------|-----------------|
+| `auth` | Caller custody / bearer failure | HTTP 401, `caller_auth_*` codes |
+| `hosted_admission` | Hosted caller identity/config failure | `hosted_*` codes (non-stale) |
+| `stale_admission` | Stale protected-path or hosted posture | `hosted_caller_identity_stale`, posture stale codes |
+| `protected_action_refusal` | Policy/gateway/isolation refusal | Policy/gateway decision codes, refusals |
+| `replay_refusal` | Replay or duplicate authority | `idempotency_duplicate_authority`, replay codes |
+| `proof_gap` | Missing or incomplete evidence | HTTP 422, MCP binding/install codes, recovery with proofRef |
+| `internal` | Misconfiguration or server fault | HTTP 5xx, unregistered transition errors |
+
+**Surface wiring:**
+- HTTP: `src/http/errors/transition-error-envelope.ts` — `failureClassForProtocolError`, `httpStatusForFailureClass`
+- MCP: `src/mcp/output.ts`, `src/mcp/x402-proposal.ts` — `mcpFailureClassEvidenceRef(failureClass)`
+- SDK: `src/sdk/client.ts`, `src/sdk/surface-clients/transport.ts`, `src/sdk/repair.ts`
+
+Reason-code metadata may pre-classify failures via `classifiedFailure` in `src/protocol/foundation/reason-codes.ts`.
+
+## Gateway check boundary
+
+**Where authority ends and enforcement begins:** `HandshakeKernel.gatewayCheck()` → `src/protocol/areas/gateway-gate/transitions.ts`.
+
+**Inside the boundary (kernel records):**
+- Exact greenlight-to-contract binding and one-time consumption (`GreenlightConsumption` via store commit)
+- Observed params digest vs contract (`protectedActionParamsDigest` in `src/protocol/foundation/canonical.ts`)
+- Isolation state, protected-path posture, delegated authority, gateway credential ref bindings
+- Gate attempt, receipt, mutation attempt index, replay refusal (`src/protocol/areas/gateway-gate/replay-refusal/`)
+
+**Outside the boundary (adapters only, after pass):**
+- Wallet signing, x402 challenge/response HTTP, package manager exec, repo writes
+- Implementations live under `src/adapters/*`; conformance probes in `src/conformance/`
+
+**x402 gateway-held custody (D-64):** `assertGatewayHeldSigningCommand` in `src/adapters/x402-payment/wallet-gateway.ts` structurally refuses signing unless the command carries a genuine `VerifiedGatewayCheck` and gate-bound `used_by_gateway` credential resolution evidence with redacted material posture.
+
+**Anti-advisory rule:** Calling `evaluatePolicy` or holding a greenlight does not authorize mutation. Skipping `gatewayCheck` or reusing a greenlight is ambient authority, not Handshake. Admission alone is advisory, not Handshake enforcement (`test/architecture/dual-enforcement-posture.test.ts`).
+
+## Integrator-parity surfaces
+
+Bounded HTTP/SDK surface for service integrators (Phase 04 operator TTHW):
+
+- Navigation tags: `test/architecture/integrator-parity.test.ts` verifies every integrator-parity transition in `src/protocol/navigation/index.ts`
+- Role client mapping: `ControlPlaneClient`, `InstallClient`, `RuntimeClient`, `PolicyClient`, `GatewayClient` in `src/sdk/surface-clients/`
+- Reference walkthrough: `test/sdk/role-clients-walkthrough.test.ts`
+- Appendix: `docs/internal/integrator-parity-transitions.md`
+- Runnable wedge in phase 04: x402 only; auth.md and package-install families marked proof-gap
+
+Surface boundary manifest (`src/surfaces/boundary-manifest.ts`) maps surface IDs to route families, custody roles, authority postures, and non-authority flags for CLI/MCP/SDK/x402/surfaces.
 
 ## Key Abstractions
 
-**Operating Envelope:**
-- Purpose: Bounds attempts, runtime context, participant bindings, catalog references, gateway registry references, and evidence expectations.
-- Examples: `src/protocol/areas/catalog-envelope/schemas.ts`, `src/protocol/areas/action-contract/contract-record.ts`
-- Pattern: Source data copied into exact contracts; it authorizes attempts, not mutations.
+**ActionContract:**
+- Purpose: Exact proposed commitment for one protected mutation attempt
+- Examples: `src/protocol/areas/action-contract/`
+- Pattern: Canonical digest binding; proposed via `proposeActionContract`
 
-**Action Contract:**
-- Purpose: Exact proposed commitment derived from intent compilation and bound to principal, agent, tenant, organization, gateway, idempotency, protected path, payload, and evidence expectations.
-- Examples: `src/protocol/areas/action-contract/schemas.ts`, `src/protocol/areas/action-contract/transitions.ts`, `src/protocol/areas/action-contract/contract-record.ts`
-- Pattern: Deterministic contract record before policy and gateway.
+**CandidateAction / IntentCompilation:**
+- Purpose: Compiled candidate from vague intent with contractability status
+- Examples: `src/protocol/areas/intent-compilation/candidate-decision.ts`
+- Pattern: `deriveCandidateDecision` → `contractable` or `rejected` with reason codes
 
-**Policy Decision and Greenlight:**
-- Purpose: Machine-checkable decision and one-use authorization candidate for a gateway check.
-- Examples: `src/protocol/areas/policy-greenlight/transitions.ts`, `src/protocol/areas/policy-greenlight/policy-record/index.ts`
-- Pattern: Policy can allow/refuse/review/halt/quarantine; greenlight is exact and consumed once.
+**Greenlight / PolicyDecision:**
+- Purpose: Machine-checkable policy outcome bound to one contract
+- Examples: `src/protocol/areas/policy-greenlight/`
+- Pattern: One-use; consumed at gateway check
 
-**Gateway Check:**
-- Purpose: Final enforcement proof before mutation.
-- Examples: `src/protocol/areas/gateway-gate/transitions.ts`, `src/protocol/areas/gateway-gate/artifacts.ts`
-- Pattern: Revalidate exact binding and current posture, then produce verified gateway evidence or refusal/proof gap.
+**GatewayCheckResult:**
+- Purpose: Gate attempt + receipt (+ optional mutation attempt record)
+- Examples: `src/protocol/areas/gateway-gate/artifacts.ts`
+- Pattern: `verifiedGatewayCheckFromResult` exported from `src/index.ts` for clients
 
-**Delegated Authority Reference:**
-- Purpose: Binds principal, agent, runtime, envelope, gateway, allowed actions, resource bounds, and spend/amount limits without creating mutation authority or secret material.
-- Examples: `src/protocol/areas/delegated-authority/schemas.ts`, `src/protocol/areas/delegated-authority/transitions.ts`
-- Pattern: Reference and status evidence, checked later by gateway transitions.
+**ProtocolRecord / object registry:**
+- Purpose: Typed persisted objects with stable IDs and digests
+- Examples: `src/protocol/areas/object-registry/schemas.ts`
 
-**Credential Custody:**
-- Purpose: Records gateway-held credential posture and proof packets while keeping secret material outside protocol records.
-- Examples: `src/protocol/areas/credential-custody/schemas.ts`, `src/protocol/areas/credential-custody/transitions.ts`
-- Pattern: Evidence of custody and resolution; adapters hold signing/mutation capability.
+**Evidence projections:**
+- Purpose: Redacted read models for CLI/MCP/HTTP evidence routes
+- Examples: `src/protocol/evidence-projections/projections.ts`, `store-reader.ts`
 
-**Evidence Projection:**
-- Purpose: Read model for review/recovery that omits raw secrets and authority-bearing material.
-- Examples: `src/protocol/evidence-projections/projections.ts`, `src/protocol/evidence-projections/assembly.ts`
-- Pattern: Redacted projection assembled from stored protocol records.
+**Surface boundary manifest:**
+- Purpose: Maps product surfaces to allowed route families and custody roles
+- Examples: `src/surfaces/boundary-manifest.ts`
 
 ## Entry Points
 
-**Worker HTTP Entry:**
-- Location: `src/worker.ts`
-- Triggers: Cloudflare Worker fetch events.
-- Responsibilities: Instantiate `createApp()` and delegate HTTP handling.
+**npm package root:**
+- Location: `src/index.ts` (package `handshake-protocol-kernel@0.2.7`)
+- Triggers: `import from "handshake-protocol-kernel"`
+- Responsibilities: Curated exports (HTTP app factory, SDK client, protocol schemas, verifier helpers)
 
-**HTTP App Factory:**
-- Location: `src/http/app.ts`
-- Triggers: Worker, tests, local server runners.
-- Responsibilities: Bind store environment, register transition/read routes, run admission, call invokers, format JSON responses.
+**CLI:**
+- Location: `bin/handshake` → `src/cli/main.ts` via `src/cli/index.ts`
+- Triggers: `handshake <group> <subcommand>`
+- Responsibilities: Operator/evidence commands; `service bootstrap` via `src/cli/service-operator/bootstrap.ts`; no kernel mutation authority
 
-**Protocol Kernel:**
-- Location: `src/protocol/kernel.ts`
-- Triggers: HTTP transition invokers, tests, adapter flows.
-- Responsibilities: Execute protocol transitions and write protocol records through `ProtocolStore`.
+**MCP stdio:**
+- Location: `bin/handshake-mcp` → `src/mcp/stdio/server.ts`
+- Triggers: MCP host launches stdio server
+- Responsibilities: x402 proposal tool + static evidence resources
 
-**Public Package Root:**
-- Location: `src/index.ts`
-- Triggers: Package consumers importing `handshake-protocol-kernel`.
-- Responsibilities: Export public contract types, role clients, surfaces, and non-internal helpers while excluding kernel/store internals.
+**Cloudflare Worker:**
+- Location: `src/worker.ts` → `src/http/app.ts`
+- Triggers: Worker `fetch`
+- Responsibilities: Hosted/local HTTP API with D1 bindings via `wrangler.toml`
 
-**Experimental Surface:**
-- Location: `src/experimental.ts`
-- Triggers: Explicit `./experimental` imports.
-- Responsibilities: Export reference fixtures and helpers with experimental naming.
-
-**Adapter Gateways:**
-- Location: `src/adapters/x402-payment/wallet-gateway.ts`, `src/adapters/package-install/gateway.ts`
-- Triggers: Adapter-specific protected action execution.
-- Responsibilities: Run gateway checks and perform external mutation only after verified gateway evidence.
+**Subpath exports:**
+- `./runtime`, `./sdk/role-clients`, `./mcp`, `./cli`, `./x402-protected-tool`, `./surfaces/*`, `./hosted-admission`, `./adapter-sdk`, `./conformance` — see `package.json` `exports`
 
 ## Architectural Constraints
 
-- **Threading:** TypeScript runs on a single JavaScript event loop in local and Worker-style environments. Concurrency safety is modeled through store-level conflict detection, greenlight consumption, and idempotency ledgers, not threads.
-- **Global state:** Runtime ingress action families are registered in module-level maps in `src/runtime/ingress/families.ts` and `src/runtime/ingress/registry.ts`; architecture tests keep them proposal-only.
-- **Circular imports:** Architecture tests require protocol areas and the kernel to import area packages through lane-owned public indexes instead of deep sibling internals (`test/architecture/import-posture.test.ts`).
-- **Protocol/storage separation:** `src/protocol/areas/*` must not import `src/storage/*`; persistence flows through `src/protocol/store/port.ts`.
-- **Transport/protocol separation:** HTTP route metadata, invokers, and response schemas stay in separate files under `src/http/routes`.
-- **Projection/authority separation:** Observer and projection files are blocked from importing policy greenlight, gateway gate, delegated authority, credential custody, receipt, isolation, or certificate authority internals.
-- **Official signer custody:** The official x402 signer factory remains in `src/adapters/x402-payment/wallet-gateway.ts`; tests block it from SDK, CLI, MCP, root exports, runtime ingress, and generated outputs.
+- **Threading:** Node ≥20 ESM; Worker is single-request isolate. No shared mutable kernel state across requests — store is per-binding/per-test instance.
+- **Global state:** Avoid module-level mutable protocol state. `HandshakeKernel` holds `store` + `ProtocolRecorder` per instance (`src/protocol/kernel.ts`).
+- **Import posture:** Protocol must not import HTTP, SDK, adapters, or storage implementations (`src/protocol/LANE.md`). Enforced by `test/architecture/import-posture.test.ts`.
+- **Dependency direction:** Kernel must not depend on surfaces; surfaces create no authority. Each first-level `src/*` lane maintains `LANE.md` with authority owner and forbidden imports.
+- **Body size:** Transition POST bodies capped at 256 KiB (`src/http/app.ts`).
+- **Catalog immutability:** `putCatalogObject` rejects digest conflicts for same object id.
 
 ## Anti-Patterns
 
-### Admission As Authority
+### Product surface performs gateway enforcement
 
-**What happens:** HTTP admission allows a route call and the caller treats that as permission to mutate.
-**Why it's wrong:** Admission only proves caller custody/read entitlement; it does not bind an exact action contract, one-use greenlight, gateway check, or mutation attempt.
-**Do this instead:** Admit the caller in `src/http/admission/index.ts`, then require policy greenlight and gateway verification through `src/protocol/areas/policy-greenlight/*` and `src/protocol/areas/gateway-gate/*`.
+**What happens:** CLI/MCP/SDK code signs, pays, or installs based on policy output alone.
 
-### Projection As Proof
+**Why it's wrong:** Policy and greenlight are not execution authority; receipt cannot distinguish advisory checks from gateway checks.
 
-**What happens:** A review/readback projection is treated as raw evidence or execution proof.
-**Why it's wrong:** Projection code intentionally redacts fields such as contract parameters, secret refs, and contract signatures; it is a read model.
-**Do this instead:** Use `src/protocol/evidence-projections/*` for review/readback, then trace raw records through scoped store reads and protocol receipts where the caller has authority.
+**Do this instead:** Route mutation through adapter code only after `gatewayCheck` passes; use surfaces for proposal and `src/protocol/evidence-projections/` readback.
 
-### Runtime Ingress As Permission
+### HTTP handler performs mutation
 
-**What happens:** Candidate actions produced by runtime ingress are treated as executable authority.
-**Why it's wrong:** Runtime ingress is proposal-only and explicitly reports no policy decision, greenlight, gateway check, mutation attempt, receipt, certificate, or permission.
-**Do this instead:** Continue through policy and gateway routes after candidate contract creation (`src/runtime/ingress/index.ts`, `src/protocol/areas/policy-greenlight/*`, `src/protocol/areas/gateway-gate/*`).
+**What happens:** A handler under `src/http/handlers/` calls gateway runners or protected APIs directly.
 
-### New Passport Primitive
+**Why it's wrong:** Violates dual-enforcement handler allowlist; bypasses mutation manifest inventory.
 
-**What happens:** Passport/admission/service gateway/principal-agent link becomes a parallel protocol object beside existing envelope, contract, delegated authority, credential custody, and gateway registry records.
-**Why it's wrong:** It duplicates authority-adjacent state and creates room for reusable ambient permission.
-**Do this instead:** Project a passport read model from `ParticipantIdentityBinding`, `OperatingEnvelope`, `ActionContract`, `DelegatedAuthorityRef`, and credential/gateway evidence without adding a new authority-bearing record.
+**Do this instead:** Add a transition route + invoker; keep handlers read-only per `test/architecture/http-handler-mutation-gating.test.ts`.
+
+### Runtime ingress treated as permission
+
+**What happens:** `proposeRuntimeIngressActionContracts` or `compileIntent` outcomes used directly to mutate.
+
+**Why it's wrong:** Runtime lane records evidence and candidates; it does not evaluate policy or verify greenlight binding.
+
+**Do this instead:** Follow kernel chain through `evaluatePolicy` and `gatewayCheck` (`src/runtime/ingress/index.ts` → HTTP transitions).
+
+### HTTP handler embeds policy rules
+
+**What happens:** Route handlers interpret contract fields or approve spend.
+
+**Why it's wrong:** `src/http/` must not own protocol meaning (`STRUCTURE.md` ownership table).
+
+**Do this instead:** Add rules in `src/protocol/areas/policy-greenlight/` and invoke via `transitionInvokers.evaluatePolicy`.
+
+### Negotiation records imply authority
+
+**What happens:** Accepted A2A offer or linked agreement used as reusable auth.
+
+**Why it's wrong:** `src/protocol/areas/negotiation/` is evidence-only; policy may require an active `AgreementObligationBinding` but does not replace gateway check.
+
+**Do this instead:** Bind obligation to exact contract, then run normal policy + gateway path (`docs/internal/decisions.md`).
 
 ## Error Handling
 
-**Strategy:** Protocol transitions return structured decisions, refusals, proof gaps, conflict statuses, and evidence records instead of throwing across authority boundaries.
+**Strategy:** Typed `HandshakeProtocolError` with HTTP mapping via `transitionErrorResult` (`src/protocol/foundation/errors.ts`, `src/http/errors/transition-error-envelope.ts`). All surfaces share `FailureClass` taxonomy from `src/protocol/foundation/failure-class/index.ts`.
 
 **Patterns:**
-- Gateway checks return passed/refused/proof-gap outcomes with specific failure posture in `src/protocol/areas/gateway-gate/transitions.ts`.
-- Store writes detect greenlight consumption, idempotency conflicts, protected-path conflicts, receipt conflicts, and isolation-current conflicts in `src/storage/memory/index.ts` and `src/storage/d1/index.ts`.
-- HTTP handlers catch typed transition outcomes and return JSON with route identity headers in `src/http/app.ts`.
-- Missing evidence is recorded as proof gap or diagnostic posture rather than converted into success in `src/protocol/areas/*`.
+- Transition guards return refusal codes before commit (`src/protocol/foundation/transition-guards.ts`)
+- Gateway refusals recorded as gate decisions with reason codes (`src/protocol/areas/gateway-gate/gateway-policy.ts`)
+- Store commit conflicts surface as 409 or structured retryability on envelope
+- MCP/SDK attach failure class for operator remediation (`src/sdk/repair.ts`)
 
 ## Cross-Cutting Concerns
 
-**Logging:** Runtime and protocol evidence is structured as records in the store, not free-form logs. Console output is limited to examples and scripts such as `examples/*/run.mjs` and `scripts/*`.
-**Validation:** Source-owned schema validation lives beside each protocol area in files such as `src/protocol/areas/action-contract/schemas.ts`, `src/protocol/areas/catalog-envelope/schemas.ts`, and `src/protocol/areas/credential-custody/schemas.ts`.
-**Authentication:** HTTP admission validates caller role, route family, hosted verifier entitlement, and scope in `src/http/admission/index.ts`; protected-action authority still requires policy and gateway records.
-**Receipts:** Receipts, reconciliation, certificates, recovery, and proof gaps are protocol records assembled into projections by `src/protocol/evidence-projections/assembly.ts`.
-**Package Boundaries:** `package.json`, `src/index.ts`, `src/experimental.ts`, and `test/architecture/package-surface.test.ts` keep internal authority surfaces out of public root exports.
+**Logging:** No centralized logger; CLI uses structured `cliOutput` (`src/cli/output.ts`). Prefer proof gaps and recorded refusals over log-only evidence.
+
+**Validation:** Zod schemas at HTTP boundary and area inputs (`src/protocol/public/schemas.ts`, per-area `schemas.ts`).
+
+**Authentication:** Transition caller roles via bearer tokens in `src/http/admission/caller-auth.ts`; hosted routes add `hosted-admission` evidence (`src/hosted-admission/`). Admission authorizes transition custody, not principal authority over mutations.
+
+**Redaction:** Evidence routes and MCP resources use redaction profiles; raw internal records gated at `src/http/handlers/internal-record-read.ts`.
 
 ---
 
-*Architecture analysis: 2026-05-25*
+*Architecture analysis: 2026-05-29*

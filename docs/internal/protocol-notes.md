@@ -15,16 +15,43 @@ Handshake's category is protected actions for automated decision making.
 - Product language centers on the cleared protected-action event: one terminal
   Handshake event with reconstructable evidence that a service can accept,
   refuse, or treat as a proof gap.
-- The protocol kernel is the source-owned state machine and schema set for exact
-  contracts, policy decisions, one-use greenlights, gateway checks, receipts,
-  refusals, proof gaps, isolation, and terminal certificates.
-- A product surface is CLI, MCP, SDK, docs, demo, or service-facing readback that
-  exposes proposal/evidence/readback without creating authority.
+- The protocol kernel is the source-owned authority state machine and schema
+  set for exact contracts, policy decisions, one-use greenlights, gateway
+  checks, receipts, refusals, proof gaps, isolation, and terminal certificates.
+- A product surface is a projection/readback surface such as CLI, MCP, docs,
+  demo, or service-facing readback that exposes proposal/evidence/readback
+  without creating authority.
+- Role-scoped protocol transition clients, including SDK policy and gateway
+  clients, transport specific kernel transitions under custody. They are not
+  product authority surfaces and do not make product nouns authoritative.
+- The service workflow story is a projection/readback translation only:
+  `Passport -> ServiceWorkflowAdmission -> ServiceWorkflowHandle -> fresh
+protected-action clearance -> terminal outcome`. Passport, admission, and
+  handle records are evidence/readback context; they are not identity, policy,
+  greenlight, gateway check, mutation permission, receipt export, terminal
+  certificate, or reusable auth.
+- `PrincipalAgentLink` and `ServiceWorkflowContextRefs` are product projection
+  contracts, not protocol authority primitives. They may provide setup evidence
+  and proposal metadata, but they cannot approve spend, widen an envelope,
+  satisfy delegated authority, perform a gateway check, or replace a fresh
+  exact action contract.
 - The certificate is terminal evidence, not permission, identity, settlement,
   hosted trust, or reusable auth.
 - Public npm availability does not create authority. MCP Registry
   discoverability remains a proof gap until registry acceptance and lookup are
   verified.
+- Hosted admission lock: service workflow simplification is not a
+  hosted-operation go-ahead. Hosted work may consume the surface only after the
+  pre-hosted service workflow gates have source-owned proof or proof-gap
+  posture. Hosted operation, provider custody, settlement/finality, marketplace
+  or certification, cross-org trust, aggregate spend enforcement, hosted org
+  auth, retention/search, or new kernel exports require a separate hosted
+  workspace or a new pre-hosted kernel task with fresh proof gates.
+- Clerk-for-agents dual enforcement: admission identifies callers at the HTTP
+  middleware layer; adapter `run*Gateway` before mutation is the route-handler
+  enforcement point. Ingress-only posture is advisory, not Handshake. External
+  PEP (Envoy/Kong/OPA) is deployment glue only — adapter-side re-check against
+  the exact greenlight is still required.
 
 ## Required Separation
 
@@ -115,6 +142,11 @@ Protocol areas may depend on foundation/events/context/store and other area publ
 - `catalog-envelope`: declared tool, action, gateway, and envelope records; catalog presence is not authorization. Envelopes may carry provider-neutral participant identity bindings, but those bindings are evidence-only links to the opaque principal/agent refs.
 - `delegated-authority`: redacted principal/agent/runtime/envelope/gateway scoped attempt-authority refs; registering a ref records bounds and evidence expectations only, and creates no policy decision, greenlight, gateway check, mutation authority, or receipt. Revocation and expiry are separate status-transition evidence that creates `authority_ref` isolation without mutating the original ref.
 - `credential-custody`: opaque gateway credential refs, redacted gateway custody proof packets, and post-gate resolution evidence; no provider clients or secret retrieval API.
+  Customer or provider gateway custody claims require official external
+  verification, current custody and resolver posture, time-bounded lease or
+  rotation evidence, attestation evidence, redaction success, and no raw
+  credential or payment material. Fixture-local custody remains local proof and
+  cannot satisfy `customer_gateway_evidence`.
 - `runtime-evidence`: generated execution evidence; evidence can propose but cannot authorize.
 - `generated-execution-graph`: normalized generated-code/spec evidence and action candidates.
 - `tool-call-draft`: opened, streaming, finalized, invalid, or abandoned generated tool-call input state.

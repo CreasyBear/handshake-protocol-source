@@ -22,6 +22,13 @@ import {
   registerFixtureObjects,
 } from "../support/fixtures";
 import { createContractRequiringGatewayCheckedPosture } from "../support/kernel-invariant-helpers";
+import {
+  agreementBindingForContract,
+  linkedAgreement,
+  negotiationDecision,
+  negotiationOffer,
+  negotiationSession,
+} from "../support/negotiation-fixtures";
 import type {
   GatewayCredentialRef,
   RegisterGatewayCredentialRefInput,
@@ -562,6 +569,40 @@ async function createGreenlitContractWithObligation() {
     }),
   });
   const contract = await fixture.kernel.proposeActionContract(proposalInputForCompilation(compilation, "test-secret"));
+  const counterpartyRef = "counterparty:npm-registry";
+  const obligationRef = "obligation:test-hono-install";
+  const baseSession = negotiationSession();
+  const initiatorParty = baseSession.parties[0];
+  const counterpartyParty = baseSession.parties[1];
+  if (!initiatorParty || !counterpartyParty) throw new Error("expected negotiation fixture parties");
+  const session = negotiationSession({
+    subjectResourceRef: "npm:hono",
+    parties: [
+      {
+        ...initiatorParty,
+        agentRef: "agent:package-installer",
+      },
+      {
+        ...counterpartyParty,
+        agentRef: counterpartyRef,
+      },
+    ],
+  });
+  await fixture.kernel.recordNegotiationSession(session);
+  await fixture.kernel.recordNegotiationOffer(negotiationOffer({ clearingEvidenceRefs: { obligationRef } }));
+  await fixture.kernel.recordNegotiationDecision(negotiationDecision());
+  await fixture.kernel.recordLinkedAgreement(
+    linkedAgreement({
+      counterpartyRef,
+      clearingEvidenceRefs: { obligationRef, counterpartyRef },
+    }),
+  );
+  await fixture.kernel.recordAgreementObligationBinding(
+    agreementBindingForContract(contract, {
+      obligationRef,
+      counterpartyRef,
+    }),
+  );
   const policy = await fixture.kernel.evaluatePolicy({
     actionContractId: contract.actionContractId,
     envelopeId: fixture.envelope.envelopeId,

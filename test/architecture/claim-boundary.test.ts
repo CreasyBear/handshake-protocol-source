@@ -72,7 +72,11 @@ describe("claim boundary", () => {
     expect(Object.keys(root)).not.toContain("projectProtectedActionChallengeFromRefusal");
     expect(Object.keys(root)).not.toContain("experimentalRunPackageInstallGateway");
     expect(Object.keys(root)).not.toContain("checkProtectedMutationAdapterConformance");
+    expect(Object.keys(root)).toContain("EvidenceClient");
+    expect(Object.keys(root)).toContain("PolicyClient");
     expect(Object.keys(root)).not.toContain("defineProtectedActionAdapterPack");
+    expect(Object.keys(root)).not.toContain("runAuthMdProtectedApiCallGateway");
+    expect(Object.keys(root)).not.toContain("runX402WalletGateway");
     expect(adapterSdkExportNames).toContain("defineProtectedActionAdapterPack");
     expect(adapterSdkExportNames).toContain("projectAdapterSdkInstallProposalReport");
     expect(adapterSdkExportNames.join(" ")).not.toMatch(
@@ -101,6 +105,7 @@ describe("claim boundary", () => {
     const protocolArchitecture = readFileSync("docs/internal/protocol-kernel-architecture.md", "utf8");
     const protocolLayman = readFileSync("docs/internal/protocol-layman.md", "utf8");
     const protocolNotes = readFileSync("docs/internal/protocol-notes.md", "utf8");
+    const serviceWorkflowStory = readFileSync("docs/internal/service-workflow-story.md", "utf8");
     const x402Walkthrough = readFileSync("examples/x402-protected-spend/README.md", "utf8");
     const httpLane = readFileSync("src/http/LANE.md", "utf8");
     const runtimeLane = readFileSync("src/runtime/LANE.md", "utf8");
@@ -146,6 +151,28 @@ describe("claim boundary", () => {
         ],
       },
       {
+        label: "projection over one authority spine",
+        sources: [
+          { name: "README.md", text: readme },
+          { name: "STRUCTURE.md", text: structure },
+          { name: "docs/internal/decisions.md", text: decisions },
+          { name: "docs/internal/protocol-notes.md", text: protocolNotes },
+          { name: "docs/internal/service-workflow-story.md", text: serviceWorkflowStory },
+          { name: "src/surfaces/LANE.md", text: readFileSync("src/surfaces/LANE.md", "utf8") },
+        ],
+        requiredPatterns: [
+          /projection\/readback/i,
+          /protocol\s+(?:authority spine|authority state machine|kernel)/i,
+          /without creating authority|not create authority|does not create/i,
+        ],
+        forbiddenPatterns: [
+          /product (?:truth|authority) lane (?:owns|creates|authorizes)/i,
+          /creates? (?:a )?peer product truth lane/i,
+          /product surface (?:creates|mints|issues) authority/i,
+          /role-scoped protocol transition clients? (?:are|become) product authority surfaces/i,
+        ],
+      },
+      {
         label: "category boundary",
         sources: canonicalSources,
         required: ["protected actions for automated decision making"],
@@ -153,6 +180,19 @@ describe("claim boundary", () => {
           /Handshake is contracted execution infrastructure for engineering agents/i,
           /first (?:credible domain|wedge) (?:remains|is) engineering-agent actions/i,
           /use case: convert generated engineering-agent execution/i,
+        ],
+      },
+      {
+        label: "category claim (D-59)",
+        sources: [
+          { name: "README.md", text: readme },
+          { name: "docs/internal/protocol-layman.md", text: protocolLayman },
+        ],
+        required: ["reconstructable clearance before consequence"],
+        forbiddenPatterns: [
+          /category[:\s][^.]*\bapproval workflow\b/i,
+          /category[:\s][^.]*\bagent permissions\b/i,
+          /Handshake is for everyone/i,
         ],
       },
       {
@@ -174,6 +214,34 @@ describe("claim boundary", () => {
           "Host-wide containment",
           "auth.md + x402",
           "proof contexts rather than execution-ready product surfaces",
+        ],
+      },
+      {
+        label: "hosted admission lock",
+        sources: [
+          { name: "README.md", text: readme },
+          { name: "docs/internal/decisions.md", text: decisions },
+          { name: "docs/internal/protocol-notes.md", text: protocolNotes },
+        ],
+        required: [
+          "Hosted admission lock",
+          "not a hosted-operation go-ahead",
+          "pre-hosted service workflow gates",
+          "hosted operation",
+          "provider custody",
+          "settlement/finality",
+          "marketplace or certification",
+          "cross-org trust",
+          "aggregate spend enforcement",
+          "hosted org auth",
+          "retention/search",
+          "separate hosted workspace",
+          "new pre-hosted kernel task",
+          "fresh proof gates",
+        ],
+        forbiddenPatterns: [
+          /service workflow simplification (?:creates|proves|unblocks) hosted operation/i,
+          /may expand protocol kernel exports for hosted needs/i,
         ],
       },
       {
@@ -383,6 +451,77 @@ describe("claim boundary", () => {
         forbiddenPatterns: [
           /aggregate x402 spend windows/i,
           /x402Client|privateKeyToAccount|SIGNING_PRIVATE_KEY|provider custody claim|hosted dashboard|cross-org certificate trust/i,
+        ],
+      },
+      {
+        label: "dual enforcement clerk framing",
+        sources: [{ name: "docs/internal/decisions.md", text: decisions }],
+        required: [
+          "Clerk-for-agents",
+          "run*Gateway",
+          "advisory, not Handshake",
+          "gateway check before mutation",
+        ],
+        requiredPatterns: [/http\/admission/i],
+        forbiddenPatterns: [
+          /admission (?:alone )?(?:authorizes|permits|protects) mutation/i,
+          /ingress (?:equals|is) (?:the )?protection/i,
+        ],
+      },
+      {
+        label: "dual enforcement protocol-notes cross-ref",
+        sources: [{ name: "docs/internal/protocol-notes.md", text: protocolNotes }],
+        required: ["Clerk-for-agents", "run*Gateway", "advisory, not Handshake"],
+        forbiddenPatterns: [/admission (?:alone )?(?:authorizes|permits|protects) mutation/i],
+      },
+      {
+        label: "dual enforcement operator docs",
+        sources: [
+          { name: "docs/internal/service-workflow-story.md", text: serviceWorkflowStory },
+          { name: "docs/internal/protocol-layman.md", text: protocolLayman },
+          { name: "AGENTS.md", text: agents },
+        ],
+        requiredPatterns: [
+          /gateway check before mutation/i,
+          /advisory, not Handshake/i,
+        ],
+        forbiddenPatterns: [
+          /admission (?:alone )?(?:authorizes|permits|protects) mutation/i,
+          /middleware (?:alone )?(?:authorizes|permits|protects) (?:mutation|protected)/i,
+        ],
+      },
+      {
+        label: "canonical state path integrity",
+        sources: [{ name: "docs/internal/protocol-definition.md", text: protocolDefinition }],
+        requiredPatterns: [
+          /## Canonical State Path/i,
+          /intent compilation record/i,
+          /candidate action/i,
+          /action contract/i,
+          /policy decision/i,
+          /gateway check attempt/i,
+          /mutation attempt, refusal, receipt, or proof gap/i,
+        ],
+        forbiddenPatterns: [
+          /OperatingEnvelope.*replaces.*action contract/i,
+          /ServiceWorkflowHandle.*replaces.*greenlight/i,
+          /admission.*replaces.*gateway check/i,
+        ],
+      },
+      {
+        label: "agent lane additive projection",
+        sources: [{ name: "docs/internal/service-workflow-story.md", text: serviceWorkflowStory }],
+        required: [
+          "Agent Lane",
+          "OperatingEnvelope",
+          "DelegatedAuthorityRef",
+          "ActionContract",
+          "additive cross-link only",
+          "does not replace the canonical state path",
+        ],
+        forbiddenPatterns: [
+          /Agent lane replaces the canonical state path/i,
+          /rename schema exports/i,
         ],
       },
     ]);

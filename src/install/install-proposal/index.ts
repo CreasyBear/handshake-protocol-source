@@ -10,6 +10,7 @@ import {
   type ToolCapability,
 } from "../../protocol/areas/catalog-envelope";
 import { BypassProbeKindSchema } from "../../protocol/areas/bypass-probe";
+import { HandshakeProtocolError } from "../../protocol/foundation/errors";
 import { DigestSchema, IdSchema, IsoDateSchema, PROTOCOL_VERSION } from "../../protocol/foundation/schema-core";
 
 export const InstallProposalBypassProbePlanItemSchema = z.strictObject({
@@ -22,15 +23,28 @@ export type InstallProposalBypassProbePlanItem = z.infer<typeof InstallProposalB
 export const InstallProposalCompiledKernelRecordsSchema = z.strictObject({
   toolCapability: ToolCapabilitySchema,
   actionType: ActionTypeSchema,
-  gatewayRegistryEntry: GatewayRegistryEntrySchema,
+  gatewayRegistryEntry: GatewayRegistryEntrySchema.nullable(),
   operatingEnvelope: OperatingEnvelopeSchema,
 });
 export type InstallProposalCompiledKernelRecords = {
   toolCapability: ToolCapability;
   actionType: ActionType;
-  gatewayRegistryEntry: GatewayRegistryEntry;
+  gatewayRegistryEntry: GatewayRegistryEntry | null;
   operatingEnvelope: OperatingEnvelope;
 };
+
+export function requireInstallProposalGatewayRegistryEntry(
+  gatewayRegistryEntry: GatewayRegistryEntry | null,
+): GatewayRegistryEntry {
+  if (gatewayRegistryEntry === null) {
+    throw new HandshakeProtocolError(
+      "install_orphan_catalog_missing_gateway",
+      "Install proposal compiled records require gateway registry entry.",
+      422,
+    );
+  }
+  return gatewayRegistryEntry;
+}
 
 export const InstallProposalSchema = z.strictObject({
   installProposalId: IdSchema,

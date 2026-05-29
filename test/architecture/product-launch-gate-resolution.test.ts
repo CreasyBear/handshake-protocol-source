@@ -25,9 +25,9 @@ describe("product launch gate resolutions", () => {
       "`auth.md + x402` is the first expansion candidate, not current composite execution",
     );
     expect(decisions).toContain("Live 402 challenge evidence");
-    expect(decisions).toContain("Package provenance is now satisfied for `0.2.7`");
+    expect(decisions).toContain("Package provenance is now satisfied for `0.2.8`");
     expect(normalizedReadme).toContain("MCP Registry discoverability is now the remaining distribution launch blocker");
-    expect(normalizedReadme).toContain("`0.2.7` npm availability is verified by registry readback");
+    expect(normalizedReadme).toContain("`0.2.8` npm availability is verified by registry readback");
   });
 
   it("turns every former launch deferral into a selected, raised-bar, blocked, or cut-line decision", () => {
@@ -56,7 +56,7 @@ describe("product launch gate resolutions", () => {
       "official MCP Registry search for handshake-protocol-kernel returned an empty server list",
     );
     expect(distribution.currentEvidence).toContain(
-      "trusted-publish workflow completed successfully for expected_version=0.2.7 and published GitHub Actions provenance",
+      "trusted-publish workflow completed successfully for expected_version=0.2.8 and published GitHub Actions provenance",
     );
     expect(distribution.blockerReasonCodes).toEqual([
       "mcp_registry_submission_not_accepted",

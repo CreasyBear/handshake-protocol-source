@@ -4,6 +4,17 @@ import { McpX402PaymentProposalInputSchema } from "./x402-proposal";
 
 export const MCP_X402_PAYMENT_PROPOSE_TOOL = "handshake.actions.x402_payment.propose" as const;
 
+export const mcpServiceWorkflowBoundary = {
+  acceptsWorkflowHandleContext: true,
+  workflowHandleCreatesAuthority: false,
+  freshActionContractRequired: true,
+  admissionCreatesPolicyDecision: false,
+  admissionCreatesGreenlight: false,
+  admissionPerformsGatewayCheck: false,
+  handlePermitsMutation: false,
+  handleExportsReceipt: false,
+} as const;
+
 export const mcpResourceTemplates = [
   {
     uriTemplate: "handshake://metadata/actions/{actionClass}",
@@ -96,6 +107,7 @@ export function mcpCatalogSnapshot() {
     schemaVersion: MCP_SCHEMA_VERSION,
     resources: mcpResourceTemplates,
     tools: mcpProposalTools,
+    serviceWorkflowBoundary: mcpServiceWorkflowBoundary,
     supportsParallelToolCalls: false,
     authorityCreated: false,
     gatewayCheckPerformed: false,

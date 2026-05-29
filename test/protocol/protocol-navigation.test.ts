@@ -17,10 +17,7 @@ describe("protocol navigation", () => {
       .map((entry) => String(entry.routeId))
       .sort();
     const protocolHttpIds = protocolNavigation
-      .filter(
-        (entry) =>
-          entry.transitionId !== "createGeneratedExecutionGraph" && entry.transitionId !== "createAuthorityCertificate",
-      )
+      .filter((entry) => !kernelOnlyTransitionIds.has(entry.transitionId))
       .map((entry) => String(entry.transitionId))
       .sort();
 
@@ -110,3 +107,14 @@ describe("protocol navigation", () => {
     }
   });
 });
+
+const kernelOnlyTransitionIds = new Set([
+  "createGeneratedExecutionGraph",
+  "createAuthorityCertificate",
+  "recordNegotiationSession",
+  "recordNegotiationOffer",
+  "recordNegotiationDecision",
+  "recordLinkedAgreement",
+  "recordAgreementObligationBinding",
+  "transitionAgreementStatus",
+]);

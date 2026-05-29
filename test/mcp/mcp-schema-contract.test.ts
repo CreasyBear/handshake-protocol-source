@@ -59,6 +59,32 @@ describe("MCP schema contract", () => {
     }
   });
 
+  it("accepts typed service workflow context only as non-authority proposal metadata", () => {
+    const base = validProposalInput();
+    const contextRefs = serviceWorkflowContextRefs();
+    expect(
+      McpX402PaymentProposalInputSchema.safeParse({ ...base, serviceWorkflowContextRefs: contextRefs }).success,
+    ).toBe(true);
+
+    for (const forbiddenField of [
+      "policyDecisionRef",
+      "greenlightRef",
+      "gatewayCheckRef",
+      "receiptRef",
+      "authorityCertificateRef",
+      "gatewayCredentialRef",
+      "paymentApprovalRef",
+      "signerRef",
+    ]) {
+      expect(
+        McpX402PaymentProposalInputSchema.safeParse({
+          ...base,
+          serviceWorkflowContextRefs: { ...contextRefs, [forbiddenField]: "x" },
+        }).success,
+      ).toBe(false);
+    }
+  });
+
   it("requires explicit x402 request-body and provider posture", () => {
     const valid = validProposalInput();
     expect(McpX402PaymentProposalInputSchema.safeParse(valid).success).toBe(true);
@@ -189,6 +215,16 @@ export function validProposalInput() {
     selectedPaymentRequirementIndex: 1,
     selectedPaymentRequirementDigest: digest(6),
     sdkPackageVersions: { "@x402/core": "2.12.0" },
+  };
+}
+
+export function serviceWorkflowContextRefs() {
+  return {
+    passportPackageDigest: digest(21),
+    passportPresentationId: "passport-presentation-mcp-1",
+    admissionId: "service-workflow-admission-mcp-1",
+    serviceWorkflowHandleId: "service-workflow-handle-mcp-1",
+    serviceWorkflowHandleDigest: digest(22),
   };
 }
 

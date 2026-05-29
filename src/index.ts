@@ -47,4 +47,19 @@ export {
 } from "./protocol/areas/authority-certificate";
 export * from "./protocol/public/inputs";
 export * from "./protocol/public/schemas";
+export {
+  ControlPlaneClient,
+  EvidenceClient,
+  GatewayClient,
+  PolicyClient,
+  type ControlPlaneClientOptions,
+  type EvidenceClientOptions,
+  type EvidenceClientRole,
+  type GatewayClientCheckResult,
+  type GatewayClientOptions,
+  type GatewayClientReconciliationResult,
+  type PolicyClientEvaluationResult,
+  type PolicyClientOptions,
+} from "./sdk/surface-clients/index";
+export { explainHandshakeError, type HandshakeErrorExplanation } from "./sdk/repair";
 export { HandshakeClient, HandshakeClientError, type HandshakeClientOptions, type HandshakeFetch } from "./sdk/client";

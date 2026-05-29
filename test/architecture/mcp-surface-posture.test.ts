@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
+import { mcpCatalogSnapshot } from "../../src/mcp/catalog";
 import { surfaceBoundaryManifest } from "../../src/surfaces/boundary-manifest";
 
 describe("MCP surface posture", () => {
@@ -70,6 +71,19 @@ describe("MCP surface posture", () => {
     }
 
     expect(violations.sort()).toEqual([]);
+  });
+
+  it("keeps service workflow context as MCP proposal metadata, not authority", () => {
+    expect(mcpCatalogSnapshot().serviceWorkflowBoundary).toEqual({
+      acceptsWorkflowHandleContext: true,
+      workflowHandleCreatesAuthority: false,
+      freshActionContractRequired: true,
+      admissionCreatesPolicyDecision: false,
+      admissionCreatesGreenlight: false,
+      admissionPerformsGatewayCheck: false,
+      handlePermitsMutation: false,
+      handleExportsReceipt: false,
+    });
   });
 });
 

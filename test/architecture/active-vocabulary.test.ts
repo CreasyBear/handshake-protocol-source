@@ -30,6 +30,9 @@ const STALE_PATTERNS = [
   new RegExp(`${staleBoundaryLower}Gate`),
   new RegExp(`reconcile${staleBoundaryWord}`),
 ];
+const BADGE_AUTHORITY_PATTERN = /\bbadge\b/i;
+const BADGE_ALLOWED_CONTEXT_PATTERN =
+  /not (?:a )?badge|Do not .*badge|must not .*badge|keeps badge language out|ambient authority wearing a badge|Badge-as-bearer-token|badge-as-bearer-token|forbidden/i;
 
 describe("active vocabulary guard", () => {
   it("keeps stale receiver vocabulary out of active docs, commands, migrations, and code", async () => {
@@ -40,6 +43,23 @@ describe("active vocabulary guard", () => {
       const text = await readFile(join(ROOT, file), "utf8");
       for (const pattern of STALE_PATTERNS) {
         if (pattern.test(text)) violations.push(`${file}: ${pattern.source}`);
+      }
+    }
+
+    expect(violations).toEqual([]);
+  });
+
+  it("keeps badge vocabulary constrained to anti-authority warnings", async () => {
+    const files = await activeFiles();
+    const violations: string[] = [];
+
+    for (const file of files) {
+      const text = await readFile(join(ROOT, file), "utf8");
+      const lines = text.split("\n");
+      for (const [index, line] of lines.entries()) {
+        if (BADGE_AUTHORITY_PATTERN.test(line) && !BADGE_ALLOWED_CONTEXT_PATTERN.test(line)) {
+          violations.push(`${file}:${index + 1}: badge language lacks anti-authority context`);
+        }
       }
     }
 

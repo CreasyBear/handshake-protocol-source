@@ -1,0 +1,168 @@
+import { z } from "zod";
+import { isRegisteredHttpTransitionErrorCode } from "../../../http/errors/codes";
+import { HandshakeProtocolError } from "../errors";
+import {
+  resolveProtocolReasonCodeMetadata,
+  type ProtocolReasonCodeMetadata,
+} from "../reason-codes";
+
+export const FailureClassSchema = z.enum([
+  "auth",
+  "hosted_admission",
+  "protected_action_refusal",
+  "proof_gap",
+  "replay_refusal",
+  "stale_admission",
+  "internal",
+]);
+
+export type FailureClass = z.infer<typeof FailureClassSchema>;
+
+const internalMisconfigurationCodes = new Set([
+  "caller_auth_not_configured",
+  "hosted_admission_config_not_configured",
+  "hosted_admission_config_invalid",
+  "hosted_caller_verifier_not_configured",
+  "durable_store_unavailable",
+]);
+
+const mcpInstallReasonPrefix = "mcp_install_";
+
+function isStaleHostedAdmissionCode(code: string): boolean {
+  return code === "hosted_caller_identity_stale";
+}
+
+function isAuthReasonCode(code: string): boolean {
+  return (
+    code.startsWith("caller_auth_") ||
+    code.startsWith("hosted_caller_auth_") ||
+    code === "caller_auth_required" ||
+    code === "caller_auth_forbidden"
+  );
+}
+
+function isHostedAdmissionReasonCode(code: string): boolean {
+  return code.startsWith("hosted_") && !isStaleHostedAdmissionCode(code);
+}
+
+export function failureClassFromHttpStatus(status: number): FailureClass {
+  if (status === 401) return "auth";
+  if (status === 403 || status === 409) return "protected_action_refusal";
+  if (status === 422) return "proof_gap";
+  if (status >= 500) return "internal";
+  if (status >= 400 && status < 500) return "proof_gap";
+  return "internal";
+}
+
+function failureClassFromReasonCodeMetadata(
+  code: string,
+  metadata: ProtocolReasonCodeMetadata,
+  options: { proofRef?: string | null } = {},
+): FailureClass {
+  if (metadata.classifiedFailure) return metadata.classifiedFailure;
+
+  switch (metadata.kind) {
+    case "refusal":
+      return "protected_action_refusal";
+    case "proof_gap":
+      return "proof_gap";
+    case "gateway_decision":
+      if (metadata.decisionPolarity === "pass") return "internal";
+      return code.includes("replay") ? "replay_refusal" : "protected_action_refusal";
+    case "policy_decision":
+      if (metadata.decisionPolarity === "pass") return "internal";
+      if (metadata.decisionPolarity === "proof_gap") return "proof_gap";
+      return "protected_action_refusal";
+    case "isolation":
+      return "protected_action_refusal";
+    case "recovery":
+      return options.proofRef ? "proof_gap" : "protected_action_refusal";
+    case "protected_path_posture":
+      return code.includes("stale") ? "stale_admission" : "proof_gap";
+    case "transition_error":
+      return "internal";
+    default:
+      return "internal";
+  }
+}
+
+export function classifyFailureClassFromProtocolError(error: HandshakeProtocolError): FailureClass {
+  const code = error.code;
+  if (code === "recovery_terminal_conflict") {
+    return error.metadata.proofRef ? "proof_gap" : "protected_action_refusal";
+  }
+  if (internalMisconfigurationCodes.has(code)) return "internal";
+
+  if (code.startsWith("caller_auth_")) return "auth";
+  if (code.startsWith("hosted_")) {
+    return isStaleHostedAdmissionCode(code) ? "stale_admission" : "hosted_admission";
+  }
+  if (code.includes("replay") || code === "idempotency_duplicate_authority" || code === "generated_execution_graph_nonce_replay") {
+    return "replay_refusal";
+  }
+
+  const metadata = resolveProtocolReasonCodeMetadata(code);
+  if (metadata) {
+    const metadataOptions =
+      error.metadata.proofRef !== undefined ? { proofRef: error.metadata.proofRef } : {};
+    return failureClassFromReasonCodeMetadata(code, metadata, metadataOptions);
+  }
+
+  if (error.metadata.refusalRef) return "protected_action_refusal";
+  if (error.metadata.proofRef) return "proof_gap";
+  if (error.status >= 500) return "internal";
+  if (isRegisteredHttpTransitionErrorCode(code)) return "internal";
+  if (error.status >= 400 && error.status < 500) return "protected_action_refusal";
+  return "internal";
+}
+
+export function classifyFailureClassFromReasonCodes(reasonCodes: readonly string[]): FailureClass {
+  if (reasonCodes.length === 0) return "internal";
+
+  const classes = reasonCodes.map((code) => classifyFailureClassFromReasonCode(code));
+  if (classes.includes("auth")) return "auth";
+  if (classes.includes("hosted_admission")) return "hosted_admission";
+  if (classes.includes("stale_admission")) return "stale_admission";
+  if (classes.includes("replay_refusal")) return "replay_refusal";
+  if (classes.includes("protected_action_refusal")) return "protected_action_refusal";
+  if (classes.includes("proof_gap")) return "proof_gap";
+  return classes[0] ?? "internal";
+}
+
+function classifyFailureClassFromReasonCode(code: string): FailureClass {
+  if (isAuthReasonCode(code)) return "auth";
+  if (isStaleHostedAdmissionCode(code)) return "stale_admission";
+  if (isHostedAdmissionReasonCode(code)) return "hosted_admission";
+  if (code.includes("replay") || code === "idempotency_duplicate_authority" || code === "already_consumed") {
+    return "replay_refusal";
+  }
+
+  const metadata = resolveProtocolReasonCodeMetadata(code);
+  if (metadata) {
+    return failureClassFromReasonCodeMetadata(code, metadata);
+  }
+
+  if (code.startsWith(mcpInstallReasonPrefix)) return "proof_gap";
+
+  if (code.includes("refusal") || code.includes("refused") || code.startsWith("protected_action_")) {
+    return "protected_action_refusal";
+  }
+  if (code.includes("proof_gap")) return "proof_gap";
+  if (code.includes("auth")) return "auth";
+
+  return classifyFailureClassFromProtocolError(
+    new HandshakeProtocolError(code, "Synthetic reason code classification.", 409),
+  );
+}
+
+export const MCP_FAILURE_CLASS_EVIDENCE_PREFIX = "taxonomy:failureClass/" as const;
+
+export function mcpFailureClassEvidenceRef(failureClass: FailureClass): string {
+  return `${MCP_FAILURE_CLASS_EVIDENCE_PREFIX}${failureClass}`;
+}
+
+export function parseMcpFailureClassEvidenceRef(ref: string): FailureClass | null {
+  if (!ref.startsWith(MCP_FAILURE_CLASS_EVIDENCE_PREFIX)) return null;
+  const parsed = FailureClassSchema.safeParse(ref.slice(MCP_FAILURE_CLASS_EVIDENCE_PREFIX.length));
+  return parsed.success ? parsed.data : null;
+}

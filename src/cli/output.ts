@@ -10,6 +10,7 @@ export const cliNonClaims = [
   "marketplace certification",
   "clearing-house readiness",
   "cross-org AuthorityCertificate trust",
+  "service workflow admission or handle authority",
 ] as const;
 
 export type CliPlane = "operator" | "evidence";

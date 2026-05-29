@@ -54,6 +54,7 @@ describe("root package exports", () => {
       "CompileIntentInputSchema",
       "ContractEvidenceProjectionSchema",
       "ContractStreamEventSchema",
+      "ControlPlaneClient",
       "CreateAuthorityCertificateInputSchema",
       "CreateBreakerDecisionInputSchema",
       "CreateBypassProbeInputSchema",
@@ -81,10 +82,12 @@ describe("root package exports", () => {
       "DownstreamOutcomeStatusSchema",
       "DownstreamRetryabilitySchema",
       "EvaluatePolicyInputSchema",
+      "EvidenceClient",
       "GateDecisionSchema",
       "GatewayAdmissionStatusSchema",
       "GatewayCheckAttemptSchema",
       "GatewayCheckInputSchema",
+      "GatewayClient",
       "GatewayCredentialBindingSchema",
       "GatewayCredentialRefSchema",
       "GatewayCustodyClaimLevelSchema",
@@ -129,9 +132,18 @@ describe("root package exports", () => {
       "JsonValueSchema",
       "MutationAttemptSchema",
       "OperatingEnvelopeSchema",
+      "OperationCorrelationIndexSchema",
+      "OperationReadbackGreenlightUsePostureSchema",
+      "OperationReadbackNextMechanismSchema",
+      "OperationReadbackProjectionSchema",
+      "OperationReadbackStageSchema",
+      "OperationReadbackStatusSchema",
+      "OperationReadbackSupportSeveritySchema",
+      "OperationSupportContextSchema",
       "PROTOCOL_VERSION",
       "ParticipantIdentityBindingSchema",
       "ParticipantIdentityRoleSchema",
+      "PolicyClient",
       "PolicyDecisionSchema",
       "PolicyDecisionValueSchema",
       "PostureSourceAuthoritySchema",
@@ -203,6 +215,7 @@ describe("root package exports", () => {
       "buildAuthorityCertificateSigningInput",
       "createApp",
       "evidenceReadNavigation",
+      "explainHandshakeError",
       "httpTransitionNavigation",
       "projectAuthorityCertificateJwks",
       "projectAuthorityCertificateVerifierKeySet",
@@ -409,18 +422,20 @@ describe("root package exports", () => {
     );
   });
 
-  it("keeps role-scoped SDK clients on an explicit non-root package surface", async () => {
+  it("re-exports curated role clients from package root (D-56, adjudication #1)", async () => {
     const root = await import("../../src");
     const roleClients = await import("handshake-protocol-kernel/sdk/role-clients");
-    const exportNames = Object.keys(roleClients).sort();
+    const rootExportNames = Object.keys(root);
+    const subpathExportNames = Object.keys(roleClients).sort();
 
-    expect(Object.keys(root)).not.toContain("RuntimeClient");
-    expect(Object.keys(root)).not.toContain("EvidenceClient");
-    expect(Object.keys(root)).not.toContain("ControlPlaneClient");
-    expect(Object.keys(root)).not.toContain("GatewayClient");
-    expect(Object.keys(root)).not.toContain("InstallClient");
-    expect(Object.keys(root)).not.toContain("PolicyClient");
-    expect(exportNames).toEqual([
+    expect(rootExportNames).toContain("EvidenceClient");
+    expect(rootExportNames).toContain("ControlPlaneClient");
+    expect(rootExportNames).toContain("GatewayClient");
+    expect(rootExportNames).toContain("PolicyClient");
+    expect(rootExportNames).toContain("explainHandshakeError");
+    expect(rootExportNames).not.toContain("RuntimeClient");
+    expect(rootExportNames).not.toContain("InstallClient");
+    expect(subpathExportNames).toEqual([
       "ControlPlaneClient",
       "EvidenceClient",
       "GatewayClient",
@@ -429,8 +444,8 @@ describe("root package exports", () => {
       "PolicyClient",
       "RuntimeClient",
     ]);
-    expect(exportNames).not.toContain("HandshakeClient");
-    expect(exportNames.join(" ")).not.toMatch(/ReceiptExport|AuthorityCertificateMint|PaymentPayload/);
+    expect(subpathExportNames).not.toContain("HandshakeClient");
+    expect(subpathExportNames.join(" ")).not.toMatch(/ReceiptExport|AuthorityCertificateMint|PaymentPayload/);
   });
 
   it("keeps CLI and MCP on explicit non-root package surfaces", async () => {

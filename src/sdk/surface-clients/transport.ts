@@ -3,6 +3,7 @@ import {
   TransitionErrorResponseSchema,
   type TransitionErrorEnvelope,
 } from "../../http/errors/transition-error-envelope";
+import { failureClassFromHttpStatus } from "../../protocol/foundation/failure-class";
 import {
   HANDSHAKE_ORIGINATING_IDENTITY_HEADER,
   HANDSHAKE_PROTOCOL_VERSION_HEADER,
@@ -72,6 +73,7 @@ export class RoleScopedTransport {
     const parsedBody = await parseJsonBody(response);
     const parsedError = TransitionErrorResponseSchema.safeParse(parsedBody);
     if (parsedError.success) return parsedError.data.error;
+    const failureClass = failureClassFromHttpStatus(response.status);
     return {
       code: "http_error",
       message: `Handshake request failed with HTTP ${response.status}.`,
@@ -82,6 +84,9 @@ export class RoleScopedTransport {
       requestIdentity: response.headers.get(HANDSHAKE_REQUEST_IDENTITY_HEADER),
       proofRef: null,
       refusalRef: null,
+      failureClass,
+      failurePhase: null,
+      problemType: null,
     };
   }
 }

@@ -78,7 +78,7 @@ describe("OpenClaw x402 protected tool activation artifact", () => {
         liveHostMutationClaimed: false,
       },
     });
-    expect(artifact.args).toEqual(["-y", "handshake-protocol-kernel@0.2.7", "handshake-mcp"]);
+    expect(artifact.args).toEqual(["-y", "handshake-protocol-kernel@0.2.8", "handshake-mcp"]);
     expect(artifact.manifest.protectedPath.rawSiblingCandidates.map((candidate) => candidate.routeId)).toEqual([
       "raw_sibling_openclaw_shell_x402_fetch",
       "raw_sibling_openclaw_tool_packet_direct_payment",
@@ -130,12 +130,12 @@ function validActivationInput(
   return {
     activationId: "activation_openclaw_x402_tool_packet",
     packageIdentifier: "handshake-protocol-kernel",
-    packageVersion: "0.2.7",
+    packageVersion: "0.2.8",
     profileInput: validProfileInput(),
     toolPacketConfigTarget: "openclaw.tool-packet.json",
     toolPacketName: "handshake_x402_protected_tool",
     command: "npx",
-    args: ["-y", "handshake-protocol-kernel@0.2.7", "handshake-mcp"],
+    args: ["-y", "handshake-protocol-kernel@0.2.8", "handshake-mcp"],
     observedAt: "2026-05-25T00:00:00.000Z",
     expiresAt: "2099-01-01T00:00:00.000Z",
     configDigest: digest(39),

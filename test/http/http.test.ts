@@ -464,6 +464,42 @@ describe("Hono protocol surface", () => {
     expect(await fixture.store.listRecordsByType("mutation_attempt")).toHaveLength(0);
   });
 
+  it("registers x402 compiled records atomically and refuses orphan catalog payloads", async () => {
+    const fixture = makeKernelFixture();
+    const app = createApp({ store: fixture.store, callerAuthTokens: TEST_CALLER_AUTH_TOKENS });
+    const fetchImpl = async (input: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]) => {
+      const url = new URL(String(input), "http://handshake.test");
+      return app.request(`${url.pathname}${url.search}`, init);
+    };
+    const installClient = new InstallClient(
+      "http://handshake.test",
+      {
+        roleCredential: TEST_CALLER_AUTH_TOKENS.control_plane,
+        requestIdentityFactory: () => "install-x402-http-fixture",
+      },
+      fetchImpl,
+    );
+    const { compileX402InstallProposal } = await import("../../src/adapters/x402-payment/install-proposal");
+    const { defaultX402BootstrapInstallInput, installProposalFromX402 } = await import(
+      "../../src/cli/service-operator/bootstrap"
+    );
+    const proposal = await compileX402InstallProposal(defaultX402BootstrapInstallInput());
+    const registered = await installClient.registerInstallProposalCompiledRecords(
+      installProposalFromX402(proposal),
+    );
+    expect(registered.outcome).toBe("compiled_records_registered");
+    expect(await fixture.store.listRecordsByType("operating_envelope")).toHaveLength(1);
+
+    const refused = await installClient.registerInstallProposalCompiledRecords({
+      ...installProposalFromX402(proposal),
+      status: "refused",
+      compiledRecords: null,
+      refusalReasonCodes: ["x402_wallet_signer_not_gateway_held"],
+    });
+    expect(refused.outcome).toBe("install_proposal_refused");
+    expect(await fixture.store.listRecordsByType("tool_capability")).toHaveLength(1);
+  });
+
   it("requires transition caller auth before parsing state-changing request bodies", async () => {
     const app = createApp({
       store: new InMemoryProtocolStore(),
@@ -857,9 +893,14 @@ describe("Hono protocol surface", () => {
       body: JSON.stringify({ invalid: true }),
     });
 
-    expect(response.status).toBe(412);
+    expect(response.status).toBe(409);
     expect(await response.json()).toMatchObject({
-      error: { code: "hosted_caller_identity_stale", commitState: "not_started" },
+      error: {
+        code: "hosted_caller_identity_stale",
+        commitState: "not_started",
+        failureClass: "stale_admission",
+        failurePhase: "admission",
+      },
     });
     expect(store.countRecordsOfType("runtime_execution")).toBe(0);
     expect(store.countRecordsOfType("transition_request_context")).toBe(0);
@@ -1706,6 +1747,9 @@ describe("Hono protocol surface", () => {
               requestIdentity: null,
               proofRef: null,
               refusalRef: null,
+              failureClass: "internal",
+              failurePhase: "readback",
+              problemType: null,
             },
           }),
           { status: 404 },
@@ -1733,6 +1777,9 @@ describe("Hono protocol surface", () => {
             requestIdentity: "sdk-request-id",
             proofRef: "gap_demo",
             refusalRef: null,
+            failureClass: "protected_action_refusal",
+            failurePhase: "transition",
+            problemType: null,
           },
         }),
         { status: 409 },
@@ -1811,7 +1858,7 @@ describe("Hono protocol surface", () => {
       body: JSON.stringify(state.followUpInput),
     });
 
-    expect(response.status).toBe(409);
+    expect(response.status).toBe(422);
     const body = (await response.json()) as { error: { proofRef: string } };
     expect(body).toMatchObject({
       error: {
@@ -1822,6 +1869,8 @@ describe("Hono protocol surface", () => {
         commitState: "committed",
         requestIdentity: "test-request-runtime_evidence",
         refusalRef: null,
+        failureClass: "proof_gap",
+        failurePhase: "transition",
       },
     });
     expect(body.error.proofRef).toMatch(/^gap_/);

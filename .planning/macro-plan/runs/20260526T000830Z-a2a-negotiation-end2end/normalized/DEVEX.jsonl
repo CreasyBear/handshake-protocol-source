@@ -1,0 +1,2 @@
+{"lens":"DEVEX","severity":"P0","finding":"Manual protocol assembly blocks first proof.","required_change":"Create a fixture runner for examples/a2a-negotiated-x402 before broad CLI/API work."}
+{"lens":"DEVEX","severity":"P1","finding":"Hosted or cross-org dependencies would stall adoption.","required_change":"Keep first proof local/reference with explicit non-claims."}

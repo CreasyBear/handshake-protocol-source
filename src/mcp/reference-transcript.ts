@@ -234,7 +234,8 @@ export async function buildMcpX402ReferenceTranscript(): Promise<McpReferenceTra
     installPosture: "missing",
     ...referenceTrustedProposalOptions(),
   });
-  const installHealthUri = installProposal.structuredContent.evidenceRefs[0] ?? "";
+  const installHealthUri =
+    installProposal.structuredContent.evidenceRefs.find((ref) => ref.startsWith("handshake://")) ?? "";
   const installHealthRead = installHealthUri ? await readMcpResource(installHealthUri, evidenceClient) : null;
 
   const offlineRuntime = referenceRuntimeClient();

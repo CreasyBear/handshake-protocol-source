@@ -13,3 +13,7 @@ dist/
 .planning/
 .agents/
 skills-lock.json
+
+# Runtime-generated demo output (golden-path bootstrap writes here).
+examples/service-operator-golden-path/output/
+examples/service-operator-bootstrap/output/
