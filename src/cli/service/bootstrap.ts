@@ -43,8 +43,16 @@ export type ServiceBootstrapResult = {
   };
 };
 
+type X402BootstrapInstallInputOverrides = Partial<
+  Omit<X402InstallProposalInput, "endpointEvidence" | "walletGatewayProfile" | "spendBounds">
+> & {
+  endpointEvidence?: Partial<X402InstallProposalInput["endpointEvidence"]>;
+  walletGatewayProfile?: Partial<X402InstallProposalInput["walletGatewayProfile"]>;
+  spendBounds?: Partial<X402InstallProposalInput["spendBounds"]>;
+};
+
 export function defaultX402BootstrapInstallInput(
-  overrides: Partial<X402InstallProposalInput> = {},
+  overrides: X402BootstrapInstallInputOverrides = {},
 ): X402InstallProposalInput {
   const { endpointEvidence, walletGatewayProfile, spendBounds, ...restOverrides } = overrides;
   const createdAt = restOverrides.createdAt ?? nowIso();
@@ -205,14 +213,22 @@ export async function serviceBootstrapCommand(input: { installInput?: unknown })
   });
 }
 
+function workerBindingsFromTokens(tokens: CallerAuthTokens): WorkerBindings {
+  const env: WorkerBindings = {};
+  if (tokens.control_plane !== undefined) env.HANDSHAKE_CONTROL_PLANE_TOKEN = tokens.control_plane;
+  if (tokens.runtime_evidence !== undefined) env.HANDSHAKE_RUNTIME_EVIDENCE_TOKEN = tokens.runtime_evidence;
+  if (tokens.gateway_custody !== undefined) env.HANDSHAKE_GATEWAY_CUSTODY_TOKEN = tokens.gateway_custody;
+  if (tokens.review_custody !== undefined) env.HANDSHAKE_REVIEW_CUSTODY_TOKEN = tokens.review_custody;
+  return env;
+}
+
 function installClientForStore(store: ProtocolStore, tokens: CallerAuthTokens): InstallClient {
+  const controlPlaneToken = tokens.control_plane;
+  if (!controlPlaneToken) {
+    throw new Error("service bootstrap requires a control_plane caller auth token.");
+  }
   const app = createApp({ store, callerAuthTokens: tokens });
-  const env = {
-    HANDSHAKE_CONTROL_PLANE_TOKEN: tokens.control_plane,
-    HANDSHAKE_RUNTIME_EVIDENCE_TOKEN: tokens.runtime_evidence,
-    HANDSHAKE_GATEWAY_CUSTODY_TOKEN: tokens.gateway_custody,
-    HANDSHAKE_REVIEW_CUSTODY_TOKEN: tokens.review_custody,
-  } satisfies WorkerBindings;
+  const env = workerBindingsFromTokens(tokens);
   const fetchImpl: HandshakeFetch = async (requestInput, init) => {
     const url = new URL(String(requestInput), "http://handshake.test");
     return app.request(`${url.pathname}${url.search}`, init, env);
@@ -220,7 +236,7 @@ function installClientForStore(store: ProtocolStore, tokens: CallerAuthTokens): 
   return new InstallClient(
     "http://handshake.test",
     {
-      roleCredential: tokens.control_plane,
+      roleCredential: controlPlaneToken,
       requestIdentityFactory: () => "service-bootstrap-request",
       originatingIdentity: "ref:cli/service-bootstrap",
     },
