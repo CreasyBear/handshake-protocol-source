@@ -26,7 +26,10 @@ import {
 } from "./admission/request-context";
 import { transitionErrorResult, type TransitionErrorContext } from "./errors/transition-error-envelope";
 import { transitionInvokers } from "./routes/transition-invokers";
+import { assertMutationRouteManifestParity } from "./mutation-route-manifest";
 import { transitionRouteDefinitions, type TransitionRouteDefinition } from "./routes/transition-route-registry";
+
+assertMutationRouteManifestParity();
 import { kernelFor, storeFor } from "./store/resolution";
 import { hideReferenceScopeMismatch } from "./routes/transition-scope-resolvers";
 
