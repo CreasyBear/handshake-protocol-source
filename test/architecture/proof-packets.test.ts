@@ -459,6 +459,11 @@ url = "https://mcp.exa.ai/mcp?exaApiKey=secret"
           mutationManifestGatingTestPassed: false,
           evidenceRefs: [],
         },
+        perCustomerBypassScaffold: {
+          customerOnboardingRef: null,
+          firstPartyDogfoodCustomerId: null,
+          evidenceRefs: ["per-customer-bypass-scaffold-readback.json"],
+        },
       },
     });
 
@@ -467,6 +472,7 @@ url = "https://mcp.exa.ai/mcp?exaApiKey=secret"
     expect(readback.hardBlockedGateIds).toEqual([
       "public_distribution_and_registry",
       "customer_gateway_live_x402_paid_proof",
+      "per_customer_bypass_scaffold",
     ]);
     expect(readback.overclaimViolations).toEqual([]);
     expect(readback.authorityBoundary.createsAuthority).toBe(false);

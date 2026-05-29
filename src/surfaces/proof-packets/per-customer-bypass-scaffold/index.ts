@@ -3,8 +3,8 @@
  * Dogfood shape only; never marks product completion for un-onboarded integrators.
  */
 
-import { serviceWorkflowAuthorityBoundary } from "../service-workflow-admission/index";
-import { gap, nonAuthorityBoundary, PROOF_PACKET_VERSION } from "./shared";
+import { serviceWorkflowAuthorityBoundary } from "../../service-workflow-admission/index";
+import { gap, nonAuthorityBoundary, PROOF_PACKET_VERSION } from "../shared";
 
 export type PerCustomerBypassScaffoldInput = {
   readonly generatedAt: string;
