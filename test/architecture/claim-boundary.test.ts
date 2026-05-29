@@ -183,6 +183,19 @@ describe("claim boundary", () => {
         ],
       },
       {
+        label: "category claim (D-59)",
+        sources: [
+          { name: "README.md", text: readme },
+          { name: "docs/internal/protocol-layman.md", text: protocolLayman },
+        ],
+        required: ["reconstructable clearance before consequence"],
+        forbiddenPatterns: [
+          /category[:\s][^.]*\bapproval workflow\b/i,
+          /category[:\s][^.]*\bagent permissions\b/i,
+          /Handshake is for everyone/i,
+        ],
+      },
+      {
         label: "production proof ledger",
         sources: [{ name: "docs/internal/decisions.md", text: decisions }],
         required: [
