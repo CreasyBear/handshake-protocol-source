@@ -20,9 +20,11 @@ describe("custody matrix parity", () => {
     expect(host).not.toMatch(/host configures gateway registry/i);
   });
 
-  it("defers standalone runbook files in phase 04", () => {
-    expect(existsSync("docs/internal/service-operator-runbook.md")).toBe(false);
-    expect(existsSync("docs/internal/host-operator-runbook.md")).toBe(false);
+  it("ships paired operator runbooks after phase 05 A4 (D-53)", () => {
+    expect(existsSync("docs/internal/service-operator-runbook.md")).toBe(true);
+    expect(existsSync("docs/internal/host-operator-runbook.md")).toBe(true);
+    const serviceRunbook = readFileSync("docs/internal/service-operator-runbook.md", "utf8");
+    expect(serviceRunbook).toMatch(/mutation-route-manifest|dual.enforcement/i);
   });
 
   it("frames host doctor output with attestation evidence fields", () => {

@@ -132,6 +132,7 @@ describe("root package exports", () => {
       "JsonValueSchema",
       "MutationAttemptSchema",
       "OperatingEnvelopeSchema",
+      "OperationCorrelationIndexSchema",
       "OperationReadbackGreenlightUsePostureSchema",
       "OperationReadbackNextMechanismSchema",
       "OperationReadbackProjectionSchema",

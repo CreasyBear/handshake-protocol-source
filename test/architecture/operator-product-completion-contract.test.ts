@@ -4,6 +4,8 @@ import { cliCommandManifest } from "../../src/cli/command-manifest";
 
 const requiredDocs = [
   "docs/internal/service-operator-golden-path.md",
+  "docs/internal/service-operator-runbook.md",
+  "docs/internal/host-operator-runbook.md",
   "docs/internal/developer-experience-index.md",
   "docs/internal/integrator-parity-transitions.md",
 ] as const;
@@ -18,8 +20,6 @@ const requiredExamples = ["examples/service-operator-bootstrap/run.ts"] as const
 const forbiddenPaths = [
   "examples/auth-md-protected-api-stub",
   "examples/package-install-protected-action-stub",
-  "docs/internal/service-operator-runbook.md",
-  "docs/internal/host-operator-runbook.md",
 ] as const;
 
 const requiredTests = [
@@ -50,10 +50,11 @@ describe("operator product completion contract", () => {
     expect(missing).toEqual([]);
   });
 
-  it("does not require deferred runbooks, stub dirs, or mutation manifest", () => {
+  it("keeps proof-gap stub dirs absent and mutation manifest on http spine", () => {
     const present = forbiddenPaths.filter((path) => existsSync(path)).sort();
     expect(present).toEqual([]);
     expect(existsSync("src/service-mutation-route-manifest")).toBe(false);
+    expect(existsSync("src/http/mutation-route-manifest.ts")).toBe(true);
   });
 
   it("exposes service bootstrap and host doctor commands in the manifest", () => {
