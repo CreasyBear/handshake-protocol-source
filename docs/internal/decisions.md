@@ -306,6 +306,55 @@ Admission middleware identifies callers and scopes transitions; it does **not**
 authorize protected mutation. Admission alone is advisory — only adapter-wrapped
 `run*Gateway` immediately before consequence is Handshake enforcement.
 
+## x402 Gateway-Held Credential Custody (Mechanism A)
+
+Accepted: the x402 payment signer holds **gateway-held credential custody**. The
+signer is structurally unreachable without a passed `VerifiedGatewayCheck` and
+gate-bound, redacted credential-resolution evidence. This is enforcement, not a
+comment or naming posture.
+
+Mechanism A is enforced by `assertGatewayHeldSigningCommand` in
+`src/adapters/x402-payment/wallet-gateway.ts`. It runs at two boundaries before
+any signature:
+
+- the orchestration entry `runX402WalletGateway`, immediately before
+  `surface.signPayment`; and
+- the official signing surface entry `createOfficialExactX402SigningSurface`'s
+  `signPayment`, so an integrator that constructs the official surface directly
+  still cannot bypass the check.
+
+The guard refuses unless the `X402PaymentSignatureCommand` carries:
+
+- `verifiedGate.gatewayCheckStatus === "passed"` with non-empty
+  `gateAttemptId` and `mutationAttemptId` (a forged or unfilled gate is refused);
+  and
+- `credentialResolutionEvidence` that is gateway-resolved — `resultClass ===
+  "used_by_gateway"`, `credentialMaterialIncluded === false`,
+  `redactionStatus === "redacted"` — and bound to the same gate by matching
+  `gateAttemptId`, `actionContractId`, and `greenlightId`.
+
+Raw caller-supplied credential references therefore cannot reach the signer:
+only redacted refs that the gateway resolved against the verified gate are
+admitted, and the emitted `credentialMaterialPosture: "gateway_held_redacted"`
+is a structurally enforced invariant rather than a label. Bypass via a raw x402
+SDK outside the host-trusted path remains a **proof gap**, not enforcement — it
+does not run this guard and produces no Handshake clearance evidence.
+
+This invariant is pinned by `test/architecture/x402-gateway-credential-custody.test.ts`,
+promoted from adapter runtime patterns in the same landing per the
+architecture-promotion rule (an architecture-level test is admitted only for a
+structurally enforced invariant, never an advisory one).
+
+**Integrator migration note:** `X402PaymentSignatureCommand` is unchanged — the
+guard is additive and ABI-stable (no shape change, no new required field beyond
+the already-present `verifiedGate` and `credentialResolutionEvidence`).
+Integrators that route through `runX402WalletGateway` or the official signing
+surface need no code change. Integrators that previously constructed signing
+commands by hand must supply a real passed `VerifiedGatewayCheck` and
+gateway-resolved redacted resolution evidence bound to that gate; hand-rolled
+commands with empty gate ids, unbound evidence, or
+`credentialMaterialIncluded: true` now refuse before signing.
+
 ## Market And Expansion Scoring Boundary
 
 Accepted: market scoring is strategy input, not enforcement proof. A wedge can
