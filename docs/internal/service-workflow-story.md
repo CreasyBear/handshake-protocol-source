@@ -157,5 +157,9 @@ permission. A new protected action requires a new exact contract.
 - Do not claim customer gateway custody from local fixture evidence.
   `customer_gateway_evidence` requires official external verification, current
   custody and resolver posture, lease/rotation or equivalent time-bounded
-  evidence, attestation evidence, redaction success, and no raw payment or
+  evidence,   attestation evidence, redaction success, and no raw payment or
   credential material.
+
+## Operator maintenance
+
+For day-two service API changes (mutation manifest, dual-enforcement checks, product-completion gates), use [service-operator-runbook.md](./service-operator-runbook.md). Host-side maintenance stays in [host-operator-runbook.md](./host-operator-runbook.md).

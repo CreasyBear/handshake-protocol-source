@@ -10,6 +10,13 @@ path; host-operator commands apply only when you operate MCP/runtime binding.
 Includes Step 3 custody fork (service API vs agent host). You do not need two
 top-level Start Here paths.
 
+## Operator runbooks (maintenance)
+
+| Doc | Boundary |
+| --- | -------- |
+| [service-operator-runbook.md](./service-operator-runbook.md) | Service API lane: dual enforcement, mutation manifest, completion gates |
+| [host-operator-runbook.md](./host-operator-runbook.md) | Host lane: doctor/quickstart/simulate; non-authority only |
+
 ## Service operator commands (first)
 
 | Command | Purpose |
