@@ -41,6 +41,32 @@ Builder-buyer product language centers on a cleared protected-action event: one 
 
 **Category claim (D-59):** *reconstructable clearance before consequence* — services must reconstruct clearance evidence before treating downstream consequence as proof. This is not an approval workflow, agent-permissions product, or audit-trail substitute.
 
+## Phase 05 product coherence (shipped)
+
+Accepted on branch `phase-05-product-coherence` (local close-out 2026-05-29). Phase 05 is a synthesis pass — not a new protocol mechanism layer.
+
+- **D-50:** Phase 05 unifies product surfaces and narrative; it does not add kernel transition semantics or new wedges.
+- **D-51:** Comprehensive delivery scale (~14 plans) for scrub, polish, and keel integrity — not an MVP cut.
+- **D-52:** Phase 05 execution required Phase 04 verification `status: passed` as a hard gate.
+- **D-53:** Carry-forward integrity for the Phase-04 deferred lane (mutation manifest, HTTP profile conformance, dual-enforcement inventory, operator runbooks, D-25 scaffolds).
+- **D-54:** D-25 per-customer bypass scaffolds remain honestly incomplete — no inflated claims for un-onboarded customers.
+- **D-55:** CLI, SDK, and MCP evidence readback routes through the same live-fetch spine (`OperationReadbackProjection` keyed by `actionContractId`).
+- **D-56:** One-import agent ergonomics via root re-export of role clients from `src/index.ts` (no `createHandshakeClients()` factory).
+- **D-57:** Intent-compilation stages appear in the readback spine as non-authority projection rows (`createsAuthority: false`).
+- **D-58:** Correlation index is read-only evidence keyed by `actionContractId`; it does not create authority.
+- **D-60:** Forbidden-copy lint is structural: canonical docs and CLI copy must not leak category-drift vocabulary without explicit negation or non-authority windows.
+- **D-61:** Diataxis coverage labels apply to internal docs; Phase 05 adds persona golden paths, not a full doc rewrite mandate.
+- **D-62:** Concierge demand-test scaffold lives only under `.planning/macro/` — quarantined from package scripts, exports, and CI.
+- **D-63:** Keel-integrity audit (`05-KEEL-AUDIT.md`) records each claimed invariant with a structural site, architecture-test pin, or honest proof-gap label (D-70).
+- **D-64:** Mechanism A — x402 gateway-held credential custody (see section below); signer unreachable without passed gate + gateway-resolved redacted evidence.
+- **D-65:** Gateway invariant architecture tests promote only after the structural custody site exists (05-13 before 05-14 promotion).
+- **D-66:** Agent-origin compilations require a generated execution graph refusal at `candidate-decision.ts` before contract authority is implied.
+- **D-67:** Phase 05 does not replace Phase 04; it depends on Phase 04 landing first.
+- **D-68:** Phase 05 does not add new wedge families or new kernel transitions.
+- **D-69:** Narrative polish must not soften the category claim or reintroduce passport/approval/HITL framing in headlines.
+- **D-70:** Keel audit rows require `file:line` citations; mis-mapped citations are proof-gap honesty failures, not enforcement failures.
+- **D-71:** Hosted-admission consolidation remains re-export-only polish — no hosted workspace promotion from Phase 05.
+
 Shared product/protocol vocabulary:
 
 - `protocol kernel`: the source-owned authority state machine and schemas for exact contracts, policy decisions, one-use greenlights, gateway checks, receipts, refusals, proof gaps, isolation, and terminal certificates.
@@ -301,7 +327,7 @@ not payment-only integrations.
 The `dual_enforcement_posture` gate in `src/surfaces/proof-packets/product-completion-contract.ts`
 projects **incomplete** until structural architecture evidence exists: passing
 `test/architecture/dual-enforcement-posture.test.ts` (Phase-04 plan **04-01**) and
-mutation-manifest gating coverage (deferred **04-11**, wired in plan **05-01**).
+mutation-manifest inventory at `src/http/mutation-route-manifest.ts` (Phase-05 plan **05-01**).
 Admission middleware identifies callers and scopes transitions; it does **not**
 authorize protected mutation. Admission alone is advisory — only adapter-wrapped
 `run*Gateway` immediately before consequence is Handshake enforcement.
