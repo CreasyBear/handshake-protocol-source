@@ -1,6 +1,9 @@
 import { z } from "zod";
 import { HandshakeProtocolError } from "../errors";
-import { resolveProtocolReasonCodeMetadata } from "../reason-codes";
+import {
+  resolveProtocolReasonCodeMetadata,
+  type ProtocolReasonCodeMetadata,
+} from "../reason-codes";
 
 export const FailureClassSchema = z.enum([
   "auth",
@@ -48,6 +51,47 @@ function isHostedAdmissionReasonCode(code: string): boolean {
   return code.startsWith("hosted_") && !isStaleHostedAdmissionCode(code);
 }
 
+export function failureClassFromHttpStatus(status: number): FailureClass {
+  if (status === 401) return "auth";
+  if (status === 403 || status === 409) return "protected_action_refusal";
+  if (status === 422) return "proof_gap";
+  if (status >= 500) return "internal";
+  if (status >= 400 && status < 500) return "proof_gap";
+  return "internal";
+}
+
+function failureClassFromReasonCodeMetadata(
+  code: string,
+  metadata: ProtocolReasonCodeMetadata,
+  options: { proofRef?: string | null } = {},
+): FailureClass {
+  if (metadata.classifiedFailure) return metadata.classifiedFailure;
+
+  switch (metadata.kind) {
+    case "refusal":
+      return "protected_action_refusal";
+    case "proof_gap":
+      return "proof_gap";
+    case "gateway_decision":
+      if (metadata.decisionPolarity === "pass") return "internal";
+      return code.includes("replay") ? "replay_refusal" : "protected_action_refusal";
+    case "policy_decision":
+      if (metadata.decisionPolarity === "pass") return "internal";
+      if (metadata.decisionPolarity === "proof_gap") return "proof_gap";
+      return "protected_action_refusal";
+    case "isolation":
+      return "protected_action_refusal";
+    case "recovery":
+      return options.proofRef ? "proof_gap" : "protected_action_refusal";
+    case "protected_path_posture":
+      return code.includes("stale") ? "stale_admission" : "proof_gap";
+    case "transition_error":
+      return "internal";
+    default:
+      return "internal";
+  }
+}
+
 export function classifyFailureClassFromProtocolError(error: HandshakeProtocolError): FailureClass {
   const code = error.code;
   if (code === "recovery_terminal_conflict") {
@@ -65,29 +109,15 @@ export function classifyFailureClassFromProtocolError(error: HandshakeProtocolEr
 
   const metadata = resolveProtocolReasonCodeMetadata(code);
   if (metadata) {
-    switch (metadata.kind) {
-      case "refusal":
-        return "protected_action_refusal";
-      case "proof_gap":
-        return "proof_gap";
-      case "gateway_decision":
-        return code.includes("replay") ? "replay_refusal" : "protected_action_refusal";
-      case "policy_decision":
-        return code.includes("refusal") || code.includes("refused") ? "protected_action_refusal" : "proof_gap";
-      case "isolation":
-        return "protected_action_refusal";
-      case "recovery":
-        return error.metadata.proofRef ? "proof_gap" : "protected_action_refusal";
-      case "protected_path_posture":
-        return code.includes("stale") ? "stale_admission" : "proof_gap";
-      default:
-        break;
-    }
+    const metadataOptions =
+      error.metadata.proofRef !== undefined ? { proofRef: error.metadata.proofRef } : {};
+    return failureClassFromReasonCodeMetadata(code, metadata, metadataOptions);
   }
 
   if (error.metadata.refusalRef) return "protected_action_refusal";
   if (error.metadata.proofRef) return "proof_gap";
   if (error.status >= 500) return "internal";
+  if (error.status >= 400 && error.status < 500) return "protected_action_refusal";
   return "internal";
 }
 
@@ -121,29 +151,13 @@ function classifyFailureClassFromReasonCode(code: string): FailureClass {
 
   const metadata = resolveProtocolReasonCodeMetadata(code);
   if (metadata) {
-    switch (metadata.kind) {
-      case "refusal":
-      case "isolation":
-        return "protected_action_refusal";
-      case "proof_gap":
-        return "proof_gap";
-      case "gateway_decision":
-        return code.includes("replay") ? "replay_refusal" : "protected_action_refusal";
-      case "policy_decision":
-        return code.includes("refusal") || code.includes("refused") ? "protected_action_refusal" : "proof_gap";
-      case "recovery":
-        return "proof_gap";
-      case "protected_path_posture":
-        return code.includes("stale") ? "stale_admission" : "proof_gap";
-      default:
-        break;
-    }
+    return failureClassFromReasonCodeMetadata(code, metadata);
   }
 
   if (code.includes("refusal") || code.includes("refused") || code.startsWith("protected_action_")) {
     return "protected_action_refusal";
   }
-  if (code.includes("proof_gap") || code.includes("proof")) return "proof_gap";
+  if (code.includes("proof_gap")) return "proof_gap";
   if (code.includes("auth")) return "auth";
 
   return classifyFailureClassFromProtocolError(

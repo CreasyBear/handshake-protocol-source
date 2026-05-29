@@ -50,6 +50,19 @@ const parityRows: Array<{
     expected: "replay_refusal",
     mustNotBeAuth: true,
   },
+  {
+    label: "policy envelope refusal",
+    reasonCodes: ["envelope_not_active"],
+    protocolError: new HandshakeProtocolError("envelope_not_active", "Envelope inactive.", 409),
+    expected: "protected_action_refusal",
+    mustNotBeAuth: true,
+  },
+  {
+    label: "gateway custody proof mismatch",
+    reasonCodes: ["gateway_custody_proof_custody_mismatch"],
+    expected: "internal",
+    mustNotBeAuth: true,
+  },
 ];
 
 describe("MCP failureClass parity with HTTP classifier", () => {

@@ -11,11 +11,24 @@ export type ProtocolReasonCodeKind =
   | "generated_graph_terminal"
   | "protected_path_posture";
 
+export type ProtocolReasonCodeDecisionPolarity = "pass" | "refusal" | "proof_gap";
+
+export type ProtocolReasonCodeFailureClass =
+  | "auth"
+  | "hosted_admission"
+  | "protected_action_refusal"
+  | "proof_gap"
+  | "replay_refusal"
+  | "stale_admission"
+  | "internal";
+
 export type ProtocolReasonCodeEntry = {
   code: string;
   kind: ProtocolReasonCodeKind;
   phase: ProtocolTransitionPhase;
   publicSafe: boolean;
+  decisionPolarity?: ProtocolReasonCodeDecisionPolarity;
+  classifiedFailure?: ProtocolReasonCodeFailureClass;
 };
 
 export type ProtocolReasonCodePrefixEntry = {
@@ -27,7 +40,9 @@ export type ProtocolReasonCodePrefixEntry = {
 
 export const protocolReasonCodes = [
   code("bootstrap_record_digest_conflict", "transition_error", "catalog"),
-  code("install_orphan_catalog_missing_gateway", "transition_error", "catalog"),
+  code("install_orphan_catalog_missing_gateway", "transition_error", "catalog", {
+    classifiedFailure: "proof_gap",
+  }),
   code("invalid_transition_greenlight_already_issued", "transition_error", "policy"),
   code("greenlight_issuance_refusal_commit_conflict", "transition_error", "policy"),
   code("idempotency_ledger_conflict", "transition_error", "policy"),
@@ -170,8 +185,8 @@ export const protocolReasonCodes = [
   code("gateway_custody_proof_drifted", "transition_error", "credential_custody"),
   code("gateway_custody_proof_redaction_failed", "transition_error", "credential_custody"),
 
-  code("policy_passed", "policy_decision", "policy"),
-  code("isolation_review_only", "policy_decision", "policy"),
+  code("policy_passed", "policy_decision", "policy", { decisionPolarity: "pass" }),
+  code("isolation_review_only", "policy_decision", "policy", { decisionPolarity: "pass" }),
   code("contract_expired", "policy_decision", "policy"),
   code("envelope_not_active", "policy_decision", "policy"),
   code("action_class_outside_envelope", "policy_decision", "policy"),
@@ -180,7 +195,7 @@ export const protocolReasonCodes = [
   code("prior_action_missing", "policy_decision", "policy"),
   code("prior_action_refused", "policy_decision", "policy"),
   code("prior_action_not_greenlit", "policy_decision", "policy"),
-  code("review_approved", "policy_decision", "policy"),
+  code("review_approved", "policy_decision", "policy", { decisionPolarity: "pass" }),
   code("review_decision_invalid", "policy_decision", "policy"),
   code("idempotency_duplicate_authority", "policy_decision", "policy"),
   code("idempotency_key_params_mismatch", "policy_decision", "policy"),
@@ -274,7 +289,7 @@ export const protocolReasonCodes = [
   code("gateway_policy_unknown", "gateway_decision", "gateway"),
   code("gateway_policy_drift", "gateway_decision", "gateway"),
   code("protected_surface_operation_in_progress", "gateway_decision", "gateway"),
-  code("gate_passed", "gateway_decision", "gateway"),
+  code("gate_passed", "gateway_decision", "gateway", { decisionPolarity: "pass" }),
   code("downstream_status_unknown", "proof_gap", "gateway"),
   code("lockfile_reconstruction_evidence_missing", "proof_gap", "gateway"),
   code("npm_provenance_not_verified", "proof_gap", "gateway"),
@@ -305,7 +320,7 @@ export const protocolReasonCodes = [
   code("review_artifact_action_posture_unsafe", "transition_error", "review"),
   code("review_artifact_policy_input_mismatch", "transition_error", "review"),
   code("review_artifact_gateway_policy_mismatch", "transition_error", "review"),
-  code("human_verified_exact_contract", "policy_decision", "review"),
+  code("human_verified_exact_contract", "policy_decision", "review", { decisionPolarity: "pass" }),
   code("sensitive_action", "policy_decision", "review"),
 
   code("receipt_digest_missing", "transition_error", "receipt_export"),
@@ -398,12 +413,20 @@ export function isRegisteredProtocolReasonCode(candidate: string): boolean {
   );
 }
 
-export function resolveProtocolReasonCodeMetadata(
-  candidate: string,
-): Pick<ProtocolReasonCodeEntry, "kind" | "phase"> | null {
+export type ProtocolReasonCodeMetadata = Pick<
+  ProtocolReasonCodeEntry,
+  "kind" | "phase" | "decisionPolarity" | "classifiedFailure"
+>;
+
+export function resolveProtocolReasonCodeMetadata(candidate: string): ProtocolReasonCodeMetadata | null {
   const exact = protocolReasonCodes.find((entry) => entry.code === candidate);
   if (exact) {
-    return { kind: exact.kind, phase: exact.phase };
+    return {
+      kind: exact.kind,
+      phase: exact.phase,
+      ...(exact.decisionPolarity !== undefined ? { decisionPolarity: exact.decisionPolarity } : {}),
+      ...(exact.classifiedFailure !== undefined ? { classifiedFailure: exact.classifiedFailure } : {}),
+    };
   }
   const prefix = protocolReasonCodePrefixes.find((entry) => candidate.startsWith(entry.prefix));
   if (prefix) {
@@ -412,17 +435,27 @@ export function resolveProtocolReasonCodeMetadata(
   return null;
 }
 
+type CodeOptions = {
+  publicSafe?: boolean;
+  decisionPolarity?: ProtocolReasonCodeDecisionPolarity;
+  classifiedFailure?: ProtocolReasonCodeFailureClass;
+};
+
 function code(
   value: string,
   kind: ProtocolReasonCodeKind,
   phase: ProtocolTransitionPhase,
-  publicSafe = true,
+  publicSafeOrOptions: boolean | CodeOptions = true,
 ): ProtocolReasonCodeEntry {
+  const options: CodeOptions =
+    typeof publicSafeOrOptions === "boolean" ? { publicSafe: publicSafeOrOptions } : publicSafeOrOptions;
   return {
     code: value,
     kind,
     phase,
-    publicSafe,
+    publicSafe: options.publicSafe ?? true,
+    ...(options.decisionPolarity ? { decisionPolarity: options.decisionPolarity } : {}),
+    ...(options.classifiedFailure ? { classifiedFailure: options.classifiedFailure } : {}),
   };
 }
 
