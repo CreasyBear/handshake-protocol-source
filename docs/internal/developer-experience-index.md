@@ -1,14 +1,21 @@
 # Developer Experience Index
 
+> **Doc type:** Reference
+
 Single entry for operator onboarding. Service API gating is the primary buyer
 path; host-operator commands apply only when you operate MCP/runtime binding.
 
-## Start Here — Operator journey
+## Start Here — Persona golden paths
+
+| Persona | Golden path | Boundary |
+| ------- | ----------- | -------- |
+| Agent / integrator | [golden-paths/agent-golden-path.md](./golden-paths/agent-golden-path.md) | Root import, compile→contract spine, `handshake evidence fetch` |
+| Service operator | [golden-paths/service-operator-golden-path.md](./golden-paths/service-operator-golden-path.md) | Dual enforcement, bootstrap, links service runbook |
+| Auditor / reviewer | [golden-paths/auditor-golden-path.md](./golden-paths/auditor-golden-path.md) | Readback + correlation index; proof-gap honesty |
+
+Legacy long-form operator narrative (Step 3 fork):
 
 → [service-operator-golden-path.md](./service-operator-golden-path.md)
-
-Includes Step 3 custody fork (service API vs agent host). You do not need two
-top-level Start Here paths.
 
 ## Operator runbooks (maintenance)
 

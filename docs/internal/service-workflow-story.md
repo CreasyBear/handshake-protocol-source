@@ -8,7 +8,8 @@ not create a new authority primitive or a peer product truth lane.
 
 ## Passport is not permission (D-59)
 
-**Passport is not permission.** **Show Passport is not authorization.** A
+**Passport is not a passport for permission.** **Passport is not permission.**
+**Show Passport is not authorization.** A
 presented evidence bundle helps a service map admission and readback; it does
 not substitute for policy evaluation, a one-use greenlight, or a gateway check
 before mutation. See [decisions.md](./decisions.md) for the category claim
