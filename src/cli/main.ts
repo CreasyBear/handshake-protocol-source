@@ -4,6 +4,7 @@ import { verifyCertificateCommand } from "./certificate";
 import { cliCommandManifest, cliSchemaOutput } from "./command-manifest";
 import type { CliCommandPlane } from "./command-manifest";
 import { doctorCommand, initCommand } from "./local-project/doctor";
+import { evidenceFetchCommand } from "./evidence/fetch";
 import {
   evidenceContractViewCommand,
   evidenceReceiptTimelineCommand,
@@ -67,6 +68,26 @@ export async function runCliCommand(argv: readonly string[]): Promise<unknown> {
       errorCode: "cli_required_argument_missing",
       message: "evidence aps-report requires <path>.",
       nextAction: "fix_arguments",
+    });
+  }
+  if (group === "evidence" && subcommand === "fetch") {
+    const contractId = optionValue(argv, "--contract-id");
+    if (!contractId) {
+      return cliCommandErrorOutput({
+        argv,
+        errorCode: "cli_required_argument_missing",
+        message: "evidence fetch requires --contract-id <id>.",
+        nextAction: "fix_arguments",
+      });
+    }
+    const baseUrl = optionValue(argv, "--base-url");
+    const cwd = optionValue(argv, "--cwd");
+    const roleCredential = optionValue(argv, "--role-credential");
+    return evidenceFetchCommand({
+      contractId,
+      ...(baseUrl ? { baseUrl } : {}),
+      ...(cwd ? { cwd } : {}),
+      ...(roleCredential ? { roleCredential } : {}),
     });
   }
   if (group === "evidence" && subcommand === "contract-view" && maybePath) {
