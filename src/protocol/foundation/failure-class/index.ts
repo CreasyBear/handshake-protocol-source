@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { HandshakeProtocolError } from "./errors";
-import { resolveProtocolReasonCodeMetadata } from "./reason-codes";
+import { HandshakeProtocolError } from "../errors";
+import { resolveProtocolReasonCodeMetadata } from "../reason-codes";
 
 export const FailureClassSchema = z.enum([
   "auth",
