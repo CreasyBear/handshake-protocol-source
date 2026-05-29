@@ -33,6 +33,7 @@ describe("http-profile orphan catalog guard", () => {
       });
 
     expect(result.outcome).toBe("install_proposal_refused");
+    if (result.outcome !== "install_proposal_refused") throw new Error("expected refused install");
     expect(result.reasonCodes).toContain("install_orphan_catalog_missing_gateway");
   });
 });

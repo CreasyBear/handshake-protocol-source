@@ -7,6 +7,7 @@ import {
   x402DelegatedSpendAuthorityBindingFor,
   x402WalletGatewayCredentialBindingFor,
 } from "../../src/adapters/x402-payment/install-proposal";
+import { requireInstallProposalGatewayRegistryEntry } from "../../src/install/install-proposal";
 import { proposeX402PaymentActionContract } from "../../src/adapters/x402-payment/action-proposal";
 import {
   runX402WalletGateway,
@@ -50,9 +51,10 @@ async function createNegotiatedX402GreenlightUnchecked() {
   const kernel = new HandshakeKernel(store);
   const proposal = await compileX402InstallProposal(validInstallInput());
   const records = requireCompiledRecords(proposal);
+  const gatewayRegistryEntry = requireInstallProposalGatewayRegistryEntry(records.gatewayRegistryEntry);
   await kernel.putCatalogObject({ objectType: "tool_capability", payload: records.toolCapability });
   await kernel.putCatalogObject({ objectType: "action_type", payload: records.actionType });
-  await kernel.putCatalogObject({ objectType: "gateway_registry_entry", payload: records.gatewayRegistryEntry });
+  await kernel.putCatalogObject({ objectType: "gateway_registry_entry", payload: gatewayRegistryEntry });
   await kernel.putCatalogObject({ objectType: "operating_envelope", payload: records.operatingEnvelope });
   await registerX402WalletCredentialRef(kernel, proposal, records);
   await registerX402DelegatedAuthorityRef(kernel, proposal, records);
@@ -217,13 +219,14 @@ async function recordGatewayCheckedPosture(
   proposal: X402InstallProposal,
   records: NonNullable<X402InstallProposal["compiledRecords"]>,
 ) {
+  const gatewayRegistryEntry = requireInstallProposalGatewayRegistryEntry(records.gatewayRegistryEntry);
   const bypassProbeIds: string[] = [];
   for (const probeKind of requiredGatewayCheckedBypassProbeKinds) {
     const probe = await kernel.createBypassProbe({
       tenantId: proposal.tenantId,
       organizationId: proposal.organizationId,
       runtimeAdapterId: records.toolCapability.runtimeAdapterId,
-      gatewayId: records.gatewayRegistryEntry.gatewayId,
+      gatewayId: gatewayRegistryEntry.gatewayId,
       actionClass: "x402_payment.exact",
       resourceRef: proposal.resourceRef,
       protectedSurfaceKind: "x402_payment",
@@ -240,7 +243,7 @@ async function recordGatewayCheckedPosture(
     tenantId: proposal.tenantId,
     organizationId: proposal.organizationId,
     runtimeAdapterId: records.toolCapability.runtimeAdapterId,
-    gatewayId: records.gatewayRegistryEntry.gatewayId,
+    gatewayId: gatewayRegistryEntry.gatewayId,
     actionClass: "x402_payment.exact",
     resourceRef: proposal.resourceRef,
     protectedSurfaceKind: "x402_payment",
@@ -293,6 +296,7 @@ function x402RuntimeConfig(
   if (!credentialRef) throw new Error("expected registered x402 wallet credential ref");
   const authorityRef = x402AuthorityRefs.get(proposal);
   if (!authorityRef) throw new Error("expected registered x402 delegated authority ref");
+  const gatewayRegistryEntry = requireInstallProposalGatewayRegistryEntry(records.gatewayRegistryEntry);
   return {
     tenantId: proposal.tenantId,
     organizationId: proposal.organizationId,
@@ -303,15 +307,15 @@ function x402RuntimeConfig(
     operatingEnvelopeId: records.operatingEnvelope.envelopeId,
     toolCatalogRef: `${records.toolCapability.toolCatalogId}@${records.toolCapability.toolCatalogVersion}`,
     actionCatalogRef: `${records.actionType.actionCatalogId}@${records.actionType.actionCatalogVersion}`,
-    gatewayRegistryRef: `gateway_registry@${records.gatewayRegistryEntry.gatewayRegistryVersion}`,
+    gatewayRegistryRef: `gateway_registry@${gatewayRegistryEntry.gatewayRegistryVersion}`,
     gatewayReadinessRef: "handshake://local/x402/a2a-gateway-readiness.json",
     gatewayReadinessDigest: digest,
     policyVersionRef: `${proposal.policyPackRef}@${proposal.policyPackVersion}`,
     policyVersionDigest: digest,
     toolCapabilityId: records.toolCapability.toolCapabilityId,
     actionTypeId: records.actionType.actionTypeId,
-    gatewayRegistryEntryId: records.gatewayRegistryEntry.gatewayRegistryEntryId,
-    gatewayId: records.gatewayRegistryEntry.gatewayId,
+    gatewayRegistryEntryId: gatewayRegistryEntry.gatewayRegistryEntryId,
+    gatewayId: gatewayRegistryEntry.gatewayId,
     gatewayCredentialBinding: x402WalletGatewayCredentialBindingFor(credentialRef),
     delegatedAuthorityBinding: x402DelegatedSpendAuthorityBindingFor(authorityRef),
     maxAtomicAmountPerCall: proposal.spendBounds.maxAtomicAmountPerCall,

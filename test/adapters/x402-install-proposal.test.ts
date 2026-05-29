@@ -4,6 +4,7 @@ import {
   x402PaymentExactAdapterPack,
   type X402InstallProposalInput,
 } from "../../src/adapters/x402-payment/install-proposal";
+import { requireInstallProposalGatewayRegistryEntry } from "../../src/install/install-proposal";
 import { nowIso } from "../../src/protocol/foundation/ids";
 import { futureIso } from "../support/fixtures";
 
@@ -21,8 +22,11 @@ describe("x402 install proposal compiler", () => {
     expect(proposal.humanSummary).toContain("local spend-window fields are non-enforced metadata");
     expect(proposal.spendBounds.spendWindowEnforcementStatus).toBe("not_enforced_local_metadata");
     expect(proposal.compiledRecords?.actionType.actionClass).toBe("x402_payment.exact");
-    expect(proposal.compiledRecords?.gatewayRegistryEntry.credentialCustodyStatus).toBe("fixture_gateway_held");
-    expect(proposal.compiledRecords?.gatewayRegistryEntry.enforcementMode).toBe("reference_fixture");
+    const gatewayRegistryEntry = requireInstallProposalGatewayRegistryEntry(
+      proposal.compiledRecords?.gatewayRegistryEntry ?? null,
+    );
+    expect(gatewayRegistryEntry.credentialCustodyStatus).toBe("fixture_gateway_held");
+    expect(gatewayRegistryEntry.enforcementMode).toBe("reference_fixture");
     expect(proposal.compiledRecords?.operatingEnvelope.requiredProtectedPathState).toBe("gateway_checked");
     expect(proposal.compiledRecords?.operatingEnvelope.allowedResources).toEqual([proposal.resourceRef]);
     expect(JSON.stringify(proposal.compiledRecords)).not.toContain("maxAtomicAmountPerSession");

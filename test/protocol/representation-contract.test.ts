@@ -4,6 +4,7 @@ import {
   type X402InstallProposal,
   type X402InstallProposalInput,
 } from "../../src/adapters/x402-payment/install-proposal";
+import { requireInstallProposalGatewayRegistryEntry } from "../../src/install/install-proposal";
 import {
   projectProtectedActionChallengeFromRefusal,
   projectProtectedActionMetadata,
@@ -61,12 +62,13 @@ describe("protected action representation contract", () => {
 
   it("represents x402 protected spend without signer, approval, or authority material", async () => {
     const proposal = await compileX402InstallProposal(validX402InstallInput());
-    const records = requireCompiledX402Records(proposal);
+  const records = requireCompiledX402Records(proposal);
+  const gatewayRegistryEntry = requireInstallProposalGatewayRegistryEntry(records.gatewayRegistryEntry);
 
-    const metadata = projectProtectedActionMetadata({
-      tool: records.toolCapability,
-      actionType: records.actionType,
-      gateway: records.gatewayRegistryEntry,
+  const metadata = projectProtectedActionMetadata({
+    tool: records.toolCapability,
+    actionType: records.actionType,
+    gateway: gatewayRegistryEntry,
       envelope: records.operatingEnvelope,
     });
 
@@ -88,7 +90,7 @@ describe("protected action representation contract", () => {
       receiptAssertionCreated: false,
       authorityCertificateMintRequested: false,
     });
-    expect(JSON.stringify(metadata)).not.toContain(records.gatewayRegistryEntry.mutationCredentialHolderRef);
+    expect(JSON.stringify(metadata)).not.toContain(gatewayRegistryEntry.mutationCredentialHolderRef);
 
     const x402Parameters = {
       endpointUrl: proposal.endpointEvidence.endpointUrl,
@@ -137,12 +139,12 @@ describe("protected action representation contract", () => {
       receiptAssertionCreated: false,
       authorityCertificateMintRequested: false,
     });
-    expect(JSON.stringify(request)).not.toContain(records.gatewayRegistryEntry.mutationCredentialHolderRef);
+    expect(JSON.stringify(request)).not.toContain(gatewayRegistryEntry.mutationCredentialHolderRef);
     expect(JSON.stringify(request)).not.toContain("paymentSignature");
     expect(() =>
       ProtectedActionRequestSchema.parse({
         ...request,
-        secretRefs: { signer: records.gatewayRegistryEntry.mutationCredentialHolderRef },
+        secretRefs: { signer: gatewayRegistryEntry.mutationCredentialHolderRef },
       }),
     ).toThrow();
     expectNonAuthorityEscapesRejected(ProtectedActionRequestSchema, request);

@@ -169,7 +169,8 @@ describe("manifest coverage", () => {
     for (const boundary of Object.values(surfaceBoundaryManifest)) {
       if (!boundary.id.startsWith("cli.")) continue;
       for (const root of boundary.sourceRoots) {
-        if (root === "src/cli" || root === "src/cli/") {
+        const sourceRoot = String(root);
+        if (sourceRoot === "src/cli" || sourceRoot === "src/cli/") {
           violations.push(`${boundary.id} uses directory-wide src/cli root`);
         }
       }

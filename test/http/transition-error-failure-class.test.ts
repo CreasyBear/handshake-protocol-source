@@ -109,7 +109,7 @@ describe("transition error failureClass taxonomy", () => {
     const app = createApp({
       store: fixture.store,
       callerAuthTokens: TEST_CALLER_AUTH_TOKENS,
-      hostedAdmission: hostedAdmissionConfig(),
+      hostedAdmissionConfig: hostedAdmissionConfig(),
       hostedCallerVerifier: headerHostedVerifier(),
     });
 

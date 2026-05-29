@@ -8,6 +8,7 @@ import {
   x402DelegatedSpendAuthorityBindingFor,
   x402WalletGatewayCredentialBindingFor,
 } from "../../src/adapters/x402-payment/install-proposal";
+import { requireInstallProposalGatewayRegistryEntry } from "../../src/install/install-proposal";
 import {
   buildX402PaymentAttemptFromRequiredEvidence,
   proposeX402PaymentActionContract,
@@ -467,7 +468,7 @@ async function installedX402Kernel(): Promise<{
   const records = requireCompiledRecords(proposal);
   await kernel.putCatalogObject({ objectType: "tool_capability", payload: records.toolCapability });
   await kernel.putCatalogObject({ objectType: "action_type", payload: records.actionType });
-  await kernel.putCatalogObject({ objectType: "gateway_registry_entry", payload: records.gatewayRegistryEntry });
+  await kernel.putCatalogObject({ objectType: "gateway_registry_entry", payload: requireInstallProposalGatewayRegistryEntry(records.gatewayRegistryEntry) });
   await kernel.putCatalogObject({ objectType: "operating_envelope", payload: records.operatingEnvelope });
   await registerX402WalletCredentialRef(kernel, proposal, records);
   await registerX402DelegatedAuthorityRef(kernel, proposal, records);
@@ -492,15 +493,15 @@ function runtimeConfig(proposal: X402InstallProposal, records: NonNullable<X402I
     operatingEnvelopeId: records.operatingEnvelope.envelopeId,
     toolCatalogRef: `${records.toolCapability.toolCatalogId}@${records.toolCapability.toolCatalogVersion}`,
     actionCatalogRef: `${records.actionType.actionCatalogId}@${records.actionType.actionCatalogVersion}`,
-    gatewayRegistryRef: `gateway_registry@${records.gatewayRegistryEntry.gatewayRegistryVersion}`,
+    gatewayRegistryRef: `gateway_registry@${(requireInstallProposalGatewayRegistryEntry(records.gatewayRegistryEntry)).gatewayRegistryVersion}`,
     gatewayReadinessRef: "handshake://local/x402/gateway-readiness.json",
     gatewayReadinessDigest: digest,
     policyVersionRef: `${proposal.policyPackRef}@${proposal.policyPackVersion}`,
     policyVersionDigest: digest,
     toolCapabilityId: records.toolCapability.toolCapabilityId,
     actionTypeId: records.actionType.actionTypeId,
-    gatewayRegistryEntryId: records.gatewayRegistryEntry.gatewayRegistryEntryId,
-    gatewayId: records.gatewayRegistryEntry.gatewayId,
+    gatewayRegistryEntryId: (requireInstallProposalGatewayRegistryEntry(records.gatewayRegistryEntry)).gatewayRegistryEntryId,
+    gatewayId: (requireInstallProposalGatewayRegistryEntry(records.gatewayRegistryEntry)).gatewayId,
     gatewayCredentialBinding: x402WalletGatewayCredentialBindingFor(credentialRef),
     delegatedAuthorityBinding: x402DelegatedSpendAuthorityBindingFor(requireX402AuthorityRef(proposal)),
     maxAtomicAmountPerCall: proposal.spendBounds.maxAtomicAmountPerCall,
@@ -617,7 +618,7 @@ async function installedOfficialX402Kernel(paymentRequirementsDigest: `sha256:${
   const records = requireCompiledRecords(proposal);
   await kernel.putCatalogObject({ objectType: "tool_capability", payload: records.toolCapability });
   await kernel.putCatalogObject({ objectType: "action_type", payload: records.actionType });
-  await kernel.putCatalogObject({ objectType: "gateway_registry_entry", payload: records.gatewayRegistryEntry });
+  await kernel.putCatalogObject({ objectType: "gateway_registry_entry", payload: requireInstallProposalGatewayRegistryEntry(records.gatewayRegistryEntry) });
   await kernel.putCatalogObject({ objectType: "operating_envelope", payload: records.operatingEnvelope });
   await registerX402WalletCredentialRef(kernel, proposal, records);
   await registerX402DelegatedAuthorityRef(kernel, proposal, records);
@@ -659,7 +660,7 @@ async function recordGatewayCheckedPosture(
       tenantId: proposal.tenantId,
       organizationId: proposal.organizationId,
       runtimeAdapterId: records.toolCapability.runtimeAdapterId,
-      gatewayId: records.gatewayRegistryEntry.gatewayId,
+      gatewayId: (requireInstallProposalGatewayRegistryEntry(records.gatewayRegistryEntry)).gatewayId,
       actionClass: "x402_payment.exact",
       resourceRef: proposal.resourceRef,
       protectedSurfaceKind: "x402_payment",
@@ -676,7 +677,7 @@ async function recordGatewayCheckedPosture(
     tenantId: proposal.tenantId,
     organizationId: proposal.organizationId,
     runtimeAdapterId: records.toolCapability.runtimeAdapterId,
-    gatewayId: records.gatewayRegistryEntry.gatewayId,
+    gatewayId: (requireInstallProposalGatewayRegistryEntry(records.gatewayRegistryEntry)).gatewayId,
     actionClass: "x402_payment.exact",
     resourceRef: proposal.resourceRef,
     protectedSurfaceKind: "x402_payment",

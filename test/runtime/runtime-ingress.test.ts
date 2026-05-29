@@ -8,6 +8,7 @@ import {
   x402DelegatedSpendAuthorityBindingFor,
   x402WalletGatewayCredentialBindingFor,
 } from "../../src/adapters/x402-payment/install-proposal";
+import { requireInstallProposalGatewayRegistryEntry } from "../../src/install/install-proposal";
 import type { GatewayCredentialRef } from "../../src/protocol/areas/credential-custody";
 import type { DelegatedAuthorityRef } from "../../src/protocol/areas/delegated-authority";
 import type { ProtocolObjectType, ProtocolStore } from "../../src/protocol/store/port";
@@ -523,7 +524,7 @@ describe("runtime ingress adapter", () => {
     await authFixture.kernel.putCatalogObject({ objectType: "action_type", payload: x402Records.actionType });
     await authFixture.kernel.putCatalogObject({
       objectType: "gateway_registry_entry",
-      payload: x402Records.gatewayRegistryEntry,
+      payload: requireInstallProposalGatewayRegistryEntry(x402Records.gatewayRegistryEntry),
     });
     await authFixture.kernel.putCatalogObject({
       objectType: "operating_envelope",
@@ -1121,7 +1122,7 @@ async function installedX402IngressFixture() {
   await fixture.kernel.putCatalogObject({ objectType: "action_type", payload: records.actionType });
   await fixture.kernel.putCatalogObject({
     objectType: "gateway_registry_entry",
-    payload: records.gatewayRegistryEntry,
+    payload: requireInstallProposalGatewayRegistryEntry(records.gatewayRegistryEntry),
   });
   await fixture.kernel.putCatalogObject({ objectType: "operating_envelope", payload: records.operatingEnvelope });
   const credentialRef = await registerX402WalletCredentialRef(fixture.kernel, proposal, records);
@@ -1140,15 +1141,15 @@ async function installedX402IngressFixture() {
       operatingEnvelopeId: records.operatingEnvelope.envelopeId,
       toolCatalogRef: `${records.toolCapability.toolCatalogId}@${records.toolCapability.toolCatalogVersion}`,
       actionCatalogRef: `${records.actionType.actionCatalogId}@${records.actionType.actionCatalogVersion}`,
-      gatewayRegistryRef: `gateway_registry@${records.gatewayRegistryEntry.gatewayRegistryVersion}`,
+      gatewayRegistryRef: `gateway_registry@${(requireInstallProposalGatewayRegistryEntry(records.gatewayRegistryEntry)).gatewayRegistryVersion}`,
       gatewayReadinessRef: "handshake://local/x402/gateway-readiness.json",
       gatewayReadinessDigest: x402Digest,
       policyVersionRef: `${proposal.policyPackRef}@${proposal.policyPackVersion}`,
       policyVersionDigest: x402Digest,
       toolCapabilityId: records.toolCapability.toolCapabilityId,
       actionTypeId: records.actionType.actionTypeId,
-      gatewayRegistryEntryId: records.gatewayRegistryEntry.gatewayRegistryEntryId,
-      gatewayId: records.gatewayRegistryEntry.gatewayId,
+      gatewayRegistryEntryId: (requireInstallProposalGatewayRegistryEntry(records.gatewayRegistryEntry)).gatewayRegistryEntryId,
+      gatewayId: (requireInstallProposalGatewayRegistryEntry(records.gatewayRegistryEntry)).gatewayId,
       gatewayCredentialBinding: x402WalletGatewayCredentialBindingFor(credentialRef),
       delegatedAuthorityBinding: x402DelegatedSpendAuthorityBindingFor(authorityRef),
       maxAtomicAmountPerCall: proposal.spendBounds.maxAtomicAmountPerCall,
@@ -1167,7 +1168,7 @@ async function installedMixedIngressFixture() {
   await fixture.kernel.putCatalogObject({ objectType: "action_type", payload: x402Records.actionType });
   await fixture.kernel.putCatalogObject({
     objectType: "gateway_registry_entry",
-    payload: x402Records.gatewayRegistryEntry,
+    payload: requireInstallProposalGatewayRegistryEntry(x402Records.gatewayRegistryEntry),
   });
   await fixture.kernel.putCatalogObject({ objectType: "operating_envelope", payload: x402Records.operatingEnvelope });
   const x402CredentialRef = await registerX402WalletCredentialRef(fixture.kernel, x402Proposal, x402Records);
@@ -1176,7 +1177,7 @@ async function installedMixedIngressFixture() {
     envelopeId: "env_mixed_runtime_ingress",
     objectiveRef: "intent:install package and fetch paid context",
     allowedActionClasses: ["package.install", "x402_payment.exact"],
-    allowedGateways: [fixture.gateway.gatewayId, x402Records.gatewayRegistryEntry.gatewayId],
+    allowedGateways: [fixture.gateway.gatewayId, requireInstallProposalGatewayRegistryEntry(x402Records.gatewayRegistryEntry).gatewayId],
     allowedResources: ["npm:hono", x402Proposal.resourceRef],
     evidenceRequirements: ["package_lock_diff", "x402_payment_required"],
   };
@@ -1216,15 +1217,15 @@ function x402RuntimeConfigFor(
     operatingEnvelopeId: records.operatingEnvelope.envelopeId,
     toolCatalogRef: `${records.toolCapability.toolCatalogId}@${records.toolCapability.toolCatalogVersion}`,
     actionCatalogRef: `${records.actionType.actionCatalogId}@${records.actionType.actionCatalogVersion}`,
-    gatewayRegistryRef: `gateway_registry@${records.gatewayRegistryEntry.gatewayRegistryVersion}`,
+    gatewayRegistryRef: `gateway_registry@${(requireInstallProposalGatewayRegistryEntry(records.gatewayRegistryEntry)).gatewayRegistryVersion}`,
     gatewayReadinessRef: "handshake://local/x402/gateway-readiness.json",
     gatewayReadinessDigest: x402Digest,
     policyVersionRef: `${proposal.policyPackRef}@${proposal.policyPackVersion}`,
     policyVersionDigest: x402Digest,
     toolCapabilityId: records.toolCapability.toolCapabilityId,
     actionTypeId: records.actionType.actionTypeId,
-    gatewayRegistryEntryId: records.gatewayRegistryEntry.gatewayRegistryEntryId,
-    gatewayId: records.gatewayRegistryEntry.gatewayId,
+    gatewayRegistryEntryId: (requireInstallProposalGatewayRegistryEntry(records.gatewayRegistryEntry)).gatewayRegistryEntryId,
+    gatewayId: (requireInstallProposalGatewayRegistryEntry(records.gatewayRegistryEntry)).gatewayId,
     gatewayCredentialBinding: x402WalletGatewayCredentialBindingFor(credentialRef),
     delegatedAuthorityBinding: x402DelegatedSpendAuthorityBindingFor(authorityRef),
     maxAtomicAmountPerCall: proposal.spendBounds.maxAtomicAmountPerCall,
@@ -1265,6 +1266,7 @@ function upstreamX402DispatchBinding(proposal: X402InstallProposal): Partial<Wra
     asset: proposal.endpointEvidence.token,
     payTo: proposal.endpointEvidence.payee,
     maxTimeoutSeconds: 60,
+    selectedPaymentRequirementIndex: 0,
     selectedPaymentRequirementDigest: x402SelectedPaymentRequirementDigest,
     sdkPackageVersions: x402SdkPackageVersions,
     extensionKeys: ["payment-identifier"],
