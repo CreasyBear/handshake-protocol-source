@@ -8,6 +8,7 @@ import {
   x402FirstWedgeUnsupportedSurfaces,
   type X402PaymentConformancePosture,
 } from "../../adapters/x402-payment/conformance";
+import { requireInstallProposalGatewayRegistryEntry } from "../../install/install-proposal";
 import {
   compileX402InstallProposal,
   X402InstallProposalInputSchema,
@@ -318,12 +319,17 @@ async function buildLocalInstallRecord(input: {
     refusalReasonCodes: input.proposal.refusalReasonCodes,
     compiledRecordsIncluded: false,
     compiledRecordRefs: compiled
-      ? {
-          toolCapabilityRef: compiled.toolCapability.toolCapabilityId,
-          actionTypeRef: compiled.actionType.actionTypeId,
-          gatewayRegistryEntryRef: compiled.gatewayRegistryEntry.gatewayRegistryEntryId,
-          operatingEnvelopeRef: compiled.operatingEnvelope.envelopeId,
-        }
+      ? (() => {
+          const gatewayRegistryEntry = requireInstallProposalGatewayRegistryEntry(
+            compiled.gatewayRegistryEntry,
+          );
+          return {
+            toolCapabilityRef: compiled.toolCapability.toolCapabilityId,
+            actionTypeRef: compiled.actionType.actionTypeId,
+            gatewayRegistryEntryRef: gatewayRegistryEntry.gatewayRegistryEntryId,
+            operatingEnvelopeRef: compiled.operatingEnvelope.envelopeId,
+          };
+        })()
       : null,
     controlPlaneRegistrationRequired: true,
     controlPlaneRegistrationPerformed: false,

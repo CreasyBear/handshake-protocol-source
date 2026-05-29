@@ -32,6 +32,15 @@ export type InstallProposalCompiledKernelRecords = {
   operatingEnvelope: OperatingEnvelope;
 };
 
+export function requireInstallProposalGatewayRegistryEntry(
+  gatewayRegistryEntry: GatewayRegistryEntry | null,
+): GatewayRegistryEntry {
+  if (gatewayRegistryEntry === null) {
+    throw new Error("install proposal compiled records require gateway registry entry.");
+  }
+  return gatewayRegistryEntry;
+}
+
 export const InstallProposalSchema = z.strictObject({
   installProposalId: IdSchema,
   schemaVersion: z.literal(PROTOCOL_VERSION),
