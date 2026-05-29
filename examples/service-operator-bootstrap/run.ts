@@ -3,7 +3,7 @@ import { fileURLToPath } from "node:url";
 import {
   defaultX402BootstrapInstallInput,
   runServiceBootstrap,
-} from "../../src/cli/service/bootstrap";
+} from "../../src/cli/service-operator/bootstrap";
 
 const outputDir = new URL("./output/", import.meta.url);
 const outputJsonPath = new URL("./output/latest.json", import.meta.url);

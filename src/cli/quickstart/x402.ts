@@ -1,4 +1,4 @@
-import { defaultX402BootstrapInstallInput } from "../service/bootstrap";
+import { defaultX402BootstrapInstallInput } from "../service-operator/bootstrap";
 import { installX402PaymentCommand, x402PaymentConformanceCommand } from "../x402";
 import { cliNonClaims, cliOutput } from "../output";
 

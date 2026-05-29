@@ -238,7 +238,7 @@ function installClientForStore(store: ProtocolStore, tokens: CallerAuthTokens): 
     {
       roleCredential: controlPlaneToken,
       requestIdentityFactory: () => "service-bootstrap-request",
-      originatingIdentity: "ref:cli/service-bootstrap",
+      originatingIdentity: "ref:cli/service-operator-bootstrap",
     },
     fetchImpl,
   );

@@ -481,7 +481,7 @@ describe("Hono protocol surface", () => {
     );
     const { compileX402InstallProposal } = await import("../../src/adapters/x402-payment/install-proposal");
     const { defaultX402BootstrapInstallInput, installProposalFromX402 } = await import(
-      "../../src/cli/service/bootstrap"
+      "../../src/cli/service-operator/bootstrap"
     );
     const proposal = await compileX402InstallProposal(defaultX402BootstrapInstallInput());
     const registered = await installClient.registerInstallProposalCompiledRecords(

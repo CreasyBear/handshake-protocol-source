@@ -14,7 +14,7 @@ import { supportBundleCommand } from "./support-bundle";
 import { hostDoctorCommand } from "./host/doctor";
 import { runAgentSpineQuickstart } from "./quickstart/agent-spine";
 import { runX402Quickstart } from "./quickstart/x402";
-import { serviceBootstrapCommand } from "./service/bootstrap";
+import { serviceBootstrapCommand } from "./service-operator/bootstrap";
 import { simulateX402PaymentCommand } from "./simulate/x402-payment";
 import {
   installHealthCommand,

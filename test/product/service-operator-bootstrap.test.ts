@@ -4,7 +4,7 @@ import {
   defaultX402BootstrapInstallInput,
   runServiceBootstrap,
   serviceBootstrapCommand,
-} from "../../src/cli/service/bootstrap";
+} from "../../src/cli/service-operator/bootstrap";
 import { InMemoryProtocolStore } from "../../src/storage/memory";
 
 describe("service operator bootstrap", () => {

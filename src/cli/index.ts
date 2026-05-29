@@ -14,7 +14,7 @@ export {
   defaultX402BootstrapInstallInput,
   runServiceBootstrap,
   serviceBootstrapCommand,
-} from "./service/bootstrap";
+} from "./service-operator/bootstrap";
 export { hostDoctorCommand } from "./host/doctor";
 export { runAgentSpineQuickstart } from "./quickstart/agent-spine";
 export { runX402Quickstart } from "./quickstart/x402";
