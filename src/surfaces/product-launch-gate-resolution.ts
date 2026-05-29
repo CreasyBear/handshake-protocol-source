@@ -41,7 +41,7 @@ export const productLaunchGateResolutions = ProductLaunchGateResolutionSchema.ar
       gateId: "first_external_runtime_transcript",
       status: "resolved_selected",
       decision:
-        "Codex-local is the first live runtime target, and run-local evidence now shows a fresh Codex host attempted handshake.actions.x402_payment.propose through a handshake_x402 MCP server entry pinned to the current 0.2.7 local artifact.",
+        "Codex-local is the first live runtime target, and run-local evidence now shows a fresh Codex host attempted handshake.actions.x402_payment.propose through a handshake_x402 MCP server entry pinned to the current 0.2.8 local artifact.",
       launchLanguageBoundary:
         "Codex-local host-origin MCP tool invocation may be claimed for the pinned artifact. Do not claim native certification, host-wide containment, policy authority, gateway checks, signer use, payment material, customer gateway custody, live paid execution, or registry discovery.",
       requiredEvidence: [
@@ -51,7 +51,7 @@ export const productLaunchGateResolutions = ProductLaunchGateResolutionSchema.ar
         "record proposal/readback transcript and raw sibling posture",
       ],
       currentEvidence: [
-        "live /Users/joelchan/.codex/config.toml readback found handshake_x402 pinned to handshake-protocol-kernel@0.2.7 artifact sha256 c80c3985a9c695c6008c9c9eb5323085e2dcfa262f9c090aab2a78056e6bcf42",
+        "live /Users/joelchan/.codex/config.toml readback found handshake_x402 pinned to handshake-protocol-kernel@0.2.8 artifact sha256 c80c3985a9c695c6008c9c9eb5323085e2dcfa262f9c090aab2a78056e6bcf42",
         "fresh Codex host observed and attempted handshake.actions.x402_payment.propose; empty-object input failed schema validation before authority or mutation",
       ],
       blockerReasonCodes: [],
@@ -91,9 +91,9 @@ export const productLaunchGateResolutions = ProductLaunchGateResolutionSchema.ar
         "search endpoint returns the server by package or MCP name",
       ],
       currentEvidence: [
-        "npm registry latest returned handshake-protocol-kernel@0.2.7 with registry signatures",
-        "trusted-publish workflow completed successfully for expected_version=0.2.7 and published GitHub Actions provenance",
-        "clean installed-artifact smoke passed for handshake-protocol-kernel@0.2.7",
+        "npm registry latest returned handshake-protocol-kernel@0.2.8 with registry signatures",
+        "trusted-publish workflow completed successfully for expected_version=0.2.8 and published GitHub Actions provenance",
+        "clean installed-artifact smoke passed for handshake-protocol-kernel@0.2.8",
         "official MCP Registry GET by io.github.CreasyBear/handshake-protocol-kernel returned 404 Server not found",
         "official MCP Registry search for handshake-protocol-kernel returned an empty server list",
       ],
@@ -183,9 +183,9 @@ export const productLaunchGateResolutions = ProductLaunchGateResolutionSchema.ar
       gateId: "package_provenance_npm_attestation",
       status: "resolved_selected",
       decision:
-        "Package provenance for 0.2.7 is satisfied by npm trusted publishing through the public artifact repository workflow.",
+        "Package provenance for 0.2.8 is satisfied by npm trusted publishing through the public artifact repository workflow.",
       launchLanguageBoundary:
-        "Published 0.2.7 can be described as npm-available with registry signature metadata, GitHub Actions provenance, and clean installed-artifact smoke. Do not describe publication as authority, supply-chain safety, MCP Registry discoverability, or hosted operation.",
+        "Published 0.2.8 can be described as npm-available with registry signature metadata, GitHub Actions provenance, and clean installed-artifact smoke. Do not describe publication as authority, supply-chain safety, MCP Registry discoverability, or hosted operation.",
       requiredEvidence: [
         "npm latest returns the intended product version",
         "npm dist.integrity and dist.signatures are recorded",
@@ -193,10 +193,10 @@ export const productLaunchGateResolutions = ProductLaunchGateResolutionSchema.ar
         "clean install smoke passes against the newly published artifact",
       ],
       currentEvidence: [
-        "npm latest returned 0.2.7 with dist.integrity and dist.signatures",
-        "trusted-publish workflow succeeded for expected_version=0.2.7",
+        "npm latest returned 0.2.8 with dist.integrity and dist.signatures",
+        "trusted-publish workflow succeeded for expected_version=0.2.8",
         "npm publish logged GitHub Actions provenance and Sigstore transparency log index 1628227940",
-        "clean installed-artifact smoke passed for handshake-protocol-kernel@0.2.7",
+        "clean installed-artifact smoke passed for handshake-protocol-kernel@0.2.8",
       ],
       blockerReasonCodes: [],
       nonClaims: ["not_authority_by_publication", "not_supply_chain_safety", "not_npm_audit_replacement"],

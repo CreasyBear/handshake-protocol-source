@@ -7,6 +7,52 @@ public artifact repository. It does not claim hosted operation, provider
 custody, settlement finality, marketplace certification, MCP Registry
 discoverability, or Handshake authority from publication alone.
 
+## 0.2.8 - 2026-05-29
+
+### Added
+
+- Service-agent gating phase: operator and full tier architecture gates,
+  `check:service-agent-gating-phase` scripts, service-operator golden path and
+  bootstrap examples, dual-enforcement posture tests, and HTTP mutation-route
+  manifest gating.
+- FailureClass taxonomy with registry-first derivation across HTTP transitions,
+  SDK role clients, and MCP failure surfaces.
+- x402 gateway-held credential custody (Mechanism A): signer unreachable without
+  passed gateway check and gateway-resolved redacted evidence.
+- Product coherence phase: unified readback spine, intent-compilation projection
+  rows, forbidden-copy lint, keel-integrity audit, and claim-boundary fixes
+  across CLI, SDK, and MCP surfaces.
+- Service-operator and host-operator runbooks, integrator parity docs, and
+  persona golden paths under internal docs.
+
+### Changed
+
+- Renamed service-agent integration vocabulary to service-operator where
+  product surfaces describe Branch A bootstrap and maintenance flows.
+- Root SDK re-export of role clients for one-import agent ergonomics without a
+  factory wrapper.
+- Product launch gate and proof-packet fixtures track `0.2.8` as the current
+  package surface after Phase 04+05 land.
+
+### Boundary Notes
+
+- This release does not broaden authority. The public package remains proposal,
+  evidence, conformance, SDK, CLI, and local MCP distribution only.
+- Service-agent gating proves structural dual enforcement and FailureClass
+  parity; it does not claim hosted operation, provider custody, or universal
+  agent governance.
+- MCP Registry discoverability remains a proof gap until registry acceptance
+  and lookup are verified.
+- Public npm availability does not create authority.
+
+### Release State
+
+- `ready_to_publish`: verified locally by repo gates and package projection.
+- `actually_published`: pending npm trusted-publish workflow, npm registry
+  readback, registry signature metadata, provenance publication, and clean
+  installed-artifact smoke for `0.2.8`.
+- `registry_discoverable`: pending MCP Registry acceptance and lookup.
+
 ## 0.2.7 - 2026-05-25
 
 ### Changed

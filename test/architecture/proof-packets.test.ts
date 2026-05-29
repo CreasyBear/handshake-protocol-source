@@ -19,8 +19,8 @@ describe("proof packet projectors", () => {
       package: {
         name: packageJson.name,
         version: packageJson.version,
-        packedFile: "handshake-protocol-kernel-0.2.7.tgz",
-        localArtifactPath: ".planning/artifacts/handshake-protocol-kernel-0.2.7.tgz",
+        packedFile: "handshake-protocol-kernel-0.2.8.tgz",
+        localArtifactPath: ".planning/artifacts/handshake-protocol-kernel-0.2.8.tgz",
         tarballSha256: "a".repeat(64),
         tarballSizeBytes: 123,
         npmIntegrity: "sha512-example",
@@ -146,7 +146,7 @@ trust_level = "trusted"
 url = "https://mcp.exa.ai/mcp?exaApiKey=secret"
 `,
       expectedArtifact: {
-        path: ".planning/artifacts/handshake-protocol-kernel-0.2.7.tgz",
+        path: ".planning/artifacts/handshake-protocol-kernel-0.2.8.tgz",
         exists: true,
         sha256: "b".repeat(64),
         sizeBytes: 123,
@@ -175,7 +175,7 @@ url = "https://mcp.exa.ai/mcp?exaApiKey=secret"
       configText: '[mcp_servers.handshake_x402]\ncommand = "npx"\nargs = ["handshake-mcp"]\n',
       expectedServer: expectedCodexServer(),
       expectedArtifact: {
-        path: ".planning/artifacts/handshake-protocol-kernel-0.2.7.tgz",
+        path: ".planning/artifacts/handshake-protocol-kernel-0.2.8.tgz",
         exists: true,
         sha256: "b".repeat(64),
         sizeBytes: 123,
@@ -202,7 +202,7 @@ url = "https://mcp.exa.ai/mcp?exaApiKey=secret"
         '[mcp_servers.handshake_x402]\ncommand = "/usr/local/bin/node"\nargs = ["/tmp/handshake/dist/bin/handshake-mcp.mjs"]\n',
       expectedServer: expectedCodexServer(),
       expectedArtifact: {
-        path: ".planning/artifacts/handshake-protocol-kernel-0.2.7.tgz",
+        path: ".planning/artifacts/handshake-protocol-kernel-0.2.8.tgz",
         exists: true,
         sha256: "b".repeat(64),
         sizeBytes: 123,
@@ -239,7 +239,7 @@ url = "https://mcp.exa.ai/mcp?exaApiKey=secret"
         ],
       },
       expectedArtifact: {
-        path: ".planning/artifacts/handshake-protocol-kernel-0.2.7.tgz",
+        path: ".planning/artifacts/handshake-protocol-kernel-0.2.8.tgz",
         exists: true,
         sha256: "b".repeat(64),
         sizeBytes: 123,

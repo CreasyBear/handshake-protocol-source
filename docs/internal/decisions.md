@@ -507,7 +507,7 @@ through Handshake. Do not claim live paid execution, settlement finality,
 provider custody, or buyer-side production readiness from a 402 challenge
 alone.
 
-Package provenance is now satisfied for `0.2.7` by the public artifact
+Package provenance is now satisfied for `0.2.8` by the public artifact
 repository's trusted-publish workflow. The successful run published
 `handshake-protocol-kernel@0.2.7`, recorded npm registry integrity and
 signature metadata, produced GitHub Actions provenance, and passed clean

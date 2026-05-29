@@ -41,7 +41,7 @@ action contract, policy decision, one-use greenlight or refusal, and gateway
 check before mutation. Presentation bundles are evidence for readback — they do
 not grant clearance by themselves.
 
-Package: `handshake-protocol-kernel@0.2.7`. MCP name:
+Package: `handshake-protocol-kernel@0.2.8`. MCP name:
 `io.github.CreasyBear/handshake-protocol-kernel`. Runtime: Node.js `>=20`.
 License: Apache-2.0. Published package repository form: package artifact repository, not source mirror.
 The published package repo contains package artifacts and trusted-publish
@@ -154,11 +154,11 @@ payment-budget management is intentionally outside the current remit.
 
 Trusted Publishing: MCP Registry discoverability is now the remaining
 distribution launch blocker.
-`0.2.7` npm availability is verified by registry readback, npm signature
+`0.2.8` npm availability is verified by registry readback, npm signature
 metadata, GitHub Actions provenance publication, and clean installed-artifact
 smoke. Public npm availability still does not create authority.
 
-Trusted Publishing workflow input: `expected_version = 0.2.7`. Release proof
+Trusted Publishing workflow input: `expected_version = 0.2.8`. Release proof
 states: `ready_to_publish` means package shape and local gates passed;
 `actually_published` means npm publish and installed-artifact readback passed
 for the exact version; `registry_discoverable` means MCP Registry acceptance and
