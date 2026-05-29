@@ -267,6 +267,8 @@ export const OperationReadbackStatusSchema = z.enum([
 export type OperationReadbackStatus = z.infer<typeof OperationReadbackStatusSchema>;
 
 export const OperationReadbackStageSchema = z.enum([
+  "intent_compilation",
+  "candidate_action",
   "action_contract",
   "policy_decision",
   "greenlight",
@@ -277,6 +279,31 @@ export const OperationReadbackStageSchema = z.enum([
   "isolation",
 ]);
 export type OperationReadbackStage = z.infer<typeof OperationReadbackStageSchema>;
+
+export const OperationCorrelationIndexSchema = z.strictObject({
+  schemaVersion: z.literal("handshake.operation-correlation.v0.1"),
+  actionContractRef: IdSchema,
+  sourceAuthority: z.literal("protocol_store_projection"),
+  authorityCreatedByProjection: z.literal(false),
+  greenlightCreatedByReadback: z.literal(false),
+  gatewayCheckPerformedByReadback: z.literal(false),
+  mutationAttemptedByReadback: z.literal(false),
+  intentCompilationRef: IdSchema.nullable(),
+  candidateActionRef: IdSchema.nullable(),
+  policyDecisionRef: IdSchema,
+  greenlightRef: IdSchema.nullable(),
+  gateAttemptRef: IdSchema.nullable(),
+  mutationAttemptRef: IdSchema.nullable(),
+  receiptRef: IdSchema.nullable(),
+  proofGapRefs: z.array(IdSchema).default([]),
+  refusalRefs: z.array(IdSchema).default([]),
+  recoveryRefs: z.array(z.string().min(1)).default([]),
+  isolationRefs: z.array(z.string().min(1)).default([]),
+  authorityCertificateRefs: z.array(IdSchema).default([]),
+  redactionProfileRef: z.literal("operation-correlation:v0.1-redacted"),
+  omittedFields: z.array(z.string().min(1)).default([]),
+});
+export type OperationCorrelationIndex = z.infer<typeof OperationCorrelationIndexSchema>;
 
 export const OperationReadbackNextMechanismSchema = z.enum([
   "read_evidence",

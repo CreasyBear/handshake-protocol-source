@@ -33,6 +33,15 @@ import {
   type ContractEvidenceProjection,
   type IdempotencyRecoveryDisposition,
   type IdempotencyRecoveryProjection,
+  OperationCorrelationIndexSchema,
+  OperationReadbackProjectionSchema,
+  type OperationCorrelationIndex,
+  type OperationReadbackGreenlightUsePosture,
+  type OperationReadbackNextMechanism,
+  type OperationReadbackProjection,
+  type OperationReadbackStage,
+  type OperationReadbackStatus,
+  type OperationReadbackSupportSeverity,
   type ProtectedPathInstallHealthProjection,
   type ProtectedPathInstallHealthStatus,
   type ReceiptTimelineProjection,
@@ -698,4 +707,272 @@ function facilitatorEvidenceLabels(refs: readonly string[]): string[] {
     labels.push("settlement_unknown");
   }
   return labels;
+}
+
+export async function projectOperationReadback(
+  input: AgentTransactionEnvelopeInput,
+): Promise<OperationReadbackProjection> {
+  const envelope = await projectAgentTransactionEnvelope(input);
+  const operationStatus = operationReadbackStatus(envelope);
+  const latestAuthoritativeStage = operationReadbackStage(envelope, input.contract, operationStatus);
+  const nextMechanism = operationReadbackNextMechanism(operationStatus);
+  const greenlightUsePosture = operationReadbackGreenlightUsePosture(envelope);
+  const reasonCodes = operationReadbackReasonCodes(envelope, input.policyDecision.decisionReasonCode);
+  const safeToReuseGreenlight = greenlightUsePosture === "available_for_one_gateway_check";
+  const requiresNewContract = operationReadbackRequiresNewContract(operationStatus);
+  const supportContext = {
+    schemaVersion: "handshake.support-context.v0.1" as const,
+    supportContextRef: `support_context:${input.contract.actionContractId}`,
+    sourceAuthority: "protocol_store_projection" as const,
+    surface: "operation_readback" as const,
+    actionContractRef: input.contract.actionContractId,
+    requestIdentity: null,
+    operationStatus,
+    reasonCodes,
+    nextMechanism,
+    safeToRetryReadback: true as const,
+    safeToReuseGreenlight,
+    requiresNewContract,
+    supportSeverity: operationReadbackSupportSeverity(operationStatus),
+    docsUrl: null,
+    nextCommand: `handshake evidence fetch --contract-id ${input.contract.actionContractId}`,
+    evidenceRefs: envelope.evidenceRefs,
+    proofGapRefs: envelope.proofGapRefs,
+    refusalRefs: envelope.refusalRefs,
+    traceRef: envelope.providerRequestRef,
+    spanRef: envelope.providerOperationRef,
+    redactionProfileRef: "operation-readback:v0.1-redacted" as const,
+  };
+
+  return OperationReadbackProjectionSchema.parse({
+    schemaVersion: "handshake.operation-readback.v0.1",
+    actionContractRef: envelope.actionContractRef,
+    contractDigest: envelope.contractDigest,
+    principalRef: envelope.principalRef,
+    agentRef: envelope.agentRef,
+    runId: envelope.runId,
+    runtimeAdapterRef: envelope.runtimeAdapterRef,
+    actionClass: envelope.actionClass,
+    protectedSurfaceKind: envelope.protectedSurfaceKind,
+    resourceRef: envelope.resourceRef,
+    gatewayId: envelope.gatewayId,
+    gatewayPolicyVersion: envelope.gatewayPolicyVersion,
+    sourceAuthority: "protocol_store_projection",
+    operationStatus,
+    latestAuthoritativeStage,
+    policyDecisionRef: envelope.policyDecisionRef,
+    policyDecisionStatus: envelope.policyDecisionStatus,
+    agreementObligationPolicy: agreementObligationPolicyFromDecision(input.policyDecision),
+    greenlightRef: envelope.greenlightRef,
+    gateAttemptRef: envelope.gateAttemptRef,
+    mutationAttemptRef: envelope.mutationAttemptRef,
+    receiptRef: envelope.receiptRef,
+    gatewayAdmissionStatus: envelope.gatewayAdmissionStatus,
+    downstreamOutcomeStatus: envelope.downstreamOutcomeStatus,
+    finalityStatus: envelope.reconciliationFinalityStatus ?? input.receipt?.finalityStatus ?? null,
+    greenlightUsePosture,
+    reasonCodes,
+    nextMechanism,
+    safeToRetryReadback: true,
+    safeToReuseGreenlight,
+    requiresNewContract,
+    authorityCreatedByReadback: false,
+    greenlightCreatedByReadback: false,
+    gatewayCheckPerformedByReadback: false,
+    mutationAttemptedByReadback: false,
+    receiptExportCreatedByReadback: false,
+    rawInternalRecordIncluded: false,
+    credentialMaterialIncluded: false,
+    paymentMaterialIncluded: false,
+    evidenceRefs: envelope.evidenceRefs,
+    proofGapRefs: envelope.proofGapRefs,
+    refusalRefs: envelope.refusalRefs,
+    recoveryRefs: envelope.recoveryRefs,
+    isolationRefs: envelope.isolationRefs,
+    authorityCertificateRefs: envelope.authorityCertificateRefs,
+    providerRequestRef: envelope.providerRequestRef,
+    providerOperationRef: envelope.providerOperationRef,
+    traceRef: envelope.providerRequestRef,
+    spanRef: envelope.providerOperationRef,
+    redactionProfileRef: "operation-readback:v0.1-redacted",
+    omittedFields: [
+      "actionContract.parameters",
+      "actionContract.secretRefs",
+      "receipt.evidenceRefs.raw",
+      "rawInternalRecord",
+      "credentialMaterial",
+      "paymentMaterial",
+    ],
+    supportContext,
+  });
+}
+
+export function projectOperationCorrelationIndex(
+  input: AgentTransactionEnvelopeInput,
+): OperationCorrelationIndex {
+  const contract = input.contract;
+  return OperationCorrelationIndexSchema.parse({
+    schemaVersion: "handshake.operation-correlation.v0.1",
+    actionContractRef: contract.actionContractId,
+    sourceAuthority: "protocol_store_projection",
+    authorityCreatedByProjection: false,
+    greenlightCreatedByReadback: false,
+    gatewayCheckPerformedByReadback: false,
+    mutationAttemptedByReadback: false,
+    intentCompilationRef: contract.intentCompilationId,
+    candidateActionRef: contract.candidateActionId,
+    policyDecisionRef: input.policyDecision.policyDecisionId,
+    greenlightRef: input.greenlight?.greenlightId ?? input.receipt?.greenlightId ?? null,
+    gateAttemptRef: input.gateAttempt?.gateAttemptId ?? input.receipt?.gateAttemptId ?? null,
+    mutationAttemptRef: input.mutationAttempt?.mutationAttemptId ?? input.receipt?.mutationAttemptId ?? null,
+    receiptRef: input.receipt?.receiptId ?? null,
+    proofGapRefs: [...(input.receipt?.proofGapIds ?? []), ...(input.proofGaps ?? []).map((gap) => gap.proofGapId)].filter(
+      unique,
+    ),
+    refusalRefs: (input.refusals ?? [])
+      .filter((refusal) => refusal.actionContractId === contract.actionContractId)
+      .map((refusal) => refusal.refusalId)
+      .filter(unique),
+    recoveryRefs: input.recoveryRefs ?? [],
+    isolationRefs: input.isolationRefs ?? [],
+    authorityCertificateRefs: (input.authorityCertificates ?? [])
+      .filter((certificate) => certificate.terminal.actionContractId === contract.actionContractId)
+      .map((certificate) => certificate.authorityCertificateId)
+      .filter(unique),
+    redactionProfileRef: "operation-correlation:v0.1-redacted",
+    omittedFields: ["rawInternalRecord", "credentialMaterial", "paymentMaterial"],
+  });
+}
+
+function agreementObligationPolicyFromDecision(policy: PolicyDecision) {
+  const evaluationStatus =
+    policy.decision === "greenlight" ? "greenlight" : policy.decision === "proof_gap" ? "proof_gap" : "refuse";
+  return {
+    sourceAuthority: "policy_decision_snapshot" as const,
+    evaluationStatus,
+    ok: policy.decision === "greenlight",
+    reasonCode: policy.decision === "greenlight" ? null : policy.decisionReasonCode,
+    reason: policy.decision === "greenlight" ? null : policy.decisionReasonCode,
+    policyInput: {
+      posture: "not_applicable" as const,
+      obligationRef: null,
+      linkedAgreementId: null,
+      acceptedNegotiationResolutionId: null,
+    },
+  };
+}
+
+function operationReadbackStatus(envelope: AgentTransactionEnvelopeProjection): OperationReadbackStatus {
+  if (envelope.isolationRefs.length > 0) return "isolated";
+  if (envelope.idempotencyRecoveryDisposition === "terminal_unknown_requires_recovery") {
+    return "recovery_required";
+  }
+  if (envelope.gatewayAdmissionStatus === "replayed") return "replay_refused";
+  if (envelope.policyDecisionStatus === "refuse") return "policy_refused";
+  if (envelope.policyDecisionStatus === "review_required") return "review_required";
+  if (envelope.policyDecisionStatus === "halt") return "halted";
+  if (envelope.policyDecisionStatus === "quarantine") return "quarantined";
+  if (envelope.policyDecisionStatus === "proof_gap") return "policy_proof_gap";
+  if (envelope.gatewayAdmissionStatus === "refused") return "gateway_refused";
+  if (envelope.gatewayAdmissionStatus === "proof_gap") return "gateway_proof_gap";
+  if (envelope.gatewayAdmissionStatus === "admitted") {
+    if (envelope.downstreamOutcomeStatus === "pending") return "downstream_pending";
+    if (envelope.downstreamOutcomeStatus === "succeeded") return "downstream_succeeded";
+    if (envelope.downstreamOutcomeStatus === "refused") return "downstream_refused";
+    if (envelope.downstreamOutcomeStatus === "failed") return "downstream_failed";
+    if (envelope.downstreamOutcomeStatus === "unknown") return "downstream_unknown";
+    return "gateway_admitted";
+  }
+  if (envelope.greenlightRef && !envelope.gateAttemptRef) return "greenlight_available";
+  return "policy_refused";
+}
+
+function operationReadbackStage(
+  envelope: AgentTransactionEnvelopeProjection,
+  contract: ActionContract,
+  status: OperationReadbackStatus,
+): OperationReadbackStage {
+  if (status === "isolated") return "isolation";
+  if (status === "recovery_required") return "recovery";
+  if (envelope.receiptRef) return "receipt";
+  if (envelope.mutationAttemptRef) return "mutation_attempt";
+  if (envelope.gateAttemptRef) return "gateway_check";
+  if (envelope.greenlightRef) return "greenlight";
+  if (envelope.policyDecisionRef) return "policy_decision";
+  if (contract.candidateActionId) return "candidate_action";
+  if (contract.intentCompilationId) return "intent_compilation";
+  return "action_contract";
+}
+
+function operationReadbackNextMechanism(status: OperationReadbackStatus): OperationReadbackNextMechanism {
+  if (status === "greenlight_available") return "use_greenlight_at_gateway";
+  if (status === "review_required") return "request_review";
+  if (status === "policy_refused" || status === "gateway_refused") return "recraft_request";
+  if (status === "replay_refused") return "create_new_contract";
+  if (status === "recovery_required" || status === "downstream_unknown") return "recover_terminal_unknown";
+  if (status === "isolated" || status === "halted" || status === "quarantined") return "stop";
+  if (status === "downstream_pending") return "wait_for_downstream";
+  return "read_evidence";
+}
+
+function operationReadbackGreenlightUsePosture(
+  envelope: AgentTransactionEnvelopeProjection,
+): OperationReadbackGreenlightUsePosture {
+  if (!envelope.greenlightRef) return "none";
+  if (!envelope.gateAttemptRef && !envelope.receiptRef) return "available_for_one_gateway_check";
+  if (envelope.greenlightConsumptionStatus === "consumed") return "consumed";
+  if (envelope.greenlightConsumptionStatus === "replayed" || envelope.gatewayAdmissionStatus === "replayed") {
+    return "replayed_or_unusable";
+  }
+  if (envelope.greenlightConsumptionStatus === "not_consumed") return "available_for_one_gateway_check";
+  return "unknown";
+}
+
+function operationReadbackRequiresNewContract(status: OperationReadbackStatus): boolean {
+  return (
+    status === "policy_refused" ||
+    status === "gateway_refused" ||
+    status === "replay_refused" ||
+    status === "recovery_required" ||
+    status === "halted" ||
+    status === "quarantined" ||
+    status === "isolated"
+  );
+}
+
+function operationReadbackSupportSeverity(status: OperationReadbackStatus): OperationReadbackSupportSeverity {
+  if (
+    status === "halted" ||
+    status === "quarantined" ||
+    status === "isolated" ||
+    status === "recovery_required" ||
+    status === "downstream_unknown"
+  ) {
+    return "urgent";
+  }
+  if (
+    status === "policy_refused" ||
+    status === "gateway_refused" ||
+    status === "gateway_proof_gap" ||
+    status === "policy_proof_gap" ||
+    status === "replay_refused" ||
+    status === "downstream_failed" ||
+    status === "downstream_refused"
+  ) {
+    return "warning";
+  }
+  if (status === "downstream_succeeded") return "none";
+  return "info";
+}
+
+function operationReadbackReasonCodes(
+  envelope: AgentTransactionEnvelopeProjection,
+  policyDecisionReasonCode: string,
+): string[] {
+  return [
+    ...(envelope.policyDecisionStatus === "greenlight" ? [] : [policyDecisionReasonCode]),
+    ...envelope.proofGapReasonCodes,
+    ...envelope.refusalReasonCodes,
+    ...envelope.idempotencyReasonCodes,
+  ].filter(unique);
 }
