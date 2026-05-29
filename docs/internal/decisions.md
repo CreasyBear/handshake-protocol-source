@@ -294,6 +294,16 @@ The first runnable clearance wedge remains buyer-side `x402_payment.exact`
 per-call protected action. Dual enforcement applies to any protected surface,
 not payment-only integrations.
 
+### Product-completion gate `dual_enforcement_posture` (D-53)
+
+The `dual_enforcement_posture` gate in `src/surfaces/proof-packets/product-completion-contract.ts`
+projects **incomplete** until structural architecture evidence exists: passing
+`test/architecture/dual-enforcement-posture.test.ts` (Phase-04 plan **04-01**) and
+mutation-manifest gating coverage (deferred **04-11**, wired in plan **05-01**).
+Admission middleware identifies callers and scopes transitions; it does **not**
+authorize protected mutation. Admission alone is advisory — only adapter-wrapped
+`run*Gateway` immediately before consequence is Handshake enforcement.
+
 ## Market And Expansion Scoring Boundary
 
 Accepted: market scoring is strategy input, not enforcement proof. A wedge can
