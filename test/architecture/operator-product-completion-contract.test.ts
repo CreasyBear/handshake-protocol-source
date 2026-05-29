@@ -5,11 +5,11 @@ import { cliCommandManifest } from "../../src/cli/command-manifest";
 const requiredDocs = [
   "docs/internal/service-operator-golden-path.md",
   "docs/internal/developer-experience-index.md",
-  "docs/internal/integrator-tier-1-transitions.md",
+  "docs/internal/integrator-parity-transitions.md",
 ] as const;
 
 const requiredModules = [
-  "src/protocol/foundation/failure-class.ts",
+  "src/protocol/foundation/failure-class/index.ts",
   "src/adapters/http-profile/index.ts",
 ] as const;
 

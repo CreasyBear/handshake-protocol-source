@@ -43,7 +43,7 @@ Before shipping an external adapter integration:
 - [ ] Conformance probe registered (`ProtectedMutationAdapter`)
 - [ ] Proof gaps documented honestly — do not fake `pack:check` green
 
-Admission alone is not Handshake enforcement. Every consequential attempt must reduce to an exact action contract, receive policy evaluation, and pass a gateway check before mutation. REST-like transports compose `HttpProtectedMutationProfileSchema` from `src/adapters/http-profile` (see [integrator-tier-1-transitions.md](../../docs/internal/integrator-tier-1-transitions.md)).
+Admission alone is not Handshake enforcement. Every consequential attempt must reduce to an exact action contract, receive policy evaluation, and pass a gateway check before mutation. REST-like transports compose `HttpProtectedMutationProfileSchema` from `src/adapters/http-profile` (see [integrator-parity-transitions.md](../../docs/internal/integrator-parity-transitions.md)).
 
 Proof-gap families (auth.md, package-install, registry discoverability) are prose-only in phase 04 — x402 is the only runnable clearance wedge:
 [service-operator-golden-path.md](../../docs/internal/service-operator-golden-path.md#proof-gap-list-not-runnable-in-phase-04).

@@ -38,7 +38,7 @@ every service operator.
 
 ## Advanced (not first session)
 
-- [integrator-tier-1-transitions.md](./integrator-tier-1-transitions.md) — Tier-1 integrator transition appendix; defer until after golden path
+- [integrator-parity-transitions.md](./integrator-parity-transitions.md) — integrator parity transition appendix; defer until after golden path
 
 ## Canonical internal docs
 

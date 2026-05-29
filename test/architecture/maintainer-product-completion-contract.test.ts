@@ -4,7 +4,7 @@ import { existsSync, readFileSync } from "node:fs";
 const operatorContract = "test/architecture/operator-product-completion-contract.test.ts";
 
 const maintainerOnlyTests = [
-  "test/architecture/integrator-tier-1-parity.test.ts",
+  "test/architecture/integrator-parity.test.ts",
   "test/adapters/http-profile-canonicalization.test.ts",
   "test/adapters/http-profile-orphan-catalog.test.ts",
   "test/sdk/role-clients-failure-class.test.ts",

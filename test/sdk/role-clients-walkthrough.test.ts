@@ -11,8 +11,8 @@ import {
 } from "../../src/sdk/surface-clients";
 import { futureIso, makeKernelFixture, makePackageInstallCandidate } from "../support/fixtures";
 
-describe("Tier-1 SDK role-clients walkthrough", () => {
-  it("composes Tier-1 clients with distinct roles and no bundled execute", async () => {
+describe("integrator parity SDK role-clients walkthrough", () => {
+  it("composes integrator parity clients with distinct roles and no bundled execute", async () => {
     const fixture = makeKernelFixture();
     const calls: Array<{ path: string; authorization: string | null }> = [];
     const fetchImpl: HandshakeFetch = async (_input, init) => {

@@ -199,6 +199,6 @@ OAuth BCP: clearance refusals (`protected_action_refusal`, `replay_refusal`, `pr
 
 ### Advanced (not first 30 minutes)
 
-- [integrator-tier-1-transitions.md](./integrator-tier-1-transitions.md) — Tier-1 integrator appendix
+- [integrator-parity-transitions.md](./integrator-parity-transitions.md) — integrator parity appendix
 - [service-workflow-story.md](./service-workflow-story.md) — plain-language vocabulary
 - [decisions.md](./decisions.md) — custody and expansion ledger

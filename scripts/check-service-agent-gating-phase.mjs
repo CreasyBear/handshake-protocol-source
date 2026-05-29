@@ -31,7 +31,7 @@ const operatorTests = [
 
 const fullOnlyTests = [
   "test/architecture/maintainer-product-completion-contract.test.ts",
-  "test/architecture/integrator-tier-1-parity.test.ts",
+  "test/architecture/integrator-parity.test.ts",
   "test/adapters/http-profile-canonicalization.test.ts",
   "test/adapters/http-profile-orphan-catalog.test.ts",
   "test/cli/cli-agent-spine-sequencer.test.ts",

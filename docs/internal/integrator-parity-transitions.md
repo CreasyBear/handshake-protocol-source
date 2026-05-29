@@ -1,8 +1,8 @@
-# Tier-1 integrator transitions (appendix)
+# Integrator parity transitions (appendix)
 
 > **Do not read in your first 30 minutes.** Service operators should follow [service-operator-golden-path.md](./service-operator-golden-path.md) Branch A first. Host operators use [host-golden-paths-and-trace-guidance.md](./host-golden-paths-and-trace-guidance.md).
 
-Tier-1 transitions are the bounded HTTP/SDK surface for integrators wiring Handshake into a service. They record evidence and clearance steps only — no bundled execute shortcut.
+Integrator parity transitions are the bounded HTTP/SDK surface for integrators wiring Handshake into a service. They record evidence and clearance steps only — no bundled execute shortcut.
 
 ## Progressive onboarding
 
@@ -12,9 +12,9 @@ Tier-1 transitions are the bounded HTTP/SDK surface for integrators wiring Hands
 4. **Policy** — `evaluatePolicy` returns one-use greenlight or refusal (control plane).
 5. **Gateway** — `gatewayCheck` then optional `reconcileSurfaceOperation` (gateway custody).
 
-Host doctor, quickstart x402, and simulate are **not** Tier-1 kernel transitions — see the host golden path fork.
+Host doctor, quickstart x402, and simulate are **not** integrator parity kernel transitions — see the host golden path fork.
 
-## Tier-1 transition table
+## Integrator parity transition table
 
 | transitionId | phase | HTTP | SDK client + method | caller role | authority boundary | runnable in phase 04? |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -38,9 +38,9 @@ Atomic install requires **ToolCapability**, **ActionType**, and **GatewayRegistr
 
 Runnable x402 triplet reference: [examples/service-operator-bootstrap/](../../examples/service-operator-bootstrap/).
 
-## Tier-2+ transitions (reference only)
+## Extended transitions (reference only)
 
-Negotiation sessions, recovery terminal conflict resolution, bypass probes, authority certificates, review artifacts, and generated execution graph transitions remain available on the HTTP surface but are **not** Tier-1 integrator requirements for phase 04 operator TTHW.
+Negotiation sessions, recovery terminal conflict resolution, bypass probes, authority certificates, review artifacts, and generated execution graph transitions remain available on the HTTP surface but are **not** integrator parity requirements for phase 04 operator TTHW.
 
 ## SDK walkthrough recipe
 
