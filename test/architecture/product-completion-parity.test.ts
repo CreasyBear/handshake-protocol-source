@@ -12,7 +12,7 @@ describe("product completion projector/script parity", () => {
     expect(PRODUCT_COMPLETION_READBACK_KIND).toBe("product_completion_readback");
     expect(PRODUCT_COMPLETION_STATUSES).toEqual(["completed", "closed_with_hard_blocks", "incomplete"]);
     expect(PRODUCT_COMPLETION_PACK_CHECK_EXPECT_STATUS).toBe("incomplete");
-    expect(PRODUCT_COMPLETION_GATE_IDS).toHaveLength(5);
+    expect(PRODUCT_COMPLETION_GATE_IDS).toHaveLength(6);
     expect(PRODUCT_COMPLETION_GATE_IDS).toContain("dual_enforcement_posture");
   });
 
@@ -68,6 +68,11 @@ describe("product completion projector/script parity", () => {
           mutationManifestGatingTestPassed: false,
           evidenceRefs: [],
         },
+        perCustomerBypassScaffold: {
+          customerOnboardingRef: null,
+          firstPartyDogfoodCustomerId: null,
+          evidenceRefs: [],
+        },
       },
     });
 
@@ -76,6 +81,62 @@ describe("product completion projector/script parity", () => {
     expect(proof.gates.map((gate) => gate.gateId)).toEqual([...PRODUCT_COMPLETION_GATE_IDS]);
     const dualGate = proof.gates.find((gate) => gate.gateId === "dual_enforcement_posture");
     expect(dualGate?.status).toBe("incomplete");
+    const bypassGate = proof.gates.find((gate) => gate.gateId === "per_customer_bypass_scaffold");
+    expect(bypassGate?.status).not.toBe("completed");
     expect(proof.authorityBoundary.createsAuthority).toBe(false);
+  });
+
+  it("never marks per_customer_bypass_scaffold completed for default integrator fixture", () => {
+    const proof = projectProductCompletionReadback({
+      generatedAt: "2026-05-26T00:00:00.000Z",
+      commandRefs: ["test"],
+      qualityGate: { command: "npm run check:repo", passed: true, evidenceRef: "quality-gate:passed" },
+      gates: {
+        codexLocalHostActivation: {
+          status: "host_tool_invocation_observed",
+          artifactVersion: "0.0.0",
+          artifactSha256: null,
+          observesHostToolInvocation: true,
+          authorityCreated: false,
+          evidenceRefs: [],
+        },
+        publicDistributionAndRegistry: {
+          status: "registry_discoverable",
+          localVersion: "0.0.0",
+          npmLatestVersion: "0.0.0",
+          currentSurfacePublished: true,
+          mcpRegistryAccepted: true,
+          mcpRegistryDiscoverable: true,
+          provenanceAttempted: true,
+          provenanceSupported: true,
+          proofGapReasonCodes: [],
+          evidenceRefs: [],
+        },
+        customerGatewayLiveX402PaidProof: {
+          status: "ready_for_gateway_signed_retry",
+          customerGatewayCustodyPresent: true,
+          livePaidRetryPerformed: true,
+          terminalReadbackPresent: true,
+          signerInvocationPosture: "post_gateway_check_only",
+          proofGapReasonCodes: [],
+          evidenceRefs: [],
+        },
+        authMdX402AdmissionPacket: {
+          packetVersion: "v0",
+          packetProjectorPresent: true,
+          refusalFirstTestsPassed: true,
+          redactedReadbackTestsPassed: true,
+          createsAuthority: false,
+          evidenceRefs: [],
+        },
+        perCustomerBypassScaffold: {
+          customerOnboardingRef: "customer-generic",
+          firstPartyDogfoodCustomerId: "not-on-allowlist",
+          evidenceRefs: [],
+        },
+      },
+    });
+    const bypassGate = proof.gates.find((gate) => gate.gateId === "per_customer_bypass_scaffold");
+    expect(bypassGate?.status).toBe("incomplete");
   });
 });
