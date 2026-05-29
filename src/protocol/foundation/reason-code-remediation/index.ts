@@ -29,22 +29,22 @@ const remediationEntries: readonly ReasonCodeRemediationEntry[] = [
   },
   {
     code: "recovery_terminal_conflict",
-    docsUrl: "https://handshake.dev/docs/protocol/proof-gap",
+    docsUrl: "https://handshake.dev/problems/recovery_terminal_conflict",
     requiresNewContract: true,
   },
   {
     code: "credential_resolution_replay_refused",
-    docsUrl: "https://handshake.dev/docs/protocol/replay-refusal",
+    docsUrl: "https://handshake.dev/problems/credential_resolution_replay_refused",
     requiresNewContract: true,
   },
   {
     code: "idempotency_duplicate_authority",
-    docsUrl: "https://handshake.dev/docs/protocol/replay-refusal",
+    docsUrl: "https://handshake.dev/problems/idempotency_duplicate_authority",
     requiresNewContract: true,
   },
   {
     code: "agreement_missing",
-    docsUrl: "https://handshake.dev/docs/protocol/proof-gap",
+    docsUrl: "https://handshake.dev/problems/agreement_missing",
   },
 ] as const;
 
