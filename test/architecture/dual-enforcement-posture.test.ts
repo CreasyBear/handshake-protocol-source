@@ -1,3 +1,5 @@
+// Doctrine-prose guard only: validates dual-enforcement language in docs.
+// This does NOT prove runtime bypass resistance for arbitrary integrator HTTP routes (see D-25).
 import { describe, expect, it } from "bun:test";
 import { existsSync, readFileSync } from "node:fs";
 
@@ -17,7 +19,7 @@ function activeSources(sources: DocSource[]): DocSource[] {
   return sources.filter((source) => !source.optional || source.text.length > 0);
 }
 
-describe("dual enforcement posture", () => {
+describe("dual enforcement doctrine prose", () => {
   it("requires gateway-before-mutation language and forbids admission-only protection claims", () => {
     const sources = activeSources([
       loadDoc("AGENTS.md"),
