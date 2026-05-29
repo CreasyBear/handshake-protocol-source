@@ -36,6 +36,14 @@ Vocabulary: [service-workflow-story.md](./service-workflow-story.md)
 Host branch is required only when you operate MCP/runtime binding — not for
 every service operator.
 
+## Agent SDK quick import (one-import ergonomics, D-56)
+
+```typescript
+import { PolicyClient, EvidenceClient, explainHandshakeError } from "handshake-protocol-kernel";
+```
+
+For precision or smaller bundles, use the subpath: `handshake-protocol-kernel/sdk/role-clients`.
+
 ## Advanced (not first session)
 
 - [integrator-parity-transitions.md](./integrator-parity-transitions.md) — integrator parity transition appendix; defer until after golden path

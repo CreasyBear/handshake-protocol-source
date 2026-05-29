@@ -72,7 +72,11 @@ describe("claim boundary", () => {
     expect(Object.keys(root)).not.toContain("projectProtectedActionChallengeFromRefusal");
     expect(Object.keys(root)).not.toContain("experimentalRunPackageInstallGateway");
     expect(Object.keys(root)).not.toContain("checkProtectedMutationAdapterConformance");
+    expect(Object.keys(root)).toContain("EvidenceClient");
+    expect(Object.keys(root)).toContain("PolicyClient");
     expect(Object.keys(root)).not.toContain("defineProtectedActionAdapterPack");
+    expect(Object.keys(root)).not.toContain("runAuthMdProtectedApiCallGateway");
+    expect(Object.keys(root)).not.toContain("runX402WalletGateway");
     expect(adapterSdkExportNames).toContain("defineProtectedActionAdapterPack");
     expect(adapterSdkExportNames).toContain("projectAdapterSdkInstallProposalReport");
     expect(adapterSdkExportNames.join(" ")).not.toMatch(
