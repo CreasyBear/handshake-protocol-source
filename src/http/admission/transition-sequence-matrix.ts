@@ -1,4 +1,3 @@
-import { HandshakeProtocolError } from "../../protocol/foundation/errors";
 import { transitionRouteDefinitions } from "../routes/transition-route-registry";
 import type { TransitionRouteId } from "../routes/transition-invokers";
 
@@ -76,33 +75,22 @@ export function assertTransitionSequenceMatrixCoverage(): void {
   const registeredRouteIds = new Set<TransitionRouteId>(transitionRouteDefinitions.map((route) => route.routeId));
   const matrixRouteIds = new Set(Object.keys(transitionSequenceMatrix) as TransitionRouteId[]);
 
+  // Construction-time developer drift guard (mirrors assertMutationRouteManifestParity):
+  // a violation here is a programming error caught at app construction, never a
+  // request-time protocol refusal — so it throws a plain Error, not a coded
+  // HandshakeProtocolError with a client-facing transition reason code.
   for (const routeId of registeredRouteIds) {
     if (!matrixRouteIds.has(routeId)) {
-      throw new HandshakeProtocolError(
-        "transition_sequence_matrix_incomplete",
-        `Transition route ${routeId} has no declared sequence-matrix entry.`,
-        500,
-        { retryability: "terminal", commitState: "not_started" },
-      );
+      throw new Error(`Transition route ${routeId} has no declared sequence-matrix entry.`);
     }
   }
   for (const routeId of matrixRouteIds) {
     if (!registeredRouteIds.has(routeId)) {
-      throw new HandshakeProtocolError(
-        "transition_sequence_matrix_orphan",
-        `Sequence-matrix entry ${routeId} does not map to a registered transition route.`,
-        500,
-        { retryability: "terminal", commitState: "not_started" },
-      );
+      throw new Error(`Sequence-matrix entry ${routeId} does not map to a registered transition route.`);
     }
     for (const prerequisite of transitionSequenceMatrix[routeId]) {
       if (!registeredRouteIds.has(prerequisite)) {
-        throw new HandshakeProtocolError(
-          "transition_sequence_matrix_unknown_prerequisite",
-          `Sequence-matrix entry ${routeId} references unknown prerequisite ${prerequisite}.`,
-          500,
-          { retryability: "terminal", commitState: "not_started" },
-        );
+        throw new Error(`Sequence-matrix entry ${routeId} references unknown prerequisite ${prerequisite}.`);
       }
     }
   }
@@ -116,11 +104,8 @@ function assertAcyclicSequenceMatrix(): void {
   const walk = (routeId: TransitionRouteId, trail: readonly TransitionRouteId[]): void => {
     if (settled.has(routeId)) return;
     if (visiting.has(routeId)) {
-      throw new HandshakeProtocolError(
-        "transition_sequence_matrix_cycle",
+      throw new Error(
         `Transition sequence matrix has a prerequisite cycle: ${[...trail, routeId].join(" -> ")}.`,
-        500,
-        { retryability: "terminal", commitState: "not_started" },
       );
     }
     visiting.add(routeId);
