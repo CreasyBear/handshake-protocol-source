@@ -4,6 +4,7 @@ import type {
   ContractEvidenceProjection,
   GeneratedGraphEvidenceProjection,
   IdempotencyRecoveryProjection,
+  OperationCorrelationIndex,
   OperationReadbackProjection,
   ProtectedPathInstallHealthProjection,
   ReceiptTimelineProjection,
@@ -46,6 +47,12 @@ export class EvidenceClient {
   getOperationReadbackProjection(actionContractId: string): Promise<OperationReadbackProjection> {
     return this.transport.get(
       `/v0.2/evidence/operations/${encodeURIComponent(actionContractId)}/readback`,
+    );
+  }
+
+  getOperationCorrelationIndex(actionContractId: string): Promise<OperationCorrelationIndex> {
+    return this.transport.get(
+      `/v0.2/evidence/operations/${encodeURIComponent(actionContractId)}/correlation`,
     );
   }
 

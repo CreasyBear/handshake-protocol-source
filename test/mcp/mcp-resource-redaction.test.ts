@@ -89,6 +89,10 @@ function fakeEvidenceClient(calls: string[]): McpEvidenceResourceClient {
       calls.push(`readback:${actionContractId}`);
       return { projection: "operation_readback", actionContractId };
     },
+    async getOperationCorrelationIndex(actionContractId: string) {
+      calls.push(`correlation:${actionContractId}`);
+      return { projection: "operation_correlation", actionContractId };
+    },
     async getReceiptTimelineProjection(receiptId: string) {
       calls.push(`timeline:${receiptId}`);
       return { projection: "timeline", receiptId };

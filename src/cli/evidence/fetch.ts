@@ -5,6 +5,7 @@ import {
   type OperationReadbackProjection,
 } from "../../protocol/evidence-projections/schemas";
 import { EvidenceClient } from "../../sdk/surface-clients/evidence-client";
+import { evidenceOperationReadbackCliView } from "./operation-readback-view";
 import { cliOutput } from "../output";
 
 const DEFAULT_BASE_URL = "http://127.0.0.1:8787";
@@ -16,24 +17,7 @@ export type EvidenceFetchCommandInput = {
   roleCredential?: string;
 };
 
-export function evidenceOperationReadbackCliView(projection: OperationReadbackProjection) {
-  return {
-    schemaVersion: "handshake.cli.operation-readback-view.v1" as const,
-    viewBoundary: "redacted_cli_projection_view" as const,
-    title: `Operation ${projection.actionContractRef}`,
-    status: projection.operationStatus,
-    stage: projection.latestAuthoritativeStage,
-    nextMechanism: projection.nextMechanism,
-    stageOrder: [
-      "action_contract",
-      "policy_decision",
-      "greenlight",
-      "gateway_check",
-      "mutation_attempt",
-      "receipt",
-    ] as const,
-  };
-}
+export { evidenceOperationReadbackCliView };
 
 export function evidenceOperationReadbackCommand(value: unknown) {
   const projection = OperationReadbackProjectionSchema.parse(value);

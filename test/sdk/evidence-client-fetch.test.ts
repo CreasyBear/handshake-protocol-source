@@ -43,6 +43,13 @@ describe("EvidenceClient operation readback fetch (D-55)", () => {
         calls.push(actionContractId);
         return sampleOperationReadbackProjection({ actionContractRef: actionContractId });
       },
+      async getOperationCorrelationIndex(actionContractId: string) {
+        calls.push(`correlation:${actionContractId}`);
+        return {
+          schemaVersion: "handshake.operation-correlation.v0.1",
+          actionContractRef: actionContractId,
+        };
+      },
       async getReceiptTimelineProjection() {
         return {};
       },

@@ -25,6 +25,7 @@ export type McpEvidenceResourceClient = {
   getContractEvidenceProjection(actionContractId: string): Promise<unknown>;
   getAgentTransactionEnvelopeProjection(actionContractId: string): Promise<unknown>;
   getOperationReadbackProjection(actionContractId: string): Promise<unknown>;
+  getOperationCorrelationIndex(actionContractId: string): Promise<unknown>;
   getReceiptTimelineProjection(receiptId: string): Promise<unknown>;
   getIdempotencyRecoveryProjection(actionContractId: string): Promise<unknown>;
   getProtectedPathInstallHealthProjection(actionContractId: string): Promise<unknown>;
@@ -58,6 +59,7 @@ type ParsedMcpResourceUri =
   | { kind: "challenge"; challengeId: string }
   | { kind: "contract"; actionContractId: string }
   | { kind: "operationReadback"; actionContractId: string }
+  | { kind: "operationCorrelation"; actionContractId: string }
   | { kind: "envelope"; actionContractId: string }
   | { kind: "receiptTimeline"; receiptId: string }
   | { kind: "idempotency"; actionContractId: string }
@@ -84,6 +86,14 @@ export function parseMcpResourceUri(uri: string): ParsedMcpResourceUri {
     segments[2] === "readback"
   ) {
     return { kind: "operationReadback", actionContractId: segments[1] };
+  }
+  if (
+    parsed.hostname === "evidence" &&
+    segments[0] === "operations" &&
+    segments[1] &&
+    segments[2] === "correlation"
+  ) {
+    return { kind: "operationCorrelation", actionContractId: segments[1] };
   }
   if (parsed.hostname === "evidence" && segments[0] === "envelopes" && segments[1]) {
     return { kind: "envelope", actionContractId: segments[1] };
@@ -128,6 +138,8 @@ async function readPayload(parsed: ParsedMcpResourceUri, evidenceClient: McpEvid
       return evidenceClient.getContractEvidenceProjection(parsed.actionContractId);
     case "operationReadback":
       return evidenceClient.getOperationReadbackProjection(parsed.actionContractId);
+    case "operationCorrelation":
+      return evidenceClient.getOperationCorrelationIndex(parsed.actionContractId);
     case "envelope":
       return evidenceClient.getAgentTransactionEnvelopeProjection(parsed.actionContractId);
     case "receiptTimeline":
