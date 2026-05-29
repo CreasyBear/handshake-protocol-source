@@ -61,6 +61,7 @@ export const httpTransitionErrorCodes = [
   code("proof_gap_missing", "scope_resolution", "terminal", "not_started", true),
   code("invalid_protocol_object_type", "record_read", "terminal", "not_applicable", true),
   code("record_not_found", "record_read", "terminal", "not_applicable", true),
+  code("action_contract_missing", "record_read", "terminal", "not_applicable", true),
   code("durable_store_unavailable", "store_resolution", "retryable", "unknown", true),
   code("invalid_request", "error_envelope", "terminal", "not_started", true),
   code("internal_error", "error_envelope", "retryable", "unknown", false),
