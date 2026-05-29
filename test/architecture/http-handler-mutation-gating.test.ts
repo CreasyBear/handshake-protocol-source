@@ -1,10 +1,14 @@
 import { describe, expect, it } from "bun:test";
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
+import {
+  mutationRouteDefinitions,
+  assertMutationRouteManifestParity,
+} from "../../src/http/mutation-route-manifest";
+import { transitionRouteDefinitions } from "../../src/http/routes/transition-route-registry";
 
 /**
- * Phase 04 D-24 enforcement: handler walk only.
- * service-mutation-route-manifest deferred to maintainer lane (phase 05).
+ * Phase-04 plan 04-11 carry-forward (Phase 05 plan 05-01, D-53).
  */
 
 const readOnlyHandlerAllowlist = new Set([
@@ -45,7 +49,18 @@ function walkTs(root: string): string[] {
   return files;
 }
 
-describe("http handler mutation gating", () => {
+describe("http handler mutation gating (04-11)", () => {
+  it("keeps mutation-route-manifest at src/http/mutation-route-manifest.ts", () => {
+    expect(existsSync("src/http/mutation-route-manifest.ts")).toBe(true);
+    expect(existsSync("src/surfaces/mutation-route-manifest.ts")).toBe(false);
+  });
+
+  it("matches transitionRouteDefinitions length and paths", () => {
+    expect(() => assertMutationRouteManifestParity()).not.toThrow();
+    expect(mutationRouteDefinitions.length).toBe(transitionRouteDefinitions.length);
+    expect(mutationRouteDefinitions.every((row) => row.requiresAdapterGatewayCheck)).toBe(true);
+  });
+
   it("keeps first-party HTTP handlers read-only (evidence and admission readback)", () => {
     const handlers = walkTs("src/http/handlers");
     expect(handlers.length).toBeGreaterThan(0);
