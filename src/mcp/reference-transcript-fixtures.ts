@@ -151,6 +151,13 @@ export function referenceEvidenceClient(): McpEvidenceResourceClient {
         redactionProfileRef: "reference-transcript-redacted",
       };
     },
+    async getOperationReadbackProjection(actionContractId: string) {
+      return {
+        projection: "operation_readback",
+        actionContractId,
+        redactionProfileRef: "reference-transcript-redacted",
+      };
+    },
     async getReceiptTimelineProjection(receiptId: string) {
       return {
         projection: "receipt_timeline",

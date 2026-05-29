@@ -231,6 +231,158 @@ export const AgentTransactionEnvelopeProjectionSchema = z.strictObject({
 });
 export type AgentTransactionEnvelopeProjection = z.infer<typeof AgentTransactionEnvelopeProjectionSchema>;
 
+const OperationReadbackAgreementObligationPolicySchema = z.strictObject({
+  sourceAuthority: z.literal("policy_decision_snapshot"),
+  evaluationStatus: z.enum(["greenlight", "refuse", "proof_gap"]),
+  ok: z.boolean(),
+  reasonCode: ReasonCodeSchema.nullable(),
+  reason: z.string().min(1).max(1000).nullable(),
+  policyInput: z.strictObject({
+    posture: z.enum(["not_applicable", "bound", "proof_gap", "refused"]),
+    obligationRef: ResourceRefSchema.nullable(),
+    linkedAgreementId: IdSchema.nullable(),
+    acceptedNegotiationResolutionId: IdSchema.nullable(),
+  }),
+});
+
+export const OperationReadbackStatusSchema = z.enum([
+  "policy_refused",
+  "review_required",
+  "halted",
+  "quarantined",
+  "policy_proof_gap",
+  "greenlight_available",
+  "gateway_admitted",
+  "gateway_refused",
+  "gateway_proof_gap",
+  "replay_refused",
+  "downstream_pending",
+  "downstream_succeeded",
+  "downstream_refused",
+  "downstream_failed",
+  "downstream_unknown",
+  "recovery_required",
+  "isolated",
+]);
+export type OperationReadbackStatus = z.infer<typeof OperationReadbackStatusSchema>;
+
+export const OperationReadbackStageSchema = z.enum([
+  "action_contract",
+  "policy_decision",
+  "greenlight",
+  "gateway_check",
+  "mutation_attempt",
+  "receipt",
+  "recovery",
+  "isolation",
+]);
+export type OperationReadbackStage = z.infer<typeof OperationReadbackStageSchema>;
+
+export const OperationReadbackNextMechanismSchema = z.enum([
+  "read_evidence",
+  "use_greenlight_at_gateway",
+  "request_review",
+  "recraft_request",
+  "create_new_contract",
+  "recover_terminal_unknown",
+  "stop",
+  "wait_for_downstream",
+]);
+export type OperationReadbackNextMechanism = z.infer<typeof OperationReadbackNextMechanismSchema>;
+
+export const OperationReadbackSupportSeveritySchema = z.enum(["none", "info", "warning", "urgent"]);
+export type OperationReadbackSupportSeverity = z.infer<typeof OperationReadbackSupportSeveritySchema>;
+
+export const OperationReadbackGreenlightUsePostureSchema = z.enum([
+  "none",
+  "available_for_one_gateway_check",
+  "consumed",
+  "replayed_or_unusable",
+  "unknown",
+]);
+export type OperationReadbackGreenlightUsePosture = z.infer<typeof OperationReadbackGreenlightUsePostureSchema>;
+
+export const OperationSupportContextSchema = z.strictObject({
+  schemaVersion: z.literal("handshake.support-context.v0.1"),
+  supportContextRef: z.string().min(1),
+  sourceAuthority: z.literal("protocol_store_projection"),
+  surface: z.literal("operation_readback"),
+  actionContractRef: IdSchema,
+  requestIdentity: z.string().min(1).nullable(),
+  operationStatus: OperationReadbackStatusSchema,
+  reasonCodes: z.array(ReasonCodeSchema).default([]),
+  nextMechanism: OperationReadbackNextMechanismSchema,
+  safeToRetryReadback: z.literal(true),
+  safeToReuseGreenlight: z.boolean(),
+  requiresNewContract: z.boolean(),
+  supportSeverity: OperationReadbackSupportSeveritySchema,
+  docsUrl: z.string().url().nullable(),
+  nextCommand: z.string().min(1).nullable(),
+  evidenceRefs: z.array(z.string().min(1)).default([]),
+  proofGapRefs: z.array(IdSchema).default([]),
+  refusalRefs: z.array(IdSchema).default([]),
+  traceRef: z.string().min(1).nullable(),
+  spanRef: z.string().min(1).nullable(),
+  redactionProfileRef: z.literal("operation-readback:v0.1-redacted"),
+});
+export type OperationSupportContext = z.infer<typeof OperationSupportContextSchema>;
+
+export const OperationReadbackProjectionSchema = z.strictObject({
+  schemaVersion: z.literal("handshake.operation-readback.v0.1"),
+  actionContractRef: IdSchema,
+  contractDigest: DigestSchema,
+  principalRef: IdSchema,
+  agentRef: IdSchema,
+  runId: IdSchema,
+  runtimeAdapterRef: IdSchema,
+  actionClass: z.string().min(1),
+  protectedSurfaceKind: z.string().min(1),
+  resourceRef: ResourceRefSchema,
+  gatewayId: IdSchema,
+  gatewayPolicyVersion: z.string().min(1),
+  sourceAuthority: z.literal("protocol_store_projection"),
+  operationStatus: OperationReadbackStatusSchema,
+  latestAuthoritativeStage: OperationReadbackStageSchema,
+  policyDecisionRef: IdSchema,
+  policyDecisionStatus: PolicyDecisionValueSchema,
+  agreementObligationPolicy: OperationReadbackAgreementObligationPolicySchema,
+  greenlightRef: IdSchema.nullable(),
+  gateAttemptRef: IdSchema.nullable(),
+  mutationAttemptRef: IdSchema.nullable(),
+  receiptRef: IdSchema.nullable(),
+  gatewayAdmissionStatus: GatewayAdmissionStatusSchema,
+  downstreamOutcomeStatus: DownstreamOutcomeStatusSchema,
+  finalityStatus: z.enum(["final", "pending", "suspect", "unknown"]).nullable(),
+  greenlightUsePosture: OperationReadbackGreenlightUsePostureSchema,
+  reasonCodes: z.array(ReasonCodeSchema).default([]),
+  nextMechanism: OperationReadbackNextMechanismSchema,
+  safeToRetryReadback: z.literal(true),
+  safeToReuseGreenlight: z.boolean(),
+  requiresNewContract: z.boolean(),
+  authorityCreatedByReadback: z.literal(false),
+  greenlightCreatedByReadback: z.literal(false),
+  gatewayCheckPerformedByReadback: z.literal(false),
+  mutationAttemptedByReadback: z.literal(false),
+  receiptExportCreatedByReadback: z.literal(false),
+  rawInternalRecordIncluded: z.literal(false),
+  credentialMaterialIncluded: z.literal(false),
+  paymentMaterialIncluded: z.literal(false),
+  evidenceRefs: z.array(z.string().min(1)).default([]),
+  proofGapRefs: z.array(IdSchema).default([]),
+  refusalRefs: z.array(IdSchema).default([]),
+  recoveryRefs: z.array(z.string().min(1)).default([]),
+  isolationRefs: z.array(z.string().min(1)).default([]),
+  authorityCertificateRefs: z.array(IdSchema).default([]),
+  providerRequestRef: z.string().min(1).nullable(),
+  providerOperationRef: z.string().min(1).nullable(),
+  traceRef: z.string().min(1).nullable(),
+  spanRef: z.string().min(1).nullable(),
+  redactionProfileRef: z.literal("operation-readback:v0.1-redacted"),
+  omittedFields: z.array(z.string().min(1)).default([]),
+  supportContext: OperationSupportContextSchema,
+});
+export type OperationReadbackProjection = z.infer<typeof OperationReadbackProjectionSchema>;
+
 export const ProtectedPathInstallHealthStatusSchema = z.enum([
   "not_required",
   "satisfies_gateway_checked",

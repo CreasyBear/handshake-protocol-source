@@ -4,6 +4,7 @@ import type {
   ContractEvidenceProjection,
   GeneratedGraphEvidenceProjection,
   IdempotencyRecoveryProjection,
+  OperationReadbackProjection,
   ProtectedPathInstallHealthProjection,
   ReceiptTimelineProjection,
 } from "../../protocol/public/schemas";
@@ -42,6 +43,12 @@ export class EvidenceClient {
     return this.transport.get(`/v0.2/evidence/contracts/${encodeURIComponent(actionContractId)}`);
   }
 
+  getOperationReadbackProjection(actionContractId: string): Promise<OperationReadbackProjection> {
+    return this.transport.get(
+      `/v0.2/evidence/operations/${encodeURIComponent(actionContractId)}/readback`,
+    );
+  }
+
   getAgentTransactionEnvelopeProjection(actionContractId: string): Promise<AgentTransactionEnvelopeProjection> {
     return this.transport.get(`/v0.2/evidence/agent-transactions/${encodeURIComponent(actionContractId)}`);
   }
@@ -61,4 +68,11 @@ export class EvidenceClient {
   verifyAuthorityCertificate(certificate: unknown, trustMaterial: unknown): Promise<VerifyAuthorityCertificateResult> {
     return verifyAuthorityCertificate(certificate, trustMaterial as AuthorityCertificateTrustMaterialInput);
   }
+}
+
+export async function fetchOperationReadbackProjection(
+  client: EvidenceClient,
+  actionContractId: string,
+): Promise<OperationReadbackProjection> {
+  return client.getOperationReadbackProjection(actionContractId);
 }
