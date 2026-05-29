@@ -9,10 +9,10 @@ exact contract before mutation. Vague intent and generated code are not
 authority. A protected path requires an
 exact action contract, policy decision, one-use greenlight or refusal, gateway
 check before mutation, and receipt, refusal, replay refusal, proof gap, or
-optional terminal AuthorityCertificate. Certificate is terminal evidence, not
-permission.
+optional terminal AuthorityCertificate.
+Certificate is terminal evidence, not permission.
 
-Category: **reconstructable clearance before consequence** for protected actions in automated decision making. A service must be able to reconstruct clearance evidence before treating downstream consequence as proof. Certificates are terminal evidence, not permission.
+Category: protected actions for automated decision making, framed as **reconstructable clearance before consequence**. A service must be able to reconstruct clearance evidence before treating downstream consequence as proof. Certificates are terminal evidence, not permission.
 
 Core terms: a `cleared protected-action event` is one terminal event with
 reconstructable evidence; the `protocol kernel` is the only authority state
