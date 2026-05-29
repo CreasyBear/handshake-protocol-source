@@ -66,16 +66,10 @@ describe("A1 integration KILL enforcement", () => {
   });
 
   it("KILL-02 forbids A1 authorize HTTP as Handshake clearance", () => {
-    const srcViolations = findRegexViolations(productionTsFiles, [
-      /\/v1\/authorize/,
-      /A1Client\.authorize/,
-    ]);
+    const srcViolations = findRegexViolations(productionTsFiles, [/\/v1\/authorize/, /A1Client\.authorize/]);
     expect(srcViolations).toEqual([]);
 
-    const docAllowlist = new Set([
-      "docs/internal/decisions.md",
-      "docs/internal/a1-handshake-composability.md",
-    ]);
+    const docAllowlist = new Set(["docs/internal/decisions.md", "docs/internal/a1-handshake-composability.md"]);
     const docPaths = walkMd("docs/internal").filter((rel) => !docAllowlist.has(rel));
     const docViolations = findRegexViolations(docPaths, [/\/v1\/authorize/, /A1Client\.authorize/]);
     expect(docViolations).toEqual([]);
@@ -96,9 +90,7 @@ describe("A1 integration KILL enforcement", () => {
   });
 
   it("KILL-04 forbids advisory-only A1 middleware claims in src", () => {
-    expect(
-      findIdentifierViolations(productionTsFiles, ["a1-middleware", "advisoryOnlyEnforcement"]),
-    ).toEqual([]);
+    expect(findIdentifierViolations(productionTsFiles, ["a1-middleware", "advisoryOnlyEnforcement"])).toEqual([]);
   });
 
   it("KILL-05 forbids Studio check as operator clearance", () => {
@@ -161,10 +153,7 @@ describe("A1 integration KILL enforcement", () => {
     ];
     expect(findRegexViolations(receiptFiles, mergedPatterns)).toEqual([]);
 
-    const receiptSchemas = readFileSync(
-      join(repoRoot, "src/protocol/areas/receipt-export/schemas.ts"),
-      "utf8",
-    );
+    const receiptSchemas = readFileSync(join(repoRoot, "src/protocol/areas/receipt-export/schemas.ts"), "utf8");
     expect(receiptSchemas).toMatch(/gatewayCheckStatus/);
     expect(receiptSchemas).toMatch(/downstreamOutcomeStatus/);
     expect(receiptSchemas).not.toMatch(/unifiedTerminalStatus/);
@@ -176,10 +165,7 @@ describe("A1 integration KILL enforcement", () => {
   });
 
   it("KILL-10 forbids A1 milestone copy widening action catalog", () => {
-    const composability = readFileSync(
-      join(repoRoot, "docs/internal/a1-handshake-composability.md"),
-      "utf8",
-    );
+    const composability = readFileSync(join(repoRoot, "docs/internal/a1-handshake-composability.md"), "utf8");
     const decisions = readFileSync(join(repoRoot, "docs/internal/decisions.md"), "utf8");
 
     expect(composability).toMatch(/wedge discipline|KILL-10/i);
@@ -187,15 +173,12 @@ describe("A1 integration KILL enforcement", () => {
     expect(decisions).toMatch(/D-72.*OPP-09|OPP-09.*D-72/s);
 
     const wideningClaim = /A1 enables all action types/i;
-    const allowedWedgeNegation =
-      /not an excuse|widen|forbids|KILL-10|claims A1 enables|must not|do not claim/i;
+    const allowedWedgeNegation = /not an excuse|widen|forbids|KILL-10|claims A1 enables|must not|do not claim/i;
     for (const text of [composability, decisions]) {
       const match = text.match(wideningClaim);
       if (match && match.index !== undefined) {
         const window = text.slice(Math.max(0, match.index - 120), match.index + 120);
-        expect(window, "widening claim must appear only in negation/KILL framing").toMatch(
-          allowedWedgeNegation,
-        );
+        expect(window, "widening claim must appear only in negation/KILL framing").toMatch(allowedWedgeNegation);
       }
     }
 

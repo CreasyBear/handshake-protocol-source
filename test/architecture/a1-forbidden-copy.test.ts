@@ -87,10 +87,7 @@ function scanText(name: string, source: string, rules: ForbiddenRule[] = forbidd
   for (const rule of rules) {
     for (const match of source.matchAll(rule.pattern)) {
       const index = match.index ?? 0;
-      const window = source.slice(
-        Math.max(0, index - contextWindow),
-        Math.min(source.length, index + contextWindow),
-      );
+      const window = source.slice(Math.max(0, index - contextWindow), Math.min(source.length, index + contextWindow));
       if (!allowedContextPattern.test(window)) {
         violations.push(`${name}: ${rule.name} (${rule.kill ?? "forbidden"}) @ ${index}`);
       }
@@ -122,9 +119,7 @@ describe("A1 forbidden product copy", () => {
   });
 
   it("forbids stop-after-verify demo copy", () => {
-    const rule = forbiddenRules.find(
-      (entry) => entry.name === "stop after verify without greenlight continuation",
-    );
+    const rule = forbiddenRules.find((entry) => entry.name === "stop after verify without greenlight continuation");
     expect(rule).toBeDefined();
     const leaked = "Demo complete: stop after A1 verify and return success.";
     expect(scanText("fixture.md", leaked, [rule!]).length).toBeGreaterThan(0);

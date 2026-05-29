@@ -80,18 +80,18 @@ Planned module path: `src/integrations/a1-evidence/` (A1-1; absent in A1-0).
 
 Reject on contact. Each item maps to `test/architecture/a1-integration-*.test.ts`:
 
-| ID | Refuse |
-|----|--------|
-| KILL-01 | `VerifiedToken` / HMAC fast-path as greenlight substitute |
-| KILL-02 | A1 `/v1/authorize` success = Handshake clearance |
-| KILL-03 | Passport / presentation digest as policy, greenlight, or gateway input |
-| KILL-04 | Advisory A1 middleware documented or wired as Handshake enforcement |
-| KILL-05 | Studio static check as operator clearance |
-| KILL-06 | MCP tools named authorize / mint / renew without kernel transitions |
-| KILL-07 | ZK or guest wedge labels without proof-gap framing |
+| ID      | Refuse                                                                                                               |
+| ------- | -------------------------------------------------------------------------------------------------------------------- |
+| KILL-01 | `VerifiedToken` / HMAC fast-path as greenlight substitute                                                            |
+| KILL-02 | A1 `/v1/authorize` success = Handshake clearance                                                                     |
+| KILL-03 | Passport / presentation digest as policy, greenlight, or gateway input                                               |
+| KILL-04 | Advisory A1 middleware documented or wired as Handshake enforcement                                                  |
+| KILL-05 | Studio static check as operator clearance                                                                            |
+| KILL-06 | MCP tools named authorize / mint / renew without kernel transitions                                                  |
+| KILL-07 | ZK or guest wedge labels without proof-gap framing                                                                   |
 | KILL-08 | Merged terminal receipt without `delegationProvenance` / `gatewayCheckStatus` / `downstreamOutcomeStatus` separation |
-| KILL-09 | A1 cert nonce mapped to Handshake greenlight consumption ledger |
-| KILL-10 | Milestone copy that widens the action catalog or claims A1 enables all action types |
+| KILL-09 | A1 cert nonce mapped to Handshake greenlight consumption ledger                                                      |
+| KILL-10 | Milestone copy that widens the action catalog or claims A1 enables all action types                                  |
 
 ---
 
@@ -99,11 +99,11 @@ Reject on contact. Each item maps to `test/architecture/a1-integration-*.test.ts
 
 Terminal evidence must never collapse delegation proof, gateway enforcement, and downstream rail outcome into one undifferentiated status.
 
-| Layer | Owner | Example fields | Must not imply |
-|-------|-------|------------------|----------------|
-| `delegationProvenance` | A1 evidence layer (A1-2+) | chainFingerprint, verifyDigest, reasonCodes | greenlight, gateway pass, payment success |
-| `gatewayCheckStatus` | Handshake kernel | passed / refused / proof_gap on exact contract | delegation validity alone, downstream success |
-| `downstreamOutcomeStatus` | Downstream rail / adapter | succeeded / failed / unknown on protected surface | gateway check, delegation proof |
+| Layer                     | Owner                     | Example fields                                    | Must not imply                                |
+| ------------------------- | ------------------------- | ------------------------------------------------- | --------------------------------------------- |
+| `delegationProvenance`    | A1 evidence layer (A1-2+) | chainFingerprint, verifyDigest, reasonCodes       | greenlight, gateway pass, payment success     |
+| `gatewayCheckStatus`      | Handshake kernel          | passed / refused / proof_gap on exact contract    | delegation validity alone, downstream success |
+| `downstreamOutcomeStatus` | Downstream rail / adapter | succeeded / failed / unknown on protected surface | gateway check, delegation proof               |
 
 Auditors must reconstruct which layer failed six months later without re-running live systems.
 
