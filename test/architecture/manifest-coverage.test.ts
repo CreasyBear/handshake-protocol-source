@@ -1,6 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { existsSync, readFileSync, statSync } from "node:fs";
-import { join } from "node:path";
+import { existsSync, statSync } from "node:fs";
 import packageJson from "../../package.json";
 import {
   surfaceBoundaryManifest,

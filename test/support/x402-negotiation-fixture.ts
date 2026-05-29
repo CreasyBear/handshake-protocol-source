@@ -274,11 +274,6 @@ async function registerX402DelegatedAuthorityRef(
   x402AuthorityRefs.set(proposal, authorityRef);
   return authorityRef;
 }
-
-function requireCompiledRecords(proposal: X402InstallProposal): NonNullable<X402InstallProposal["compiledRecords"]> {
-  return requireX402CompiledRecords(proposal);
-}
-
 function x402RuntimeConfig(
   proposal: X402InstallProposal,
   records: NonNullable<X402InstallProposal["compiledRecords"]>,

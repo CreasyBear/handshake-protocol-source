@@ -2,7 +2,6 @@ import { describe, expect, it } from "bun:test";
 import {
   EvidenceClient,
   GatewayClient,
-  HandshakeClientError,
   PolicyClient,
   type HandshakeFetch,
 } from "../../src/sdk/surface-clients";
