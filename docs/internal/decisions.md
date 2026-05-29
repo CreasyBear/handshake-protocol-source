@@ -66,6 +66,8 @@ Accepted on branch `phase-05-product-coherence` (local close-out 2026-05-29). Ph
 - **D-69:** Narrative polish must not soften the category claim or reintroduce passport/approval/HITL framing in headlines.
 - **D-70:** Keel audit rows require `file:line` citations; mis-mapped citations are proof-gap honesty failures, not enforcement failures.
 - **D-71:** Hosted-admission consolidation remains re-export-only polish — no hosted workspace promotion from Phase 05.
+- **D-72:** A1 integration posture (OPP-09): evidence-only TypeScript verify default in-repo; A1 gateway never a product dependency; sidecar escalation criteria explicit (see section below).
+- **D-73:** A1-1+ integration work must not merge until A1-0 KILL architecture tests and D-72 land on main (`test/architecture/a1-integration-*.test.ts`).
 
 Shared product/protocol vocabulary:
 
@@ -818,3 +820,46 @@ checks, mutate protected surfaces, or register MCP discoverability. Use
 `npm run release:admin:check:remote` after source and artifact pushes when
 remote ref readback is required before launch-admin metadata work. The operating
 runbook lives in `docs/internal/release-admin-runbook.md`.
+
+## A1 Integration Posture (OPP-09, D-72)
+
+Accepted: carry A1's core cryptographic delegation functionality into Handshake as
+a **non-authoritative evidence layer** only. A1 verification emits fingerprints
+and structured reason codes; it does not issue greenlights, perform gateway
+checks, or create mutation authority for any `ActionContract.actionType`.
+
+**Default (A1-1, not shipped in A1-0):** Evidence-only TypeScript verify module at
+`src/integrations/a1-evidence/` in this repo. Inputs: A1 `wire/schema.json` and
+conformance vectors; offline Ed25519 verify; output `DelegationEvidenceRecord`
+with chain/cert fingerprints only — no authority flags.
+
+**Rejected alternative:** Embed or product-depend on the A1 gateway (public
+`/v1/authorize`, passport presentation routes, `VerifiedToken` HMAC fast-path).
+**Why rejected:** ambient authority, advisory HTTP clearance, expanded trusted
+surface, and category confusion (KILL-01, KILL-02, KILL-04, KILL-05). HTTP 200
+from A1 authorize proves capability-class delegation, not an exact Handshake
+`ActionContract` clearance.
+
+**Sidecar escalation criteria (binary):** An internal Rust verify sidecar is
+allowed **only if** (1) the TypeScript verify module fails A1 conformance vectors
+in CI, **or** (2) Worker crypto or bundle limits block shipping TS verify. The
+sidecar must run on internal network only, never as a public product dependency,
+never as clearance substitute, and never on the mutation hot path.
+
+**Non-negotiable:** A1 evidence verifies delegation provenance when policy
+requires it. Handshake alone evaluates exact contracts, issues one-use
+greenlights, and enforces `gatewayCheck` before mutation. Valid delegation
+evidence is necessary when required, never sufficient alone.
+
+**Merge gate (D-73):** Do not merge A1-1 schema or verify module work until
+`docs/internal/a1-handshake-composability.md`, D-72, and
+`test/architecture/a1-integration-kill-enforcement.test.ts`,
+`test/architecture/a1-forbidden-copy.test.ts`, and
+`test/architecture/a1-integration-phase-gate.test.ts` exist on main.
+
+**Cross-ref:** `docs/internal/a1-handshake-composability.md`.
+
+**Wedge discipline (KILL-10):** A1 integration strengthens delegation provenance;
+it is not an excuse to widen the action catalog or claim "A1 enables all action
+types" in milestone copy. Architecture remains action-type agnostic;
+`x402_payment.exact` stays one proof profile, not the boundary.
