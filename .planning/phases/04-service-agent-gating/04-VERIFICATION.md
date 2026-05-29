@@ -243,5 +243,59 @@ Remaining gaps are documented honestly: MCP registry proof gap, deferred mutatio
 
 ---
 
+## Regression cleanup (orchestrator-adjudicated, post-verification)
+
+The verifier's open questions #1 and #3 were resolved by establishing empirical
+ground truth: the full `bun test` suite was run at baseline `1e801b7` in an
+isolated worktree and set-diffed against HEAD. See `04-REGRESSION-TRUTH.md`.
+
+**Finding:** the executor + first fixer mislabeled phase-introduced failures as
+"pre-existing." Baseline had **22** failures; Phase 04 *fixed 19* but
+*introduced 14*. Of the 17 remaining after the first tsc-fix pass, only 3 were
+genuinely pre-existing; 12 were phase-introduced and fixable; 2 were
+environmental (local gitignored `.DS_Store` / `.agents` absent in clean checkout).
+
+**Resolution (two Composer fix passes):**
+
+| Pass | Cleared | Commits |
+| --- | --- | --- |
+| tsc + test contracts | 91→0 tsc errors; 35→17 failures | `2a46970 920e38a 86e0758 401a866 3840c25 6b06c6a` + D-18 `06c6214` |
+| naming + MCP + CLI evidence | 17→3 failures (all 12 phase-introduced cleared) | `2acddf1 bafc2ee a85f93b 738a34c 42b1fb3` |
+
+Notable doctrine fixes: renamed banned `src/cli/service` bucket → `service-operator`;
+moved `failure-class.ts` into a subdir to clear the foundation loose-file threshold;
+**renamed the D-15 "Tier 1" integrator concept → "integrator parity"** to honor the
+AGENTS.md ban on planning-stage labels in repo-facing surfaces (behavioral contract
+preserved; surface label only); realigned MCP reference transcript + import roots +
+CLI evidence surface to the Phase 04 failureClass taxonomy. No `as any`, no
+test-weakening, no D-decision violations.
+
+### Corrected final health (independently re-verified at `42b1fb3`)
+
+| Metric | Baseline `1e801b7` | Final `42b1fb3` | Verdict |
+| --- | --- | --- | --- |
+| `npx tsc --noEmit` | 3 errors | **0 errors** | better |
+| `bun test` | 22 fail | **3 fail** | much better |
+| Tier operator | — | **10/10 PASS** | green |
+| Tier full | — | **15/15 PASS** | green |
+
+The 3 residual failures are NOT phase regressions:
+- `repo naming posture > keeps workspace metadata junk` — local `.DS_Store` (absent in clean CI checkout).
+- `repo naming posture > keeps deleted scratch documents` — local `.agents/` + `skills-lock.json` gstack install (gitignored; absent in clean CI checkout).
+- `manifest coverage > maps each product surface export …` — **pre-existing** (failed at baseline); deferred to Phase 05 (`./hosted-admission`, `./surfaces/service-workflow-admission` export mapping).
+
+In a clean CI checkout the first two do not exist, leaving the single pre-existing
+manifest-coverage gap — honestly carried into Phase 05.
+
+### Revised status
+
+**`passed`** for the Phase 04 goal and health bar (baseline-or-better on tsc and
+tests; both tier gates green). One pre-existing manifest-coverage gap and the
+MCP-Registry proof gap remain documented and deferred to Phase 05 — neither is a
+Phase 04 regression.
+
+---
+
 _Verified: 2026-05-29_  
-_Verifier: gsd-verifier (independent goal-backward audit)_
+_Verifier: gsd-verifier (independent goal-backward audit)_  
+_Regression truth + cleanup adjudication: orchestrator, 2026-05-29_
