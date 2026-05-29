@@ -193,10 +193,24 @@ function durableRecordScopeMismatch(context: IntentCompilationDecisionContext): 
 }
 
 function requiresMissingGeneratedExecutionGraphRefusal(context: IntentCompilationDecisionContext): boolean {
-  return Boolean(
-    context.runtimeExecution &&
-    requiresGeneratedExecutionGraph(context.runtimeExecution.executionShape) &&
-    !context.generatedExecutionGraph,
+  if (context.generatedExecutionGraph) {
+    return false;
+  }
+  if (context.runtimeExecution && requiresGeneratedExecutionGraph(context.runtimeExecution.executionShape)) {
+    return true;
+  }
+  // D-66 (adjudication #4): an agent-origin compilation claims a generated
+  // execution graph/node binding but attaches no runtime-execution record.
+  // Generated code is not an action contract, so the graph stays required even
+  // when no runtime evidence is present — this closes the no-`runtimeExecutionId`
+  // hole where the runtime-shape branch above could never fire.
+  return isAgentOriginCompilation(context);
+}
+
+function isAgentOriginCompilation(context: IntentCompilationDecisionContext): boolean {
+  return (
+    context.runtimeExecution === null &&
+    (context.input.generatedExecutionGraphId !== null || context.input.generatedExecutionNodeId !== null)
   );
 }
 
