@@ -73,12 +73,11 @@ function gatewayHeldCommand(
     surfaceOperationRef: "surface-op:x402:demo",
     ...overrides.verifiedGate,
   };
-  const credentialResolutionEvidence = gatewayResolvedCredentialEvidence({
-    actionContractId: verifiedGate.actionContractId,
-    greenlightId: verifiedGate.greenlightId,
-    gateAttemptId: verifiedGate.gateAttemptId,
-    ...overrides.credentialResolutionEvidence,
-  });
+  // Evidence defaults are fixed-valid (matching the verified-gate defaults) so the
+  // guard — not the schema parser — is what rejects emptied/mismatched gate ids.
+  const credentialResolutionEvidence = gatewayResolvedCredentialEvidence(
+    overrides.credentialResolutionEvidence,
+  );
   return {
     verifiedGate,
     parameters: { gatewayCredentialRefId: "gcred_demo_0001" } as X402PaymentParameters,

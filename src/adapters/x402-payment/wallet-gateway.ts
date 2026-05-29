@@ -129,6 +129,63 @@ export interface X402WalletSigningSurface {
   signPayment(command: X402PaymentSignatureCommand): Promise<X402PaymentSignatureEvidence>;
 }
 
+/**
+ * D-64 Mechanism A — gateway-held credential custody (structural, not label-only).
+ *
+ * The x402 signer must never mint a payment signature unless the command carries a
+ * genuine {@link VerifiedGatewayCheck} AND gateway-resolved, redacted credential
+ * resolution evidence bound to that same gate attempt. This makes
+ * `credentialMaterialPosture: "gateway_held_redacted"` an enforced invariant rather
+ * than a label: a caller-only path holding a raw `gatewayCredentialRefId` cannot
+ * reach `signPayment` because it cannot produce gate-bound `used_by_gateway`
+ * resolution evidence. Throws on any custody violation.
+ */
+export function assertGatewayHeldSigningCommand(command: X402PaymentSignatureCommand): void {
+  const refuse = (reasonCode: string, detail: string): never => {
+    throw new Error(`x402 gateway-held custody refused signing (${reasonCode}): ${detail}`);
+  };
+
+  const gate = command.verifiedGate;
+  if (gate.gatewayCheckStatus !== "passed") {
+    refuse("gateway_check_not_authoritative", "verified gate status is not passed.");
+  }
+  const requiredGateIds: ReadonlyArray<[keyof VerifiedGatewayCheck, string]> = [
+    ["gateAttemptId", gate.gateAttemptId],
+    ["mutationAttemptId", gate.mutationAttemptId],
+    ["surfaceOperationRef", gate.surfaceOperationRef],
+    ["actionContractId", gate.actionContractId],
+    ["greenlightId", gate.greenlightId],
+    ["gatewayId", gate.gatewayId],
+    ["idempotencyKey", gate.idempotencyKey],
+  ];
+  for (const [field, value] of requiredGateIds) {
+    if (!value) refuse("gateway_check_not_authoritative", `verified gate ${String(field)} is empty.`);
+  }
+
+  const evidence = command.credentialResolutionEvidence;
+  if (!evidence) {
+    refuse("credential_resolution_evidence_missing", "no gateway credential resolution evidence present.");
+  }
+  if (evidence.credentialMaterialIncluded !== false) {
+    refuse("credential_material_not_redacted", "resolution evidence must not include credential material.");
+  }
+  if (evidence.resultClass !== "used_by_gateway") {
+    refuse("credential_not_used_by_gateway", `resolution evidence resultClass is ${evidence.resultClass}.`);
+  }
+  if (evidence.redactionStatus !== "redacted") {
+    refuse("credential_resolution_not_redacted", `resolution evidence redactionStatus is ${evidence.redactionStatus}.`);
+  }
+  if (evidence.gateAttemptId !== gate.gateAttemptId) {
+    refuse("credential_resolution_gate_unbound", "resolution evidence is not bound to the verified gate attempt.");
+  }
+  if (evidence.actionContractId !== gate.actionContractId) {
+    refuse("credential_resolution_contract_unbound", "resolution evidence is not bound to the gate action contract.");
+  }
+  if (evidence.greenlightId !== gate.greenlightId) {
+    refuse("credential_resolution_greenlight_unbound", "resolution evidence is not bound to the gate greenlight.");
+  }
+}
+
 export type CreateOfficialExactX402SigningSurfaceInput = {
   signer: ClientEvmSigner;
   paymentRequired: unknown;
@@ -234,13 +291,15 @@ export async function runX402WalletGateway(input: X402WalletGatewayInput): Promi
         `digest:${observedParameters.policyVersionDigest}`,
       ],
     });
-    const signatureEvidence = await input.surface.signPayment({
+    const signingCommand: X402PaymentSignatureCommand = {
       verifiedGate,
       parameters: observedParameters,
       credentialResolutionEvidence,
       credentialUseRef: `gateway-credential-use:x402:${verifiedGate.gateAttemptId}`,
       ...providerRefs,
-    });
+    };
+    assertGatewayHeldSigningCommand(signingCommand);
+    const signatureEvidence = await input.surface.signPayment(signingCommand);
     const evidenceRefs = [
       signatureEvidence.evidenceRef,
       signatureEvidence.paymentSignatureHeaderRef,
@@ -313,6 +372,7 @@ export function createOfficialExactX402SigningSurface(
 
   return {
     async signPayment(command: X402PaymentSignatureCommand): Promise<X402PaymentSignatureEvidence> {
+      assertGatewayHeldSigningCommand(command);
       const paymentIdentifierDigest = await verifyPaymentIdentifierBinding({
         parameters: command.parameters,
         paymentIdentifier,
