@@ -4,8 +4,42 @@ import {
   type GatewayCredentialRef,
   type RegisterGatewayCredentialRefInput,
 } from "../../protocol/areas/credential-custody";
+import { canonicalizeHttpProfile } from "../http-profile/canonicalize";
 import { digestCanonical } from "../../protocol/foundation/canonical";
 import { DigestSchema, IdSchema, IsoDateSchema, type JsonValue } from "../../protocol/foundation/schema-core";
+
+/** Phase 04 plan `04-08` / D-11: shared HTTP transport canonicalization for auth.md exact profile. */
+export const AUTH_MD_PROTECTED_API_CALL_EXACT_PROFILE = "auth_md_protected_api_call.exact" as const;
+
+export const AuthMdProtectedApiCallAllowedHttpMethodSchema = z.enum(["GET", "POST", "PUT", "PATCH", "DELETE"]);
+export type AuthMdProtectedApiCallAllowedHttpMethod = z.infer<typeof AuthMdProtectedApiCallAllowedHttpMethodSchema>;
+
+export const AuthMdProtectedApiCallHeaderAllowlistSchema = z.array(
+  z.enum(["accept", "content-type", "authorization", "x-request-id", "x-idempotency-key"]),
+);
+export type AuthMdProtectedApiCallHeaderAllowlist = z.infer<typeof AuthMdProtectedApiCallHeaderAllowlistSchema>;
+
+export const AuthMdProtectedApiCallExactTransportSchema = z.strictObject({
+  targetHttpMethod: AuthMdProtectedApiCallAllowedHttpMethodSchema,
+  endpointUrl: z.string().url(),
+  pathTemplate: z
+    .string()
+    .min(1)
+    .refine((value) => value.startsWith("/"), { message: "pathTemplate must start with /" }),
+  requestBodyDigest: DigestSchema.nullable().default(null),
+  selectedHeadersDigest: DigestSchema,
+  dynamicEndpointConstructionObserved: z.boolean().default(false),
+  dynamicHostConstructionObserved: z.boolean().default(false),
+  retryAuthorityReuseDetected: z.boolean().default(false),
+});
+
+export function canonicalizeAuthMdProtectedApiCallExactTransport(
+  input: z.input<typeof AuthMdProtectedApiCallExactTransportSchema>,
+): z.infer<typeof AuthMdProtectedApiCallExactTransportSchema> {
+  const parsed = AuthMdProtectedApiCallExactTransportSchema.parse(input);
+  const canonical = canonicalizeHttpProfile(parsed);
+  return AuthMdProtectedApiCallExactTransportSchema.parse(canonical);
+}
 
 export const AUTH_MD_REGISTERED_CREDENTIAL_PROFILE = "auth_md_registered_credential.v0";
 export const AUTH_MD_DISCOVERY_REDACTION_PROFILE = "auth-md-discovery:v0-redacted";
