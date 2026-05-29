@@ -1,13 +1,14 @@
 import type { CodexHostActivationReadback } from "./codex-host-activation";
 import type { DistributionProvenanceReadback } from "./distribution-provenance";
 import type { LiveX402RequirementReadback } from "./live-x402-requirement";
+import {
+  assertProductCompletionGateIds,
+  PRODUCT_COMPLETION_READBACK_KIND,
+  type ProductCompletionGateId,
+} from "./product-completion-contract";
 import { nonAuthorityBoundary, PROOF_PACKET_VERSION } from "./shared";
 
-export type ProductCompletionGateId =
-  | "codex_local_host_activation"
-  | "public_distribution_and_registry"
-  | "customer_gateway_live_x402_paid_proof"
-  | "auth_md_x402_admission_packet";
+export type { ProductCompletionGateId };
 
 export type ProductCompletionGateStatus = "completed" | "hard_blocked" | "incomplete";
 
@@ -55,6 +56,11 @@ export type ProductCompletionReadbackInput = {
       readonly refusalFirstTestsPassed: boolean;
       readonly redactedReadbackTestsPassed: boolean;
       readonly createsAuthority: boolean;
+      readonly evidenceRefs: readonly string[];
+    };
+    readonly dualEnforcementPosture?: {
+      readonly dualEnforcementPostureTestPassed: boolean;
+      readonly mutationManifestGatingTestPassed: boolean;
       readonly evidenceRefs: readonly string[];
     };
   };
@@ -115,7 +121,9 @@ export function projectProductCompletionReadback(input: ProductCompletionReadbac
       blockers: [],
       evidenceRefs: input.gates.authMdX402AdmissionPacket.evidenceRefs,
     }),
+    dualEnforcementPostureGateResult(input),
   ];
+  assertProductCompletionGateIds(gateResults.map((result) => result.gateId));
   const incompleteGateIds = gateResults
     .filter((result) => result.status !== "completed" && result.status !== "hard_blocked")
     .map((result) => result.gateId);
@@ -131,12 +139,12 @@ export function projectProductCompletionReadback(input: ProductCompletionReadbac
       : ("incomplete" as const);
 
   return {
-    proofKind: "product_completion_readback" as const,
+    proofKind: PRODUCT_COMPLETION_READBACK_KIND,
     proofVersion: PROOF_PACKET_VERSION,
     generatedAt: input.generatedAt,
     status,
     scope:
-      "Aggregate source-owned closeout readback for the four product gates. This object audits evidence posture only; it creates no authority.",
+      "Aggregate source-owned closeout readback for the product gates. This object audits evidence posture only; it creates no authority.",
     qualityGate: input.qualityGate,
     gates: gateResults,
     incompleteGateIds,
@@ -165,6 +173,32 @@ export function projectProductCompletionReadback(input: ProductCompletionReadbac
           ? "Resolve public distribution: publish the current package with provenance support or explicitly accept the no-provenance release risk, then verify npm and MCP Registry readback."
           : "Resolve the remaining incomplete gate with source-owned evidence before claiming product closeout.",
   };
+}
+
+/** Phase-04 plans 04-01 / deferred 04-11 — honest incomplete until structural tests pass. */
+function dualEnforcementPostureGateResult(input: ProductCompletionReadbackInput) {
+  const structuralEvidenceReady =
+    input.gates.dualEnforcementPosture?.dualEnforcementPostureTestPassed === true &&
+    input.gates.dualEnforcementPosture?.mutationManifestGatingTestPassed === true;
+  const blockers = structuralEvidenceReady
+    ? []
+    : [
+        "dual_enforcement_structural_evidence_absent",
+        "awaiting_test_architecture_dual_enforcement_posture",
+        "awaiting_test_architecture_http_handler_mutation_gating",
+      ];
+  return productCompletionGateResult({
+    gateId: "dual_enforcement_posture",
+    title: "Dual enforcement: admission identifies callers; adapter run*Gateway before mutation enforces",
+    completed: structuralEvidenceReady,
+    hardBlocked: false,
+    blockers,
+    evidenceRefs: input.gates.dualEnforcementPosture?.evidenceRefs ?? [
+      "evidence:phase-04:04-01",
+      "evidence:phase-04:04-11-deferred",
+      "evidence:test:dual-enforcement-posture",
+    ],
+  });
 }
 
 function productCompletionGateResult(input: {
