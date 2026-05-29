@@ -26,13 +26,6 @@ const internalMisconfigurationCodes = new Set([
   "durable_store_unavailable",
 ]);
 
-const mcpBindingReasonCodes = new Set([
-  "mcp_trusted_spend_bound_missing",
-  "mcp_trusted_readiness_binding_missing",
-  "mcp_policy_version_binding_missing",
-  "mcp_trusted_proposal_binding_invalid",
-]);
-
 const mcpInstallReasonPrefix = "mcp_install_";
 
 function isStaleHostedAdmissionCode(code: string): boolean {
@@ -137,13 +130,6 @@ export function classifyFailureClassFromReasonCodes(reasonCodes: readonly string
 }
 
 function classifyFailureClassFromReasonCode(code: string): FailureClass {
-  if (code === "mcp_input_schema_invalid") return "internal";
-  if (code === "mcp_tools_list_changed" || code === "mcp_metadata_digest_stale") return "proof_gap";
-  if (code.startsWith(mcpInstallReasonPrefix)) return "proof_gap";
-  if (mcpBindingReasonCodes.has(code)) return "proof_gap";
-  if (code === "mcp_gateway_offline" || code === "mcp_gateway_posture_unknown") return "proof_gap";
-  if (code === "mcp_candidate_not_contractable" || code === "mcp_candidate_digest_missing") return "proof_gap";
-
   if (isAuthReasonCode(code)) return "auth";
   if (isStaleHostedAdmissionCode(code)) return "stale_admission";
   if (isHostedAdmissionReasonCode(code)) return "hosted_admission";
@@ -155,6 +141,8 @@ function classifyFailureClassFromReasonCode(code: string): FailureClass {
   if (metadata) {
     return failureClassFromReasonCodeMetadata(code, metadata);
   }
+
+  if (code.startsWith(mcpInstallReasonPrefix)) return "proof_gap";
 
   if (code.includes("refusal") || code.includes("refused") || code.startsWith("protected_action_")) {
     return "protected_action_refusal";

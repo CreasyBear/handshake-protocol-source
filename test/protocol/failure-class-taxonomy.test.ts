@@ -6,6 +6,7 @@ import {
 } from "../../src/protocol/foundation/failure-class";
 import { failureClassForProtocolError, httpStatusForFailureClass, transitionErrorResult } from "../../src/http/errors/transition-error-envelope";
 import { HandshakeProtocolError } from "../../src/protocol/foundation/errors";
+import { protocolReasonCodes } from "../../src/protocol/foundation/reason-codes";
 
 describe("failureClass taxonomy registry parity", () => {
   const policyRefusalCodes = [
@@ -72,5 +73,30 @@ describe("failureClass taxonomy registry parity", () => {
     expect(failureClassFromHttpStatus(422)).toBe("proof_gap");
     expect(failureClassFromHttpStatus(418)).toBe("proof_gap");
     expect(failureClassFromHttpStatus(500)).toBe("internal");
+  });
+
+  it("maps every registry refusal kind to protected_action_refusal (never proof_gap)", () => {
+    const refusalCodes = protocolReasonCodes.filter((entry) => entry.kind === "refusal");
+    expect(refusalCodes.length).toBeGreaterThan(0);
+
+    for (const entry of refusalCodes) {
+      const failureClass = classifyFailureClassFromReasonCodes([entry.code]);
+      expect(failureClass).toBe("protected_action_refusal");
+      expect(failureClass).not.toBe("proof_gap");
+    }
+  });
+
+  it("classifies MCP intent-compilation refusals as protected_action_refusal", () => {
+    expect(classifyFailureClassFromReasonCodes(["mcp_candidate_not_contractable"])).toBe(
+      "protected_action_refusal",
+    );
+    expect(classifyFailureClassFromReasonCodes(["mcp_input_schema_invalid"])).toBe(
+      "protected_action_refusal",
+    );
+  });
+
+  it("classifies MCP candidate digest integrity errors as internal", () => {
+    expect(classifyFailureClassFromReasonCodes(["mcp_candidate_digest_missing"])).toBe("internal");
+    expect(classifyFailureClassFromReasonCodes(["mcp_candidate_digest_missing"])).not.toBe("proof_gap");
   });
 });
