@@ -23,7 +23,11 @@ import {
   AuthMdProtectedApiCallParametersSchema,
   type AuthMdProtectedApiCallParameters,
 } from "./action-proposal";
-import { assertNoLeakedAuthMdCredentialMaterial } from "./profiles";
+import {
+  assertNoLeakedAuthMdCredentialMaterial,
+  AuthMdProtectedApiCallAllowedHttpMethodSchema,
+  canonicalizeAuthMdProtectedApiCallExactTransport,
+} from "./profiles";
 
 export const AuthMdProtectedApiCallDownstreamStatusSchema = z.enum(["succeeded", "refused", "unknown"]);
 export type AuthMdProtectedApiCallDownstreamStatus = z.infer<typeof AuthMdProtectedApiCallDownstreamStatusSchema>;
@@ -42,6 +46,61 @@ export const AuthMdProtectedApiCallEvidenceSchema = z.strictObject({
   evidenceRefs: z.array(z.string().min(1)).default([]),
 });
 export type AuthMdProtectedApiCallEvidence = z.infer<typeof AuthMdProtectedApiCallEvidenceSchema>;
+
+export const AuthMdProfileConformanceReason = {
+  missingVerifiedGate: "auth_md_profile_missing_verified_gate",
+  paramsDigestDrift: "auth_md_profile_params_digest_drift",
+  leakedCredentialMaterial: "auth_md_profile_leaked_credential_material",
+} as const;
+
+export type AuthMdProfileConformanceInput = {
+  verifiedGate?: VerifiedGatewayCheck;
+  parameters?: AuthMdProtectedApiCallParameters;
+  expectedActionContractId?: string;
+};
+
+export function assertAuthMdProfileConformance(input: AuthMdProfileConformanceInput): void {
+  if (!input.verifiedGate) {
+    throw new HandshakeProtocolError(
+      AuthMdProfileConformanceReason.missingVerifiedGate,
+      "auth.md profile conformance requires a verified gateway check before protected API call I/O",
+      409,
+    );
+  }
+  if (
+    input.expectedActionContractId &&
+    input.verifiedGate.actionContractId !== input.expectedActionContractId
+  ) {
+    throw new HandshakeProtocolError(
+      AuthMdProfileConformanceReason.paramsDigestDrift,
+      "auth.md observed parameters drift from verified greenlight action contract binding",
+      409,
+    );
+  }
+  if (input.parameters) {
+    try {
+      canonicalizeAuthMdProtectedApiCallExactTransport({
+        targetHttpMethod: AuthMdProtectedApiCallAllowedHttpMethodSchema.parse(
+          input.parameters.targetHttpMethod.trim().toUpperCase(),
+        ),
+        endpointUrl: input.parameters.endpointUrl,
+        pathTemplate: input.parameters.pathTemplate,
+        requestBodyDigest: input.parameters.requestBodyDigest,
+        selectedHeadersDigest: input.parameters.selectedHeadersDigest,
+        dynamicEndpointConstructionObserved: input.parameters.dynamicEndpointConstructionObserved,
+        dynamicHostConstructionObserved: input.parameters.dynamicHostConstructionObserved,
+        retryAuthorityReuseDetected: input.parameters.retryAuthorityReuseDetected,
+      });
+    } catch (error) {
+      throw new HandshakeProtocolError(
+        AuthMdProfileConformanceReason.paramsDigestDrift,
+        error instanceof Error ? error.message : "auth.md profile transport canonicalization failed",
+        409,
+      );
+    }
+    assertNoLeakedAuthMdCredentialMaterial(input.parameters);
+  }
+}
 
 export type AuthMdProtectedApiCallCommand = {
   verifiedGate: VerifiedGatewayCheck;
@@ -196,7 +255,11 @@ export async function runAuthMdProtectedApiCallGateway(
       credentialUseRef: `gateway-credential-use:auth-md:${verifiedGate.gateAttemptId}`,
       ...providerRefs,
     };
-    assertNoLeakedAuthMdCredentialMaterial(command);
+    assertAuthMdProfileConformance({
+      verifiedGate,
+      parameters: observedParameters,
+      expectedActionContractId: input.actionContractId,
+    });
     const apiCallEvidence = AuthMdProtectedApiCallEvidenceSchema.parse(
       await input.surface.executeProtectedApiCall(command),
     );
