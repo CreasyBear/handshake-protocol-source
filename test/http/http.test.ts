@@ -1858,7 +1858,7 @@ describe("Hono protocol surface", () => {
       body: JSON.stringify(state.followUpInput),
     });
 
-    expect(response.status).toBe(409);
+    expect(response.status).toBe(422);
     const body = (await response.json()) as { error: { proofRef: string } };
     expect(body).toMatchObject({
       error: {
@@ -1869,6 +1869,8 @@ describe("Hono protocol surface", () => {
         commitState: "committed",
         requestIdentity: "test-request-runtime_evidence",
         refusalRef: null,
+        failureClass: "proof_gap",
+        failurePhase: "transition",
       },
     });
     expect(body.error.proofRef).toMatch(/^gap_/);
