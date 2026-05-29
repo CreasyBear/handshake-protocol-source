@@ -12,6 +12,7 @@ import {
   ReasonCodeSchema,
   ResourceRefSchema,
 } from "../../foundation/schema-core";
+import { DelegationEvidenceRefSchema } from "./delegation-evidence-ref";
 
 export const CandidateActionStatusSchema = z.enum(["contractable", "rejected"]);
 export type CandidateActionStatus = z.infer<typeof CandidateActionStatusSchema>;
@@ -67,6 +68,7 @@ export const CandidateActionSchema = z.strictObject({
   toolCallDraftId: IdSchema.nullable().default(null),
   toolCallDraftDigest: DigestSchema.nullable().default(null),
   toolCallDraftState: z.enum(["opened", "streaming", "finalized", "invalid", "abandoned"]).nullable().default(null),
+  delegationEvidenceRef: DelegationEvidenceRefSchema.nullable().default(null),
 });
 export type CandidateAction = z.infer<typeof CandidateActionSchema>;
 
