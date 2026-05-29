@@ -24,12 +24,19 @@ Planning scratch is local-only. Canonical repo truth lives in `AGENTS.md`, `READ
 
 ## Current State
 
-**Phases 04 + 05 complete locally** on branch `phase-05-product-coherence` @ `6e23848`
-(plus close-out commits). Operator tier **10/10** and full tier **15/15** gates green;
-`npx tsc --noEmit` clean; `bun test` **846 pass / 3 fail** (acceptable residuals only).
+**Phases 04 + 05 complete** on branch `phase-05-product-coherence` @ `4509826`,
+**pushed to origin** (`origin/phase-05-product-coherence`). Phase 04 is an ancestor of
+Phase 05, so this single branch carries both phases. `phase-04-service-agent-gating` is
+also on origin @ `74ff1f1`. Operator tier **10/10** and full tier **15/15** gates green;
+`npx tsc --noEmit` clean; `bun test` **849 pass / 3 fail** (acceptable residuals only;
+HR-01 classifier-doctrine fix landed @ `e60fc87`).
 
-**Remote ship deferred:** gh CLI absent + npm 401 — no push, PR, or npm publish in this
-close-out pass.
+**Remote land — partial:** branch pushed ✓. Still pending (require credentials absent in
+this environment):
+- **PR + merge to main** — `gh` CLI absent; create via web:
+  `https://github.com/CreasyBear/handshake-protocol-source/compare/main...phase-05-product-coherence`
+- **npm publish** — `npm whoami` returns 401; needs `npm login` (or a token in `~/.npmrc`)
+  before `npm publish`. Confirm version (`package.json` 0.2.7) is not already taken.
 
 ## Phase Status
 
