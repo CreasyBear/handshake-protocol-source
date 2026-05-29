@@ -110,7 +110,7 @@ export type SurfaceBoundary = {
 
 type SdkSurfaceId = Extract<SurfaceId, `sdk.${string}`>;
 type CliSurfaceId = Extract<SurfaceId, `cli.${string}`>;
-type RuntimeSurfaceId = Exclude<SurfaceId, SdkSurfaceId | CliSurfaceId>;
+type RuntimeAdapterSurfaceId = Extract<SurfaceId, "mcp.runtime" | "x402.protected_tool">;
 
 const forbiddenAuthorityRouteFamilies = [
   "certificate_mint_write",
@@ -710,7 +710,7 @@ const runtimeSurfaceBoundaryManifest = {
       "tool_visibility_is_not_authorization",
     ],
   },
-} as const satisfies Record<RuntimeSurfaceId, SurfaceBoundary>;
+} as const satisfies Record<RuntimeAdapterSurfaceId, SurfaceBoundary>;
 
 const productSurfaceBoundaryManifest = {
   "surfaces.a2a_negotiation": {
