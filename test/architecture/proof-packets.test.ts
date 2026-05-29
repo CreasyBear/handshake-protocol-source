@@ -403,7 +403,7 @@ url = "https://mcp.exa.ai/mcp?exaApiKey=secret"
     ]);
   });
 
-  it("aggregates the four product gates without hiding hard blockers", () => {
+  it("aggregates product gates without hiding hard blockers or dual-enforcement proof gaps", () => {
     const readback = projectProductCompletionReadback({
       generatedAt: "2026-05-25T00:00:00.000Z",
       commandRefs: ["npm run check:repo", "node scripts/check-distribution-provenance.mjs"],
@@ -454,11 +454,16 @@ url = "https://mcp.exa.ai/mcp?exaApiKey=secret"
           createsAuthority: false,
           evidenceRefs: ["auth-md-x402-interlock-packet.test.ts"],
         },
+        dualEnforcementPosture: {
+          dualEnforcementPostureTestPassed: false,
+          mutationManifestGatingTestPassed: false,
+          evidenceRefs: [],
+        },
       },
     });
 
-    expect(readback.status).toBe("closed_with_hard_blocks");
-    expect(readback.incompleteGateIds).toEqual([]);
+    expect(readback.status).toBe("incomplete");
+    expect(readback.incompleteGateIds).toEqual(["dual_enforcement_posture"]);
     expect(readback.hardBlockedGateIds).toEqual([
       "public_distribution_and_registry",
       "customer_gateway_live_x402_paid_proof",
