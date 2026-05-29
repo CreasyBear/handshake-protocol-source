@@ -874,6 +874,7 @@ const productSurfaceBoundaryManifest = {
       "fresh_action_contract_required",
     ],
   },
+  /** Phase-03 D-39 canonical package; D-71 defers external hosted workspace promotion. */
   "surfaces.hosted_admission": {
     id: "surfaces.hosted_admission",
     status: "active",
