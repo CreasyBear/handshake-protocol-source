@@ -10,6 +10,7 @@ import {
   type ToolCapability,
 } from "../../protocol/areas/catalog-envelope";
 import { BypassProbeKindSchema } from "../../protocol/areas/bypass-probe";
+import { HandshakeProtocolError } from "../../protocol/foundation/errors";
 import { DigestSchema, IdSchema, IsoDateSchema, PROTOCOL_VERSION } from "../../protocol/foundation/schema-core";
 
 export const InstallProposalBypassProbePlanItemSchema = z.strictObject({
@@ -36,7 +37,11 @@ export function requireInstallProposalGatewayRegistryEntry(
   gatewayRegistryEntry: GatewayRegistryEntry | null,
 ): GatewayRegistryEntry {
   if (gatewayRegistryEntry === null) {
-    throw new Error("install proposal compiled records require gateway registry entry.");
+    throw new HandshakeProtocolError(
+      "install_orphan_catalog_missing_gateway",
+      "Install proposal compiled records require gateway registry entry.",
+      422,
+    );
   }
   return gatewayRegistryEntry;
 }
