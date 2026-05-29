@@ -1,8 +1,18 @@
 # Service Workflow Story
 
+> **Doc type:** Reference
+
 This story is a product projection/readback surface over the existing protocol
 authority spine. It makes the first-use path easier to understand, but it does
 not create a new authority primitive or a peer product truth lane.
+
+## Passport is not permission (D-59)
+
+**Passport is not permission.** **Show Passport is not authorization.** A
+presented evidence bundle helps a service map admission and readback; it does
+not substitute for policy evaluation, a one-use greenlight, or a gateway check
+before mutation. See [decisions.md](./decisions.md) for the category claim
+*reconstructable clearance before consequence*.
 
 ## Plain Flow
 

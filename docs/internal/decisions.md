@@ -39,6 +39,8 @@ The category is protected actions for automated decision making.
 
 Builder-buyer product language centers on a cleared protected-action event: one specific terminal Handshake event with reconstructable evidence that a service can accept, refuse, or treat as a proof gap.
 
+**Category claim (D-59):** *reconstructable clearance before consequence* — services must reconstruct clearance evidence before treating downstream consequence as proof. This is not an approval workflow, agent-permissions product, or audit-trail substitute.
+
 Shared product/protocol vocabulary:
 
 - `protocol kernel`: the source-owned authority state machine and schemas for exact contracts, policy decisions, one-use greenlights, gateway checks, receipts, refusals, proof gaps, isolation, and terminal certificates.

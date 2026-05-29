@@ -1,5 +1,7 @@
 # Handshake Protocol Kernel
 
+> **Doc type:** Explanation
+
 Handshake is protected action infrastructure for automated decision making. This
 package is the installable protocol kernel, CLI, SDK, and local MCP
 proposal/evidence server for reducing one consequential automated action to an
@@ -10,7 +12,7 @@ check before mutation, and receipt, refusal, replay refusal, proof gap, or
 optional terminal AuthorityCertificate. Certificate is terminal evidence, not
 permission.
 
-Category: protected actions for automated decision making; certificate is terminal evidence, not permission.
+Category: **reconstructable clearance before consequence** for protected actions in automated decision making. A service must be able to reconstruct clearance evidence before treating downstream consequence as proof. Certificates are terminal evidence, not permission.
 
 Core terms: a `cleared protected-action event` is one terminal event with
 reconstructable evidence; the `protocol kernel` is the only authority state
@@ -25,19 +27,19 @@ until registry acceptance and lookup are verified.
 First-use product projection/readback surfaces should teach the service workflow as:
 
 ```text
-Show Passport
--> ServiceWorkflowAdmission
--> ServiceWorkflowHandle
--> Request Clearance for one protected action
--> Read Outcome
+Present evidence bundle (readback only)
+-> ServiceWorkflowAdmission (mapping only)
+-> ServiceWorkflowHandle (correlation only)
+-> Request reconstructable clearance for one protected action
+-> Read outcome evidence
 ```
 
-`Passport` means a presented evidence package, not identity or reusable auth.
 `ServiceWorkflowAdmission` means service-side accepted/refused/stale/proof-gap
 mapping, not policy. `ServiceWorkflowHandle` means correlation and readback
 context only, not permission. Each protected action still requires a fresh exact
 action contract, policy decision, one-use greenlight or refusal, and gateway
-check before mutation.
+check before mutation. Presentation bundles are evidence for readback — they do
+not grant clearance by themselves.
 
 Package: `handshake-protocol-kernel@0.2.7`. MCP name:
 `io.github.CreasyBear/handshake-protocol-kernel`. Runtime: Node.js `>=20`.

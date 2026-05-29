@@ -1,5 +1,7 @@
 # Plain-English Protocol Guide
 
+> **Doc type:** Explanation
+
 Last plain-language protocol audit: 2026-05-21.
 
 This document translates `docs/internal/protocol-definition.md` and
@@ -19,9 +21,11 @@ Handshake says:
 > exact work order, check that exact work order, make the real gate check the
 > pass before anything changes, and keep a record of what happened.
 
-For a builder-buyer, the product outcome is a cleared protected-action event: a
-specific terminal Handshake event with reconstructable evidence that a service
-can accept, refuse, or treat as a proof gap.
+For a builder-buyer, the category claim is **reconstructable clearance before
+consequence**: a service must reconstruct clearance evidence before treating
+downstream consequence as proof. The product outcome is a cleared protected-action
+event — one specific terminal Handshake event with reconstructable evidence that
+a service can accept, refuse, or treat as a proof gap.
 
 The protocol kernel is the source-owned machinery that records the exact work
 order, decision, pass, gate check, receipt/refusal/proof gap, and optional
@@ -34,17 +38,14 @@ authority.
 The simple service-facing story is:
 
 ```text
-Show Passport
--> ServiceWorkflowAdmission
--> ServiceWorkflowHandle
--> Request Clearance
--> Read Outcome
+Present evidence bundle (readback only)
+-> ServiceWorkflowAdmission (mapping only)
+-> ServiceWorkflowHandle (correlation only)
+-> Request reconstructable clearance
+-> Read outcome evidence
 ```
 
 That story hides protocol detail from the user. It does not hide authority.
-
-`Passport` is the evidence bundle the agent shows a service. It is not identity,
-trust, permission, spend approval, signer access, or reusable auth.
 
 `ServiceWorkflowAdmission` is the service's accepted, refused, stale, or
 proof-gap mapping of that presented evidence. It is not a policy decision,
