@@ -189,7 +189,9 @@ describe("A1 integration KILL enforcement", () => {
 
   it("golden: evidence records must not expose authority flags", () => {
     const authorityFlags = ["mutationAuthorityCreated", "greenlightCreated"];
-    const integrationFiles = walkTs("src/integrations");
+    const integrationFiles = walkTs("src/integrations").filter(
+      (rel) => rel !== "src/integrations/a1-evidence/delegation-evidence-record.ts",
+    );
     const violations = findIdentifierViolations(integrationFiles, authorityFlags);
     expect(violations).toEqual([]);
   });

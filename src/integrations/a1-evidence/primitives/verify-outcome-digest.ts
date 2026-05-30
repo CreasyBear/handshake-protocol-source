@@ -1,6 +1,6 @@
 import { blake3 } from "@noble/hashes/blake3";
 import { DOMAIN_VERIFY_OUTCOME } from "./domains.js";
-import { toHexLower } from "./hex.js";
+import { toHexLower } from "../hex.js";
 
 export type A1VerifyOutcomeDigestInput = {
   valid: boolean;

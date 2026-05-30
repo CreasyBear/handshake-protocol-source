@@ -1,22 +1,12 @@
 import { describe, expect, it } from "bun:test";
-
-const RED = "A1-1-RED: computeEvidenceBindingDigest not implemented";
+import type { EvidenceBindingDigestInput } from "../../../src/integrations/a1-evidence/primitives/binding-digest.js";
+import { computeEvidenceBindingDigest } from "../../../src/integrations/a1-evidence/primitives/binding-digest.js";
 
 describe("evidence binding digest golden (A1-1)", () => {
   it("different actionContractDigest → different evidenceBindingDigest (same chain fp)", async () => {
-    let computeEvidenceBindingDigest: (input: unknown) => Uint8Array;
-    try {
-      ({ computeEvidenceBindingDigest } = await import(
-        "../../../src/integrations/a1-evidence/binding-digest.js"
-      ));
-    } catch {
-      throw new Error(RED);
-    }
-
-    const chainFp = Uint8Array.from({ length: 32 }, (_, i) => i);
-    const shared = {
-      a1ChainFingerprint: chainFp,
-      a1VerifierVersion: "2.8.0-zip215",
+    const sharedBase: Omit<EvidenceBindingDigestInput, "actionContractDigest"> = {
+      a1ChainFingerprint: Uint8Array.from({ length: 32 }, (_, i) => i),
+      a1VerifierVersion: "handshake-delegation-1.0.0-zip215",
       a1VerifyOutcomeDigest: Uint8Array.from({ length: 32 }, (_, i) => i + 1),
       candidateDigest: Uint8Array.from({ length: 32 }, (_, i) => i + 2),
       actionTypeId: "repo.write",
@@ -27,11 +17,11 @@ describe("evidence binding digest golden (A1-1)", () => {
     };
 
     const digestA = computeEvidenceBindingDigest({
-      ...shared,
+      ...sharedBase,
       actionContractDigest: Uint8Array.from({ length: 32 }, () => 0xaa),
     });
     const digestB = computeEvidenceBindingDigest({
-      ...shared,
+      ...sharedBase,
       actionContractDigest: Uint8Array.from({ length: 32 }, () => 0xbb),
     });
 
@@ -41,18 +31,9 @@ describe("evidence binding digest golden (A1-1)", () => {
   });
 
   it("identical inputs → identical evidenceBindingDigest", async () => {
-    let computeEvidenceBindingDigest: (input: unknown) => Uint8Array;
-    try {
-      ({ computeEvidenceBindingDigest } = await import(
-        "../../../src/integrations/a1-evidence/binding-digest.js"
-      ));
-    } catch {
-      throw new Error(RED);
-    }
-
-    const input = {
+    const input: EvidenceBindingDigestInput = {
       a1ChainFingerprint: Uint8Array.from({ length: 32 }, (_, i) => i),
-      a1VerifierVersion: "2.8.0-zip215",
+      a1VerifierVersion: "handshake-delegation-1.0.0-zip215",
       a1VerifyOutcomeDigest: Uint8Array.from({ length: 32 }, (_, i) => i + 10),
       candidateDigest: Uint8Array.from({ length: 32 }, (_, i) => i + 20),
       actionContractDigest: Uint8Array.from({ length: 32 }, (_, i) => i + 30),

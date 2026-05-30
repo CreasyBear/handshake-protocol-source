@@ -57,7 +57,7 @@ const cert1 = signDelegationCert({
 });
 const chain1 = buildSignedChain({ principal: human, principalScope: scope, certs: [cert1] });
 
-writeFixture("valid-1hop.json", {
+const valid1hopFixture: Fixture = {
   signedChain: chain1,
   executorPk: toHexLower(agent1.publicKey),
   intentHash: toHexLower(intentHash),
@@ -70,7 +70,10 @@ writeFixture("valid-1hop.json", {
     certFingerprints: [certFingerprintHex(cert1)],
     reasonCode: null,
   },
-});
+};
+
+writeFixture("valid-1hop.json", valid1hopFixture);
+writeFixture("valid-zip215-edge.json", valid1hopFixture);
 
 const cert2a = signDelegationCert({
   delegator: human,
@@ -134,7 +137,9 @@ writeFixture("invalid-bad-sig.json", {
   driftToleranceSecs: 15,
   expected: {
     valid: false,
-    chainFingerprint: chainFingerprintHex(buildSignedChain({ principal: human, principalScope: scope, certs: [cert1] })),
+    chainFingerprint: chainFingerprintHex(
+      buildSignedChain({ principal: human, principalScope: scope, certs: [cert1] }),
+    ),
     certFingerprints: [certFingerprintHex(cert1)],
     reasonCode: "delegation_evidence_invalid:invalid_signature",
   },

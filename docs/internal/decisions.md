@@ -39,7 +39,7 @@ The category is protected actions for automated decision making.
 
 Builder-buyer product language centers on a cleared protected-action event: one specific terminal Handshake event with reconstructable evidence that a service can accept, refuse, or treat as a proof gap.
 
-**Category claim (D-59):** *reconstructable clearance before consequence* — services must reconstruct clearance evidence before treating downstream consequence as proof. This is not an approval workflow, agent-permissions product, or audit-trail substitute.
+**Category claim (D-59):** _reconstructable clearance before consequence_ — services must reconstruct clearance evidence before treating downstream consequence as proof. This is not an approval workflow, agent-permissions product, or audit-trail substitute.
 
 ## Phase 05 product coherence (shipped)
 
@@ -224,27 +224,27 @@ adjacency to the protocol.
 
 Current ledger:
 
-| Surface or claim | Current status | configuredBy | Boundary |
-| --- | --- | --- | --- |
-| Gateway registry entry | locally proven (x402 triplet) | service_operator | Service catalog/install owns registry binding before host attestation. |
-| Gateway credential custody | proof gap beyond local/reference | service_operator | External signer lease/rotation evidence required for production claims. |
-| Adapter mutation enforcement | locally proven on x402 wedge | service_operator | Handler must call `adapter.run*Gateway` before downstream effect. |
-| Trusted binding digests | locally proven (doctor attestation) | host_operator | Host doctor emits attestation evidence only — not identity or gateway ownership. |
-| MCP proposal wiring | locally proven (reference MCP) | shared | Host runtime wiring + service registry digests must both be fresh. |
-| Policy pack baseline | shared | shared | Service registers pack; host consumes policy version digests in bindings. |
-| Hosted admission verifier | proof gap until deployed | service_operator | Tenant boundary + verifier config evidence required for hosted claims. |
-| `x402_payment.exact` per-call path | locally proven for self-hosted package | service_operator | Exact contract, policy, one-use greenlight, gateway check, receipt/readback. |
-| Hosted operation | proof gap | service_operator | Requires deployed tenant boundary, hosted custody, retention, and ops evidence. |
-| Provider/customer gateway custody | proof gap beyond local/reference proof | service_operator | Requires external custody proof, signer lease/rotation/revocation, and monitoring evidence. |
-| Settlement/finality | proof gap | service_operator | Downstream payment observation is not settlement finality. |
-| Facilitator operation | outside current claim | — | First wedge consumes x402 evidence; it does not operate a facilitator. |
-| Seller middleware | outside current claim | — | First wedge is buyer-side only. |
-| Marketplace or certification | proof gap | — | Requires separate listing, rating, dispute, and trust evidence model. |
-| Cross-org trust | proof gap | — | Local terminal certificates and pinned keys do not create portable trust. |
-| Broad x402 compatibility | cut line | — | Only one buyer-side `exact` per-call path is admitted. |
-| Aggregate spend enforcement | proof gap | service_operator | Requires a policy-time and gateway-time aggregate ledger. |
-| MCP Registry discoverability | proof gap until verified | shared | Public npm availability and `server.json` metadata are distribution facts only. |
-| Host-wide containment | cut line | host_operator | Host profiles and raw sibling probes record posture, not native containment. |
+| Surface or claim                   | Current status                         | configuredBy     | Boundary                                                                                    |
+| ---------------------------------- | -------------------------------------- | ---------------- | ------------------------------------------------------------------------------------------- |
+| Gateway registry entry             | locally proven (x402 triplet)          | service_operator | Service catalog/install owns registry binding before host attestation.                      |
+| Gateway credential custody         | proof gap beyond local/reference       | service_operator | External signer lease/rotation evidence required for production claims.                     |
+| Adapter mutation enforcement       | locally proven on x402 wedge           | service_operator | Handler must call `adapter.run*Gateway` before downstream effect.                           |
+| Trusted binding digests            | locally proven (doctor attestation)    | host_operator    | Host doctor emits attestation evidence only — not identity or gateway ownership.            |
+| MCP proposal wiring                | locally proven (reference MCP)         | shared           | Host runtime wiring + service registry digests must both be fresh.                          |
+| Policy pack baseline               | shared                                 | shared           | Service registers pack; host consumes policy version digests in bindings.                   |
+| Hosted admission verifier          | proof gap until deployed               | service_operator | Tenant boundary + verifier config evidence required for hosted claims.                      |
+| `x402_payment.exact` per-call path | locally proven for self-hosted package | service_operator | Exact contract, policy, one-use greenlight, gateway check, receipt/readback.                |
+| Hosted operation                   | proof gap                              | service_operator | Requires deployed tenant boundary, hosted custody, retention, and ops evidence.             |
+| Provider/customer gateway custody  | proof gap beyond local/reference proof | service_operator | Requires external custody proof, signer lease/rotation/revocation, and monitoring evidence. |
+| Settlement/finality                | proof gap                              | service_operator | Downstream payment observation is not settlement finality.                                  |
+| Facilitator operation              | outside current claim                  | —                | First wedge consumes x402 evidence; it does not operate a facilitator.                      |
+| Seller middleware                  | outside current claim                  | —                | First wedge is buyer-side only.                                                             |
+| Marketplace or certification       | proof gap                              | —                | Requires separate listing, rating, dispute, and trust evidence model.                       |
+| Cross-org trust                    | proof gap                              | —                | Local terminal certificates and pinned keys do not create portable trust.                   |
+| Broad x402 compatibility           | cut line                               | —                | Only one buyer-side `exact` per-call path is admitted.                                      |
+| Aggregate spend enforcement        | proof gap                              | service_operator | Requires a policy-time and gateway-time aggregate ledger.                                   |
+| MCP Registry discoverability       | proof gap until verified               | shared           | Public npm availability and `server.json` metadata are distribution facts only.             |
+| Host-wide containment              | cut line                               | host_operator    | Host profiles and raw sibling probes record posture, not native containment.                |
 
 Standalone operator runbooks (`service-operator-runbook.md`, `host-operator-runbook.md`) are deferred post-execute; bilateral order lives in golden path docs for phase 04.
 
@@ -357,7 +357,7 @@ The guard refuses unless the `X402PaymentSignatureCommand` carries:
   `gateAttemptId` and `mutationAttemptId` (a forged or unfilled gate is refused);
   and
 - `credentialResolutionEvidence` that is gateway-resolved — `resultClass ===
-  "used_by_gateway"`, `credentialMaterialIncluded === false`,
+"used_by_gateway"`, `credentialMaterialIncluded === false`,
   `redactionStatus === "redacted"` — and bound to the same gate by matching
   `gateAttemptId`, `actionContractId`, and `greenlightId`.
 
@@ -680,15 +680,15 @@ authorized to mutate.
 
 ### Production acceptance custody matrix (configured-by)
 
-| Responsibility | configuredBy | Surface owner | Notes |
-| --- | --- | --- | --- |
-| gateway registry entry | service_operator | InstallClient / bootstrap | Atomic triplet; orphan without gateway refuses |
-| gateway credential custody | service_operator | GatewayClient / wallet adapter | Signer held at gateway, not agent-exposed |
-| adapter mutation enforcement | service_operator | Family adapters + handlers | `run*Gateway` before downstream mutation (D-24) |
-| trusted binding digests | host_operator | `handshake host doctor` | Attestation evidence only (D-23) |
-| MCP proposal wiring | shared | MCP x402 proposal bridge | Parity with HTTP `failureClass`; no authority |
-| policy pack baseline | service_operator | PolicyClient / bootstrap | Exact policy per action family |
-| hosted admission verifier | shared | HTTP admission + service workflow | Ingress identifies callers; not mutation authority |
+| Responsibility               | configuredBy     | Surface owner                     | Notes                                              |
+| ---------------------------- | ---------------- | --------------------------------- | -------------------------------------------------- |
+| gateway registry entry       | service_operator | InstallClient / bootstrap         | Atomic triplet; orphan without gateway refuses     |
+| gateway credential custody   | service_operator | GatewayClient / wallet adapter    | Signer held at gateway, not agent-exposed          |
+| adapter mutation enforcement | service_operator | Family adapters + handlers        | `run*Gateway` before downstream mutation (D-24)    |
+| trusted binding digests      | host_operator    | `handshake host doctor`           | Attestation evidence only (D-23)                   |
+| MCP proposal wiring          | shared           | MCP x402 proposal bridge          | Parity with HTTP `failureClass`; no authority      |
+| policy pack baseline         | service_operator | PolicyClient / bootstrap          | Exact policy per action family                     |
+| hosted admission verifier    | shared           | HTTP admission + service workflow | Ingress identifies callers; not mutation authority |
 
 Do not claim hosted marketplace trust, cross-org federation, or registry discoverability as phase-04 proof.
 
@@ -835,6 +835,8 @@ with chain/cert fingerprints only — no authority flags.
 
 **Rejected alternative:** Embed or product-depend on the A1 gateway (public
 `/v1/authorize`, passport presentation routes, `VerifiedToken` HMAC fast-path).
+These are non-authority HTTP signals; Handshake does not create clearance from any
+of them, and presented evidence is never permission.
 **Why rejected:** ambient authority, advisory HTTP clearance, expanded trusted
 surface, and category confusion (KILL-01, KILL-02, KILL-04, KILL-05). HTTP 200
 from A1 authorize proves capability-class delegation, not an exact Handshake
@@ -863,3 +865,17 @@ evidence is necessary when required, never sufficient alone.
 it is not an excuse to widen the action catalog or claim "A1 enables all action
 types" in milestone copy. Architecture remains action-type agnostic;
 `x402_payment.exact` stays one proof profile, not the boundary.
+
+- **D-74:** The A1-1 delegation-evidence module is a **Handshake-owned re-namespace** of
+  the MIT-licensed A1 delegation certificate design (`handshake::delegation::*::v1`
+  domains, verifier label `handshake-delegation-1.0.0-zip215`). Attribution lives in
+  `THIRD_PARTY_NOTICES` and per-file provenance headers under `src/integrations/a1-evidence/`.
+  Interoperability with real A1 `a1::dyolo::` chains is **not** a goal; archived A1-domain
+  vectors under `test/fixtures/a1-evidence/archive/` are a one-time fidelity check only.
+
+- **D-75:** Handshake remains the **enforcement and receipt layer above** any delegation
+  credential format — not another credential format or clearance mint. This decision
+  **forbids** (for the A1 integration milestone) product surfaces that would imply ambient
+  delegation authority: a public gateway `authorize` HTTP endpoint, a reusable `VerifiedToken`
+  clearance object, or MCP tools that mint/authorize delegation tokens. Reversible at
+  milestone end if strategy changes; does not block evidence-only verify or fingerprint binding.

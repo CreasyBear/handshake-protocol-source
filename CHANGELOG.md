@@ -48,9 +48,11 @@ discoverability, or Handshake authority from publication alone.
 ### Release State
 
 - `ready_to_publish`: verified locally by repo gates and package projection.
-- `actually_published`: pending npm trusted-publish workflow, npm registry
-  readback, registry signature metadata, provenance publication, and clean
-  installed-artifact smoke for `0.2.8`.
+- `actually_published`: verified by maintainer passkey publish from source
+  checkout, npm registry readback for `0.2.8`, and registry signature metadata.
+  Artifact-repo trusted-publish workflow and clean installed-artifact smoke remain
+  to reconcile when `handshake-protocol-kernel` is re-projected from this source
+  state.
 - `registry_discoverable`: pending MCP Registry acceptance and lookup.
 
 ## 0.2.7 - 2026-05-25

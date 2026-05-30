@@ -1,3 +1,7 @@
+/**
+ * Delegation evidence digests and cert preimages (Handshake-owned domains).
+ * Design lineage: MIT-licensed A1 (https://github.com/dyologician/A1) — see THIRD_PARTY_NOTICES.
+ */
 import { blake3 } from "@noble/hashes/blake3";
 import {
   CERT_VERSION,
@@ -16,8 +20,8 @@ import {
   INNER_INTENT_LEAF,
   INNER_SUBSCOPE,
 } from "./domains.js";
-import type { SubScopeProofWire, WireDelegationCert } from "./wire-types.js";
-import { parseHex16, parseHex32, parseHex64 } from "./hex.js";
+import type { SubScopeProofWire, WireDelegationCert } from "../wire-types.js";
+import { parseHex16, parseHex32, parseHex64 } from "../hex.js";
 
 export function deriveKey(domain: string, version: number): ReturnType<typeof blake3.create> {
   const h = blake3.create({ context: domain });
@@ -156,7 +160,11 @@ export function merkleNode(left: Uint8Array, right: Uint8Array): Uint8Array {
   return h.digest();
 }
 
-export function merkleProofVerify(leaf: Uint8Array, proof: { hash: Uint8Array; isLeft: boolean }[], expectedRoot: Uint8Array): boolean {
+export function merkleProofVerify(
+  leaf: Uint8Array,
+  proof: { hash: Uint8Array; isLeft: boolean }[],
+  expectedRoot: Uint8Array,
+): boolean {
   let current = leaf;
   for (const node of proof) {
     current = node.isLeft ? merkleNode(node.hash, current) : merkleNode(current, node.hash);

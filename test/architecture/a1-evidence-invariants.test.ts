@@ -11,9 +11,8 @@ describe("A1 evidence invariants (A1-1)", () => {
       safeParse: (value: unknown) => { success: boolean };
     };
     try {
-      ({ DelegationEvidenceRecordSchema } = await import(
-        "../../src/integrations/a1-evidence/delegation-evidence-record.js"
-      ));
+      ({ DelegationEvidenceRecordSchema } =
+        await import("../../src/integrations/a1-evidence/delegation-evidence-record.js"));
     } catch {
       throw new Error("A1-1-RED: DelegationEvidenceRecord not implemented");
     }
@@ -26,7 +25,7 @@ describe("A1 evidence invariants (A1-1)", () => {
       chainDepth: 1,
       principalPkFingerprint: "c".repeat(64),
       terminalDelegatePkFingerprint: "d".repeat(64),
-      a1VerifierVersion: "2.8.0-zip215",
+      a1VerifierVersion: "handshake-delegation-1.0.0-zip215",
       verifyPath: "ts",
       verifyOutcome: "valid",
       reasonCodes: [],
@@ -76,8 +75,9 @@ describe("A1 evidence invariants (A1-1)", () => {
     expect(outcome.valid).toBe(false);
     if (outcome.valid) return;
     expect(outcome.reasonCode).toMatch(/^delegation_evidence_invalid:/);
-    expect(outcome.mutationAuthorityCreated).toBeUndefined();
-    expect(outcome.greenlightCreated).toBeUndefined();
+    const outcomeRecord = outcome as Record<string, unknown>;
+    expect(outcomeRecord.mutationAuthorityCreated).toBeUndefined();
+    expect(outcomeRecord.greenlightCreated).toBeUndefined();
   });
 
   it("candidate with delegationEvidenceRef has no authority flags on CandidateAction", async () => {
@@ -97,8 +97,15 @@ describe("A1 evidence invariants (A1-1)", () => {
     expect(parsed.success).toBe(true);
     if (!parsed.success || !parsed.data) return;
     const data = parsed.data as Record<string, unknown>;
-    expect(data.mutationAuthorityCreated).toBeUndefined();
-    expect(data.greenlightCreated).toBeUndefined();
+    for (const forbiddenKey of [
+      "mutationAuthorityCreated",
+      "greenlightCreated",
+      "greenlightId",
+      "gatewayCheckPassed",
+      "gatewayCheckAttemptId",
+    ]) {
+      expect(data[forbiddenKey]).toBeUndefined();
+    }
     expect(data.delegationEvidenceRef).toBeDefined();
   });
 });

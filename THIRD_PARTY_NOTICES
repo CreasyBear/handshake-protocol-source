@@ -1,0 +1,14 @@
+# Third-party notices
+
+## A1 delegation evidence design (MIT)
+
+The delegation-evidence verify layer in `src/integrations/a1-evidence/` adapts the
+cryptographic delegation certificate and chain design from the **A1** project:
+
+- **Project:** https://github.com/dyologician/A1
+- **License:** MIT (see upstream `LICENSE`)
+
+Handshake re-namespaces Ed25519/BLAKE3 domain separators to `handshake::delegation::*::v1`,
+ships an independent TypeScript verifier (`handshake-delegation-1.0.0-zip215`), and does
+**not** intend wire interoperability with live A1 `a1::dyolo::` chains. Attribution is
+required; upstream code is not vendored in this repository.

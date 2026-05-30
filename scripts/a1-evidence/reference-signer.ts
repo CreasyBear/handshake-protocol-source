@@ -19,7 +19,7 @@ import {
   INNER_CHAIN_FP,
   INNER_INTENT_LEAF,
   INNER_SUBSCOPE,
-} from "../../src/integrations/a1-evidence/domains.js";
+} from "../../src/integrations/a1-evidence/primitives/domains.js";
 import { toHexLower } from "../../src/integrations/a1-evidence/hex.js";
 import type { SignedChainWire, WireDelegationCert } from "../../src/integrations/a1-evidence/wire-types.js";
 
@@ -61,7 +61,10 @@ function u64Le(value: number): Uint8Array {
   return new Uint8Array(buf);
 }
 
-function refSubscopeCommitment(subsetIntents: Uint8Array[], proofs: { hash: Uint8Array; isLeft: boolean }[][]): Uint8Array {
+function refSubscopeCommitment(
+  subsetIntents: Uint8Array[],
+  proofs: { hash: Uint8Array; isLeft: boolean }[][],
+): Uint8Array {
   const h = deriveKey(DOMAIN_SUBSCOPE, CERT_VERSION);
   h.update(new TextEncoder().encode(INNER_SUBSCOPE));
   h.update(u64Le(subsetIntents.length));
@@ -83,7 +86,7 @@ function refCertExtensionsCommitment(version: number, extensions: Record<string,
   const fields =
     extensions && typeof extensions === "object" && "fields" in extensions
       ? (extensions.fields as Record<string, unknown>)
-      : extensions ?? {};
+      : (extensions ?? {});
   const keys = Object.keys(fields).sort();
   if (keys.length === 0) {
     h.update(u64Le(0));
