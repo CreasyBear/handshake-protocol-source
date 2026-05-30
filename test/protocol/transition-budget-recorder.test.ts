@@ -24,7 +24,7 @@ const gatewayBudget = budget({
   maxStreamPartitionsTouched: 3,
 });
 const receiptExportBudget = budget({
-  maxReads: 6,
+  maxReads: 7,
   maxWrites: 1,
   maxCommittedRecords: 1,
   maxEmittedEvents: 3,

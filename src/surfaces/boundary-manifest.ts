@@ -686,7 +686,14 @@ const runtimeSurfaceBoundaryManifest = {
       "protected_path_posture_write",
       "surface_reconciliation_write",
     ],
-    allowedImportRoots: ["src/mcp", "src/protocol/evidence-projections", "src/protocol/foundation/failure-class", "src/sdk", "src/surfaces"],
+    allowedImportRoots: [
+      "src/mcp",
+      "src/integrations/a1-evidence",
+      "src/protocol/evidence-projections",
+      "src/protocol/foundation/failure-class",
+      "src/sdk",
+      "src/surfaces",
+    ],
     forbiddenImportFragments: [...forbiddenAuthorityImports, "adapters/", "storage/"],
     forbiddenCredentialShapes: [...authorityCredentialShapes, "review_custody_token"],
     forbiddenOutputFields: [

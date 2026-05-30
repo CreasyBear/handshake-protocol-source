@@ -18,6 +18,7 @@ import {
   projectOperationReadback,
   projectProtectedPathInstallHealth,
   projectReceiptTimeline,
+  resolveReceiptTimelineDelegationProvenance,
 } from "../../protocol/evidence-projections";
 import { idempotencyLedgerKey, idempotencyLedgerKeyDigest } from "../../protocol/areas/idempotency-ledger";
 import { protectedPathPostureScopeKeyForContract } from "../../protocol/areas/protected-path-posture";
@@ -109,12 +110,17 @@ export async function handleEvidenceRead(
             organizationId: receiptRecord.organizationId,
           },
         );
+        const delegationProvenance = await resolveReceiptTimelineDelegationProvenance(
+          store,
+          receiptRecord.payload,
+        );
         return c.json(
           projectReceiptTimeline({
             receipt: receiptRecord.payload,
             events: events.events,
             missingEventCount: events.missingEventCount,
             reconciliations: reconciliations.map((record) => record.payload),
+            delegationProvenance,
           }),
         );
       }

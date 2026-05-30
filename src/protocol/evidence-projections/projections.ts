@@ -334,6 +334,7 @@ export function projectReceiptTimeline(input: {
   events: ContractStreamEvent[];
   missingEventCount: number;
   reconciliations: SurfaceOperationReconciliation[];
+  delegationProvenance?: ReceiptTimelineProjection["delegationProvenance"];
 }): ReceiptTimelineProjection {
   const latestReconciliation = input.reconciliations
     .filter((reconciliation) => reconciliation.mutationAttemptId === input.receipt.mutationAttemptId)
@@ -380,6 +381,7 @@ export function projectReceiptTimeline(input: {
           diagnosticsRedactionPosture: latestReconciliation.diagnosticsRedactionPosture,
         }
       : null,
+    delegationProvenance: input.delegationProvenance ?? null,
     redactionProfileRef: "receipt-timeline:v0.2-redacted",
     omittedFields: ["event.payload", "event.createdAt", "receipt.evidenceRefs"],
   });

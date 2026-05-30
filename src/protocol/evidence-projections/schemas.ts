@@ -35,6 +35,7 @@ import {
   ReceiptStreamReferenceSchema,
 } from "../areas/receipt-export/schemas";
 import { ContractStreamEventSchema } from "../events/schemas";
+import { ReceiptDelegationProvenanceSchema } from "../areas/receipt-export";
 
 export const ContractEvidenceProjectionSchema = z.strictObject({
   actionContractRef: IdSchema,
@@ -149,6 +150,7 @@ export const ReceiptTimelineProjectionSchema = z.strictObject({
   events: z.array(ReceiptTimelineEventProjectionSchema).default([]),
   missingEventCount: z.number().int().nonnegative(),
   failureEvidence: ReceiptTimelineFailureEvidenceProjectionSchema.nullable(),
+  delegationProvenance: ReceiptDelegationProvenanceSchema.nullable().default(null),
   redactionProfileRef: z.literal("receipt-timeline:v0.2-redacted"),
   omittedFields: z.array(z.string().min(1)).default([]),
 });

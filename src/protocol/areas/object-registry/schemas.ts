@@ -19,6 +19,7 @@ import { GeneratedExecutionGraphSchema } from "../generated-execution-graph/sche
 import { IdempotencyLedgerEntrySchema } from "../idempotency-ledger/schemas";
 import { BypassProbeSchema } from "../bypass-probe/schemas";
 import { ToolCallDraftSchema } from "../tool-call-draft/schemas";
+import { StoredDelegationEvidenceRecordSchema } from "../delegation-evidence-record";
 import { IntentCompilationRecordSchema } from "../intent-compilation/schemas";
 import {
   AgreementObligationBindingSchema,
@@ -61,6 +62,7 @@ export const ProtocolObjectTypeSchema = z.enum([
   "tool_call_draft",
   "protected_path_posture",
   "intent_compilation",
+  "delegation_evidence_record",
   "negotiation_session",
   "negotiation_offer",
   "negotiation_decision",
@@ -116,6 +118,10 @@ export const ProtocolRecordSchema = z.discriminatedUnion("objectType", [
   z.strictObject({ objectType: z.literal("tool_call_draft"), payload: ToolCallDraftSchema }),
   z.strictObject({ objectType: z.literal("protected_path_posture"), payload: ProtectedPathPostureSchema }),
   z.strictObject({ objectType: z.literal("intent_compilation"), payload: IntentCompilationRecordSchema }),
+  z.strictObject({
+    objectType: z.literal("delegation_evidence_record"),
+    payload: StoredDelegationEvidenceRecordSchema,
+  }),
   z.strictObject({ objectType: z.literal("negotiation_session"), payload: NegotiationSessionSchema }),
   z.strictObject({ objectType: z.literal("negotiation_offer"), payload: NegotiationOfferSchema }),
   z.strictObject({ objectType: z.literal("negotiation_decision"), payload: NegotiationDecisionSchema }),

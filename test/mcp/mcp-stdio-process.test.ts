@@ -1,6 +1,11 @@
 import { describe, expect, it } from "bun:test";
 import { fileURLToPath } from "node:url";
 import {
+  MCP_DELEGATION_VERIFY_TOOL,
+  MCP_X402_PAYMENT_PROPOSE_TOOL,
+} from "../../src/mcp/catalog";
+
+import {
   McpProcessTimeoutError,
   runMcpStdioProcessProof,
   withMcpProcessTimeout,
@@ -23,7 +28,7 @@ describe("MCP stdio process proof", () => {
       },
     });
     expect(proof.stderr).toBe("");
-    expect(proof.toolNames).toEqual(["handshake.actions.x402_payment.propose"]);
+    expect(proof.toolNames).toEqual([MCP_X402_PAYMENT_PROPOSE_TOOL, MCP_DELEGATION_VERIFY_TOOL]);
     expect(proof.metadataRead).toMatchObject({
       uri: "handshake://metadata/actions/x402_payment.exact",
       readOnly: true,

@@ -1,15 +1,25 @@
 import { describe, expect, it } from "bun:test";
-import { mcpCatalogSnapshot, mcpProposalTools, mcpResourceTemplates } from "../../src/mcp/catalog";
+import {
+  mcpCatalogSnapshot,
+  MCP_DELEGATION_VERIFY_TOOL,
+  mcpProposalTools,
+  mcpReadOnlyTools,
+  mcpResourceTemplates,
+} from "../../src/mcp/catalog";
 import { McpStructuredContentSchema } from "../../src/mcp/output";
 import { McpX402PaymentProposalInputSchema } from "../../src/mcp/x402-proposal";
 import { surfaceOutcomeBase } from "../../src/surfaces/outcome";
 
 describe("MCP schema contract", () => {
-  it("exposes read resources plus exactly one x402 proposal tool", () => {
+  it("exposes read resources plus read-only delegation verify and one x402 proposal tool", () => {
     const catalog = mcpCatalogSnapshot();
 
-    expect(catalog.tools.map((tool) => tool.name)).toEqual(["handshake.actions.x402_payment.propose"]);
+    expect(catalog.tools.map((tool) => tool.name)).toEqual([
+      MCP_DELEGATION_VERIFY_TOOL,
+      "handshake.actions.x402_payment.propose",
+    ]);
     expect(catalog.supportsParallelToolCalls).toBe(false);
+    expect(mcpReadOnlyTools).toHaveLength(1);
     expect(mcpProposalTools).toHaveLength(1);
     expect(mcpResourceTemplates.map((resource) => resource.uriTemplate)).toEqual([
       "handshake://metadata/actions/{actionClass}",

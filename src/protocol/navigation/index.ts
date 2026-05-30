@@ -5,6 +5,7 @@ export type KernelTransitionMethod =
   | "putCatalogObject"
   | "registerInstallProposalCompiledRecords"
   | "compileIntent"
+  | "commitIngressRefusal"
   | "createRuntimeExecution"
   | "createGeneratedExecutionGraph"
   | "registerGatewayCredentialRef"
@@ -43,6 +44,7 @@ export type ProtocolTransitionId =
   | "registerOperatingEnvelope"
   | "registerInstallProposalCompiledRecords"
   | "compileIntent"
+  | "commitIngressRefusal"
   | "createRuntimeExecution"
   | "createGeneratedExecutionGraph"
   | "registerGatewayCredentialRef"
@@ -168,6 +170,17 @@ export const protocolNavigation = [
     eventsEmitted: ["intent_compiled"],
     authorityBoundary: "candidate evidence only",
     evidenceObligation: "record uncertainty or compiler refusal before any ActionContract exists",
+  },
+  {
+    transitionId: "commitIngressRefusal",
+    kernelMethod: "commitIngressRefusal",
+    phase: "intent_compilation",
+    outcomeClasses: ["refusal"],
+    recordsWritten: ["refusal", "contract_stream_event"],
+    eventsEmitted: ["action_refused"],
+    authorityBoundary: "ingress wire refusal evidence only",
+    evidenceObligation:
+      "record structured runtime ingress wire refusal without policy, greenlight, gate, mutation, receipt, or certificate authority",
   },
   {
     transitionId: "createGeneratedExecutionGraph",

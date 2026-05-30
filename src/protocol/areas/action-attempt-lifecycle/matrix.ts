@@ -344,6 +344,15 @@ export const actionAttemptLifecycleMatrix: Partial<Record<ActionAttemptLifecycle
     },
     "invalid or overreaching candidate stops before contract",
   ),
+  "commitIngressRefusal:refusal": entry(
+    {
+      phase: "compilation",
+      state: "candidate_refused",
+      authorityEffect: "none",
+      terminalOutcome: "refusal",
+    },
+    "malformed runtime ingress wire stops before runtime evidence or contract",
+  ),
   "proposeActionContract:recorded": entry(
     {
       phase: "contract",

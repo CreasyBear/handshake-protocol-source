@@ -87,6 +87,7 @@ export const protocolReasonCodes = [
   code("protected_x402_readiness_binding_mismatch", "protected_path_posture", "protected_path_posture"),
   code("protected_x402_trusted_readiness_missing", "protected_path_posture", "protected_path_posture"),
   code("mcp_input_schema_invalid", "refusal", "intent_compilation"),
+  code("runtime_ingress_wire_invalid", "refusal", "intent_compilation"),
   code("mcp_candidate_not_contractable", "refusal", "intent_compilation"),
 
   code("candidate_params_digest_mismatch", "transition_error", "action_contract"),

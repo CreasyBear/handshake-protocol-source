@@ -7,6 +7,37 @@ public artifact repository. It does not claim hosted operation, provider
 custody, settlement finality, marketplace certification, MCP Registry
 discoverability, or Handshake authority from publication alone.
 
+## 0.2.9 - 2026-05-30
+
+### Added
+
+- Handshake-owned delegation evidence verifier at `src/integrations/a1-evidence/`
+  (Ed25519 zip215 + BLAKE3, conformance vectors, parent-swap resistance).
+- Optional `delegationEvidenceRef` on candidate actions and
+  `ReceiptExport.delegationProvenance` — separable from gateway check and
+  downstream outcome (KILL-08).
+- Agent-native runtime ingress: committed refusals surfaced in
+  `refusalRefs`; malformed wire returns structured refusal instead of throw
+  (D-76).
+- Downgrade-only delegation evidence policy hook and compilation-phase proof
+  gaps for required-but-unverifiable evidence.
+- MCP read-only tool `handshake.evidence.delegation.verify` — offline chain
+  verify with explicit non-authority outcome (D-75: no mint/authorize tools).
+
+### Changed
+
+- Delegation evidence domains re-namespaced to `handshake::delegation::*::v1`
+  (D-74); A1 wire interop is not a goal.
+- MCP catalog lists read-only verify before x402 proposal tool; stdio server
+  registration order unchanged for proposal-first harness flows.
+
+### Boundary Notes
+
+- Delegation evidence verifies provenance when policy requires it. Valid
+  evidence alone never creates a greenlight or substitutes for gateway check.
+- This release does not add A1 gateway HTTP, `VerifiedToken` clearance, or
+  ambient delegation authority.
+
 ## 0.2.8 - 2026-05-29
 
 ### Added

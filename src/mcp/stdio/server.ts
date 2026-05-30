@@ -1,5 +1,5 @@
 import { McpServer, StdioServerTransport } from "@modelcontextprotocol/server";
-import { mcpProposalTools, MCP_X402_PAYMENT_PROPOSE_TOOL } from "../catalog";
+import { mcpProposalTools, mcpReadOnlyTools, MCP_X402_PAYMENT_PROPOSE_TOOL, MCP_DELEGATION_VERIFY_TOOL } from "../catalog";
 import { McpStructuredContentSchema } from "../output";
 import {
   MCP_REFERENCE_METADATA_URI,
@@ -14,6 +14,7 @@ import {
 } from "../reference-transcript-fixtures";
 import { readMcpResource, type McpEvidenceResourceClient } from "../resources";
 import { McpX402PaymentProposalInputSchema, proposeMcpX402Payment } from "../x402-proposal";
+import { McpDelegationVerifyInputSchema, verifyMcpDelegationEvidence } from "../tools/delegation-verify.js";
 import type { McpGatewayPosture, McpInstallPosture, McpRuntimeProposalClient } from "../x402-proposal";
 
 export const MCP_STDIO_SERVER_VERSION = "handshake.mcp.stdio-server.v0.1" as const;
@@ -71,6 +72,23 @@ export function createHandshakeMcpStdioServer(options: HandshakeMcpStdioServerOp
     );
   }
 
+  registerMcpX402ProposalTool(server, {
+    runtimeClient,
+    options,
+  });
+  registerMcpDelegationVerifyTool(server);
+
+  return server;
+}
+
+function registerMcpX402ProposalTool(
+  server: McpServer,
+  ctx: {
+    runtimeClient: McpRuntimeProposalClient;
+    options: HandshakeMcpStdioServerOptions;
+  },
+): void {
+  const { runtimeClient, options } = ctx;
   const tool = mcpProposalTools.find((entry) => entry.name === MCP_X402_PAYMENT_PROPOSE_TOOL);
   if (!tool) throw new Error("Handshake MCP x402 proposal tool is missing from the source catalog.");
 
@@ -103,8 +121,30 @@ export function createHandshakeMcpStdioServer(options: HandshakeMcpStdioServerOp
       };
     },
   );
+}
 
-  return server;
+function registerMcpDelegationVerifyTool(server: McpServer): void {
+  const tool = mcpReadOnlyTools.find((entry) => entry.name === MCP_DELEGATION_VERIFY_TOOL);
+  if (!tool) throw new Error("Handshake MCP delegation verify tool is missing from the source catalog.");
+
+  server.registerTool(
+    MCP_DELEGATION_VERIFY_TOOL,
+    {
+      title: "Verify A1 delegation evidence",
+      description: tool.description,
+      inputSchema: McpDelegationVerifyInputSchema,
+      outputSchema: McpStructuredContentSchema,
+      annotations: tool.annotations,
+    },
+    async (input) => {
+      const result = verifyMcpDelegationEvidence(input);
+      return {
+        content: result.content,
+        structuredContent: result.structuredContent,
+        isError: result.isError,
+      };
+    },
+  );
 }
 
 export async function startHandshakeMcpStdioServer(options: HandshakeMcpStdioServerOptions = {}): Promise<McpServer> {

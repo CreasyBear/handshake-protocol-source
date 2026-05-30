@@ -383,7 +383,7 @@ describe("Hono protocol surface", () => {
       authorityCertificateMinted: false,
       nextAction: "read_evidence",
     });
-    expect(result.generatedExecutionGraph.coverageStatus).toBe("fully_covered_no_unsupported_nodes");
+    expect(result.generatedExecutionGraph!.coverageStatus).toBe("fully_covered_no_unsupported_nodes");
     const proposal = result.proposals[0];
     if (!proposal || proposal.outcome !== "action_contract_proposed") throw new Error("expected contract proposal");
     expect(proposal.actionContract.resourceRef).toBe("npm:hono");

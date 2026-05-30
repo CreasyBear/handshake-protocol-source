@@ -31,6 +31,7 @@ const idFields = {
   tool_call_draft: "toolCallDraftId",
   protected_path_posture: "protectedPathPostureId",
   intent_compilation: "intentCompilationId",
+  delegation_evidence_record: "delegationEvidenceRecordId",
   negotiation_session: "negotiationSessionId",
   negotiation_offer: "negotiationOfferId",
   negotiation_decision: "negotiationDecisionId",

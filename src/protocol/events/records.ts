@@ -49,6 +49,13 @@ export class ProtocolRecorder {
     return record;
   }
 
+  async optionalRecord<T>(
+    objectType: ProtocolObjectType,
+    objectId: string,
+  ): Promise<StoredProtocolRecord<T> | null> {
+    return this.store.getRecord<T>(objectType, objectId);
+  }
+
   async persistRecord(record: ProtocolRecord): Promise<void> {
     await this.store.putRecord(await this.buildRecord(record));
     await this.persistTransitionRequestContextIfNeeded(record);

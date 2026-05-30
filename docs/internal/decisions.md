@@ -879,3 +879,66 @@ types" in milestone copy. Architecture remains action-type agnostic;
   delegation authority: a public gateway `authorize` HTTP endpoint, a reusable `VerifiedToken`
   clearance object, or MCP tools that mint/authorize delegation tokens. Reversible at
   milestone end if strategy changes; does not block evidence-only verify or fingerprint binding.
+
+## Agent-Native Ingress Hardening (D-76)
+
+Context: the milestone is consumed by agnostic harnesses (Claude, Codex, OpenClaw,
+Hermes) that drive retry/branch loops off the runtime-ingress response posture. A
+read-only evidence pass (`.planning/research/AGENT-NATIVE-INGRESS-ADVISORY.md`,
+`gsd-advisor-researcher` / composer-2.5, independently re-evaluated by the orchestrator)
+examined two candidates against doctrine and source.
+
+This decision touches the **proposal / readback boundary only**. It issues no
+greenlight and performs no gateway check. Presented ingress signals remain
+`proposal_only` / `candidate_only`; structured refusals are not "almost cleared"
+and carry no greenlight or gateway hints (`RefusalSchema`,
+`src/protocol/areas/refusal/schemas.ts:18-21`, all authority flags `false`).
+
+- **D-76a — Surface committed refusals (ADOPT, fold into A1-2).** The composite
+  ingress response returns `refusalRefs: []` (`src/runtime/ingress/index.ts:300`)
+  even though `compileIntent` commits a refusal record to the store on a rejected
+  candidate (`src/protocol/areas/intent-compilation/transitions.ts:229-279`;
+  `recordCount(...,"refusal")===1` at `test/runtime/runtime-ingress.test.ts:212`).
+  The response will collect each committed `refusalId` into `responsePosture.refusalRefs`
+  / per-proposal metadata. Rationale: a hidden refusal makes `retryability` / `nextAction`
+  / `reasonCodes` posture fields unactionable for an external harness; this surfaces
+  already-committed evidence and strengthens proposal≠permission. No authority boundary
+  is touched.
+
+- **D-76b — Structured malformed-wire refusal, no throw (ADOPT, fold into A1-2).**
+  `RuntimeIngressDispatchBlockSchema.parse(blockValue)` throws raw Zod
+  (`src/runtime/ingress/index.ts:177`; mixed-family throw at `:561-566`), while the
+  MCP path `safeParse`s into a structured outcome (`mcp_input_schema_invalid`,
+  `src/mcp/x402-proposal.ts:169-177`). The composite ingress will `safeParse` and map
+  Zod issues to a `buildRefusal` (phase `compilation`, new reason code
+  `runtime_ingress_wire_invalid` registered in `src/protocol/foundation/reason-codes.ts`),
+  returning a `one_or_more_dispatches_refused` posture instead of throwing. Rationale:
+  inconsistent failure shape across two ingress paths invites blind retry of an
+  identical malformed payload.
+
+- **D-76c — Compilation-phase proof-gap builder (ADOPT-NARROW, A1-2 only).**
+  `buildProofGap` requires an `ActionContract` (`src/protocol/areas/proof-gap/transitions.ts:8-13`),
+  but the compile boundary has no contract yet. A `buildCompilationProofGap`
+  (`gapPhase: "compilation"`, `affectedObjectRefs` in `[intent_compilation, runtime_execution]`)
+  will be added **only** for unverifiable delegation/catalog ground truth during A1-2,
+  reusing the a1-evidence proof-gap constants. Decision rule (`src/integrations/LANE.md:49-50`):
+  **refusal** when the candidate is rejectable; **proof gap** only when ground truth is
+  unavailable but the observation is structurally valid. This resolves the A1-2 T3 HOLD
+  on proof-gap placement.
+
+- **D-76d — Defer the full harness-neutral ingress envelope (Candidate B).** The
+  registry path **already is** a normalized presented-action envelope
+  (`RuntimeIngressDispatchBlockSchema` block + discriminated family sub-objects,
+  `src/runtime/ingress/schemas.ts:118-198`); the real divergence is the parallel MCP /
+  codemode / host-activation paths, not missing block fields. Collapsing them is
+  premature for single-wedge discipline (`AGENTS.md` wedge rule). **Reopen criteria
+  (binary):** (1) N≥2 distinct *external* harness integrations blocked on duplicate glue
+  with measured refusal/readback divergence; (2) a conformance test proving the unified
+  envelope yields identical `IntentCompilationRecord` + refusal reason codes as today's
+  path-specific builders; (3) import-posture / claim-boundary tests still pass with zero
+  new authority symbols in the registry. Optional narrow slice (only if A1 ingress needs
+  declared gaps): add optional `declaredAssumptions` / `declaredProofGapRefs` on the
+  existing block schema — **no** second envelope name.
+
+Evidence: `.planning/research/AGENT-NATIVE-INGRESS-ADVISORY.md`. Cross-ref: D-72, D-73,
+`docs/internal/a1-handshake-composability.md`.

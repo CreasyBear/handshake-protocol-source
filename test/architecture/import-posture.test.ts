@@ -367,6 +367,7 @@ describe("protocol module import posture", () => {
       "../catalog-envelope/schemas",
       "../credential-custody/schemas",
       "../delegated-authority/schemas",
+      "../delegation-evidence-record",
       "../gateway-gate/schemas",
       "../generated-execution-graph/schemas",
       "../idempotency-ledger/schemas",

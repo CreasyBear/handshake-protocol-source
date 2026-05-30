@@ -49,6 +49,8 @@ import {
 import type { CreateToolCallDraftInput, ToolCallDraft, TransitionToolCallDraftInput } from "./areas/tool-call-draft";
 import { compileIntent as compileIntentTransition } from "./areas/intent-compilation";
 import type { CompileIntentInput, IntentCompilationRecord } from "./areas/intent-compilation";
+import { commitRefusal, type BuildRefusalInput } from "./areas/refusal";
+import type { Refusal } from "./areas/refusal";
 import {
   createBreakerDecision as createBreakerDecisionTransition,
   createIsolationState as createIsolationStateTransition,
@@ -171,6 +173,10 @@ export class HandshakeKernel {
 
   compileIntent(input: CompileIntentInput): Promise<IntentCompilationRecord> {
     return compileIntentTransition(this.store, this.recorder, input);
+  }
+
+  commitIngressRefusal(input: BuildRefusalInput): Promise<Refusal> {
+    return commitRefusal(this.recorder, input);
   }
 
   proposeActionContract(input: ProposeActionContractInput): Promise<ActionContract> {

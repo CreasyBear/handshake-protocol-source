@@ -1,6 +1,6 @@
 {
   "name": "handshake-protocol-kernel",
-  "version": "0.2.8",
+  "version": "0.2.9",
   "description": "Protected action infrastructure for automated decision making: protocol kernel, CLI evidence views, and local MCP proposal/evidence server.",
   "license": "Apache-2.0",
   "mcpName": "io.github.CreasyBear/handshake-protocol-kernel",

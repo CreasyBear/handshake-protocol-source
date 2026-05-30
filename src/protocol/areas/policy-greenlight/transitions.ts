@@ -43,6 +43,10 @@ import { isolationScopeRefsForContract } from "../object-registry";
 import type { ProofGap } from "../proof-gap";
 import { protocolObjectRef, type Refusal } from "../refusal";
 import { buildGreenlight, buildPolicyDecision, commitPolicyEvaluation } from "./policy-record";
+import type { IntentCompilationRecord } from "../intent-compilation";
+import { VECTOR_GROUNDTRUTH_UNAVAILABLE_PROOF_GAP } from "../../../integrations/a1-evidence/types.js";
+
+export const DELEGATION_EVIDENCE_REQUIRED_REF = "delegation_evidence:required" as const;
 
 type ParsedEvaluatePolicyInput = ReturnType<typeof EvaluatePolicyInputSchema.parse>;
 
@@ -67,6 +71,8 @@ type PolicyConstraintEvaluation = PolicyEvaluationContext & {
   gatewayCredentialBindingEvaluation: GatewayCredentialBindingEvaluation;
   delegatedAuthorityBindingEvaluation: DelegatedAuthorityBindingEvaluation;
   agreementObligationEvaluation: AgreementObligationPolicyEvaluation;
+  intentCompilation: IntentCompilationRecord | null;
+  delegationEvidenceRequired: boolean;
   policyInput: {
     contractDigest: string;
     envelopeId: string;
@@ -220,6 +226,13 @@ async function derivePolicyConstraintEvaluation(
     context.now,
   );
   const agreementObligationEvaluation = await evaluateAgreementObligationPolicy(store, context.contract, context.now);
+  const intentCompilationRecord = await store.getRecord<IntentCompilationRecord>(
+    "intent_compilation",
+    context.contract.intentCompilationId,
+  );
+  const intentCompilation = intentCompilationRecord?.payload ?? null;
+  const delegationEvidenceRequired =
+    intentCompilation?.requiredEvidenceRefs.includes(DELEGATION_EVIDENCE_REQUIRED_REF) ?? false;
   const authorityLedger = await effectiveAuthorityLedger(context.contract, agreementObligationEvaluation);
   const idempotencyLedgerEntry = await store.getCurrentIdempotencyLedgerEntry(authorityLedger.ledgerKeyDigest);
   const policyInput = buildPolicyInput(
@@ -247,6 +260,8 @@ async function derivePolicyConstraintEvaluation(
     gatewayCredentialBindingEvaluation,
     delegatedAuthorityBindingEvaluation,
     agreementObligationEvaluation,
+    intentCompilation,
+    delegationEvidenceRequired,
     policyInput,
     policyInputDigest,
     isolationSnapshot: isolationSnapshotRef(isolationStates),
@@ -307,6 +322,7 @@ async function resolvePolicyDecisionValue(
   decisionValue = applyGatewayCredentialRefPolicy(decisionValue, constraints);
   decisionValue = applyAgreementObligationPolicy(decisionValue, constraints);
   decisionValue = applyExactProtectedActionPolicy(decisionValue, constraints);
+  decisionValue = applyDelegationEvidencePolicy(decisionValue, constraints);
   decisionValue = applyIdempotencyLedgerPolicy(decisionValue, constraints);
   if (decisionValue.decision === "review_required" && constraints.input.reviewDecisionId) {
     const reviewDecision = await recorder.requiredRecord<ReviewDecision>(
@@ -337,6 +353,7 @@ async function resolvePolicyDecisionValue(
     decisionValue = applyGatewayCredentialRefPolicy(decisionValue, constraints);
     decisionValue = applyAgreementObligationPolicy(decisionValue, constraints);
     decisionValue = applyExactProtectedActionPolicy(decisionValue, constraints);
+    decisionValue = applyDelegationEvidencePolicy(decisionValue, constraints);
     decisionValue = applyIdempotencyLedgerPolicy(decisionValue, constraints);
   }
   return decisionValue;
@@ -586,6 +603,33 @@ function applyExactProtectedActionPolicy(
     reason: failure.reason,
     matchedRuleIds: ["exact_protected_action_policy_binding"],
   };
+}
+
+function applyDelegationEvidencePolicy(
+  decisionValue: PolicyEvaluationResult,
+  constraints: PolicyConstraintEvaluation,
+): PolicyEvaluationResult {
+  if (decisionValue.decision !== "greenlight") return decisionValue;
+  if (!constraints.delegationEvidenceRequired) return decisionValue;
+
+  const ref = constraints.intentCompilation?.candidateAction.delegationEvidenceRef ?? null;
+  if (!ref) {
+    return {
+      decision: "proof_gap",
+      reasonCode: VECTOR_GROUNDTRUTH_UNAVAILABLE_PROOF_GAP,
+      reason: "Delegation evidence is required but missing from the compiled candidate.",
+      matchedRuleIds: ["delegation_evidence_required_missing"],
+    };
+  }
+  if (ref.verifyOutcome === "invalid") {
+    return {
+      decision: "refuse",
+      reasonCode: "delegation_evidence_invalid:malformed",
+      reason: "Required delegation evidence failed verification.",
+      matchedRuleIds: ["delegation_evidence_required_invalid"],
+    };
+  }
+  return decisionValue;
 }
 
 function evaluateExactProtectedActionPolicyContract(

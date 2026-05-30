@@ -6,6 +6,7 @@ import {
   ProtectedX402ToolHostProfileInputSchema,
   X402ProtectedToolReadinessSnapshotSchema,
 } from "../../src/adapters/x402-payment";
+import { MCP_DELEGATION_VERIFY_TOOL, MCP_X402_PAYMENT_PROPOSE_TOOL } from "../../src/mcp/catalog";
 
 const repoRoot = fileURLToPath(new URL("../..", import.meta.url));
 const outputJsonPath = `${repoRoot}/examples/x402-protected-tool-profiles/output/latest.json`;
@@ -57,7 +58,8 @@ describe("x402 protected tool profile artifacts", () => {
       },
     });
     expect(output.catalogSnapshot.tools.map((tool: { name: string }) => tool.name)).toEqual([
-      "handshake.actions.x402_payment.propose",
+      MCP_DELEGATION_VERIFY_TOOL,
+      MCP_X402_PAYMENT_PROPOSE_TOOL,
     ]);
     expect(output.sampleInputs).toMatchObject({
       generatedBy: "examples/x402-protected-tool-profiles/run.ts",

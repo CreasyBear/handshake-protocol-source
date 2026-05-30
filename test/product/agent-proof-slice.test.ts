@@ -99,8 +99,8 @@ describe("adapter-backed APS proof spine", () => {
     if (!proposed || proposed.outcome !== "action_contract_proposed") throw new Error("expected x402 contract");
     const contract = proposed.actionContract;
     expect(contract.actionClass).toBe("x402_payment.exact");
-    expect(contract.runtimeExecutionId).toBe(runtime.runtimeExecution.runtimeExecutionId);
-    expect(contract.generatedExecutionGraphId).toBe(runtime.generatedExecutionGraph.generatedExecutionGraphId);
+    expect(contract.runtimeExecutionId).toBe(runtime.runtimeExecution!.runtimeExecutionId);
+    expect(contract.generatedExecutionGraphId).toBe(runtime.generatedExecutionGraph!.generatedExecutionGraphId);
     expect(contract.generatedExecutionNodeId).toBe("runtime_dispatch_1");
     expect(contract.parameters).toMatchObject({
       intendedHttpMethod: "GET",
@@ -112,7 +112,7 @@ describe("adapter-backed APS proof spine", () => {
       sdkPackageVersions: x402SdkPackageVersions,
       extensionKeys: ["payment-identifier"],
     });
-    expect(runtime.runtimeExecution.evidenceRefs).toContain("evidence:x402-payment-required");
+    expect(runtime.runtimeExecution!.evidenceRefs).toContain("evidence:x402-payment-required");
     expect(JSON.stringify(runtime)).not.toContain("PAYMENT-SIGNATURE");
     expect(JSON.stringify(runtime)).not.toContain("PaymentPayload");
     expect(await recordCount(fixture.store, "policy_decision")).toBe(0);
@@ -242,7 +242,7 @@ describe("adapter-backed APS proof spine", () => {
       },
     );
     expect(rawBypass.outcome).toBe("one_or_more_dispatches_refused");
-    expect(rawBypass.generatedExecutionGraph.coverageStatus).toBe("contains_bypass_risk");
+    expect(rawBypass.generatedExecutionGraph!.coverageStatus).toBe("contains_bypass_risk");
     expect(await recordCount(rawBypassFixture.store, "action_contract")).toBe(0);
     expect(await recordCount(rawBypassFixture.store, "greenlight")).toBe(0);
     expect(await recordCount(rawBypassFixture.store, "gateway_check_attempt")).toBe(0);

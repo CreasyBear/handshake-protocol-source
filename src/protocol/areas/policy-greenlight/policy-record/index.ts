@@ -8,6 +8,8 @@ import { createId } from "../../../foundation/ids";
 import type { ProtocolRecorder } from "../../../events/records";
 import type { ProtectedPathPosture } from "../../protected-path-posture";
 import { ProofGapSchema, type ProofGap } from "../../proof-gap";
+import { buildCompilationProofGap } from "../../proof-gap/transitions";
+import { VECTOR_GROUNDTRUTH_UNAVAILABLE_PROOF_GAP } from "../../../../integrations/a1-evidence/types.js";
 import { buildRefusal, protocolObjectRef, type Refusal } from "../../refusal";
 import type { StoredProtocolRecord } from "../../../store/port";
 import {
@@ -289,6 +291,16 @@ async function commitGreenlightPolicyDecision(
 }
 
 function buildPolicyProofGap(contract: ActionContract, decision: PolicyDecision, now: string): ProofGap {
+  if (decision.decisionReasonCode === VECTOR_GROUNDTRUTH_UNAVAILABLE_PROOF_GAP) {
+    return buildCompilationProofGap({
+      tenantId: contract.tenantId,
+      organizationId: contract.organizationId,
+      intentCompilationId: contract.intentCompilationId,
+      runtimeExecutionId: contract.runtimeExecutionId,
+      expectedEvidenceType: "delegation_evidence",
+      reasonCode: decision.decisionReasonCode,
+    });
+  }
   return ProofGapSchema.parse({
     schemaVersion: PROTOCOL_VERSION,
     tenantId: contract.tenantId,

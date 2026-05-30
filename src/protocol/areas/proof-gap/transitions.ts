@@ -5,6 +5,38 @@ import type { SurfaceOperationReconciliation } from "../operation-lifecycle";
 import type { ProtocolRecorder } from "../../events/records";
 import { PROTOCOL_VERSION, ProofGapSchema, type ProofGap } from "./types";
 
+export function buildCompilationProofGap(input: {
+  tenantId: string;
+  organizationId: string;
+  intentCompilationId: string;
+  runtimeExecutionId: string | null;
+  expectedEvidenceType: string;
+  reasonCode: string;
+}): ProofGap {
+  return ProofGapSchema.parse({
+    schemaVersion: PROTOCOL_VERSION,
+    tenantId: input.tenantId,
+    organizationId: input.organizationId,
+    createdAt: nowIso(),
+    proofGapId: createId("gap"),
+    gapPhase: "compilation",
+    expectedEvidenceType: input.expectedEvidenceType,
+    missingOrInvalidEvidenceRef: input.expectedEvidenceType,
+    affectedObjectRefs: [
+      input.intentCompilationId,
+      ...(input.runtimeExecutionId ? [input.runtimeExecutionId] : []),
+    ],
+    gateAttemptId: null,
+    mutationAttemptId: null,
+    receiptId: null,
+    reasonCode: input.reasonCode,
+    finalityImpact: "unknown",
+    recoveryRequirement: "Supply verifiable delegation evidence before treating compilation as contractable.",
+    resolvedAt: null,
+    resolvedByRef: null,
+  });
+}
+
 export function buildProofGap(
   contract: ActionContract,
   gapPhase: "compilation" | "policy" | "gate" | "mutation" | "receipt" | "stream" | "recovery",

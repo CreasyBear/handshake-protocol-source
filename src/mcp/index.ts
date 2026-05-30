@@ -1,8 +1,10 @@
 export {
   mcpCatalogSnapshot,
   mcpProposalTools,
+  mcpReadOnlyTools,
   mcpResourceTemplates,
   mcpServiceWorkflowBoundary,
+  MCP_DELEGATION_VERIFY_TOOL,
   MCP_X402_PAYMENT_PROPOSE_TOOL,
 } from "./catalog";
 export { McpStructuredContentSchema, MCP_SCHEMA_VERSION, McpToolResultSchema } from "./output";

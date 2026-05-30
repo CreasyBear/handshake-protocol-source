@@ -21,6 +21,7 @@ import { IdempotencyLedgerEntrySchema } from "../idempotency-ledger/schemas";
 import { BypassProbeSchema } from "../bypass-probe/schemas";
 import { ToolCallDraftSchema } from "../tool-call-draft/schemas";
 import { IntentCompilationRecordSchema } from "../intent-compilation/schemas";
+import { StoredDelegationEvidenceRecordSchema } from "../delegation-evidence-record";
 import {
   AgreementObligationBindingSchema,
   AgreementStatusTransitionSchema,
@@ -180,6 +181,13 @@ export const protocolObjectRegistry = {
     "intent_compilation",
     IntentCompilationRecordSchema,
     (record) => record.payload.intentCompilationId,
+    "transition_evidence",
+    "audit_read",
+  ),
+  delegation_evidence_record: entry(
+    "delegation_evidence_record",
+    StoredDelegationEvidenceRecordSchema,
+    (record) => record.payload.delegationEvidenceRecordId,
     "transition_evidence",
     "audit_read",
   ),

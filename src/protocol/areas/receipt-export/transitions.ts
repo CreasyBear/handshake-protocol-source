@@ -5,6 +5,9 @@ import { HandshakeProtocolError } from "../../foundation/errors";
 import type { GatewayCheckAttempt } from "../gateway-gate";
 import { createId, nowIso } from "../../foundation/ids";
 import type { ProofGap } from "../proof-gap";
+import type { IntentCompilationRecord } from "../intent-compilation";
+import type { StoredDelegationEvidenceRecord } from "../delegation-evidence-record";
+import { resolveReceiptDelegationProvenance, type ReceiptDelegationProvenance } from "./delegation-provenance";
 import { CreateReceiptExportInputSchema, type CreateReceiptExportInput } from "./types";
 import { deriveDownstreamOutcomeStatus, deriveGatewayAdmissionStatus } from "./status";
 import type { ProtocolRecorder } from "../../events/records";
@@ -19,9 +22,12 @@ type DigestedReceipt = Receipt & {
 type ParsedCreateReceiptExportInput = ReturnType<typeof CreateReceiptExportInputSchema.parse>;
 
 type ReceiptExportContext = {
+  recorder: ProtocolRecorder;
   input: ParsedCreateReceiptExportInput;
   receipt: DigestedReceipt;
   contract: ActionContract;
+  intentCompilation: IntentCompilationRecord;
+  delegationEvidenceRecord: StoredDelegationEvidenceRecord | null;
   gateAttempt: GatewayCheckAttempt | null;
   proofGaps: ProofGap[];
   receiptExportId: string;
@@ -48,21 +54,38 @@ async function getReceiptExportContext(
   assertReceiptExportable(receipt);
   await assertReceiptDigests(receipt);
 
-  const [contractRecord, gateAttemptRecord] = await Promise.all([
-    recorder.requiredRecord<ActionContract>("action_contract", receipt.actionContractId, "contract_missing"),
-    receipt.gateAttemptId
-      ? recorder.requiredRecord<GatewayCheckAttempt>(
-          "gateway_check_attempt",
-          receipt.gateAttemptId,
-          "gateway_check_attempt_missing",
-        )
-      : Promise.resolve(null),
-  ]);
+  const contractRecord = await recorder.requiredRecord<ActionContract>(
+    "action_contract",
+    receipt.actionContractId,
+    "contract_missing",
+  );
+  const intentCompilationRecord = await recorder.requiredRecord<IntentCompilationRecord>(
+    "intent_compilation",
+    contractRecord.payload.intentCompilationId,
+    "intent_compilation_missing",
+  );
+  const delegationRef = intentCompilationRecord.payload.candidateAction.delegationEvidenceRef;
+  const delegationEvidenceRecord = delegationRef
+    ? await recorder.optionalRecord<StoredDelegationEvidenceRecord>(
+        "delegation_evidence_record",
+        delegationRef.delegationEvidenceRefId,
+      )
+    : null;
+  const gateAttemptRecord = receipt.gateAttemptId
+    ? await recorder.requiredRecord<GatewayCheckAttempt>(
+        "gateway_check_attempt",
+        receipt.gateAttemptId,
+        "gateway_check_attempt_missing",
+      )
+    : null;
   const proofGaps = await loadProofGaps(recorder, receipt.proofGapIds);
   return {
+    recorder,
     input,
     receipt,
     contract: contractRecord.payload,
+    intentCompilation: intentCompilationRecord.payload,
+    delegationEvidenceRecord: delegationEvidenceRecord?.payload ?? null,
     gateAttempt: gateAttemptRecord?.payload ?? null,
     proofGaps,
     receiptExportId: createId("rex"),
@@ -72,7 +95,14 @@ async function getReceiptExportContext(
 
 async function buildReceiptExport(context: ReceiptExportContext): Promise<ReceiptExport> {
   const { input, receipt, contract, gateAttempt, proofGaps, receiptExportId, now } = context;
-  const exportDigest = await digestCanonical(buildReceiptExportBinding(context));
+  const delegationResolution = await resolveReceiptDelegationProvenance({
+    contract,
+    intentCompilation: context.intentCompilation,
+    storedRecord: context.delegationEvidenceRecord,
+  });
+  const evidenceRefs = [...new Set([...receipt.evidenceRefs, ...(delegationResolution?.evidenceRefs ?? [])])];
+  const delegationProvenance = delegationResolution?.provenance ?? undefined;
+  const exportDigest = await digestCanonical(buildReceiptExportBinding(context, delegationProvenance ?? null));
   return ReceiptExportSchema.parse({
     schemaVersion: PROTOCOL_VERSION,
     tenantId: receipt.tenantId,
@@ -102,7 +132,8 @@ async function buildReceiptExport(context: ReceiptExportContext): Promise<Receip
     proofGapIds: receipt.proofGapIds,
     proofGapReasonCodes: proofGaps.map((proofGap) => proofGap.reasonCode),
     finalityStatus: receipt.finalityStatus,
-    evidenceRefs: receipt.evidenceRefs,
+    evidenceRefs,
+    ...(delegationProvenance ? { delegationProvenance } : {}),
     streamOffsets: receipt.streamOffsets,
     receiptDigest: receipt.receiptDigest,
     auditChainDigest: receipt.auditChainDigest,
@@ -119,7 +150,10 @@ async function buildReceiptExport(context: ReceiptExportContext): Promise<Receip
   });
 }
 
-function buildReceiptExportBinding(context: ReceiptExportContext): JsonValue {
+function buildReceiptExportBinding(
+  context: ReceiptExportContext,
+  delegationProvenance: ReceiptDelegationProvenance | null,
+): JsonValue {
   const { input, receipt, receiptExportId, now } = context;
   const exportBinding = {
     receiptExportId,
@@ -130,6 +164,7 @@ function buildReceiptExportBinding(context: ReceiptExportContext): JsonValue {
     streamOffsets: receipt.streamOffsets,
     proofGapIds: receipt.proofGapIds,
     finalityStatus: receipt.finalityStatus,
+    delegationProvenance,
     exportFormat: input.exportFormat,
     redactionProfileRef: input.redactionProfileRef,
     exportPurposeCode: input.exportPurposeCode,

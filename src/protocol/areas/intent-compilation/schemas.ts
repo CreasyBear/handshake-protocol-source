@@ -93,6 +93,7 @@ export const IntentCompilationRecordSchema = ProtocolBaseSchema.extend({
   rejectedCandidateRefs: z.array(IdSchema).default([]),
   overreachReasonCodes: z.array(ReasonCodeSchema).default([]),
   requiredEvidenceRefs: z.array(z.string()).default([]),
+  compilationRefusalId: IdSchema.nullable().default(null),
   compilerVersion: z.string().min(1),
 });
 export type IntentCompilationRecord = z.infer<typeof IntentCompilationRecordSchema>;

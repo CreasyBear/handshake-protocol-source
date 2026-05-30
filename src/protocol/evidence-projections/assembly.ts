@@ -10,6 +10,9 @@ import type { Greenlight, PolicyDecision } from "../areas/policy-greenlight/sche
 import type { ProofGap } from "../areas/proof-gap";
 import { protocolObjectRef, type Refusal } from "../areas/refusal";
 import type { Receipt } from "../areas/receipt-export/schemas";
+import { resolveReceiptDelegationProvenance, type ReceiptDelegationProvenance } from "../areas/receipt-export";
+import type { IntentCompilationRecord } from "../areas/intent-compilation";
+import type { StoredDelegationEvidenceRecord } from "../areas/delegation-evidence-record";
 import type { RecoveryRecommendation, RecoveryRecommendationStatusTransition } from "../areas/recovery/schemas";
 import { HandshakeProtocolError } from "../foundation/errors";
 import type { ProtocolStore, StoredProtocolRecord } from "../store/port";
@@ -176,6 +179,31 @@ export async function assembleAgentTransactionEnvelope(
       ...scopedReconciliationRecords,
     ],
   };
+}
+
+export async function resolveReceiptTimelineDelegationProvenance(
+  store: ProtocolStore,
+  receipt: Receipt,
+): Promise<ReceiptDelegationProvenance | null> {
+  const contractRecord = await store.getRecord<ActionContract>("action_contract", receipt.actionContractId);
+  if (!contractRecord) return null;
+  const intentCompilationRecord = await store.getRecord<IntentCompilationRecord>(
+    "intent_compilation",
+    contractRecord.payload.intentCompilationId,
+  );
+  if (!intentCompilationRecord) return null;
+  const delegationRef = intentCompilationRecord.payload.candidateAction.delegationEvidenceRef;
+  if (!delegationRef) return null;
+  const storedRecord = await store.getRecord<StoredDelegationEvidenceRecord>(
+    "delegation_evidence_record",
+    delegationRef.delegationEvidenceRefId,
+  );
+  const resolved = await resolveReceiptDelegationProvenance({
+    contract: contractRecord.payload,
+    intentCompilation: intentCompilationRecord.payload,
+    storedRecord: storedRecord?.payload ?? null,
+  });
+  return resolved?.provenance ?? null;
 }
 
 async function recordPayload<T>(

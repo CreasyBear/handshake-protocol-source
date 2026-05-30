@@ -1,7 +1,9 @@
 import { z } from "zod";
 import { McpStructuredContentSchema, MCP_SCHEMA_VERSION } from "./output";
 import { McpX402PaymentProposalInputSchema } from "./x402-proposal";
+import { MCP_DELEGATION_VERIFY_TOOL, McpDelegationVerifyInputSchema } from "./tools/delegation-verify.js";
 
+export { MCP_DELEGATION_VERIFY_TOOL } from "./tools/delegation-verify.js";
 export const MCP_X402_PAYMENT_PROPOSE_TOOL = "handshake.actions.x402_payment.propose" as const;
 
 export const mcpServiceWorkflowBoundary = {
@@ -81,6 +83,28 @@ export const mcpResourceTemplates = [
   },
 ] as const;
 
+export const mcpReadOnlyTools = [
+  {
+    name: MCP_DELEGATION_VERIFY_TOOL,
+    description:
+      "Cryptographically verify an A1 delegation signed chain offline. Evidence-only: does not authorize, greenlight, or execute any protected action.",
+    inputSchema: z.toJSONSchema(McpDelegationVerifyInputSchema, {
+      target: "draft-2020-12",
+      unrepresentable: "any",
+    }),
+    outputSchema: z.toJSONSchema(McpStructuredContentSchema, {
+      target: "draft-2020-12",
+      unrepresentable: "any",
+    }),
+    annotations: {
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+      readOnlyHint: true,
+    },
+  },
+] as const;
+
 export const mcpProposalTools = [
   {
     name: MCP_X402_PAYMENT_PROPOSE_TOOL,
@@ -106,7 +130,7 @@ export function mcpCatalogSnapshot() {
   return {
     schemaVersion: MCP_SCHEMA_VERSION,
     resources: mcpResourceTemplates,
-    tools: mcpProposalTools,
+    tools: [...mcpReadOnlyTools, ...mcpProposalTools],
     serviceWorkflowBoundary: mcpServiceWorkflowBoundary,
     supportsParallelToolCalls: false,
     authorityCreated: false,

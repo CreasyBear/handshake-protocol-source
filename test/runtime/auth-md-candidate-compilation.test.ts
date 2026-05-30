@@ -36,10 +36,10 @@ describe("auth.md runtime candidate compilation", () => {
       reasonCodes: [],
       graphCoverageStatus: "fully_covered_no_unsupported_nodes",
     });
-    expect(result.generatedExecutionGraph.supportedGrammarVersion).toBe(
+    expect(result.generatedExecutionGraph!.supportedGrammarVersion).toBe(
       "runtime-dispatch-auth-md-protected-api-call-0.1",
     );
-    expect(result.generatedExecutionGraph.nodes[0]?.nodeId).toBe(runtimeIngressDispatchNodeId(1));
+    expect(result.generatedExecutionGraph!.nodes[0]?.nodeId).toBe(runtimeIngressDispatchNodeId(1));
     const proposal = result.proposals[0];
     if (!proposal || proposal.outcome !== "action_contract_proposed") throw new Error("expected contract proposal");
     expect(proposal.intentCompilation.candidateAction.candidateStatus).toBe("contractable");
@@ -115,7 +115,7 @@ describe("auth.md runtime candidate compilation", () => {
       actionContractRefs: [],
       graphCoverageStatus: "unsupported_or_ambiguous",
     });
-    expect(result.runtimeExecution.refusalReasonCodes).toEqual(
+    expect(result.runtimeExecution!.refusalReasonCodes).toEqual(
       expect.arrayContaining([
         "auth_md_dynamic_host_refused",
         "auth_md_idempotency_material_missing",
@@ -126,7 +126,7 @@ describe("auth.md runtime candidate compilation", () => {
         "auth_md_wildcard_scope_refused",
       ]),
     );
-    expect(result.generatedExecutionGraph.terminalReasonCodes).toEqual(
+    expect(result.generatedExecutionGraph!.terminalReasonCodes).toEqual(
       expect.arrayContaining(["auth_md_wildcard_scope_refused", "generated_execution_node_ambiguous"]),
     );
     const proposal = result.proposals[0];
@@ -172,9 +172,9 @@ describe("auth.md runtime candidate compilation", () => {
 
     expect(result.outcome).toBe("one_or_more_dispatches_refused");
     expect(result.responsePosture.nextAction).toBe("stop");
-    expect(result.generatedExecutionGraph.coverageStatus).toBe("contains_bypass_risk");
-    expect(result.generatedExecutionGraph.terminalReasonCodes).toContain("runtime_ingress_raw_sibling_bypass");
-    expect(result.generatedExecutionGraph.nodes[0]?.commandRiskBypassRefs).toContain("mcp:authmd.directApiCall");
+    expect(result.generatedExecutionGraph!.coverageStatus).toBe("contains_bypass_risk");
+    expect(result.generatedExecutionGraph!.terminalReasonCodes).toContain("runtime_ingress_raw_sibling_bypass");
+    expect(result.generatedExecutionGraph!.nodes[0]?.commandRiskBypassRefs).toContain("mcp:authmd.directApiCall");
     const proposal = result.proposals[0];
     if (!proposal || proposal.outcome !== "intent_compilation_refused") throw new Error("expected refusal");
     expect(proposal.refusalReasonCodes).toContain("generated_execution_graph_not_contractable");
@@ -198,8 +198,8 @@ describe("auth.md runtime candidate compilation", () => {
     );
 
     expect(result.outcome).toBe("one_or_more_dispatches_refused");
-    expect(result.generatedExecutionGraph.coverageStatus).toBe("contains_coverage_gap");
-    expect(result.generatedExecutionGraph.terminalReasonCodes).toContain("generated_execution_graph_truncated");
+    expect(result.generatedExecutionGraph!.coverageStatus).toBe("contains_coverage_gap");
+    expect(result.generatedExecutionGraph!.terminalReasonCodes).toContain("generated_execution_graph_truncated");
     const proposal = result.proposals[0];
     if (!proposal || proposal.outcome !== "intent_compilation_refused") throw new Error("expected refusal");
     expect(proposal.refusalReasonCodes).toContain("generated_execution_graph_not_contractable");

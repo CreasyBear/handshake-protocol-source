@@ -68,6 +68,7 @@ describe("foundation transition matrix", () => {
   it("keeps authority-bearing transitions explicit about non-authority evidence", () => {
     const nonAuthorityTransitions = [
       "compileIntent",
+      "commitIngressRefusal",
       "createRuntimeExecution",
       "createGeneratedExecutionGraph",
       "registerInstallProposalCompiledRecords",
@@ -100,6 +101,7 @@ describe("foundation transition matrix", () => {
 });
 
 const kernelOnlyTransitionIds = new Set([
+  "commitIngressRefusal",
   "createGeneratedExecutionGraph",
   "createAuthorityCertificate",
   "recordNegotiationSession",

@@ -1,5 +1,9 @@
 import { describe, expect, it } from "bun:test";
 import { fileURLToPath } from "node:url";
+import {
+  MCP_DELEGATION_VERIFY_TOOL,
+  MCP_X402_PAYMENT_PROPOSE_TOOL,
+} from "../../src/mcp/catalog";
 
 const repoRoot = fileURLToPath(new URL("../..", import.meta.url));
 const outputJsonPath = `${repoRoot}/examples/self-hosted-activation/output/latest.json`;
@@ -56,7 +60,7 @@ describe("Self-hosted activation packet", () => {
       expect(readback.mutationAttempted).toBe(false);
       expect(readback.credentialMaterialIncluded).toBe(false);
     }
-    expect(output.mcpStdio.toolNames).toEqual(["handshake.actions.x402_payment.propose"]);
+    expect(output.mcpStdio.toolNames).toEqual([MCP_X402_PAYMENT_PROPOSE_TOOL, MCP_DELEGATION_VERIFY_TOOL]);
     expect(output.mcpStdio.toolResult.structuredContent).toMatchObject({
       outcome: "action_contract_proposed",
       authorityCreated: false,

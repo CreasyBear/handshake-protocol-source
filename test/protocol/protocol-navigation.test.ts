@@ -109,6 +109,7 @@ describe("protocol navigation", () => {
 });
 
 const kernelOnlyTransitionIds = new Set([
+  "commitIngressRefusal",
   "createGeneratedExecutionGraph",
   "createAuthorityCertificate",
   "recordNegotiationSession",

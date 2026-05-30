@@ -2,6 +2,7 @@ import { z } from "zod";
 import { ClearingEvidenceRefsSchema, JsonValueSchema } from "../../foundation/schema-core";
 import { GatewayCredentialBindingSchema } from "../credential-custody/schemas";
 import { DelegatedAuthorityBindingSchema } from "../delegated-authority/schemas";
+import { DelegationEvidenceRefSchema } from "./delegation-evidence-ref";
 
 export const CompileIntentInputSchema = z.strictObject({
   tenantId: z.string().min(1),
@@ -22,6 +23,7 @@ export const CompileIntentInputSchema = z.strictObject({
   generatedCodeOrSpecRefs: z.array(z.string()).default([]),
   declaredAssumptions: z.array(z.string()).default([]),
   requiredEvidenceRefs: z.array(z.string()).default([]),
+  delegationEvidenceRef: DelegationEvidenceRefSchema.nullable().default(null),
   candidate: z.strictObject({
     toolCapabilityId: z.string().min(1),
     actionTypeId: z.string().min(1),

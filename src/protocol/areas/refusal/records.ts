@@ -45,6 +45,28 @@ export async function buildRefusal(input: BuildRefusalInput): Promise<Refusal> {
   });
 }
 
+export async function commitRefusal(
+  recorder: import("../../events/records").ProtocolRecorder,
+  input: BuildRefusalInput,
+): Promise<Refusal> {
+  const refusal = await buildRefusal(input);
+  await recorder.commitRecordsWithEvents(
+    [{ objectType: "refusal", payload: refusal }],
+    [
+      {
+        source: refusal,
+        eventType: "action_refused",
+        objectRefs: [
+          refusal.refusalId,
+          ...(refusal.refusedObjectRef ? [refusal.refusedObjectRef] : []),
+        ],
+        payload: { reasonCode: refusal.reasonCode },
+      },
+    ],
+  );
+  return refusal;
+}
+
 export function protocolObjectRef(objectType: string, objectId: string): string {
   return `${objectType}:${objectId}`;
 }

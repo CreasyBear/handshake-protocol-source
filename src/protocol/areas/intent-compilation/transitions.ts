@@ -177,6 +177,7 @@ async function buildCandidateAction(
     toolCallDraftId: toolCallDraft?.toolCallDraftId ?? null,
     toolCallDraftDigest: toolCallDraft?.draftDigest ?? null,
     toolCallDraftState: toolCallDraft?.draftState ?? null,
+    delegationEvidenceRef: input.delegationEvidenceRef ?? null,
   } satisfies CandidateAction;
   const candidateDigest =
     decision.candidateStatus === "contractable"
@@ -243,9 +244,12 @@ async function commitIntentCompilation(
           refusedAt: record.createdAt,
         })
       : null;
+  const committedRecord = refusal
+    ? IntentCompilationRecordSchema.parse({ ...record, compilationRefusalId: refusal.refusalId })
+    : record;
   await recorder.commitRecordsWithEvents(
     [
-      { objectType: "intent_compilation", payload: record },
+      { objectType: "intent_compilation", payload: committedRecord },
       ...(refusal ? ([{ objectType: "refusal", payload: refusal }] as const) : []),
     ],
     [
@@ -282,6 +286,7 @@ async function commitIntentCompilation(
 }
 
 function candidateDigestMaterial(input: ParsedCompileIntentInput, candidate: CandidateAction): JsonValue {
+  const { delegationEvidenceRef: _delegationEvidenceRef, ...candidateForDigest } = candidate;
   return {
     tenantId: input.tenantId,
     organizationId: input.organizationId,
@@ -296,7 +301,7 @@ function candidateDigestMaterial(input: ParsedCompileIntentInput, candidate: Can
     toolCallDraftId: input.toolCallDraftId,
     toolCallDraftDigest: candidate.toolCallDraftDigest,
     candidateAction: {
-      ...candidate,
+      ...candidateForDigest,
       clearingEvidenceRefs: clearingEvidenceRefsJson(candidate.clearingEvidenceRefs),
       candidateDigest: null,
     },

@@ -131,10 +131,10 @@ describe("runtime ingress adapter", () => {
       reasonCodes: [],
       graphCoverageStatus: "fully_covered_no_unsupported_nodes",
     });
-    expect(result.runtimeExecution.runtimePosture).toBe("hook_assisted");
-    expect(result.runtimeExecution.observedConsequentialCallCount).toBe(1);
-    expect(result.generatedExecutionGraph.coverageStatus).toBe("fully_covered_no_unsupported_nodes");
-    expect(result.generatedExecutionGraph.nodes[0]?.nodeId).toBe(runtimeIngressDispatchNodeId(1));
+    expect(result.runtimeExecution!.runtimePosture).toBe("hook_assisted");
+    expect(result.runtimeExecution!.observedConsequentialCallCount).toBe(1);
+    expect(result.generatedExecutionGraph!.coverageStatus).toBe("fully_covered_no_unsupported_nodes");
+    expect(result.generatedExecutionGraph!.nodes[0]?.nodeId).toBe(runtimeIngressDispatchNodeId(1));
     const proposal = result.proposals[0];
     if (!proposal || proposal.outcome !== "action_contract_proposed") throw new Error("expected contract proposal");
     expect(proposal.toolCallDraft.draftState).toBe("finalized");
@@ -142,9 +142,9 @@ describe("runtime ingress adapter", () => {
     expect(proposal.intentCompilation.candidateAction.candidateStatus).toBe("contractable");
     expect(proposal.actionContract.resourceRef).toBe("npm:hono");
     expect(result.responsePosture.actionContractRefs).toEqual([proposal.actionContract.actionContractId]);
-    expect(proposal.actionContract.runtimeExecutionId).toBe(result.runtimeExecution.runtimeExecutionId);
+    expect(proposal.actionContract.runtimeExecutionId).toBe(result.runtimeExecution!.runtimeExecutionId);
     expect(proposal.actionContract.generatedExecutionGraphId).toBe(
-      result.generatedExecutionGraph.generatedExecutionGraphId,
+      result.generatedExecutionGraph!.generatedExecutionGraphId,
     );
     expect(await recordCount(fixture.store, "runtime_execution")).toBe(1);
     expect(await recordCount(fixture.store, "generated_execution_graph")).toBe(1);
@@ -197,9 +197,9 @@ describe("runtime ingress adapter", () => {
         "generated_execution_graph_not_contractable",
       ]),
     );
-    expect(result.runtimeExecution.dynamicToolConstructionDetected).toBe(true);
-    expect(result.runtimeExecution.unobservedRegionRefs).toEqual(["argv:package-name"]);
-    expect(result.generatedExecutionGraph.coverageStatus).toBe("unsupported_or_ambiguous");
+    expect(result.runtimeExecution!.dynamicToolConstructionDetected).toBe(true);
+    expect(result.runtimeExecution!.unobservedRegionRefs).toEqual(["argv:package-name"]);
+    expect(result.generatedExecutionGraph!.coverageStatus).toBe("unsupported_or_ambiguous");
     const proposal = result.proposals[0];
     if (!proposal || proposal.outcome !== "intent_compilation_refused") throw new Error("expected refusal");
     expect(proposal.toolCallDraft.draftState).toBe("finalized");
@@ -248,10 +248,10 @@ describe("runtime ingress adapter", () => {
       expect.arrayContaining(["runtime_ingress_loop_detected", "runtime_ingress_retry_detected"]),
     );
     expect(result.responsePosture.nextAction).toBe("read_evidence");
-    expect(result.runtimeExecution.loopDetected).toBe(true);
-    expect(result.runtimeExecution.retryDetected).toBe(true);
-    expect(result.runtimeExecution.executionShape).toBe("tool_dispatch_chain");
-    expect(result.generatedExecutionGraph.edges).toEqual([
+    expect(result.runtimeExecution!.loopDetected).toBe(true);
+    expect(result.runtimeExecution!.retryDetected).toBe(true);
+    expect(result.runtimeExecution!.executionShape).toBe("tool_dispatch_chain");
+    expect(result.generatedExecutionGraph!.edges).toEqual([
       {
         fromNodeId: runtimeIngressDispatchNodeId(1),
         toNodeId: runtimeIngressDispatchNodeId(2),
@@ -275,23 +275,27 @@ describe("runtime ingress adapter", () => {
     const fixture = makeKernelFixture();
     await registerFixtureObjects(fixture);
 
-    await expect(
-      proposeRuntimeIngressActionContracts(
-        fixture.kernel,
-        { packageInstall: packageInstallRuntimeConfig(fixture) },
-        {
-          principalIntentRef: "intent:oversized dispatch block",
-          generatedCodeOrSpecRef: "runtime:dispatch-block-oversized",
-          dispatchBoundaryRef: "dispatch-boundary:oversized",
-          dispatches: Array.from({ length: 65 }, (_, index) => ({
-            dispatchKind: "wrapped_package_install",
-            dispatchRef: `dispatch:package-install:${index}`,
-            package: "hono",
-            versionRange: "^4.12.19",
-          })),
-        },
-      ),
-    ).rejects.toThrow();
+    const result = await proposeRuntimeIngressActionContracts(
+      fixture.kernel,
+      { packageInstall: packageInstallRuntimeConfig(fixture) },
+      {
+        principalIntentRef: "intent:oversized dispatch block",
+        generatedCodeOrSpecRef: "runtime:dispatch-block-oversized",
+        dispatchBoundaryRef: "dispatch-boundary:oversized",
+        dispatches: Array.from({ length: 65 }, (_, index) => ({
+          dispatchKind: "wrapped_package_install",
+          dispatchRef: `dispatch:package-install:${index}`,
+          package: "hono",
+          versionRange: "^4.12.19",
+        })),
+      },
+    );
+
+    expect(result.outcome).toBe("one_or_more_dispatches_refused");
+    expect(result.responsePosture.refusalRefs.length).toBeGreaterThan(0);
+    expect(result.responsePosture.reasonCodes).toContain("runtime_ingress_wire_invalid");
+    expect(result.runtimeExecution).toBeNull();
+    expect(result.generatedExecutionGraph).toBeNull();
 
     expect(await recordCount(fixture.store, "runtime_execution")).toBe(0);
     expect(await recordCount(fixture.store, "generated_execution_graph")).toBe(0);
@@ -330,10 +334,10 @@ describe("runtime ingress adapter", () => {
       actionContractRefs: [],
     });
     expect(result.responsePosture.reasonCodes).toContain("runtime_ingress_raw_sibling_bypass");
-    expect(result.generatedExecutionGraph.coverageStatus).toBe("contains_bypass_risk");
-    expect(result.generatedExecutionGraph.terminalReasonCodes).toContain("runtime_ingress_raw_sibling_bypass");
-    expect(result.generatedExecutionGraph.terminalReasonCodes).toContain("generated_execution_node_bypass_risk");
-    expect(result.generatedExecutionGraph.terminalReasonCodes).toContain(
+    expect(result.generatedExecutionGraph!.coverageStatus).toBe("contains_bypass_risk");
+    expect(result.generatedExecutionGraph!.terminalReasonCodes).toContain("runtime_ingress_raw_sibling_bypass");
+    expect(result.generatedExecutionGraph!.terminalReasonCodes).toContain("generated_execution_node_bypass_risk");
+    expect(result.generatedExecutionGraph!.terminalReasonCodes).toContain(
       "generated_execution_command_risk_bypass_detected",
     );
     const proposal = result.proposals[0];
@@ -371,8 +375,8 @@ describe("runtime ingress adapter", () => {
     );
 
     expect(result.outcome).toBe("one_or_more_dispatches_refused");
-    expect(result.generatedExecutionGraph.coverageStatus).toBe("contains_coverage_gap");
-    expect(result.generatedExecutionGraph.terminalReasonCodes).toContain("generated_execution_graph_truncated");
+    expect(result.generatedExecutionGraph!.coverageStatus).toBe("contains_coverage_gap");
+    expect(result.generatedExecutionGraph!.terminalReasonCodes).toContain("generated_execution_graph_truncated");
     const proposal = result.proposals[0];
     if (!proposal || proposal.outcome !== "intent_compilation_refused") throw new Error("expected refusal");
     expect(proposal.refusalReasonCodes).toContain("generated_execution_graph_not_contractable");
@@ -395,7 +399,7 @@ describe("runtime ingress adapter", () => {
     );
 
     expect(result.outcome).toBe("action_contracts_proposed");
-    expect(result.generatedExecutionGraph.supportedGrammarVersion).toBe("runtime-dispatch-x402-payment-0.1");
+    expect(result.generatedExecutionGraph!.supportedGrammarVersion).toBe("runtime-dispatch-x402-payment-0.1");
     const contract = result.proposals[0]?.actionContract;
     if (!contract) throw new Error("expected x402 action contract");
     expect(contract.actionClass).toBe("x402_payment.exact");
@@ -430,7 +434,7 @@ describe("runtime ingress adapter", () => {
       gatewayReadinessDigest: x402Digest,
       policyVersionDigest: x402Digest,
     });
-    expect(result.runtimeExecution.evidenceRefs).toContain("evidence:x402-payment-required");
+    expect(result.runtimeExecution!.evidenceRefs).toContain("evidence:x402-payment-required");
     expect(result.proposals[0]?.toolCallDraft.evidenceRefs).toContain("evidence:x402-payment-required");
     expect(JSON.stringify(result)).not.toContain("PAYMENT-SIGNATURE");
     expect(JSON.stringify(result)).not.toContain("PaymentPayload");
@@ -467,7 +471,7 @@ describe("runtime ingress adapter", () => {
     );
 
     expect(result.outcome).toBe("action_contracts_proposed");
-    expect(result.generatedExecutionGraph.supportedGrammarVersion).toBe("runtime-dispatch-mixed-0.1");
+    expect(result.generatedExecutionGraph!.supportedGrammarVersion).toBe("runtime-dispatch-mixed-0.1");
     expect(result.proposals.map((proposal) => proposal.actionContract?.actionClass)).toEqual([
       "package.install",
       "x402_payment.exact",
@@ -482,33 +486,37 @@ describe("runtime ingress adapter", () => {
   it("rejects mixed-family dispatch blocks with different envelopes before recording runtime evidence", async () => {
     const { fixture, packageRuntimeConfig, x402RuntimeConfig, x402Proposal } = await installedMixedIngressFixture();
 
-    await expect(
-      proposeRuntimeIngressActionContracts(
-        fixture.kernel,
-        {
-          packageInstall: { ...packageRuntimeConfig, operatingEnvelopeId: "env_different_runtime_block" },
-          x402Payment: x402RuntimeConfig,
-        },
-        {
-          principalIntentRef: "intent:install package and fetch paid context through mismatched envelopes",
-          generatedCodeOrSpecRef: "runtime:dispatch-block-mixed-envelope-mismatch",
-          dispatchBoundaryRef: "dispatch-boundary:mixed-envelope-mismatch",
-          dispatches: [
-            {
-              dispatchKind: "wrapped_package_install",
-              dispatchRef: "dispatch:package-install:mixed-mismatch",
-              package: "hono",
-              versionRange: "^4.12.19",
-            },
-            x402Dispatch(
-              x402Proposal,
-              "dispatch:x402-payment:mixed-mismatch",
-              upstreamX402DispatchBinding(x402Proposal),
-            ),
-          ],
-        },
-      ),
-    ).rejects.toThrow("Runtime ingress mixed-family dispatch block requires one same-envelope projection.");
+    const result = await proposeRuntimeIngressActionContracts(
+      fixture.kernel,
+      {
+        packageInstall: { ...packageRuntimeConfig, operatingEnvelopeId: "env_different_runtime_block" },
+        x402Payment: x402RuntimeConfig,
+      },
+      {
+        principalIntentRef: "intent:install package and fetch paid context through mismatched envelopes",
+        generatedCodeOrSpecRef: "runtime:dispatch-block-mixed-envelope-mismatch",
+        dispatchBoundaryRef: "dispatch-boundary:mixed-envelope-mismatch",
+        dispatches: [
+          {
+            dispatchKind: "wrapped_package_install",
+            dispatchRef: "dispatch:package-install:mixed-mismatch",
+            package: "hono",
+            versionRange: "^4.12.19",
+          },
+          x402Dispatch(
+            x402Proposal,
+            "dispatch:x402-payment:mixed-mismatch",
+            upstreamX402DispatchBinding(x402Proposal),
+          ),
+        ],
+      },
+    );
+
+    expect(result.outcome).toBe("one_or_more_dispatches_refused");
+    expect(result.responsePosture.refusalRefs.length).toBeGreaterThan(0);
+    expect(result.responsePosture.reasonCodes).toContain("runtime_ingress_wire_invalid");
+    expect(result.runtimeExecution).toBeNull();
+    expect(result.generatedExecutionGraph).toBeNull();
 
     expect(await recordCount(fixture.store, "runtime_execution")).toBe(0);
     expect(await recordCount(fixture.store, "generated_execution_graph")).toBe(0);
@@ -533,28 +541,32 @@ describe("runtime ingress adapter", () => {
     const x402CredentialRef = await registerX402WalletCredentialRef(authFixture.kernel, x402Proposal, x402Records);
     const x402AuthorityRef = await registerX402DelegatedAuthorityRef(authFixture.kernel, x402Proposal, x402Records);
 
-    await expect(
-      proposeRuntimeIngressActionContracts(
-        authFixture.kernel,
-        {
-          authMdProtectedApiCall: authMdRuntimeConfig(authFixture),
-          x402Payment: x402RuntimeConfigFor(x402Proposal, x402Records, x402CredentialRef, x402AuthorityRef),
-        },
-        {
-          principalIntentRef: "intent:pay and call credentialed API through one generated block",
-          generatedCodeOrSpecRef: "runtime:dispatch-block-x402-auth-md-composite",
-          dispatchBoundaryRef: "dispatch-boundary:x402-auth-md-composite",
-          dispatches: [
-            x402Dispatch(
-              x402Proposal,
-              "dispatch:x402-payment:auth-md-composite",
-              upstreamX402DispatchBinding(x402Proposal),
-            ),
-            authMdRuntimeDispatch(authFixture, "dispatch:auth-md:composite"),
-          ],
-        },
-      ),
-    ).rejects.toThrow("Runtime ingress mixed-family dispatch block requires one same-envelope projection.");
+    const result = await proposeRuntimeIngressActionContracts(
+      authFixture.kernel,
+      {
+        authMdProtectedApiCall: authMdRuntimeConfig(authFixture),
+        x402Payment: x402RuntimeConfigFor(x402Proposal, x402Records, x402CredentialRef, x402AuthorityRef),
+      },
+      {
+        principalIntentRef: "intent:pay and call credentialed API through one generated block",
+        generatedCodeOrSpecRef: "runtime:dispatch-block-x402-auth-md-composite",
+        dispatchBoundaryRef: "dispatch-boundary:x402-auth-md-composite",
+        dispatches: [
+          x402Dispatch(
+            x402Proposal,
+            "dispatch:x402-payment:auth-md-composite",
+            upstreamX402DispatchBinding(x402Proposal),
+          ),
+          authMdRuntimeDispatch(authFixture, "dispatch:auth-md:composite"),
+        ],
+      },
+    );
+
+    expect(result.outcome).toBe("one_or_more_dispatches_refused");
+    expect(result.responsePosture.refusalRefs.length).toBeGreaterThan(0);
+    expect(result.responsePosture.reasonCodes).toContain("runtime_ingress_wire_invalid");
+    expect(result.runtimeExecution).toBeNull();
+    expect(result.generatedExecutionGraph).toBeNull();
 
     expect(await recordCount(authFixture.store, "runtime_execution")).toBe(0);
     expect(await recordCount(authFixture.store, "generated_execution_graph")).toBe(0);
@@ -636,11 +648,11 @@ describe("runtime ingress adapter", () => {
         "generated_execution_graph_not_contractable",
       ]),
     );
-    expect(result.runtimeExecution.refusalReasonCodes).toEqual(
+    expect(result.runtimeExecution!.refusalReasonCodes).toEqual(
       expect.arrayContaining(["x402_request_body_posture_unsupported", "x402_provider_environment_not_sandboxed"]),
     );
-    expect(result.generatedExecutionGraph.coverageStatus).toBe("unsupported_or_ambiguous");
-    expect(result.generatedExecutionGraph.nodes[0]?.unsupportedReasonCodes).toEqual(
+    expect(result.generatedExecutionGraph!.coverageStatus).toBe("unsupported_or_ambiguous");
+    expect(result.generatedExecutionGraph!.nodes[0]?.unsupportedReasonCodes).toEqual(
       expect.arrayContaining(["x402_request_body_posture_unsupported", "x402_provider_environment_not_sandboxed"]),
     );
     const proposalResult = result.proposals[0];
@@ -683,7 +695,7 @@ describe("runtime ingress adapter", () => {
     );
 
     expect(result.outcome).toBe("one_or_more_dispatches_refused");
-    expect(result.generatedExecutionGraph.coverageStatus).toBe("unsupported_or_ambiguous");
+    expect(result.generatedExecutionGraph!.coverageStatus).toBe("unsupported_or_ambiguous");
     const proposalResult = result.proposals[0];
     if (!proposalResult || proposalResult.outcome !== "intent_compilation_refused") throw new Error("expected refusal");
     expect(proposalResult.refusalReasonCodes).toContain("runtime_dynamic_tool_construction_detected");
@@ -734,10 +746,10 @@ describe("runtime ingress adapter", () => {
       actionContractRefs: [],
       nextAction: "recraft_request",
     });
-    expect(result.runtimeExecution.evidenceRefs).toEqual(expect.arrayContaining([handleEvidenceRef, staleReviewRef]));
-    expect(result.runtimeExecution.unobservedRegionRefs).toEqual([handleEvidenceRef, staleReviewRef]);
-    expect(result.generatedExecutionGraph.coverageStatus).toBe("unsupported_or_ambiguous");
-    expect(result.generatedExecutionGraph.nodes[0]?.unsupportedReasonCodes).toEqual(
+    expect(result.runtimeExecution!.evidenceRefs).toEqual(expect.arrayContaining([handleEvidenceRef, staleReviewRef]));
+    expect(result.runtimeExecution!.unobservedRegionRefs).toEqual([handleEvidenceRef, staleReviewRef]);
+    expect(result.generatedExecutionGraph!.coverageStatus).toBe("unsupported_or_ambiguous");
+    expect(result.generatedExecutionGraph!.nodes[0]?.unsupportedReasonCodes).toEqual(
       expect.arrayContaining(["runtime_ingress_dynamic_tool_construction", "runtime_ingress_late_bound_parameters"]),
     );
     const proposalResult = result.proposals[0];
@@ -780,8 +792,8 @@ describe("runtime ingress adapter", () => {
     );
 
     expect(result.outcome).toBe("one_or_more_dispatches_refused");
-    expect(result.generatedExecutionGraph.coverageStatus).toBe("unsupported_or_ambiguous");
-    expect(result.generatedExecutionGraph.nodes[0]?.unsupportedReasonCodes).toContain(
+    expect(result.generatedExecutionGraph!.coverageStatus).toBe("unsupported_or_ambiguous");
+    expect(result.generatedExecutionGraph!.nodes[0]?.unsupportedReasonCodes).toContain(
       "runtime_ingress_unknown_consequential_dispatch",
     );
     const proposalResult = result.proposals[0];
@@ -820,8 +832,8 @@ describe("runtime ingress adapter", () => {
     );
 
     expect(result.outcome).toBe("one_or_more_dispatches_refused");
-    expect(result.generatedExecutionGraph.coverageStatus).toBe("contains_bypass_risk");
-    expect(result.generatedExecutionGraph.terminalReasonCodes).toContain("runtime_ingress_raw_sibling_bypass");
+    expect(result.generatedExecutionGraph!.coverageStatus).toBe("contains_bypass_risk");
+    expect(result.generatedExecutionGraph!.terminalReasonCodes).toContain("runtime_ingress_raw_sibling_bypass");
     const proposalResult = result.proposals[0];
     if (!proposalResult || proposalResult.outcome !== "intent_compilation_refused") throw new Error("expected refusal");
     expect(proposalResult.refusalReasonCodes).toContain("generated_execution_graph_not_contractable");
@@ -858,9 +870,9 @@ describe("runtime ingress adapter", () => {
     );
 
     expect(result.outcome).toBe("one_or_more_dispatches_refused");
-    expect(result.generatedExecutionGraph.coverageStatus).toBe("contains_bypass_risk");
-    expect(result.generatedExecutionGraph.nodes[0]?.commandRiskBypassRefs).toContain("mcp:x402.directPayment");
-    expect(result.generatedExecutionGraph.terminalReasonCodes).toContain("runtime_ingress_raw_sibling_bypass");
+    expect(result.generatedExecutionGraph!.coverageStatus).toBe("contains_bypass_risk");
+    expect(result.generatedExecutionGraph!.nodes[0]?.commandRiskBypassRefs).toContain("mcp:x402.directPayment");
+    expect(result.generatedExecutionGraph!.terminalReasonCodes).toContain("runtime_ingress_raw_sibling_bypass");
     const proposalResult = result.proposals[0];
     if (!proposalResult || proposalResult.outcome !== "intent_compilation_refused") throw new Error("expected refusal");
     expect(proposalResult.refusalReasonCodes).toContain("generated_execution_graph_not_contractable");
@@ -890,8 +902,8 @@ describe("runtime ingress adapter", () => {
     );
 
     expect(result.outcome).toBe("action_contracts_proposed");
-    expect(result.runtimeExecution.loopDetected).toBe(true);
-    expect(result.runtimeExecution.retryDetected).toBe(true);
+    expect(result.runtimeExecution!.loopDetected).toBe(true);
+    expect(result.runtimeExecution!.retryDetected).toBe(true);
     expect(result.proposals.map((item) => item.sequenceNumber)).toEqual([1, 2]);
     const first = result.proposals[0]?.actionContract;
     const second = result.proposals[1]?.actionContract;
@@ -941,9 +953,9 @@ describe("runtime ingress adapter", () => {
       mutationCommandIncluded: false,
       receiptExportCreated: false,
     });
-    expect(result.runtimeExecution.evidenceRefs).toEqual(expect.arrayContaining([handleEvidenceRef, handleDigestRef]));
-    expect(result.runtimeExecution.loopDetected).toBe(true);
-    expect(result.runtimeExecution.retryDetected).toBe(true);
+    expect(result.runtimeExecution!.evidenceRefs).toEqual(expect.arrayContaining([handleEvidenceRef, handleDigestRef]));
+    expect(result.runtimeExecution!.loopDetected).toBe(true);
+    expect(result.runtimeExecution!.retryDetected).toBe(true);
     expect(result.responsePosture.reasonCodes).toEqual(
       expect.arrayContaining(["runtime_ingress_loop_detected", "runtime_ingress_retry_detected"]),
     );
@@ -998,7 +1010,7 @@ describe("runtime ingress adapter", () => {
     );
 
     expect(result.outcome).toBe("action_contracts_proposed");
-    expect(result.runtimeExecution.branchDetected).toBe(true);
+    expect(result.runtimeExecution!.branchDetected).toBe(true);
     expect(result.responsePosture.reasonCodes).toContain("runtime_ingress_branch_detected");
     const first = result.proposals[0]?.actionContract;
     const second = result.proposals[1]?.actionContract;
@@ -1014,21 +1026,25 @@ describe("runtime ingress adapter", () => {
   it("rejects reused x402 dispatch refs before recording runtime evidence", async () => {
     const { fixture, runtimeConfig, proposal } = await installedX402IngressFixture();
 
-    await expect(
-      proposeRuntimeIngressActionContracts(
-        fixture.kernel,
-        { x402Payment: runtimeConfig },
-        {
-          principalIntentRef: "intent:reuse request id across generated x402 calls",
-          generatedCodeOrSpecRef: "runtime:dispatch-block-x402-reused-ref",
-          dispatchBoundaryRef: "dispatch-boundary:x402-reused-ref",
-          dispatches: [
-            x402Dispatch(proposal, "dispatch:x402-payment:reused"),
-            x402Dispatch(proposal, "dispatch:x402-payment:reused", { atomicAmount: "2000" }),
-          ],
-        },
-      ),
-    ).rejects.toThrow("Runtime ingress dispatchRef must be unique within a dispatch block.");
+    const result = await proposeRuntimeIngressActionContracts(
+      fixture.kernel,
+      { x402Payment: runtimeConfig },
+      {
+        principalIntentRef: "intent:reuse request id across generated x402 calls",
+        generatedCodeOrSpecRef: "runtime:dispatch-block-x402-reused-ref",
+        dispatchBoundaryRef: "dispatch-boundary:x402-reused-ref",
+        dispatches: [
+          x402Dispatch(proposal, "dispatch:x402-payment:reused"),
+          x402Dispatch(proposal, "dispatch:x402-payment:reused", { atomicAmount: "2000" }),
+        ],
+      },
+    );
+
+    expect(result.outcome).toBe("one_or_more_dispatches_refused");
+    expect(result.responsePosture.refusalRefs.length).toBeGreaterThan(0);
+    expect(result.responsePosture.reasonCodes).toContain("runtime_ingress_wire_invalid");
+    expect(result.runtimeExecution).toBeNull();
+    expect(result.generatedExecutionGraph).toBeNull();
 
     expect(await recordCount(fixture.store, "runtime_execution")).toBe(0);
     expect(await recordCount(fixture.store, "generated_execution_graph")).toBe(0);
@@ -1058,8 +1074,8 @@ describe("runtime ingress adapter", () => {
     );
 
     expect(result.outcome).toBe("action_contracts_proposed");
-    expect(result.runtimeExecution.loopDetected).toBe(true);
-    expect(result.runtimeExecution.retryDetected).toBe(true);
+    expect(result.runtimeExecution!.loopDetected).toBe(true);
+    expect(result.runtimeExecution!.retryDetected).toBe(true);
     const first = result.proposals[0]?.actionContract;
     const second = result.proposals[1]?.actionContract;
     if (!first || !second) throw new Error("expected two x402 contracts");
@@ -1087,8 +1103,8 @@ describe("runtime ingress adapter", () => {
     );
 
     expect(result.outcome).toBe("one_or_more_dispatches_refused");
-    expect(result.generatedExecutionGraph.coverageStatus).toBe("contains_coverage_gap");
-    expect(result.generatedExecutionGraph.terminalReasonCodes).toContain("generated_execution_graph_truncated");
+    expect(result.generatedExecutionGraph!.coverageStatus).toBe("contains_coverage_gap");
+    expect(result.generatedExecutionGraph!.terminalReasonCodes).toContain("generated_execution_graph_truncated");
     const proposalResult = result.proposals[0];
     if (!proposalResult || proposalResult.outcome !== "intent_compilation_refused") throw new Error("expected refusal");
     expect(proposalResult.refusalReasonCodes).toContain("generated_execution_graph_not_contractable");

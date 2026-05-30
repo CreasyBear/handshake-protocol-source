@@ -7,6 +7,7 @@ import {
   ReasonCodeSchema,
   SignaturePostureSchema,
 } from "../../foundation/schema-core";
+import { ReceiptDelegationProvenanceSchema } from "./delegation-provenance";
 import { GateDecisionSchema } from "../gateway-gate/schemas";
 import { PolicyDecisionValueSchema } from "../policy-greenlight/schemas";
 
@@ -103,5 +104,6 @@ export const ReceiptExportSchema = ProtocolBaseSchema.extend({
   evidenceRetentionUntil: IsoDateSchema.nullable(),
   exportedAt: IsoDateSchema,
   exportDigest: DigestSchema,
+  delegationProvenance: ReceiptDelegationProvenanceSchema.optional(),
 });
 export type ReceiptExport = z.infer<typeof ReceiptExportSchema>;
