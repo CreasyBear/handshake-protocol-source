@@ -22,9 +22,7 @@ describe("EvidenceClient operation readback fetch (D-55)", () => {
         readRole: "review_custody",
       });
       await fetchOperationReadbackProjection(client, "act_readback_demo");
-      expect(calls).toEqual([
-        "https://handshake.example/v0.2/evidence/operations/act_readback_demo/readback",
-      ]);
+      expect(calls).toEqual(["https://handshake.example/v0.2/evidence/operations/act_readback_demo/readback"]);
     } finally {
       globalThis.fetch = original;
     }
@@ -61,10 +59,7 @@ describe("EvidenceClient operation readback fetch (D-55)", () => {
       },
     };
 
-    const result = await readMcpResource(
-      "handshake://evidence/operations/act_mcp/readback",
-      evidenceClient,
-    );
+    const result = await readMcpResource("handshake://evidence/operations/act_mcp/readback", evidenceClient);
     expect(calls).toEqual(["act_mcp"]);
     expect(result.payload).toMatchObject({
       schemaVersion: "handshake.operation-readback.v0.1",

@@ -480,13 +480,10 @@ describe("Hono protocol surface", () => {
       fetchImpl,
     );
     const { compileX402InstallProposal } = await import("../../src/adapters/x402-payment/install-proposal");
-    const { defaultX402BootstrapInstallInput, installProposalFromX402 } = await import(
-      "../../src/cli/service-operator/bootstrap"
-    );
+    const { defaultX402BootstrapInstallInput, installProposalFromX402 } =
+      await import("../../src/cli/service-operator/bootstrap");
     const proposal = await compileX402InstallProposal(defaultX402BootstrapInstallInput());
-    const registered = await installClient.registerInstallProposalCompiledRecords(
-      installProposalFromX402(proposal),
-    );
+    const registered = await installClient.registerInstallProposalCompiledRecords(installProposalFromX402(proposal));
     expect(registered.outcome).toBe("compiled_records_registered");
     expect(await fixture.store.listRecordsByType("operating_envelope")).toHaveLength(1);
 

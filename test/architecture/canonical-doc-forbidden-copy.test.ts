@@ -52,10 +52,7 @@ function scanText(name: string, source: string): string[] {
   for (const pattern of forbiddenCategoryPatterns) {
     for (const match of source.matchAll(pattern)) {
       const index = match.index ?? 0;
-      const window = source.slice(
-        Math.max(0, index - contextWindow),
-        Math.min(source.length, index + contextWindow),
-      );
+      const window = source.slice(Math.max(0, index - contextWindow), Math.min(source.length, index + contextWindow));
       if (!allowedContextPattern.test(window)) {
         violations.push(`${name}: ${match[0]} @ ${index}`);
       }

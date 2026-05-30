@@ -134,10 +134,7 @@ export async function runServiceBootstrap(input: {
   callerAuthTokens?: CallerAuthTokens;
 }): Promise<ServiceBootstrapResult> {
   const parsed = ServiceBootstrapInputSchema.parse(input.installInput);
-  const actionFamily =
-    "installInput" in parsed
-      ? (parsed.actionFamily ?? X402_ACTION_FAMILY)
-      : X402_ACTION_FAMILY;
+  const actionFamily = "installInput" in parsed ? (parsed.actionFamily ?? X402_ACTION_FAMILY) : X402_ACTION_FAMILY;
   if (actionFamily !== X402_ACTION_FAMILY) {
     return refusedBootstrapResult({
       actionFamily,
@@ -160,9 +157,7 @@ export async function runServiceBootstrap(input: {
     } satisfies CallerAuthTokens);
 
   const installClient = installClientForStore(store, tokens);
-  const registration = await installClient.registerInstallProposalCompiledRecords(
-    installProposalFromX402(proposal),
-  );
+  const registration = await installClient.registerInstallProposalCompiledRecords(installProposalFromX402(proposal));
 
   return {
     outcome: registration.outcome,
@@ -170,9 +165,7 @@ export async function runServiceBootstrap(input: {
     installProposalId: proposal.installProposalId,
     installDigest: proposal.installDigest,
     reasonCodes:
-      registration.outcome === "install_proposal_refused"
-        ? registration.reasonCodes
-        : proposal.refusalReasonCodes,
+      registration.outcome === "install_proposal_refused" ? registration.reasonCodes : proposal.refusalReasonCodes,
     recordRefs: registration.recordRefs,
     policyPackRef: proposal.policyPackRef,
     policyPackVersion: proposal.policyPackVersion,

@@ -110,10 +110,7 @@ export async function handleEvidenceRead(
             organizationId: receiptRecord.organizationId,
           },
         );
-        const delegationProvenance = await resolveReceiptTimelineDelegationProvenance(
-          store,
-          receiptRecord.payload,
-        );
+        const delegationProvenance = await resolveReceiptTimelineDelegationProvenance(store, receiptRecord.payload);
         return c.json(
           projectReceiptTimeline({
             receipt: receiptRecord.payload,

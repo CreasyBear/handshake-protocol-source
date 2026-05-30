@@ -436,7 +436,10 @@ async function checkMcpStdioBin() {
   try {
     await withTimeout(client.connect(transport), 8_000, "connect");
     const tools = await withTimeout(client.listTools(), 8_000, "tools/list");
-    assert.deepEqual(tools.tools.map((tool) => tool.name).sort(), ["handshake.actions.x402_payment.propose"]);
+    assert.deepEqual(tools.tools.map((tool) => tool.name).sort(), [
+      "handshake.actions.x402_payment.propose",
+      "handshake.evidence.delegation.verify",
+    ]);
 
     const metadataRead = await readJsonResource(client, "handshake://metadata/actions/x402_payment.exact");
     assert.equal(metadataRead.readOnly, true);

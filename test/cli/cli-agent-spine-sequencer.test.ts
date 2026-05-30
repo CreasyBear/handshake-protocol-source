@@ -73,7 +73,15 @@ describe("quickstart agent-spine sequencer", () => {
 
   it("routes through CLI manifest alias", async () => {
     const { workspace, stateRoot } = await localProject("agent-spine-cli");
-    await runCliCommand(["init", "--cwd", workspace, "--state-root", stateRoot, "--project-id", "proj_agent_spine_cli"]);
+    await runCliCommand([
+      "init",
+      "--cwd",
+      workspace,
+      "--state-root",
+      stateRoot,
+      "--project-id",
+      "proj_agent_spine_cli",
+    ]);
     const output = await runCliCommand(["quickstart", "agent-spine", "--cwd", workspace]);
     expect(output).toMatchObject({
       command: "quickstart agent-spine",

@@ -865,11 +865,7 @@ const productSurfaceBoundaryManifest = {
       "surface_reconciliation_write",
       "tool_call_draft_write",
     ],
-    allowedImportRoots: [
-      "src/surfaces/service-workflow-admission",
-      "src/protocol/public",
-      "src/protocol/foundation",
-    ],
+    allowedImportRoots: ["src/surfaces/service-workflow-admission", "src/protocol/public", "src/protocol/foundation"],
     forbiddenImportFragments: [...forbiddenAuthorityImports, "adapters/", "storage/"],
     forbiddenCredentialShapes: [...authorityCredentialShapes],
     forbiddenOutputFields: [...cliAuthorityOutputFields, "downstreamSuccess"],

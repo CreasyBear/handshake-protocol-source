@@ -320,9 +320,7 @@ async function buildLocalInstallRecord(input: {
     compiledRecordsIncluded: false,
     compiledRecordRefs: compiled
       ? (() => {
-          const gatewayRegistryEntry = requireInstallProposalGatewayRegistryEntry(
-            compiled.gatewayRegistryEntry,
-          );
+          const gatewayRegistryEntry = requireInstallProposalGatewayRegistryEntry(compiled.gatewayRegistryEntry);
           return {
             toolCapabilityRef: compiled.toolCapability.toolCapabilityId,
             actionTypeRef: compiled.actionType.actionTypeId,

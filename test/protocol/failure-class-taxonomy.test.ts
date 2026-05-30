@@ -4,7 +4,11 @@ import {
   classifyFailureClassFromReasonCodes,
   failureClassFromHttpStatus,
 } from "../../src/protocol/foundation/failure-class";
-import { failureClassForProtocolError, httpStatusForFailureClass, transitionErrorResult } from "../../src/http/errors/transition-error-envelope";
+import {
+  failureClassForProtocolError,
+  httpStatusForFailureClass,
+  transitionErrorResult,
+} from "../../src/http/errors/transition-error-envelope";
 import { HandshakeProtocolError } from "../../src/protocol/foundation/errors";
 import { protocolReasonCodes } from "../../src/protocol/foundation/reason-codes";
 
@@ -41,9 +45,7 @@ describe("failureClass taxonomy registry parity", () => {
   }
 
   it("aligns recovery reason codes without proofRef to protected_action_refusal", () => {
-    expect(classifyFailureClassFromReasonCodes(["idempotency_recovery_missing"])).toBe(
-      "protected_action_refusal",
-    );
+    expect(classifyFailureClassFromReasonCodes(["idempotency_recovery_missing"])).toBe("protected_action_refusal");
   });
 
   it("keeps recovery terminal conflict with proofRef as proof_gap on protocol errors", () => {
@@ -87,12 +89,8 @@ describe("failureClass taxonomy registry parity", () => {
   });
 
   it("classifies MCP intent-compilation refusals as protected_action_refusal", () => {
-    expect(classifyFailureClassFromReasonCodes(["mcp_candidate_not_contractable"])).toBe(
-      "protected_action_refusal",
-    );
-    expect(classifyFailureClassFromReasonCodes(["mcp_input_schema_invalid"])).toBe(
-      "protected_action_refusal",
-    );
+    expect(classifyFailureClassFromReasonCodes(["mcp_candidate_not_contractable"])).toBe("protected_action_refusal");
+    expect(classifyFailureClassFromReasonCodes(["mcp_input_schema_invalid"])).toBe("protected_action_refusal");
   });
 
   it("classifies MCP candidate digest integrity errors as internal", () => {

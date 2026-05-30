@@ -10,10 +10,10 @@ treating readback surfaces as authority. Category claim:
 
 For a known `actionContractId`:
 
-| Surface | HTTP route (evidence read roles) |
-| ------- | -------------------------------- |
-| Operation readback | `GET /v0.2/evidence/operations/:actionContractId/readback` |
-| Correlation index | `GET /v0.2/evidence/operations/:actionContractId/correlation` |
+| Surface            | HTTP route (evidence read roles)                              |
+| ------------------ | ------------------------------------------------------------- |
+| Operation readback | `GET /v0.2/evidence/operations/:actionContractId/readback`    |
+| Correlation index  | `GET /v0.2/evidence/operations/:actionContractId/correlation` |
 
 SDK: `EvidenceClient.getOperationReadbackProjection` and
 `EvidenceClient.getOperationCorrelationIndex`.

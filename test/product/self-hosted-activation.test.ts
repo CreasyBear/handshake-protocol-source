@@ -1,9 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import { fileURLToPath } from "node:url";
-import {
-  MCP_DELEGATION_VERIFY_TOOL,
-  MCP_X402_PAYMENT_PROPOSE_TOOL,
-} from "../../src/mcp/catalog";
+import { MCP_DELEGATION_VERIFY_TOOL, MCP_X402_PAYMENT_PROPOSE_TOOL } from "../../src/mcp/catalog";
 
 const repoRoot = fileURLToPath(new URL("../..", import.meta.url));
 const outputJsonPath = `${repoRoot}/examples/self-hosted-activation/output/latest.json`;

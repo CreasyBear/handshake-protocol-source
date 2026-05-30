@@ -22,10 +22,7 @@ export function buildCompilationProofGap(input: {
     gapPhase: "compilation",
     expectedEvidenceType: input.expectedEvidenceType,
     missingOrInvalidEvidenceRef: input.expectedEvidenceType,
-    affectedObjectRefs: [
-      input.intentCompilationId,
-      ...(input.runtimeExecutionId ? [input.runtimeExecutionId] : []),
-    ],
+    affectedObjectRefs: [input.intentCompilationId, ...(input.runtimeExecutionId ? [input.runtimeExecutionId] : [])],
     gateAttemptId: null,
     mutationAttemptId: null,
     receiptId: null,

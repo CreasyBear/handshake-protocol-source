@@ -55,11 +55,7 @@ describe("integrator parity SDK role-clients walkthrough", () => {
       expiresAt: futureIso(),
     });
 
-    const runtime = new RuntimeClient(
-      "http://handshake.test",
-      { roleCredential: "runtime-token" },
-      fetchImpl,
-    );
+    const runtime = new RuntimeClient("http://handshake.test", { roleCredential: "runtime-token" }, fetchImpl);
     await runtime.compileIntent({
       tenantId: "tenant_demo",
       organizationId: "org_demo",

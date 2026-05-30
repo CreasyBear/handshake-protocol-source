@@ -62,13 +62,13 @@ describe("protected action representation contract", () => {
 
   it("represents x402 protected spend without signer, approval, or authority material", async () => {
     const proposal = await compileX402InstallProposal(validX402InstallInput());
-  const records = requireCompiledX402Records(proposal);
-  const gatewayRegistryEntry = requireInstallProposalGatewayRegistryEntry(records.gatewayRegistryEntry);
+    const records = requireCompiledX402Records(proposal);
+    const gatewayRegistryEntry = requireInstallProposalGatewayRegistryEntry(records.gatewayRegistryEntry);
 
-  const metadata = projectProtectedActionMetadata({
-    tool: records.toolCapability,
-    actionType: records.actionType,
-    gateway: gatewayRegistryEntry,
+    const metadata = projectProtectedActionMetadata({
+      tool: records.toolCapability,
+      actionType: records.actionType,
+      gateway: gatewayRegistryEntry,
       envelope: records.operatingEnvelope,
     });
 

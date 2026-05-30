@@ -71,12 +71,12 @@ Full day-one `OperatingEnvelope` plus policy pack for every agent is reserved
 for **fixed-tenant / regulated** services only — not the default multi-agent
 hosted path.
 
-| Posture              | Default multi-agent hosted | Fixed-tenant / regulated |
-| -------------------- | -------------------------- | ------------------------ |
-| Catalog triplet      | Required per family        | Required per family      |
-| Day-one full envelope| No — per-instance bounds   | Yes — standing bounds upfront |
-| Delegated mandate    | Per spend/delegation event | May be pre-provisioned   |
-| Proof expectation    | x402 runnable wedge        | Same; extra audit rows   |
+| Posture               | Default multi-agent hosted | Fixed-tenant / regulated      |
+| --------------------- | -------------------------- | ----------------------------- |
+| Catalog triplet       | Required per family        | Required per family           |
+| Day-one full envelope | No — per-instance bounds   | Yes — standing bounds upfront |
+| Delegated mandate     | Per spend/delegation event | May be pre-provisioned        |
+| Proof expectation     | x402 runnable wedge        | Same; extra audit rows        |
 
 ### Atomic bootstrap (D-08)
 
@@ -171,11 +171,11 @@ adapter on Branch A routes. Product test anchor:
 
 ### Proof-gap list (not runnable in phase 04)
 
-| Family | Runnable in phase 04? | proofGaps (summary) | What to use instead |
-| --- | --- | --- | --- |
-| auth.md protected API | false | live gateway, admission packet, provider custody | x402 wedge + `src/adapters/http-profile/` module (plan 08); external-adapter-sdk checklist |
-| package install | false | live gateway, composite admission, material evidence | x402 install triplet pattern via `handshake service bootstrap` |
-| MCP Registry discoverability | false | registry acceptance, lookup proof | local MCP doctor only; npm publish is distribution not authority |
+| Family                       | Runnable in phase 04? | proofGaps (summary)                                  | What to use instead                                                                        |
+| ---------------------------- | --------------------- | ---------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| auth.md protected API        | false                 | live gateway, admission packet, provider custody     | x402 wedge + `src/adapters/http-profile/` module (plan 08); external-adapter-sdk checklist |
+| package install              | false                 | live gateway, composite admission, material evidence | x402 install triplet pattern via `handshake service bootstrap`                             |
+| MCP Registry discoverability | false                 | registry acceptance, lookup proof                    | local MCP doctor only; npm publish is distribution not authority                           |
 
 Do not treat quickstart-shaped stub directories as clearance paths. The only runnable
 clearance wedge in phase 04 is buyer-side `x402_payment.exact` per call.
@@ -186,14 +186,14 @@ Forbidden operator language: "run the auth.md quickstart", "bootstrap package in
 
 _Table filled by plan 05 (`failureClass` × HTTP status × safe retry × forbidden actions)._
 
-| failureClass | HTTP | Safe retry? | Forbidden actions | What to run next |
-| ------------ | ---- | ----------- | ----------------- | ---------------- |
-| auth | 401 / 403 | No — fix bearer/custody token | Retry as OAuth refresh for clearance refusals | Re-run with correct role token; `handshake host doctor` on host lane |
-| hosted_admission | 403 | No — fix hosted identity/config | Treat as mutation authority | Refresh hosted verifier claims; check [hosted readiness](/v0.2/hosted/readiness) readback |
-| protected_action_refusal | 409 | No — craft new exact contract | Reuse greenlight or widen scope silently | SDK: new `proposeActionContract` + policy path; never refresh OAuth |
-| proof_gap | 422 | After evidence repair only | Assume downstream success without receipt | SDK: resolve proof gap or read evidence projection; do not retry same mutation |
-| replay_refusal | 409 | No — new idempotency key | Replay same greenlight | New contract + greenlight; inspect receipt `greenlightConsumptionStatus` |
-| stale_admission | 409 | After re-admission | Continue with stale hosted identity | Re-issue hosted caller identity; check freshness window |
+| failureClass             | HTTP      | Safe retry?                     | Forbidden actions                             | What to run next                                                                          |
+| ------------------------ | --------- | ------------------------------- | --------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| auth                     | 401 / 403 | No — fix bearer/custody token   | Retry as OAuth refresh for clearance refusals | Re-run with correct role token; `handshake host doctor` on host lane                      |
+| hosted_admission         | 403       | No — fix hosted identity/config | Treat as mutation authority                   | Refresh hosted verifier claims; check [hosted readiness](/v0.2/hosted/readiness) readback |
+| protected_action_refusal | 409       | No — craft new exact contract   | Reuse greenlight or widen scope silently      | SDK: new `proposeActionContract` + policy path; never refresh OAuth                       |
+| proof_gap                | 422       | After evidence repair only      | Assume downstream success without receipt     | SDK: resolve proof gap or read evidence projection; do not retry same mutation            |
+| replay_refusal           | 409       | No — new idempotency key        | Replay same greenlight                        | New contract + greenlight; inspect receipt `greenlightConsumptionStatus`                  |
+| stale_admission          | 409       | After re-admission              | Continue with stale hosted identity           | Re-issue hosted caller identity; check freshness window                                   |
 
 OAuth BCP: clearance refusals (`protected_action_refusal`, `replay_refusal`, `proof_gap`) must **not** be retried as credential refresh. Read dedicated routes may return **200** with claim/readiness status; mutation refusals never masquerade as auth **403**.
 

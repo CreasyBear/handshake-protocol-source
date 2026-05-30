@@ -1,10 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
-import {
-  mutationRouteDefinitions,
-  assertMutationRouteManifestParity,
-} from "../../src/http/mutation-route-manifest";
+import { mutationRouteDefinitions, assertMutationRouteManifestParity } from "../../src/http/mutation-route-manifest";
 import { transitionRouteDefinitions } from "../../src/http/routes/transition-route-registry";
 
 /**

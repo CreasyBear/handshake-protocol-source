@@ -14,8 +14,7 @@ import { join, relative } from "node:path";
 const repoRoot = process.cwd();
 const cliRoot = "src/cli";
 
-const forbiddenClearancePattern =
-  /\b(authorized|cleared|greenlight issued|safe to execute|ready to pay)\b/gi;
+const forbiddenClearancePattern = /\b(authorized|cleared|greenlight issued|safe to execute|ready to pay)\b/gi;
 
 const allowedContextPattern =
   /\b(proof gap|proof-gap|non-authority|non authority|diagnostic|simulation|does not create|not authority|readiness only|does not claim|not claimed|never|not authorized|does not)\b/i;
@@ -26,10 +25,7 @@ function scanText(name: string, source: string): string[] {
   const violations: string[] = [];
   for (const match of source.matchAll(forbiddenClearancePattern)) {
     const index = match.index ?? 0;
-    const window = source.slice(
-      Math.max(0, index - contextWindow),
-      Math.min(source.length, index + contextWindow),
-    );
+    const window = source.slice(Math.max(0, index - contextWindow), Math.min(source.length, index + contextWindow));
     if (!allowedContextPattern.test(window)) {
       violations.push(`${name}: ${match[0]} @ ${index}`);
     }

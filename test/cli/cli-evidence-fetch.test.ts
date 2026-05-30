@@ -24,9 +24,7 @@ describe("CLI evidence fetch (D-55 live readback parity)", () => {
         baseUrl: "https://handshake.example",
         roleCredential: "review-token",
       });
-      expect(calls.some((url) => url.includes("/v0.2/evidence/operations/act_readback_demo/readback"))).toBe(
-        true,
-      );
+      expect(calls.some((url) => url.includes("/v0.2/evidence/operations/act_readback_demo/readback"))).toBe(true);
       expect(output).toMatchObject({
         command: "evidence operation-readback",
         plane: "evidence",

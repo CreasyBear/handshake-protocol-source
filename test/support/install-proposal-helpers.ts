@@ -16,17 +16,13 @@ export function localX402PaymentAttemptBindings() {
   } as const;
 }
 
-export function requireX402CompiledRecords(
-  proposal: X402InstallProposal,
-): InstallProposalCompiledKernelRecords {
+export function requireX402CompiledRecords(proposal: X402InstallProposal): InstallProposalCompiledKernelRecords {
   if (!proposal.compiledRecords) {
     throw new Error("expected installable x402 proposal compiled records");
   }
   return proposal.compiledRecords;
 }
 
-export function requireX402GatewayRegistryEntry(
-  records: InstallProposalCompiledKernelRecords,
-): GatewayRegistryEntry {
+export function requireX402GatewayRegistryEntry(records: InstallProposalCompiledKernelRecords): GatewayRegistryEntry {
   return requireInstallProposalGatewayRegistryEntry(records.gatewayRegistryEntry);
 }

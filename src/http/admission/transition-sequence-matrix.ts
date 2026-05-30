@@ -104,9 +104,7 @@ function assertAcyclicSequenceMatrix(): void {
   const walk = (routeId: TransitionRouteId, trail: readonly TransitionRouteId[]): void => {
     if (settled.has(routeId)) return;
     if (visiting.has(routeId)) {
-      throw new Error(
-        `Transition sequence matrix has a prerequisite cycle: ${[...trail, routeId].join(" -> ")}.`,
-      );
+      throw new Error(`Transition sequence matrix has a prerequisite cycle: ${[...trail, routeId].join(" -> ")}.`);
     }
     visiting.add(routeId);
     for (const prerequisite of transitionSequenceMatrix[routeId] ?? []) {

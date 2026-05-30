@@ -7,9 +7,7 @@ export type AgentSpineStepEnvelope = QuickstartStepEnvelope;
 
 export async function runAgentSpineQuickstart(input: { cwd: string }) {
   const doctorOutput = await hostDoctorCommand({ cwd: input.cwd });
-  const steps: AgentSpineStepEnvelope[] = [
-    stepEnvelope("host_doctor", "host doctor", doctorOutput),
-  ];
+  const steps: AgentSpineStepEnvelope[] = [stepEnvelope("host_doctor", "host doctor", doctorOutput)];
 
   if (doctorOutput.ok) {
     const x402Output = await runX402Quickstart({ cwd: input.cwd });

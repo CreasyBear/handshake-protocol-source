@@ -30,10 +30,7 @@ describe("dual enforcement doctrine prose", () => {
       loadDoc("docs/internal/service-operator-golden-path.md", true),
     ]);
 
-    const requiredGatewayPatterns = [
-      /gateway check before mutation/i,
-      /run\*Gateway/i,
-    ];
+    const requiredGatewayPatterns = [/gateway check before mutation/i, /run\*Gateway/i];
     const requiredAdmissionAdvisoryPatterns = [
       /admission alone is (?:not|advisory)/i,
       /ingress[- ]only posture is advisory/i,

@@ -59,10 +59,7 @@ import type {
 } from "../protocol/areas/recovery";
 import { PROTOCOL_VERSION } from "../protocol/public/schemas";
 import type { CallerAuthTokens, TransitionCallerRole } from "../http/admission/caller-auth";
-import {
-  TransitionErrorResponseSchema,
-  type TransitionErrorEnvelope,
-} from "../http/errors/transition-error-envelope";
+import { TransitionErrorResponseSchema, type TransitionErrorEnvelope } from "../http/errors/transition-error-envelope";
 import { failureClassFromHttpStatus } from "../protocol/foundation/failure-class";
 import {
   HANDSHAKE_ORIGINATING_IDENTITY_HEADER,

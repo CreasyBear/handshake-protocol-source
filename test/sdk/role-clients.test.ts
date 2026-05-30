@@ -520,9 +520,8 @@ function installSetupResponse(body: unknown): unknown {
     recordRefs: {
       toolCapabilityId: proposal.compiledRecords.toolCapability.toolCapabilityId,
       actionTypeId: proposal.compiledRecords.actionType.actionTypeId,
-      gatewayRegistryEntryId: requireInstallProposalGatewayRegistryEntry(
-        proposal.compiledRecords.gatewayRegistryEntry,
-      ).gatewayRegistryEntryId,
+      gatewayRegistryEntryId: requireInstallProposalGatewayRegistryEntry(proposal.compiledRecords.gatewayRegistryEntry)
+        .gatewayRegistryEntryId,
       operatingEnvelopeId: proposal.compiledRecords.operatingEnvelope.envelopeId,
     },
     refusal: null,

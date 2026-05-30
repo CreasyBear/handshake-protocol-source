@@ -1,3 +1,4 @@
+import type { ProtocolRecorder } from "../../events/records";
 import { digestCanonical } from "../../foundation/canonical";
 import { PROTOCOL_VERSION, type JsonValue } from "../../foundation/schema-core";
 import { RefusalSchema, type Refusal, type RefusalPhase } from "./types";
@@ -45,10 +46,7 @@ export async function buildRefusal(input: BuildRefusalInput): Promise<Refusal> {
   });
 }
 
-export async function commitRefusal(
-  recorder: import("../../events/records").ProtocolRecorder,
-  input: BuildRefusalInput,
-): Promise<Refusal> {
+export async function commitRefusal(recorder: ProtocolRecorder, input: BuildRefusalInput): Promise<Refusal> {
   const refusal = await buildRefusal(input);
   await recorder.commitRecordsWithEvents(
     [{ objectType: "refusal", payload: refusal }],
@@ -56,10 +54,7 @@ export async function commitRefusal(
       {
         source: refusal,
         eventType: "action_refused",
-        objectRefs: [
-          refusal.refusalId,
-          ...(refusal.refusedObjectRef ? [refusal.refusedObjectRef] : []),
-        ],
+        objectRefs: [refusal.refusalId, ...(refusal.refusedObjectRef ? [refusal.refusedObjectRef] : [])],
         payload: { reasonCode: refusal.reasonCode },
       },
     ],

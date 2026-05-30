@@ -67,10 +67,7 @@ export function assertAuthMdProfileConformance(input: AuthMdProfileConformanceIn
       409,
     );
   }
-  if (
-    input.expectedActionContractId &&
-    input.verifiedGate.actionContractId !== input.expectedActionContractId
-  ) {
+  if (input.expectedActionContractId && input.verifiedGate.actionContractId !== input.expectedActionContractId) {
     throw new HandshakeProtocolError(
       AuthMdProfileConformanceReason.paramsDigestDrift,
       "auth.md observed parameters drift from verified greenlight action contract binding",
@@ -318,33 +315,35 @@ export async function runAuthMdProtectedApiCallGateway(
 }
 
 function authMdGatewayUnsafeObservedParameterReasons(parameters: AuthMdProtectedApiCallParameters): string[] {
-  const reasons = [...authMdProtectedApiCallRefusalReasonCodes({
-    principalIntentRef: "gateway-observed:auth-md-protected-api-call",
-    generatedCodeOrSpecRef: "gateway-observed:auth-md-protected-api-call",
-    protectedResource: parameters.protectedResource,
-    protectedResourceMetadataDigest: parameters.protectedResourceMetadataDigest,
-    authorizationServerMetadataDigest: parameters.authorizationServerMetadataDigest,
-    authorizationServer: parameters.authorizationServer,
-    targetHttpMethod: parameters.targetHttpMethod,
-    endpointUrl: parameters.endpointUrl,
-    pathTemplate: parameters.pathTemplate,
-    requestBodyDigest: parameters.requestBodyDigest,
-    selectedHeadersDigest: parameters.selectedHeadersDigest,
-    requiredScopes: parameters.requiredScopes,
-    gatewayCredentialRefId: parameters.gatewayCredentialRefId,
-    gatewayCredentialRefDigest: parameters.gatewayCredentialRefDigest,
-    providerRegistryRef: parameters.providerRegistryRef,
-    providerRegistryDigest: parameters.providerRegistryDigest,
-    requiredCredentialCustodyStatus: parameters.requiredCredentialCustodyStatus,
-    operationId: parameters.operationId,
-    idempotencyMaterialRef: "gateway-observed",
-    metadataCachePosture: parameters.metadataCachePosture,
-    gatewayCredentialRefPosture: parameters.gatewayCredentialRefPosture,
-    rawAuthorizationHeaderObserved: parameters.rawAuthorizationHeaderObserved,
-    dynamicEndpointConstructionObserved: parameters.dynamicEndpointConstructionObserved,
-    dynamicHostConstructionObserved: parameters.dynamicHostConstructionObserved,
-    retryAuthorityReuseDetected: parameters.retryAuthorityReuseDetected,
-  })];
+  const reasons = [
+    ...authMdProtectedApiCallRefusalReasonCodes({
+      principalIntentRef: "gateway-observed:auth-md-protected-api-call",
+      generatedCodeOrSpecRef: "gateway-observed:auth-md-protected-api-call",
+      protectedResource: parameters.protectedResource,
+      protectedResourceMetadataDigest: parameters.protectedResourceMetadataDigest,
+      authorizationServerMetadataDigest: parameters.authorizationServerMetadataDigest,
+      authorizationServer: parameters.authorizationServer,
+      targetHttpMethod: parameters.targetHttpMethod,
+      endpointUrl: parameters.endpointUrl,
+      pathTemplate: parameters.pathTemplate,
+      requestBodyDigest: parameters.requestBodyDigest,
+      selectedHeadersDigest: parameters.selectedHeadersDigest,
+      requiredScopes: parameters.requiredScopes,
+      gatewayCredentialRefId: parameters.gatewayCredentialRefId,
+      gatewayCredentialRefDigest: parameters.gatewayCredentialRefDigest,
+      providerRegistryRef: parameters.providerRegistryRef,
+      providerRegistryDigest: parameters.providerRegistryDigest,
+      requiredCredentialCustodyStatus: parameters.requiredCredentialCustodyStatus,
+      operationId: parameters.operationId,
+      idempotencyMaterialRef: "gateway-observed",
+      metadataCachePosture: parameters.metadataCachePosture,
+      gatewayCredentialRefPosture: parameters.gatewayCredentialRefPosture,
+      rawAuthorizationHeaderObserved: parameters.rawAuthorizationHeaderObserved,
+      dynamicEndpointConstructionObserved: parameters.dynamicEndpointConstructionObserved,
+      dynamicHostConstructionObserved: parameters.dynamicHostConstructionObserved,
+      retryAuthorityReuseDetected: parameters.retryAuthorityReuseDetected,
+    }),
+  ];
   if (
     new URL(parameters.protectedResource).origin !== parameters.protectedResourceOrigin ||
     new URL(parameters.endpointUrl).origin !== parameters.endpointOrigin

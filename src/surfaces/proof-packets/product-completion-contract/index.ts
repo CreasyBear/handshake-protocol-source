@@ -10,11 +10,7 @@ export type ProductCompletionGateId =
 
 export const PRODUCT_COMPLETION_READBACK_KIND = "product_completion_readback" as const;
 
-export const PRODUCT_COMPLETION_STATUSES = [
-  "completed",
-  "closed_with_hard_blocks",
-  "incomplete",
-] as const;
+export const PRODUCT_COMPLETION_STATUSES = ["completed", "closed_with_hard_blocks", "incomplete"] as const;
 
 export type ProductCompletionStatus = (typeof PRODUCT_COMPLETION_STATUSES)[number];
 

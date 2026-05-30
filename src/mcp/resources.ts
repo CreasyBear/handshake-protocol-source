@@ -79,20 +79,10 @@ export function parseMcpResourceUri(uri: string): ParsedMcpResourceUri {
   if (parsed.hostname === "evidence" && segments[0] === "contracts" && segments[1]) {
     return { kind: "contract", actionContractId: segments[1] };
   }
-  if (
-    parsed.hostname === "evidence" &&
-    segments[0] === "operations" &&
-    segments[1] &&
-    segments[2] === "readback"
-  ) {
+  if (parsed.hostname === "evidence" && segments[0] === "operations" && segments[1] && segments[2] === "readback") {
     return { kind: "operationReadback", actionContractId: segments[1] };
   }
-  if (
-    parsed.hostname === "evidence" &&
-    segments[0] === "operations" &&
-    segments[1] &&
-    segments[2] === "correlation"
-  ) {
+  if (parsed.hostname === "evidence" && segments[0] === "operations" && segments[1] && segments[2] === "correlation") {
     return { kind: "operationCorrelation", actionContractId: segments[1] };
   }
   if (parsed.hostname === "evidence" && segments[0] === "envelopes" && segments[1]) {

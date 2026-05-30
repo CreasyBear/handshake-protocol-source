@@ -13,12 +13,12 @@ not create a new authority primitive or a peer product truth lane.
 presented evidence bundle helps a service map admission and readback; it does
 not substitute for policy evaluation, a one-use greenlight, or a gateway check
 before mutation. See [decisions.md](./decisions.md) for the category claim
-*reconstructable clearance before consequence*.
+_reconstructable clearance before consequence_.
 
 ## Plain Flow
 
 ```text
-Agent shows Passport
+Agent presents evidence package (Passport label — not permission)
 -> Service returns ServiceWorkflowAdmission
 -> Agent carries ServiceWorkflowHandle
 -> Agent requests Clearance for one protected action
@@ -110,14 +110,14 @@ Standing Bounds
 -> Outcome
 ```
 
-| Agent lane term   | Schema-native object                          | Does not mean                                                                 |
-| ----------------- | --------------------------------------------- | ----------------------------------------------------------------------------- |
-| Standing Bounds   | `OperatingEnvelope`                           | Permission, mutation authority, or a reusable pass for future actions.        |
-| Delegated Mandate | `DelegatedAuthorityRef`                       | Greenlight, gateway check, spend approval, or signer access.                  |
-| Compile           | `IntentCompilationRecord` / `CandidateAction` | Policy decision, authority, or an executable contract.                        |
-| Work Order        | `ActionContract`                              | Ambient permission, plan approval, or a batch of unrelated mutations.           |
-| Clearance         | Policy decision + one-use greenlight + gateway check before mutation | Admission alone, workflow handle carry-forward, or ingress middleware theatre. |
-| Outcome           | Receipt / refusal / proof gap / replay refusal / terminal certificate | Downstream business success or permission for the next action.                |
+| Agent lane term   | Schema-native object                                                  | Does not mean                                                                  |
+| ----------------- | --------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| Standing Bounds   | `OperatingEnvelope`                                                   | Permission, mutation authority, or a reusable pass for future actions.         |
+| Delegated Mandate | `DelegatedAuthorityRef`                                               | Greenlight, gateway check, spend approval, or signer access.                   |
+| Compile           | `IntentCompilationRecord` / `CandidateAction`                         | Policy decision, authority, or an executable contract.                         |
+| Work Order        | `ActionContract`                                                      | Ambient permission, plan approval, or a batch of unrelated mutations.          |
+| Clearance         | Policy decision + one-use greenlight + gateway check before mutation  | Admission alone, workflow handle carry-forward, or ingress middleware theatre. |
+| Outcome           | Receipt / refusal / proof gap / replay refusal / terminal certificate | Downstream business success or permission for the next action.                 |
 
 Every agent-lane projection that exposes workflow or compilation context must
 carry the same non-authority boundary as the service workflow surface:
@@ -168,7 +168,7 @@ permission. A new protected action requires a new exact contract.
 - Do not claim customer gateway custody from local fixture evidence.
   `customer_gateway_evidence` requires official external verification, current
   custody and resolver posture, lease/rotation or equivalent time-bounded
-  evidence,   attestation evidence, redaction success, and no raw payment or
+  evidence, attestation evidence, redaction success, and no raw payment or
   credential material.
 
 ## Operator maintenance

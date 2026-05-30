@@ -43,13 +43,13 @@ Keep gate evidence honest: incomplete until architecture tests prove adapter + a
 
 ## Failure escalation
 
-| Symptom | Likely layer | Next step |
-| ------- | ------------ | --------- |
-| 401/403 on transition | Admission / custody | Verify role credential and transition scope |
-| 409 policy_refused | Policy | Read refusal projection; do not retry same contract |
-| 409 gateway_refused | Gateway check | Inspect gate attempt evidence before mutation |
-| 422 proof_gap | Evidence gap | File proof gap; no silent retry |
-| Protected mutation without gate | Adapter bypass | Fix adapter — admission cannot substitute |
+| Symptom                         | Likely layer        | Next step                                           |
+| ------------------------------- | ------------------- | --------------------------------------------------- |
+| 401/403 on transition           | Admission / custody | Verify role credential and transition scope         |
+| 409 policy_refused              | Policy              | Read refusal projection; do not retry same contract |
+| 409 gateway_refused             | Gateway check       | Inspect gate attempt evidence before mutation       |
+| 422 proof_gap                   | Evidence gap        | File proof gap; no silent retry                     |
+| Protected mutation without gate | Adapter bypass      | Fix adapter — admission cannot substitute           |
 
 ## Non-claims
 

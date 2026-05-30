@@ -456,12 +456,7 @@ describe("claim boundary", () => {
       {
         label: "dual enforcement clerk framing",
         sources: [{ name: "docs/internal/decisions.md", text: decisions }],
-        required: [
-          "Clerk-for-agents",
-          "run*Gateway",
-          "advisory, not Handshake",
-          "gateway check before mutation",
-        ],
+        required: ["Clerk-for-agents", "run*Gateway", "advisory, not Handshake", "gateway check before mutation"],
         requiredPatterns: [/http\/admission/i],
         forbiddenPatterns: [
           /admission (?:alone )?(?:authorizes|permits|protects) mutation/i,
@@ -481,10 +476,7 @@ describe("claim boundary", () => {
           { name: "docs/internal/protocol-layman.md", text: protocolLayman },
           { name: "AGENTS.md", text: agents },
         ],
-        requiredPatterns: [
-          /gateway check before mutation/i,
-          /advisory, not Handshake/i,
-        ],
+        requiredPatterns: [/gateway check before mutation/i, /advisory, not Handshake/i],
         forbiddenPatterns: [
           /admission (?:alone )?(?:authorizes|permits|protects) mutation/i,
           /middleware (?:alone )?(?:authorizes|permits|protects) (?:mutation|protected)/i,
@@ -519,10 +511,7 @@ describe("claim boundary", () => {
           "additive cross-link only",
           "does not replace the canonical state path",
         ],
-        forbiddenPatterns: [
-          /Agent lane replaces the canonical state path/i,
-          /rename schema exports/i,
-        ],
+        forbiddenPatterns: [/Agent lane replaces the canonical state path/i, /rename schema exports/i],
       },
     ]);
 

@@ -100,5 +100,4 @@ describe("service operator bootstrap", () => {
     expect(await store.listRecordsByType("gateway_registry_entry")).toHaveLength(1);
     expect(await store.listRecordsByType("operating_envelope")).toHaveLength(1);
   });
-
 });

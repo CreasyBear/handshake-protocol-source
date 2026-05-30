@@ -1,4 +1,4 @@
-import { z } from "zod";
+import type { z } from "zod";
 import { DelegationEvidenceRecordSchema } from "../../../integrations/a1-evidence/delegation-evidence-record.js";
 import { IdSchema, ProtocolBaseSchema } from "../../foundation/schema-core";
 

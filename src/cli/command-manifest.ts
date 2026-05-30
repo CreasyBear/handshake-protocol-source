@@ -308,12 +308,7 @@ export const cliCommandManifest = [
     outputSchema: CLI_SCHEMA_VERSION,
     agentSafe: true,
     redactionPosture: "redacted_projection_only",
-    nonGoals: [
-      ...sharedNonGoals,
-      "live wallet operation",
-      "bundled execute API",
-      "greenlight reuse",
-    ],
+    nonGoals: [...sharedNonGoals, "live wallet operation", "bundled execute API", "greenlight reuse"],
   },
   {
     id: "conformance.x402-payment",

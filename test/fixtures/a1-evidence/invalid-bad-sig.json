@@ -34,9 +34,7 @@
   "expected": {
     "valid": false,
     "chainFingerprint": "d5d05f180981e8e8540d50cff1958a935268200cdac0cef6a47c247b178c6b01",
-    "certFingerprints": [
-      "d653dc48bc9eb992d6abe3ff743c9d19bbb2d3e40b5ca89594269111e414a4d4"
-    ],
+    "certFingerprints": ["d653dc48bc9eb992d6abe3ff743c9d19bbb2d3e40b5ca89594269111e414a4d4"],
     "reasonCode": "delegation_evidence_invalid:invalid_signature"
   }
 }

@@ -1,5 +1,8 @@
 import { describe, expect, it } from "bun:test";
-import { evidenceOperationReadbackCliView, OPERATION_READBACK_STAGE_ORDER } from "../../../src/cli/evidence/operation-readback-view";
+import {
+  evidenceOperationReadbackCliView,
+  OPERATION_READBACK_STAGE_ORDER,
+} from "../../../src/cli/evidence/operation-readback-view";
 import { evidenceReadRouteDefinitions } from "../../../src/http/routes/evidence-read-route-registry";
 import {
   assembleAgentTransactionEnvelope,
@@ -105,9 +108,7 @@ describe("operation readback spine (05-08)", () => {
         readRole: "review_custody",
       });
       await client.getOperationCorrelationIndex("act_corr_demo");
-      expect(calls).toEqual([
-        "https://handshake.example/v0.2/evidence/operations/act_corr_demo/correlation",
-      ]);
+      expect(calls).toEqual(["https://handshake.example/v0.2/evidence/operations/act_corr_demo/correlation"]);
     } finally {
       globalThis.fetch = original;
     }

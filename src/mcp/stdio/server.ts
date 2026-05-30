@@ -1,5 +1,10 @@
 import { McpServer, StdioServerTransport } from "@modelcontextprotocol/server";
-import { mcpProposalTools, mcpReadOnlyTools, MCP_X402_PAYMENT_PROPOSE_TOOL, MCP_DELEGATION_VERIFY_TOOL } from "../catalog";
+import {
+  mcpProposalTools,
+  mcpReadOnlyTools,
+  MCP_X402_PAYMENT_PROPOSE_TOOL,
+  MCP_DELEGATION_VERIFY_TOOL,
+} from "../catalog";
 import { McpStructuredContentSchema } from "../output";
 import {
   MCP_REFERENCE_METADATA_URI,

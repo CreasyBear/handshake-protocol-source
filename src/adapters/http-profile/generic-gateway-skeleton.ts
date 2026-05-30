@@ -9,9 +9,7 @@ export type GenericHttpProfileGatewaySkeletonResult = {
   message: string;
 };
 
-export function runGenericHttpProfileGatewaySkeleton(
-  input: unknown,
-): GenericHttpProfileGatewaySkeletonResult {
+export function runGenericHttpProfileGatewaySkeleton(input: unknown): GenericHttpProfileGatewaySkeletonResult {
   const profile = canonicalizeHttpProfile(HttpProtectedMutationProfileSchema.parse(input));
   void profile;
   return {

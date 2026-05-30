@@ -1,14 +1,13 @@
 import { describe, expect, it } from "bun:test";
-import {
-  EvidenceClient,
-  GatewayClient,
-  PolicyClient,
-  type HandshakeFetch,
-} from "../../src/sdk/surface-clients";
+import { EvidenceClient, GatewayClient, PolicyClient, type HandshakeFetch } from "../../src/sdk/surface-clients";
 
 describe("role-scoped SDK failureClass", () => {
   it("surfaces protected_action_refusal on policy refusal with HTTP 409", async () => {
-    const policyClient = new PolicyClient("http://handshake.test", { roleCredential: "policy-token" }, errorFetch(409, policyRefusalEnvelope()));
+    const policyClient = new PolicyClient(
+      "http://handshake.test",
+      { roleCredential: "policy-token" },
+      errorFetch(409, policyRefusalEnvelope()),
+    );
 
     await expect(policyClient.evaluatePolicy(minimalEvaluatePolicyInput())).rejects.toMatchObject({
       status: 409,
@@ -18,7 +17,11 @@ describe("role-scoped SDK failureClass", () => {
   });
 
   it("surfaces auth failureClass on missing bearer with HTTP 401", async () => {
-    const gatewayClient = new GatewayClient("http://handshake.test", { roleCredential: "gateway-token" }, errorFetch(401, authEnvelope()));
+    const gatewayClient = new GatewayClient(
+      "http://handshake.test",
+      { roleCredential: "gateway-token" },
+      errorFetch(401, authEnvelope()),
+    );
 
     await expect(gatewayClient.gatewayCheck(minimalGatewayCheckInput())).rejects.toMatchObject({
       status: 401,

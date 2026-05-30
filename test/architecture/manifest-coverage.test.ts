@@ -1,11 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import { existsSync, statSync } from "node:fs";
 import packageJson from "../../package.json";
-import {
-  surfaceBoundaryManifest,
-  type SurfaceBoundary,
-  type SurfaceId,
-} from "../../src/surfaces/boundary-manifest";
+import { surfaceBoundaryManifest, type SurfaceBoundary, type SurfaceId } from "../../src/surfaces/boundary-manifest";
 
 type PackageJson = {
   exports: Record<string, unknown>;
@@ -13,18 +9,12 @@ type PackageJson = {
 
 const pkg = packageJson as PackageJson;
 
+// D-71: hosted-admission and service-workflow-admission remain in boundary manifest
+// and source but are intentionally not published npm subpaths.
 const exportToManifestExpectation: Record<
   string,
   { readonly surfaceId: SurfaceId; readonly sourcePathPrefix: string }
 > = {
-  "./hosted-admission": {
-    surfaceId: "surfaces.hosted_admission",
-    sourcePathPrefix: "src/hosted-admission",
-  },
-  "./surfaces/service-workflow-admission": {
-    surfaceId: "surfaces.service_workflow_admission",
-    sourcePathPrefix: "src/surfaces/service-workflow-admission",
-  },
   "./surfaces/a2a-negotiation-readback": {
     surfaceId: "surfaces.a2a_readback",
     sourcePathPrefix: "src/surfaces/a2a-negotiation-readback",

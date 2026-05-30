@@ -5,10 +5,7 @@
  */
 
 import type { SurfaceRouteFamily } from "../surfaces/boundary-manifest";
-import {
-  transitionRouteDefinitions,
-  type TransitionRouteDefinition,
-} from "./routes/transition-route-registry";
+import { transitionRouteDefinitions, type TransitionRouteDefinition } from "./routes/transition-route-registry";
 
 export type MutationRouteDefinition = {
   readonly routeId: TransitionRouteDefinition["routeId"];

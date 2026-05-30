@@ -1,9 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import { existsSync, readFileSync } from "node:fs";
-import {
-  defaultX402BootstrapInstallInput,
-  runServiceBootstrap,
-} from "../../src/cli/service-operator/bootstrap";
+import { defaultX402BootstrapInstallInput, runServiceBootstrap } from "../../src/cli/service-operator/bootstrap";
 import {
   ServiceWorkflowAdmissionSchema,
   serviceWorkflowNonAuthorityBoundary,

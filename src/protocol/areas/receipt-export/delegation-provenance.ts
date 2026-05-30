@@ -7,7 +7,6 @@ import type { ActionContract } from "../action-contract";
 import type { IntentCompilationRecord } from "../intent-compilation";
 import { delegationEvidenceEvidenceRefUri } from "../intent-compilation";
 import type { StoredDelegationEvidenceRecord } from "../delegation-evidence-record";
-import type { ProtocolRecorder } from "../../events/records";
 import { z } from "zod";
 import { DigestSchema } from "../../foundation/schema-core";
 

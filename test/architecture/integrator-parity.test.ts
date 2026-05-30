@@ -1,10 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import { httpTransitionNavigation } from "../../src/http/navigation";
 import { transitionRouteDefinitions } from "../../src/http/routes/transition-route-registry";
-import {
-  integratorParityTransitionIds,
-  protocolNavigationByTransitionId,
-} from "../../src/protocol/navigation";
+import { integratorParityTransitionIds, protocolNavigationByTransitionId } from "../../src/protocol/navigation";
 
 describe("integrator parity navigation", () => {
   it("tags every integrator parity transition in navigation metadata", () => {
@@ -15,9 +12,7 @@ describe("integrator parity navigation", () => {
   });
 
   it("maps each integrator parity transition to an HTTP route with matching role", () => {
-    const routesByTransition = new Map(
-      httpTransitionNavigation.map((entry) => [entry.transitionId, entry]),
-    );
+    const routesByTransition = new Map(httpTransitionNavigation.map((entry) => [entry.transitionId, entry]));
 
     for (const transitionId of integratorParityTransitionIds) {
       const httpEntry = routesByTransition.get(transitionId);

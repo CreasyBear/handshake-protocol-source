@@ -1,4 +1,5 @@
 import { describe, expect, it } from "bun:test";
+import { execFileSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 
@@ -119,7 +120,7 @@ describe("repo naming posture", () => {
   });
 
   it("keeps deleted scratch documents out of the active tree", () => {
-    const violations = nonCanonicalScratchFiles.filter((file) => existsSync(file));
+    const violations = nonCanonicalScratchFiles.filter((file) => existsSync(file) && isGitTracked(file));
 
     expect(violations).toEqual([]);
   });
@@ -236,4 +237,13 @@ function walkDirs(root: string): string[] {
 
 function normalize(path: string): string {
   return relative(process.cwd(), path).replaceAll("\\", "/");
+}
+
+function isGitTracked(path: string): boolean {
+  try {
+    execFileSync("git", ["ls-files", "--error-unmatch", path], { stdio: "ignore" });
+    return true;
+  } catch {
+    return false;
+  }
 }

@@ -16,19 +16,19 @@ Host doctor, quickstart x402, and simulate are **not** integrator parity kernel 
 
 ## Integrator parity transition table
 
-| transitionId | phase | HTTP | SDK client + method | caller role | authority boundary | runnable in phase 04? |
-| --- | --- | --- | --- | --- | --- | --- |
-| registerToolCapability | catalog | POST /v0.2/catalog/tool-capabilities | ControlPlaneClient.registerToolCapability | control_plane | catalog availability only | yes |
-| registerActionType | catalog | POST /v0.2/catalog/action-types | ControlPlaneClient.registerActionType | control_plane | catalog availability only | yes |
-| registerGatewayRegistryEntry | catalog | POST /v0.2/catalog/gateways | ControlPlaneClient.registerGatewayRegistryEntry | control_plane | catalog availability only | yes |
-| registerOperatingEnvelope | catalog | POST /v0.2/envelopes | ControlPlaneClient.registerOperatingEnvelope | control_plane | catalog availability only | yes |
-| registerInstallProposalCompiledRecords | install_setup | POST /v0.2/install-proposals/compiled-records | InstallClient.registerInstallProposalCompiledRecords | control_plane | install setup evidence only | yes |
-| registerDelegatedAuthorityRef | delegated_authority | POST /v0.2/delegated-authority-refs | ControlPlaneClient.registerDelegatedAuthorityRef | control_plane | delegated authority evidence only | yes |
-| compileIntent | intent_compilation | POST /v0.2/intent-compilations | RuntimeClient.compileIntent | runtime_evidence | candidate evidence only | yes |
-| proposeActionContract | action_contract | POST /v0.2/action-contracts | RuntimeClient.proposeActionContract | runtime_evidence | exact contract proposal only | yes |
-| evaluatePolicy | policy | POST /v0.2/policy-decisions | PolicyClient.evaluatePolicy | control_plane | policy decision / greenlight only | yes |
-| gatewayCheck | gateway | POST /v0.2/gateway-check-attempts | GatewayClient.gatewayCheck | gateway_custody | gateway check before mutation | yes (x402 wedge only) |
-| reconcileSurfaceOperation | operation_lifecycle | POST /v0.2/surface-operation-reconciliations | GatewayClient.reconcileSurfaceOperation | gateway_custody | downstream observation only | yes (x402 wedge only) |
+| transitionId                           | phase               | HTTP                                          | SDK client + method                                  | caller role      | authority boundary                | runnable in phase 04? |
+| -------------------------------------- | ------------------- | --------------------------------------------- | ---------------------------------------------------- | ---------------- | --------------------------------- | --------------------- |
+| registerToolCapability                 | catalog             | POST /v0.2/catalog/tool-capabilities          | ControlPlaneClient.registerToolCapability            | control_plane    | catalog availability only         | yes                   |
+| registerActionType                     | catalog             | POST /v0.2/catalog/action-types               | ControlPlaneClient.registerActionType                | control_plane    | catalog availability only         | yes                   |
+| registerGatewayRegistryEntry           | catalog             | POST /v0.2/catalog/gateways                   | ControlPlaneClient.registerGatewayRegistryEntry      | control_plane    | catalog availability only         | yes                   |
+| registerOperatingEnvelope              | catalog             | POST /v0.2/envelopes                          | ControlPlaneClient.registerOperatingEnvelope         | control_plane    | catalog availability only         | yes                   |
+| registerInstallProposalCompiledRecords | install_setup       | POST /v0.2/install-proposals/compiled-records | InstallClient.registerInstallProposalCompiledRecords | control_plane    | install setup evidence only       | yes                   |
+| registerDelegatedAuthorityRef          | delegated_authority | POST /v0.2/delegated-authority-refs           | ControlPlaneClient.registerDelegatedAuthorityRef     | control_plane    | delegated authority evidence only | yes                   |
+| compileIntent                          | intent_compilation  | POST /v0.2/intent-compilations                | RuntimeClient.compileIntent                          | runtime_evidence | candidate evidence only           | yes                   |
+| proposeActionContract                  | action_contract     | POST /v0.2/action-contracts                   | RuntimeClient.proposeActionContract                  | runtime_evidence | exact contract proposal only      | yes                   |
+| evaluatePolicy                         | policy              | POST /v0.2/policy-decisions                   | PolicyClient.evaluatePolicy                          | control_plane    | policy decision / greenlight only | yes                   |
+| gatewayCheck                           | gateway             | POST /v0.2/gateway-check-attempts             | GatewayClient.gatewayCheck                           | gateway_custody  | gateway check before mutation     | yes (x402 wedge only) |
+| reconcileSurfaceOperation              | operation_lifecycle | POST /v0.2/surface-operation-reconciliations  | GatewayClient.reconcileSurfaceOperation              | gateway_custody  | downstream observation only       | yes (x402 wedge only) |
 
 **Proof-gap families (not runnable in phase 04):** auth.md and package-install adapter families have `runnable: false` — see [service-operator-golden-path.md](./service-operator-golden-path.md#proof-gap-list-not-runnable-in-phase-04). Only x402 install/clearance paths are honestly runnable.
 

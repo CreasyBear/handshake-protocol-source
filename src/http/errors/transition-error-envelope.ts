@@ -99,12 +99,8 @@ export function transitionErrorBody(error: unknown, context: TransitionErrorCont
   return transitionErrorResult(error, context).body;
 }
 
-export function httpStatusForFailureClass(
-  failureClass: TransitionFailureClass,
-  preferredStatus?: number,
-): number {
-  const preferred =
-    preferredStatus && preferredStatus >= 400 && preferredStatus < 600 ? preferredStatus : undefined;
+export function httpStatusForFailureClass(failureClass: TransitionFailureClass, preferredStatus?: number): number {
+  const preferred = preferredStatus && preferredStatus >= 400 && preferredStatus < 600 ? preferredStatus : undefined;
 
   switch (failureClass) {
     case "auth":
@@ -142,10 +138,7 @@ export function failureClassForProtocolError(error: HandshakeProtocolError): Tra
   return classifyFailureClassFromProtocolError(error);
 }
 
-export function failurePhaseForError(
-  code: string,
-  context: TransitionErrorContext,
-): TransitionFailurePhase {
+export function failurePhaseForError(code: string, context: TransitionErrorContext): TransitionFailurePhase {
   if (context.failurePhase) return context.failurePhase;
   const httpAdmission = httpTransitionErrorCodes.find((entry) => entry.code === code);
   if (httpAdmission?.phase === "auth" || httpAdmission?.phase === "hosted_admission") {

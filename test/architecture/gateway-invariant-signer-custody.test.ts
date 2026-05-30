@@ -98,9 +98,7 @@ describe("gateway invariant: x402 signer refuses without a VerifiedGatewayCheck 
 
   it("refuses a command whose verified gate is not passed", () => {
     expect(() =>
-      assertGatewayHeldSigningCommand(
-        gatewayHeldCommand({ verifiedGate: { gatewayCheckStatus: "refused" as never } }),
-      ),
+      assertGatewayHeldSigningCommand(gatewayHeldCommand({ verifiedGate: { gatewayCheckStatus: "refused" as never } })),
     ).toThrow();
   });
 

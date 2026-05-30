@@ -49,10 +49,7 @@ export class ProtocolRecorder {
     return record;
   }
 
-  async optionalRecord<T>(
-    objectType: ProtocolObjectType,
-    objectId: string,
-  ): Promise<StoredProtocolRecord<T> | null> {
+  async optionalRecord<T>(objectType: ProtocolObjectType, objectId: string): Promise<StoredProtocolRecord<T> | null> {
     return this.store.getRecord<T>(objectType, objectId);
   }
 

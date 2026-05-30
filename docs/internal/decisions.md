@@ -932,7 +932,7 @@ and carry no greenlight or gateway hints (`RefusalSchema`,
   `src/runtime/ingress/schemas.ts:118-198`); the real divergence is the parallel MCP /
   codemode / host-activation paths, not missing block fields. Collapsing them is
   premature for single-wedge discipline (`AGENTS.md` wedge rule). **Reopen criteria
-  (binary):** (1) N≥2 distinct *external* harness integrations blocked on duplicate glue
+  (binary):** (1) N≥2 distinct _external_ harness integrations blocked on duplicate glue
   with measured refusal/readback divergence; (2) a conformance test proving the unified
   envelope yields identical `IntentCompilationRecord` + refusal reason codes as today's
   path-specific builders; (3) import-posture / claim-boundary tests still pass with zero

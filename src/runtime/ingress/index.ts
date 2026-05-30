@@ -190,11 +190,7 @@ export async function proposeRuntimeIngressActionContracts(
 ): Promise<RuntimeIngressResult> {
   const parsedBlock = RuntimeIngressDispatchBlockSchema.safeParse(blockValue);
   if (!parsedBlock.success) {
-    return refuseRuntimeIngressWire(
-      protocol,
-      config,
-      "Runtime ingress dispatch block failed wire validation.",
-    );
+    return refuseRuntimeIngressWire(protocol, config, "Runtime ingress dispatch block failed wire validation.");
   }
   const block = parsedBlock.data;
   const envelopeError = runtimeIngressSameEnvelopeError(config, block);

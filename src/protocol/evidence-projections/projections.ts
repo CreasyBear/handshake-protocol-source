@@ -809,9 +809,7 @@ export async function projectOperationReadback(
   });
 }
 
-export function projectOperationCorrelationIndex(
-  input: AgentTransactionEnvelopeInput,
-): OperationCorrelationIndex {
+export function projectOperationCorrelationIndex(input: AgentTransactionEnvelopeInput): OperationCorrelationIndex {
   const contract = input.contract;
   return OperationCorrelationIndexSchema.parse({
     schemaVersion: "handshake.operation-correlation.v0.1",
@@ -828,9 +826,10 @@ export function projectOperationCorrelationIndex(
     gateAttemptRef: input.gateAttempt?.gateAttemptId ?? input.receipt?.gateAttemptId ?? null,
     mutationAttemptRef: input.mutationAttempt?.mutationAttemptId ?? input.receipt?.mutationAttemptId ?? null,
     receiptRef: input.receipt?.receiptId ?? null,
-    proofGapRefs: [...(input.receipt?.proofGapIds ?? []), ...(input.proofGaps ?? []).map((gap) => gap.proofGapId)].filter(
-      unique,
-    ),
+    proofGapRefs: [
+      ...(input.receipt?.proofGapIds ?? []),
+      ...(input.proofGaps ?? []).map((gap) => gap.proofGapId),
+    ].filter(unique),
     refusalRefs: (input.refusals ?? [])
       .filter((refusal) => refusal.actionContractId === contract.actionContractId)
       .map((refusal) => refusal.refusalId)

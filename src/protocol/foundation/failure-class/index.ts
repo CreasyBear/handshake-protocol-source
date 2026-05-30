@@ -1,10 +1,7 @@
 import { z } from "zod";
 import { isRegisteredHttpTransitionErrorCode } from "../../../http/errors/codes";
 import { HandshakeProtocolError } from "../errors";
-import {
-  resolveProtocolReasonCodeMetadata,
-  type ProtocolReasonCodeMetadata,
-} from "../reason-codes";
+import { resolveProtocolReasonCodeMetadata, type ProtocolReasonCodeMetadata } from "../reason-codes";
 
 export const FailureClassSchema = z.enum([
   "auth",
@@ -97,14 +94,17 @@ export function classifyFailureClassFromProtocolError(error: HandshakeProtocolEr
   if (code.startsWith("hosted_")) {
     return isStaleHostedAdmissionCode(code) ? "stale_admission" : "hosted_admission";
   }
-  if (code.includes("replay") || code === "idempotency_duplicate_authority" || code === "generated_execution_graph_nonce_replay") {
+  if (
+    code.includes("replay") ||
+    code === "idempotency_duplicate_authority" ||
+    code === "generated_execution_graph_nonce_replay"
+  ) {
     return "replay_refusal";
   }
 
   const metadata = resolveProtocolReasonCodeMetadata(code);
   if (metadata) {
-    const metadataOptions =
-      error.metadata.proofRef !== undefined ? { proofRef: error.metadata.proofRef } : {};
+    const metadataOptions = error.metadata.proofRef !== undefined ? { proofRef: error.metadata.proofRef } : {};
     return failureClassFromReasonCodeMetadata(code, metadata, metadataOptions);
   }
 

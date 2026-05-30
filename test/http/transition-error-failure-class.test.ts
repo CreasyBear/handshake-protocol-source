@@ -23,22 +23,15 @@ describe("transition error failureClass taxonomy", () => {
     expect(failureClassForProtocolError(authRequired)).toBe("auth");
     expect(httpStatusForFailureClass("auth", 401)).toBe(401);
 
-    const hostedStale = new HandshakeProtocolError(
-      "hosted_caller_identity_stale",
-      "Hosted identity stale.",
-      403,
-    );
+    const hostedStale = new HandshakeProtocolError("hosted_caller_identity_stale", "Hosted identity stale.", 403);
     expect(failureClassForProtocolError(hostedStale)).toBe("stale_admission");
     expect(httpStatusForFailureClass("stale_admission")).toBe(409);
   });
 
   it("maps clearance refusals and proof gaps to non-auth HTTP statuses", () => {
-    const refusal = new HandshakeProtocolError(
-      "unwrapped_consequential_tool",
-      "Tool bypass refused.",
-      403,
-      { refusalRef: "ref_demo" },
-    );
+    const refusal = new HandshakeProtocolError("unwrapped_consequential_tool", "Tool bypass refused.", 403, {
+      refusalRef: "ref_demo",
+    });
     const classified = transitionErrorResult(refusal, {
       transitionName: "compileIntent",
       callerCustodyRole: "runtime_evidence",
@@ -50,12 +43,9 @@ describe("transition error failureClass taxonomy", () => {
       refusalRef: "ref_demo",
     });
 
-    const proofGap = new HandshakeProtocolError(
-      "agreement_missing",
-      "Agreement missing.",
-      409,
-      { proofRef: "gap_demo" },
-    );
+    const proofGap = new HandshakeProtocolError("agreement_missing", "Agreement missing.", 409, {
+      proofRef: "gap_demo",
+    });
     const gapClassified = transitionErrorResult(proofGap);
     expect(gapClassified.status).toBe(422);
     expect(gapClassified.body.error.failureClass).toBe("proof_gap");
@@ -74,23 +64,16 @@ describe("transition error failureClass taxonomy", () => {
   });
 
   it("maps replay refusals to 409 replay_refusal", () => {
-    const replay = new HandshakeProtocolError(
-      "credential_resolution_replay_refused",
-      "Replay refused.",
-      409,
-    );
+    const replay = new HandshakeProtocolError("credential_resolution_replay_refused", "Replay refused.", 409);
     expect(failureClassForProtocolError(replay)).toBe("replay_refusal");
     expect(transitionErrorResult(replay).status).toBe(409);
     expect(transitionErrorResult(replay).body.error.failureClass).toBe("replay_refusal");
   });
 
   it("maps recovery terminal conflict proof gaps to 422 proof_gap", () => {
-    const conflict = new HandshakeProtocolError(
-      "recovery_terminal_conflict",
-      "Recovery terminal conflict.",
-      409,
-      { proofRef: "gap_demo" },
-    );
+    const conflict = new HandshakeProtocolError("recovery_terminal_conflict", "Recovery terminal conflict.", 409, {
+      proofRef: "gap_demo",
+    });
     const classified = transitionErrorResult(conflict);
     expect(classified.status).toBe(422);
     expect(classified.body.error.failureClass).toBe("proof_gap");

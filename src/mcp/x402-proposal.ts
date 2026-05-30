@@ -5,10 +5,7 @@ import {
   serviceWorkflowContextCorrelationRef,
   serviceWorkflowContextEvidenceRefs,
 } from "../surfaces/service-workflow-admission";
-import {
-  classifyFailureClassFromReasonCodes,
-  mcpFailureClassEvidenceRef,
-} from "../protocol/foundation/failure-class";
+import { classifyFailureClassFromReasonCodes, mcpFailureClassEvidenceRef } from "../protocol/foundation/failure-class";
 import type { SurfaceOutcomeBaseInput } from "../surfaces/outcome";
 import { mcpActionContractProposedOutcome, mcpNonContractOutcome, mcpToolResult, type McpToolResult } from "./output";
 import { digestMcp, type McpJsonValue } from "./digest";

@@ -46,11 +46,7 @@ export function nextHandshakeCommand(error: unknown): string | null {
 }
 
 function failureClassRequiresNewContract(failureClass: FailureClass): boolean {
-  return (
-    failureClass === "stale_admission" ||
-    failureClass === "replay_refusal" ||
-    failureClass === "proof_gap"
-  );
+  return failureClass === "stale_admission" || failureClass === "replay_refusal" || failureClass === "proof_gap";
 }
 
 function nextActionForFailureClass(

@@ -75,9 +75,7 @@ function gatewayHeldCommand(
   };
   // Evidence defaults are fixed-valid (matching the verified-gate defaults) so the
   // guard — not the schema parser — is what rejects emptied/mismatched gate ids.
-  const credentialResolutionEvidence = gatewayResolvedCredentialEvidence(
-    overrides.credentialResolutionEvidence,
-  );
+  const credentialResolutionEvidence = gatewayResolvedCredentialEvidence(overrides.credentialResolutionEvidence);
   return {
     verifiedGate,
     parameters: { gatewayCredentialRefId: "gcred_demo_0001" } as X402PaymentParameters,
@@ -95,9 +93,7 @@ describe("x402 gateway-held credential custody (D-64, D-65)", () => {
 
   it("refuses a command whose verified gate status is not passed (D-64)", () => {
     expect(() =>
-      assertGatewayHeldSigningCommand(
-        gatewayHeldCommand({ verifiedGate: { gatewayCheckStatus: "refused" as never } }),
-      ),
+      assertGatewayHeldSigningCommand(gatewayHeldCommand({ verifiedGate: { gatewayCheckStatus: "refused" as never } })),
     ).toThrow();
   });
 
